@@ -1,0 +1,52 @@
+import { Module, OnModuleInit } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+
+import { Order } from './database/entities/order.entity';
+import { User } from './database/entities/user.entity';
+import { CadFile } from './database/entities/cad-file.entity';
+import { Sku } from './database/entities/sku.entity';
+import { Notification } from './database/entities/notification.entity';
+
+import { OrdersModule } from './modules/orders/orders.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { CadModule } from './modules/cad/cad.module';
+import { SkuModule } from './modules/sku/sku.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuthService } from './modules/auth/auth.service';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ScheduleModule.forRoot(),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+    }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        type: 'sqljs',
+        entities: [Order, User, CadFile, Sku, Notification],
+        synchronize: config.get('NODE_ENV') !== 'production',
+        logging: false,
+        autoSave: false,
+      }),
+      inject: [ConfigService],
+    }),
+    AuthModule,
+    OrdersModule,
+    CadModule,
+    SkuModule,
+    NotificationsModule,
+  ],
+})
+export class AppModule implements OnModuleInit {
+  constructor(private readonly authService: AuthService) {}
+  async onModuleInit() {
+    await this.authService.seedAdmin();
+  }
+}

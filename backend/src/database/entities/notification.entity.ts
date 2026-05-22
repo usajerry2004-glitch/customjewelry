@@ -1,0 +1,39 @@
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+
+export enum NotificationType {
+  ORDER_CREATED = 'ORDER_CREATED',
+  CAD_UPLOADED = 'CAD_UPLOADED',
+  CAD_SENT_FOR_APPROVAL = 'CAD_SENT_FOR_APPROVAL',
+  CAD_APPROVED = 'CAD_APPROVED',
+  CAD_REJECTED = 'CAD_REJECTED',
+  SKU_GENERATED = 'SKU_GENERATED',
+  STATUS_CHANGED = 'STATUS_CHANGED',
+  GENERAL = 'GENERAL',
+}
+
+@Entity('notifications')
+export class Notification {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'varchar', default: NotificationType.GENERAL })
+  type: NotificationType;
+
+  @Column()
+  title: string;
+
+  @Column({ type: 'text' })
+  message: string;
+
+  @Column({ nullable: true })
+  orderId: string;
+
+  @Column({ nullable: true })
+  targetUserId: string;
+
+  @Column({ default: false })
+  isRead: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JewelFlow OS — Dashboard Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root {
+    --gold: #E6A817; --gold-light: #F6D860; --bg: #0B0B10;
+    --surface: #111118; --surface2: #18181F; --border: #22222E;
+    --text: #E2E8F0; --muted: #64748B; --accent: #6366F1;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;overflow:hidden}
+  
+  /* SIDEBAR */
+  .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+  .logo{padding:22px 16px 18px;border-bottom:1px solid var(--border)}
+  .logo-mark{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;letter-spacing:1px;background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .logo-sub{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+  nav{padding:10px 8px;flex:1}
+  .nav-section{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:12px 8px 4px;font-weight:500}
+  .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);margin-bottom:1px;transition:all .15s;text-decoration:none}
+  .nav-item:hover{background:var(--surface2);color:var(--text)}
+  .nav-item.active{background:rgba(230,168,23,.12);color:var(--gold-light)}
+  .nav-icon{font-size:14px;width:18px;text-align:center}
+  .nav-badge{margin-left:auto;background:rgba(99,102,241,.2);color:#818CF8;font-size:9px;padding:1px 6px;border-radius:99px;font-weight:600}
+  .sidebar-footer{padding:14px 16px;border-top:1px solid var(--border)}
+  .user-row{display:flex;align-items:center;gap:9px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#B8730A);display:flex;align-items:center;justify-content:center;font-size:12px;color:#000;font-weight:700;flex-shrink:0}
+  .user-name{font-size:11px;font-weight:600}
+  .user-role{font-size:9px;color:var(--muted);letter-spacing:.5px}
+
+  /* MAIN */
+  .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .page-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;letter-spacing:.5px}
+  .topbar-actions{display:flex;gap:10px;align-items:center}
+  .btn{padding:7px 14px;border-radius:7px;font-size:12px;cursor:pointer;border:none;font-weight:500;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),#B8730A);color:#000;font-weight:600}
+  .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+  .search{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 12px;color:var(--text);font-size:12px;width:200px;font-family:'DM Sans',sans-serif}
+  .search:focus{outline:none;border-color:var(--gold)}
+  .content{padding:20px 24px;flex:1}
+
+  /* KPI GRID */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:border-color .2s}
+  .kpi-card:hover{border-color:rgba(230,168,23,.3)}
+  .kpi-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 12px 0 100%;opacity:.06}
+  .kpi-card.gold::before{background:var(--gold)}
+  .kpi-card.purple::before{background:#6366F1}
+  .kpi-card.green::before{background:#10B981}
+  .kpi-card.blue::before{background:#3B82F6}
+  .kpi-icon{font-size:20px;margin-bottom:10px}
+  .kpi-value{font-size:26px;font-weight:700;letter-spacing:-1px;font-family:'DM Mono',monospace}
+  .kpi-value.gold{color:var(--gold-light)}
+  .kpi-value.purple{color:#818CF8}
+  .kpi-value.green{color:#34D399}
+  .kpi-value.blue{color:#60A5FA}
+  .kpi-label{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+  .kpi-change{font-size:10px;margin-top:6px}
+  .kpi-change.up{color:#34D399}
+
+  /* BOTTOM GRID */
+  .bottom-grid{display:grid;grid-template-columns:1fr 340px;gap:14px}
+  
+  /* ORDERS TABLE */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-size:13px;font-weight:600;letter-spacing:.2px}
+  .card-action{font-size:11px;color:var(--gold);cursor:pointer}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:10px 16px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+  td{padding:11px 16px;font-size:12px;border-bottom:1px solid rgba(34,34,46,.5)}
+  tr:last-child td{border:none}
+  tr:hover td{background:rgba(255,255,255,.015)}
+  .po{color:var(--gold-light);font-weight:700;font-family:'DM Mono',monospace;font-size:11px}
+  .sku{color:var(--muted);font-size:10px;font-family:'DM Mono',monospace}
+  .store{font-weight:500;font-size:12px}
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap}
+  .cost{font-family:'DM Mono',monospace;font-size:11px;color:#34D399;font-weight:600}
+  .metal-tag{display:inline-flex;align-items:center;gap:3px;background:rgba(99,102,241,.1);color:#818CF8;padding:2px 7px;border-radius:5px;font-size:10px}
+
+  /* RIGHT PANEL */
+  .pipeline-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .pipeline-list{padding:8px 0}
+  .pipeline-row{display:flex;align-items:center;padding:10px 18px;gap:12px;cursor:pointer;transition:background .15s}
+  .pipeline-row:hover{background:var(--surface2)}
+  .pip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .pip-label{font-size:12px;flex:1}
+  .pip-count{font-size:12px;font-weight:700;font-family:'DM Mono',monospace}
+  .pip-bar-wrap{height:3px;background:var(--surface2);border-radius:99px;margin:0 18px 2px;overflow:hidden}
+  .pip-bar{height:100%;border-radius:99px;opacity:.6}
+
+  /* WORKFLOW STEPS */
+  .workflow-card{margin-top:14px}
+  .steps{padding:14px 18px;display:flex;flex-direction:column;gap:0}
+  .step{display:flex;gap:14px;padding-bottom:16px;position:relative}
+  .step:last-child{padding-bottom:0}
+  .step:not(:last-child)::after{content:'';position:absolute;left:11px;top:26px;bottom:0;width:1px;background:var(--border)}
+  .step-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;z-index:1}
+  .step-dot.done{background:rgba(16,185,129,.15);border:1.5px solid #10B981;color:#10B981}
+  .step-dot.active{background:rgba(230,168,23,.15);border:1.5px solid var(--gold);color:var(--gold)}
+  .step-dot.pending{background:var(--surface2);border:1.5px solid var(--border);color:var(--muted)}
+  .step-body{flex:1}
+  .step-title{font-size:12px;font-weight:500}
+  .step-sub{font-size:10px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">💎 JewelFlow OS</div>
+    <div class="logo-sub">Workflow Platform</div>
+  </div>
+  <nav>
+    <div class="nav-section">Main</div>
+    <div class="nav-item active"><span class="nav-icon">🏠</span> Dashboard</div>
+    <div class="nav-item"><span class="nav-icon">📋</span> Orders <span class="nav-badge">187</span></div>
+    <div class="nav-item"><span class="nav-icon">🔲</span> Kanban Board</div>
+    <div class="nav-section">Production</div>
+    <div class="nav-item"><span class="nav-icon">🎨</span> CAD Files <span class="nav-badge">12</span></div>
+    <div class="nav-item"><span class="nav-icon">🏷️</span> SKU Management</div>
+    <div class="nav-item"><span class="nav-icon">💎</span> Inventory</div>
+    <div class="nav-item"><span class="nav-icon">🏭</span> Manufacturing</div>
+    <div class="nav-section">Delivery</div>
+    <div class="nav-item"><span class="nav-icon">🚚</span> Shipping <span class="nav-badge">7</span></div>
+    <div class="nav-item"><span class="nav-icon">🔧</span> Repairs</div>
+    <div class="nav-item"><span class="nav-icon">👥</span> Customers</div>
+    <div class="nav-section">Admin</div>
+    <div class="nav-item"><span class="nav-icon">📊</span> Analytics</div>
+    <div class="nav-item"><span class="nav-icon">⚙️</span> Settings</div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-row">
+      <div class="avatar">RP</div>
+      <div>
+        <div class="user-name">RP Admin</div>
+        <div class="user-role">ADMINISTRATOR</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title">Dashboard</div>
+    <div class="topbar-actions">
+      <input class="search" placeholder="🔍  Search orders, SKUs..." />
+      <button class="btn btn-ghost">📤 Export</button>
+      <button class="btn btn-primary">+ New Order</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- KPI Row -->
+    <div class="kpi-grid">
+      <div class="kpi-card gold">
+        <div class="kpi-icon">📋</div>
+        <div class="kpi-value gold">187</div>
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-change up">↑ 23 this month</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-icon">⚙️</div>
+        <div class="kpi-value purple">142</div>
+        <div class="kpi-label">Active Orders</div>
+        <div class="kpi-change up">↑ 8 this week</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-value green">$312K</div>
+        <div class="kpi-label">Active Revenue</div>
+        <div class="kpi-change up">↑ 18% vs last month</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-icon">🚚</div>
+        <div class="kpi-value blue">18</div>
+        <div class="kpi-label">Ready to Ship</div>
+        <div class="kpi-change up">↑ 5 new today</div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid -->
+    <div class="bottom-grid">
+      <!-- Orders Table -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Recent Orders</span>
+            <span class="card-action">View all →</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>PO # / SKU</th>
+                <th>Store</th>
+                <th>Specs</th>
+                <th>Quoted</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="po">CO-00554</div>
+                  <div class="sku">CJ00554-21</div>
+                </td>
+                <td><div class="store">The Diamond Habit</div></td>
+                <td><span class="metal-tag">14K WG · Ring 6.5 · Lab F+VS+</span></td>
+                <td><span class="cost">$2,975</span></td>
+                <td><span class="badge" style="background:rgba(14,165,233,.15);color:#38BDF8">VPO Issued</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="po">CO-00528</div>
+                  <div class="sku">CJ00528E-X1</div>
+                </td>
+                <td><div class="store">Yosayo Inc</div></td>
+                <td><span class="metal-tag">Plat · Earrings · Lab E+ VVS</span></td>
+                <td><span class="cost">$2,500</span></td>
+                <td><span class="badge" style="background:rgba(34,197,94,.15);color:#4ADE80">Ready to Invoice</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="po">CO-00491</div>
+                  <div class="sku">CJ00491-21</div>
+                </td>
+                <td><div class="store">Chain Reaction</div></td>
+                <td><span class="metal-tag">14K WG · Earrings · Lab F+VS+</span></td>
+                <td><span class="cost">$2,765</span></td>
+                <td><span class="badge" style="background:rgba(99,102,241,.15);color:#818CF8">Ready to Ship</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="po">CO-00537</div>
+                  <div class="sku">CJ00537-22</div>
+                </td>
+                <td><div class="store">Chain Reaction</div></td>
+                <td><span class="metal-tag">14K YG · Pendant · Lab F+VS+</span></td>
+                <td><span class="cost">$675</span></td>
+                <td><span class="badge" style="background:rgba(14,165,233,.15);color:#38BDF8">VPO Issued</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="po">CO-00509</div>
+                  <div class="sku">CJ00509-22</div>
+                </td>
+                <td><div class="store">Underground Jeweler</div></td>
+                <td><span class="metal-tag">14K YG · Earrings · Lab</span></td>
+                <td><span class="cost">$450</span></td>
+                <td><span class="badge" style="background:rgba(245,158,11,.15);color:#FCD34D">Waiting Confirm</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="po">CO-00543</div>
+                  <div class="sku">CJ00543-2X</div>
+                </td>
+                <td><div class="store">Chain Reaction</div></td>
+                <td><span class="metal-tag">14K WY · Ring 5⅞ · Lab F+VS+</span></td>
+                <td><span class="cost">$1,300</span></td>
+                <td><span class="badge" style="background:rgba(34,197,94,.15);color:#4ADE80">Ready to Invoice</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <!-- Pipeline -->
+        <div class="pipeline-card">
+          <div class="card-header">
+            <span class="card-title">Order Pipeline</span>
+          </div>
+          <div class="pipeline-list">
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#F59E0B"></div>
+              <span class="pip-label">Waiting Confirmation</span>
+              <span class="pip-count" style="color:#F59E0B">23</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:62%;background:#F59E0B"></div></div>
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#0EA5E9"></div>
+              <span class="pip-label">VPO Issued</span>
+              <span class="pip-count" style="color:#0EA5E9">42</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:100%;background:#0EA5E9"></div></div>
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#22C55E"></div>
+              <span class="pip-label">Ready to Invoice</span>
+              <span class="pip-count" style="color:#22C55E">31</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:74%;background:#22C55E"></div></div>
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#3B82F6"></div>
+              <span class="pip-label">Ready to Ship</span>
+              <span class="pip-count" style="color:#3B82F6">18</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:43%;background:#3B82F6"></div></div>
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#8B5CF6"></div>
+              <span class="pip-label">Pending CAD</span>
+              <span class="pip-count" style="color:#8B5CF6">15</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:36%;background:#8B5CF6"></div></div>
+            <div class="pipeline-row">
+              <div class="pip-dot" style="background:#10B981"></div>
+              <span class="pip-label">Delivered</span>
+              <span class="pip-count" style="color:#10B981">19</span>
+            </div>
+            <div class="pip-bar-wrap"><div class="pip-bar" style="width:45%;background:#10B981"></div></div>
+          </div>
+        </div>
+
+        <!-- Workflow Steps for latest order -->
+        <div class="card workflow-card">
+          <div class="card-header">
+            <span class="card-title">Order CO-00554 — Progress</span>
+          </div>
+          <div class="steps">
+            <div class="step">
+              <div class="step-dot done">✓</div>
+              <div class="step-body">
+                <div class="step-title">Customer Request</div>
+                <div class="step-sub">Received from The Diamond Habit</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot done">✓</div>
+              <div class="step-body">
+                <div class="step-title">Authorization</div>
+                <div class="step-sub">Approved by Authorizer</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot done">✓</div>
+              <div class="step-body">
+                <div class="step-title">CAD Design</div>
+                <div class="step-sub">CJ00554-21 — Ring 6.5 WG 14K</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot active">→</div>
+              <div class="step-body">
+                <div class="step-title">Manufacturing (Creations, India)</div>
+                <div class="step-sub">VPO #100762 — In production</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot pending">○</div>
+              <div class="step-body">
+                <div class="step-title">Stone Allocation</div>
+                <div class="step-sub">Pending stone request</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot pending">○</div>
+              <div class="step-body">
+                <div class="step-title">Ship to USA</div>
+                <div class="step-sub">—</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-dot pending">○</div>
+              <div class="step-body">
+                <div class="step-title">Deliver to Customer</div>
+                <div class="step-sub">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
