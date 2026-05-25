@@ -1,876 +1,807 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JewelFlow OS — Stakeholder Demo</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>JewelFlow OS - Stakeholder Demo</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0B0B10;color:#E2E8F0;overflow:hidden;height:100vh}
-  .slide{display:none;height:100vh;overflow:hidden;flex-direction:column}
-  .slide.active{display:flex}
-  /* NAV */
-  .nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:rgba(17,17,24,0.95);border:1px solid #2D2D3D;padding:10px 18px;border-radius:50px;z-index:999;backdrop-filter:blur(10px)}
-  .nav-btn{background:none;border:1px solid #2D2D3D;color:#94A3B8;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:12px;transition:all .15s}
-  .nav-btn:hover{background:#1E1E2E;color:#E2E8F0}
-  .nav-btn.primary{background:linear-gradient(135deg,#F6D860,#E6A817);border-color:transparent;color:#000;font-weight:700}
-  .slide-counter{font-size:11px;color:#4B5563;padding:0 8px;min-width:70px;text-align:center}
-  .role-chip{padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px}
-  /* COLORS */
-  .gold{color:#F6D860} .green{color:#10B981} .purple{color:#8B5CF6} .blue{color:#6366F1} .orange{color:#F97316} .amber{color:#F59E0B} .red{color:#EF4444}
-  .bg-card{background:#111118;border:1px solid #1E1E2E;border-radius:12px}
-  .bg-dark{background:#0F0F14}
-  /* SIDEBAR */
-  .sidebar{width:220px;min-height:100vh;background:#0A0A12;border-right:1px solid #1E1E2E;display:flex;flex-direction:column;flex-shrink:0}
-  .sidebar-logo{padding:20px 18px;border-bottom:1px solid #1E1E2E}
-  .sidebar-logo .title{font-size:18px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .sidebar-logo .sub{font-size:10px;color:#4B5563;margin-top:2px}
-  .sidebar nav{padding:10px 8px;flex:1}
-  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:2px;font-size:12px;cursor:default;transition:all .15s}
-  .nav-item.active{background:#1E1E2E;color:#F6D860;font-weight:600}
-  .nav-item:not(.active){color:#64748B}
-  .nav-item .icon{font-size:15px}
-  .sidebar-user{padding:14px 16px;border-top:1px solid #1E1E2E;display:flex;align-items:center;gap:8px}
-  .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F6D860,#E6A817);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;flex-shrink:0}
-  .avatar.cust{background:linear-gradient(135deg,#F97316,#EA580C);color:#fff}
-  .avatar.sales{background:linear-gradient(135deg,#10B981,#059669);color:#fff}
-  .avatar.cad{background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:#fff}
-  /* TOPBAR */
-  .topbar{background:#111118;border-bottom:1px solid #1E1E2E;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .topbar-title{font-family:Georgia,serif;font-size:20px;font-weight:600;letter-spacing:.5px}
-  .topbar-sub{font-size:11px;color:#4B5563;margin-top:2px}
-  .topbar-right{display:flex;align-items:center;gap:8px}
-  /* MAIN CONTENT */
-  .main{flex:1;overflow:auto;padding:22px 24px}
-  .app-shell{display:flex;height:100vh}
-  /* BADGE */
-  .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700}
-  /* STATUS */
-  .status-wait{background:rgba(245,158,11,.15);color:#F59E0B}
-  .status-cad{background:rgba(99,102,241,.15);color:#6366F1}
-  .status-approved{background:rgba(16,185,129,.15);color:#10B981}
-  .status-rejected{background:rgba(239,68,68,.15);color:#EF4444}
-  .status-ship{background:rgba(59,130,246,.15);color:#3B82F6}
-  .status-delivered{background:rgba(16,185,129,.15);color:#10B981}
-  .status-vpo{background:rgba(14,165,233,.15);color:#0EA5E9}
-  .status-pending-cad{background:rgba(139,92,246,.15);color:#8B5CF6}
-  /* ORDER CARD */
-  .order-card{background:#111118;border:1px solid #1E1E2E;border-radius:10px;padding:14px 16px;margin-bottom:8px}
-  .order-card:hover{border-color:#2D2D3D}
-  .order-po{font-size:14px;font-weight:700;color:#E2E8F0;margin-bottom:3px}
-  .order-meta{font-size:11px;color:#64748B;display:flex;gap:10px;flex-wrap:wrap}
-  /* TITLE SLIDE */
-  .title-slide{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;background:linear-gradient(135deg,#0B0B10 0%,#0F0F1A 50%,#0B0B10 100%);position:relative;overflow:hidden}
-  .title-slide::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(246,216,96,.06) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none}
-  .grid{display:grid}
-  .btn{display:inline-flex;align-items:center;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:default;border:none}
-  .btn-gold{background:linear-gradient(135deg,#F6D860,#E6A817);color:#000}
-  .btn-outline{background:#1A1A24;border:1px solid #2D2D3D;color:#94A3B8}
-  /* KPI CARD */
-  .kpi{background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:16px 18px}
-  .kpi-val{font-size:26px;font-weight:800;margin:6px 0 3px}
-  .kpi-label{font-size:11px;color:#64748B}
-  .kpi-delta{font-size:9px;color:#4B5563;background:#0F0F14;padding:2px 7px;border-radius:6px}
-  /* PROGRESS */
-  .progress-bar{height:3px;background:#1A1A24;border-radius:99px;overflow:hidden;margin-top:10px}
-  .progress-fill{height:100%;border-radius:99px}
-  /* SECTION HEADER */
-  .sec{font-size:11px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
-  /* FORM */
-  .field{margin-bottom:14px}
-  .field label{display:block;font-size:10px;color:#64748B;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase}
-  .field-val{background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:9px 12px;color:#E2E8F0;font-size:12px}
-  .field-placeholder{color:#4B5563}
-  /* TABLE ROW */
-  .trow{display:flex;justify-content:space-between;margin-bottom:8px}
-  .trow .tk{font-size:11px;color:#4B5563}
-  .trow .tv{font-size:11px;color:#CBD5E1;font-weight:500}
-  /* TIMELINE */
-  .timeline{display:flex;align-items:flex-start;gap:0}
-  .tl-step{display:flex;flex-direction:column;align-items:center;flex:1}
-  .tl-dot{width:10px;height:10px;border-radius:50%;border:2px solid #2D2D3D;background:#1A1A24;transition:all .2s}
-  .tl-dot.done{background:#10B981;border-color:#10B981}
-  .tl-dot.active{width:14px;height:14px;background:#F59E0B;border-color:#F59E0B;box-shadow:0 0 8px rgba(245,158,11,.5)}
-  .tl-line{height:2px;flex:1;background:#1A1A24;margin-top:4px}
-  .tl-line.done{background:#10B981}
-  .tl-label{font-size:8px;color:#2D2D3D;margin-top:4px;text-align:center;max-width:48px;line-height:1.2}
-  .tl-label.done{color:#4B5563}
-  .tl-label.active{color:#F59E0B}
-  /* CHIP */
-  .chip{display:inline-flex;gap:6px;flex-wrap:wrap}
-  .tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:600}
-  /* KANBAN */
-  .kan-col{background:#0F0F14;border:1px solid #1A1A24;border-radius:10px;padding:12px;min-width:160px;flex-shrink:0}
-  .kan-head{font-size:10px;font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-  .kan-card{background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px;margin-bottom:6px}
-  .kan-po{font-size:11px;font-weight:700;color:#E2E8F0;margin-bottom:3px}
-  .kan-meta{font-size:9px;color:#4B5563}
-  /* CAD STATUS */
-  .cad-card{border-radius:10px;padding:14px 16px;margin-bottom:8px}
-  /* CUSTOMER LAYOUT */
-  .cust-topbar{background:#111118;border-bottom:1px solid #1E1E2E;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;flex-shrink:0}
-  .cust-nav a{display:inline-block;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:500;color:#64748B;text-decoration:none;margin:0 2px}
-  .cust-nav a.active{color:#F6D860;background:rgba(246,216,96,.1)}
-  /* SECTION DIVIDERS */
-  .divider{height:1px;background:#1E1E2E;margin:16px 0}
-  /* ROLE OVERVIEW */
-  .role-card{background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:18px;height:100%}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0B0B10;color:#E2E8F0;overflow:hidden;height:100vh;}
+.slide{display:none;width:100%;height:100vh;overflow-y:auto;}
+.slide.active{display:flex;flex-direction:column;}
+.nav-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,18,0.97);border-top:1px solid #1E1E2E;display:flex;align-items:center;justify-content:center;gap:16px;padding:12px;z-index:1000;}
+.nav-bar button{background:#F6D860;color:#000;border:none;padding:8px 22px;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;}
+.nav-bar button:hover{background:#E6A817;}
+.slide-counter{color:#64748B;font-size:12px;min-width:80px;text-align:center;}
+.dot{width:6px;height:6px;border-radius:50%;background:#2D2D3D;cursor:pointer;transition:all 0.2s;display:inline-block;margin:0 2px;vertical-align:middle;}
+.dot.active{background:#F6D860;width:18px;border-radius:3px;}
+.page{padding:28px 32px 80px;flex:1;}
+.card{background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:18px;}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.kpi-card{background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:18px;}
+.kpi-val{font-size:28px;font-weight:800;color:#F6D860;}
+.kpi-lbl{font-size:11px;color:#64748B;margin-top:3px;}
+.kpi-chg{font-size:10px;color:#10B981;margin-top:2px;}
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:99px;font-size:10px;font-weight:700;}
+.b-wait{background:rgba(245,158,11,.15);color:#F59E0B;}
+.b-cad{background:rgba(99,102,241,.15);color:#6366F1;}
+.b-approved{background:rgba(16,185,129,.15);color:#10B981;}
+.b-ship{background:rgba(59,130,246,.15);color:#3B82F6;}
+.b-mfg{background:rgba(168,85,247,.15);color:#A855F7;}
+.b-reject{background:rgba(239,68,68,.15);color:#EF4444;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{font-size:10px;color:#4B5563;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid #1E1E2E;}
+.tbl td{font-size:12px;color:#CBD5E1;padding:11px 12px;border-bottom:1px solid #0F0F14;}
+.tbl tr:hover td{background:#111118;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:10px;color:#64748B;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:9px 12px;color:#E2E8F0;font-size:13px;outline:none;}
+.btn-gold{background:linear-gradient(135deg,#F6D860,#E6A817);border:none;border-radius:8px;padding:10px 20px;color:#000;font-weight:700;font-size:13px;cursor:pointer;}
+.btn-dark{background:#1A1A24;border:1px solid #2D2D3D;border-radius:8px;padding:10px 20px;color:#94A3B8;font-size:13px;cursor:pointer;}
+.pbar{height:4px;background:#1A1A24;border-radius:999px;overflow:hidden;margin-top:8px;}
+.pbar div{height:100%;border-radius:999px;}
+.shell{display:flex;height:calc(100vh - 52px);}
+.sidebar{width:220px;min-width:220px;background:#0A0A12;border-right:1px solid #1E1E2E;display:flex;flex-direction:column;}
+.sb-logo{padding:20px;border-bottom:1px solid #1E1E2E;}
+.sb-name{font-size:17px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.sb-sub{font-size:10px;color:#4B5563;margin-top:2px;}
+.sb-nav{padding:10px 8px;flex:1;}
+.sb-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;margin-bottom:2px;font-size:12px;color:#64748B;}
+.sb-item.on{background:#1E1E2E;color:#F6D860;font-weight:600;}
+.sb-user{padding:14px 16px;border-top:1px solid #1E1E2E;}
+.main{flex:1;overflow-y:auto;padding:24px;background:#0B0B10;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.flex-sb{display:flex;justify-content:space-between;align-items:center;}
+.sec-lbl{font-size:10px;font-weight:700;color:#64748B;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;}
+.kanban-col{background:#0F0F14;border:1px solid #1E1E2E;border-radius:12px;padding:14px;flex:1;}
+.kanban-col h4{font-size:11px;font-weight:700;margin-bottom:10px;}
+.kanban-card{background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px;margin-bottom:8px;}
+.kanban-card .po{font-size:11px;font-weight:700;color:#E2E8F0;}
+.kanban-card .meta{font-size:10px;color:#4B5563;margin-top:3px;}
+.tl-row{display:flex;align-items:center;}
+.tl-step{display:flex;flex-direction:column;align-items:center;flex:1;}
+.tl-dot{width:11px;height:11px;border-radius:50%;border:2px solid #2D2D3D;background:#1A1A24;}
+.tl-dot.done{border-color:#10B981;background:#10B981;}
+.tl-dot.cur{width:14px;height:14px;border-color:#F6D860;background:#F6D860;box-shadow:0 0 8px rgba(246,216,96,0.5);}
+.tl-lbl{font-size:8px;color:#2D2D3D;margin-top:4px;text-align:center;max-width:55px;line-height:1.2;}
+.tl-lbl.done{color:#10B981;}
+.tl-lbl.cur{color:#F6D860;}
+.tl-line{flex:1;height:2px;background:#1A1A24;}
+.tl-line.done{background:#10B981;}
+.cust-nav{background:#0A0A12;border-bottom:1px solid #1E1E2E;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;}
+.cust-logo{font-size:16px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.cust-link{padding:6px 14px;border-radius:7px;font-size:12px;color:#64748B;cursor:pointer;}
+.cust-link.on{background:#1E1E2E;color:#F6D860;font-weight:600;}
+.cad-file{background:#0F0F14;border:1px solid #1E1E2E;border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+.hero{display:flex;flex-direction:column;justify-content:center;align-items:center;height:calc(100vh - 52px);text-align:center;padding:40px;}
 </style>
 </head>
 <body>
 
-<!-- ===================== SLIDE 1: TITLE ===================== -->
 <div class="slide active" id="s1">
-  <div class="title-slide">
-    <div style="font-size:56px;margin-bottom:16px">💎</div>
-    <h1 style="font-size:42px;font-weight:900;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px">JewelFlow OS</h1>
-    <p style="font-size:16px;color:#64748B;margin-bottom:32px;max-width:480px;line-height:1.6">Custom Jewelry Workflow Management Platform<br>Full-stack solution for Kira Jewels</p>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:40px">
-      <span class="tag" style="background:rgba(99,102,241,.15);color:#818CF8">Next.js 14</span>
-      <span class="tag" style="background:rgba(99,102,241,.15);color:#818CF8">NestJS</span>
-      <span class="tag" style="background:rgba(99,102,241,.15);color:#818CF8">TypeORM</span>
-      <span class="tag" style="background:rgba(99,102,241,.15);color:#818CF8">JWT Auth</span>
-      <span class="tag" style="background:rgba(99,102,241,.15);color:#818CF8">Role-Based Access</span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:680px;width:100%;padding:0 20px">
-      <div class="kpi" style="text-align:center">
-        <div class="kpi-val gold" style="font-size:28px">5</div>
-        <div class="kpi-label">User Roles</div>
-      </div>
-      <div class="kpi" style="text-align:center">
-        <div class="kpi-val" style="font-size:28px;color:#8B5CF6">15+</div>
-        <div class="kpi-label">Order Stages</div>
-      </div>
-      <div class="kpi" style="text-align:center">
-        <div class="kpi-val green" style="font-size:28px">CAD</div>
-        <div class="kpi-label">File Approval</div>
-      </div>
-      <div class="kpi" style="text-align:center">
-        <div class="kpi-val gold" style="font-size:28px">SKU</div>
-        <div class="kpi-label">Auto-Gen</div>
-      </div>
-    </div>
-    <p style="margin-top:32px;font-size:12px;color:#2D2D3D">Press → or click Next to begin the tour</p>
+<div class="hero">
+  <div style="font-size:60px;">&#128142;</div>
+  <h1 style="font-size:50px;font-weight:900;color:#F6D860;margin-top:14px;letter-spacing:-1px;">JewelFlow OS</h1>
+  <p style="color:#94A3B8;font-size:17px;margin-top:12px;max-width:580px;line-height:1.8;">Custom Jewelry Workflow Management Platform for <strong style="color:#F6D860;">Kira Jewels</strong></p>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:36px;width:100%;max-width:680px;">
+    <div class="kpi-card" style="text-align:center;"><div class="kpi-val">7</div><div class="kpi-lbl">User Roles</div></div>
+    <div class="kpi-card" style="text-align:center;"><div class="kpi-val">15+</div><div class="kpi-lbl">Order Stages</div></div>
+    <div class="kpi-card" style="text-align:center;"><div class="kpi-val">CAD</div><div class="kpi-lbl">Approval Flow</div></div>
+    <div class="kpi-card" style="text-align:center;"><div class="kpi-val">SKU</div><div class="kpi-lbl">Auto-Generator</div></div>
+  </div>
+  <div style="margin-top:24px;padding:14px 22px;background:rgba(246,216,96,0.08);border:1px solid rgba(246,216,96,0.2);border-radius:10px;font-size:12px;color:#94A3B8;">
+    Stack: <strong style="color:#E2E8F0;">Next.js 14</strong> &middot; <strong style="color:#E2E8F0;">NestJS</strong> &middot; <strong style="color:#E2E8F0;">TypeORM</strong> &middot; <strong style="color:#E2E8F0;">JWT Auth</strong> &middot; <strong style="color:#E2E8F0;">Role-Based Access Control</strong>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 2: ROLE OVERVIEW ===================== -->
 <div class="slide" id="s2">
-  <div class="topbar" style="background:#0A0A12;border-bottom:1px solid #1E1E2E">
-    <div><div style="font-size:18px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💎 JewelFlow OS</div></div>
-    <div style="font-size:12px;color:#4B5563">Platform Overview — 5 User Roles</div>
+<div class="page">
+  <div style="font-size:22px;font-weight:800;color:#F1F5F9;">Platform Roles &amp; Access</div>
+  <div style="font-size:13px;color:#64748B;margin-bottom:24px;">Every user sees only what they need &mdash; enforced at the API level with JWT + RolesGuard</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;">
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#128081;</div><div style="font-size:14px;font-weight:700;color:#6366F1;margin-bottom:6px;">Admin</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Full access: all orders, users, CAD, SKU, manufacturing, shipping, customers, settings.</div></div>
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#128188;</div><div style="font-size:14px;font-weight:700;color:#10B981;margin-bottom:6px;">Sales Rep</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Create and manage orders. View Kanban pipeline. Approve/reject orders. Manage customers.</div></div>
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#127912;</div><div style="font-size:14px;font-weight:700;color:#8B5CF6;margin-bottom:6px;">CAD Designer</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Views only CAD-stage orders. Upload CAD files, send for customer approval, manage revisions.</div></div>
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#127991;&#65039;</div><div style="font-size:14px;font-weight:700;color:#F59E0B;margin-bottom:6px;">SKU Manager</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Generate SKUs (KJ-RING-18KWG-0001). Assign to orders. View all orders read-only.</div></div>
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#127981;</div><div style="font-size:14px;font-weight:700;color:#A855F7;margin-bottom:6px;">Factory Manager</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Manages manufacturing queue. Updates production status for customer-approved orders.</div></div>
+    <div class="card"><div style="font-size:30px;margin-bottom:8px;">&#128666;</div><div style="font-size:14px;font-weight:700;color:#3B82F6;margin-bottom:6px;">Shipping Manager</div><div style="font-size:12px;color:#64748B;line-height:1.6;">Handles dispatch, adds tracking numbers, marks orders shipped or delivered.</div></div>
   </div>
-  <div style="flex:1;padding:28px;overflow:auto">
-    <div style="max-width:900px;margin:0 auto">
-      <h2 style="font-size:22px;font-weight:800;color:#E2E8F0;margin-bottom:8px">Who Uses JewelFlow OS</h2>
-      <p style="font-size:13px;color:#4B5563;margin-bottom:28px">Each role sees a tailored interface. No role can access data or actions outside their permissions.</p>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
-        <div class="role-card">
-          <div style="font-size:28px;margin-bottom:10px">👑</div>
-          <div style="font-size:14px;font-weight:700;color:#6366F1;margin-bottom:6px">Admin</div>
-          <div style="font-size:11px;color:#64748B;line-height:1.6">Full access to all pages, orders, users, settings, SKUs, and workflows. Sees all data.</div>
-          <div style="margin-top:12px;padding:8px;background:#0F0F14;border-radius:7px;font-size:10px;color:#818CF8">admin@kirajewels.one</div>
-        </div>
-        <div class="role-card">
-          <div style="font-size:28px;margin-bottom:10px">💼</div>
-          <div style="font-size:14px;font-weight:700;color:#10B981;margin-bottom:6px">Sales Rep</div>
-          <div style="font-size:11px;color:#64748B;line-height:1.6">Views all orders, creates orders, approves / changes order status through the pipeline.</div>
-          <div style="margin-top:12px;padding:8px;background:#0F0F14;border-radius:7px;font-size:10px;color:#10B981">sales@kirajewels.one</div>
-        </div>
-        <div class="role-card">
-          <div style="font-size:28px;margin-bottom:10px">🎨</div>
-          <div style="font-size:14px;font-weight:700;color:#8B5CF6;margin-bottom:6px">CAD Designer</div>
-          <div style="font-size:11px;color:#64748B;line-height:1.6">Sees only CAD-stage orders. Uploads design files, sends them to customers for approval.</div>
-          <div style="margin-top:12px;padding:8px;background:#0F0F14;border-radius:7px;font-size:10px;color:#8B5CF6">cad@kirajewels.one</div>
-        </div>
-        <div class="role-card">
-          <div style="font-size:28px;margin-bottom:10px">🏷️</div>
-          <div style="font-size:14px;font-weight:700;color:#F59E0B;margin-bottom:6px">SKU Manager</div>
-          <div style="font-size:11px;color:#64748B;line-height:1.6">Manages SKU catalog. Generates SKU numbers from order specs. Auto-format: KJ-RING-18KWG-0001.</div>
-          <div style="margin-top:12px;padding:8px;background:#0F0F14;border-radius:7px;font-size:10px;color:#F59E0B">sku@kirajewels.one</div>
-        </div>
-        <div class="role-card">
-          <div style="font-size:28px;margin-bottom:10px">👤</div>
-          <div style="font-size:14px;font-weight:700;color:#F97316;margin-bottom:6px">Customer</div>
-          <div style="font-size:11px;color:#64748B;line-height:1.6">Separate portal. Can place orders, track status, view and approve CAD design files.</div>
-          <div style="margin-top:12px;padding:8px;background:#0F0F14;border-radius:7px;font-size:10px;color:#F97316">customer@example.com</div>
-        </div>
-      </div>
-      <div style="margin-top:24px;background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:18px">
-        <div style="font-size:11px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px">Permission Matrix</div>
-        <div style="display:grid;grid-template-columns:180px repeat(5,1fr);gap:0;font-size:10px">
-          <div></div>
-          <div style="color:#6366F1;text-align:center;font-weight:700;padding:4px">Admin</div>
-          <div style="color:#10B981;text-align:center;font-weight:700;padding:4px">Sales</div>
-          <div style="color:#8B5CF6;text-align:center;font-weight:700;padding:4px">CAD</div>
-          <div style="color:#F59E0B;text-align:center;font-weight:700;padding:4px">SKU Mgr</div>
-          <div style="color:#F97316;text-align:center;font-weight:700;padding:4px">Customer</div>
-          ${[
-            ['View All Orders','✅','✅','CAD only','✅','Own only'],
-            ['Create Orders','✅','✅','—','—','✅'],
-            ['Change Status','✅','✅','—','—','—'],
-            ['Upload CAD Files','✅','—','✅','—','—'],
-            ['Approve/Reject CAD','✅','—','—','—','✅ (own)'],
-            ['Generate SKUs','✅','—','—','✅','—'],
-            ['Kanban Board','✅','✅','—','—','—'],
-            ['Settings','✅','—','—','—','—'],
-          ].map(row => `
-          <div style="color:#64748B;padding:5px 0;border-top:1px solid #1A1A24">${row[0]}</div>
-          ${row.slice(1).map(v => `<div style="text-align:center;padding:5px 0;border-top:1px solid #1A1A24;color:${v==='✅'?'#10B981':v==='—'?'#2D2D3D':'#94A3B8'}">${v}</div>`).join('')}
-          `).join('')}
-        </div>
+  <div class="card">
+    <div class="sec-lbl">Customer Portal (separate login, redirects to /customer/orders)</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:6px;">
+      <div style="font-size:28px;">&#128100;</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#F97316;">Customer</div>
+        <div style="font-size:12px;color:#64748B;margin-top:2px;">Place new orders &middot; Track real-time order status with visual timeline &middot; View and approve / reject CAD design files</div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 3: LOGIN ===================== -->
 <div class="slide" id="s3">
-  <div style="min-height:100vh;background:#0B0B10;display:flex;align-items:center;justify-content:center;padding:20px">
-    <div style="width:100%;max-width:420px">
-      <div style="text-align:center;margin-bottom:28px">
-        <div style="font-size:40px;margin-bottom:8px">💎</div>
-        <h1 style="font-size:26px;font-weight:900;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent">JewelFlow OS</h1>
-        <p style="font-size:12px;color:#4B5563;margin-top:5px">Custom Jewelry Workflow Management</p>
-      </div>
-      <div class="bg-card" style="padding:26px;margin-bottom:14px">
-        <div class="field"><label>Email</label><div class="field-val">admin@kirajewels.one</div></div>
-        <div class="field" style="margin-bottom:20px"><label>Password</label><div class="field-val">••••••••</div></div>
-        <div class="btn btn-gold" style="width:100%;justify-content:center;padding:12px;font-size:14px;border-radius:8px">Sign In</div>
-      </div>
-      <div class="bg-card" style="padding:16px">
-        <div style="font-size:10px;color:#4B5563;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Quick Access — Demo Accounts</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:9px 11px">
-            <div style="font-size:12px;font-weight:700;color:#818CF8">Admin</div>
-            <div style="font-size:10px;color:#4B5563;margin-top:2px">admin@kirajewels.one</div>
-          </div>
-          <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:9px 11px">
-            <div style="font-size:12px;font-weight:700;color:#10B981">Sales Rep</div>
-            <div style="font-size:10px;color:#4B5563;margin-top:2px">sales@kirajewels.one</div>
-          </div>
-          <div style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:9px 11px">
-            <div style="font-size:12px;font-weight:700;color:#8B5CF6">CAD Designer</div>
-            <div style="font-size:10px;color:#4B5563;margin-top:2px">cad@kirajewels.one</div>
-          </div>
-          <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:9px 11px">
-            <div style="font-size:12px;font-weight:700;color:#F59E0B">SKU Manager</div>
-            <div style="font-size:10px;color:#4B5563;margin-top:2px">sku@kirajewels.one</div>
-          </div>
-          <div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:9px 11px;grid-column:span 2">
-            <div style="font-size:12px;font-weight:700;color:#F97316">Customer Portal</div>
-            <div style="font-size:10px;color:#4B5563;margin-top:2px">customer@example.com — separate portal</div>
-          </div>
-        </div>
-      </div>
+<div style="display:flex;justify-content:center;align-items:center;height:calc(100vh - 52px);padding:20px 20px 80px;">
+  <div style="width:100%;max-width:420px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:44px;">&#128142;</div>
+      <div style="font-size:22px;font-weight:800;color:#F6D860;margin-top:8px;">JewelFlow OS</div>
+      <div style="font-size:12px;color:#4B5563;margin-top:2px;">Sign in to your account</div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="field"><label>Email</label><input type="email" value="admin@kirajewels.one" readonly/></div>
+      <div class="field" style="margin-bottom:20px;"><label>Password</label><input type="password" value="admin123" readonly/></div>
+      <button class="btn-gold" style="width:100%;padding:12px;">Sign In</button>
+    </div>
+    <div style="font-size:11px;color:#4B5563;margin-bottom:10px;text-align:center;">Quick login - Demo Accounts</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#6366F1;">Admin</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">admin@kirajewels.one / admin123</div></div>
+      <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#10B981;">Sales Rep</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">sales@kirajewels.one / sales123</div></div>
+      <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#8B5CF6;">CAD Designer</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">cad@kirajewels.one / cad123</div></div>
+      <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#F59E0B;">SKU Manager</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">sku@kirajewels.one / sku123</div></div>
+      <div style="background:#111118;border:1px solid rgba(249,115,22,0.4);border-radius:8px;padding:10px 12px;grid-column:1/-1;"><div style="font-size:10px;font-weight:700;color:#F97316;">Customer Portal</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">customer@example.com / customer123 &rarr; redirects to /customer/orders</div></div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 4: ADMIN DASHBOARD ===================== -->
 <div class="slide" id="s4">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div><div class="sub">Workflow Management</div></div>
-      <nav>
-        <div class="nav-item active"><span class="icon">🏠</span>Dashboard</div>
-        <div class="nav-item"><span class="icon">📋</span>Orders</div>
-        <div class="nav-item"><span class="icon">🔲</span>Kanban Board</div>
-        <div class="nav-item"><span class="icon">🎨</span>CAD Files</div>
-        <div class="nav-item"><span class="icon">🏷️</span>SKU Management</div>
-        <div class="nav-item"><span class="icon">🏭</span>Manufacturing</div>
-        <div class="nav-item"><span class="icon">🚚</span>Shipping</div>
-        <div class="nav-item"><span class="icon">🔧</span>Repairs</div>
-        <div class="nav-item"><span class="icon">👥</span>Customers</div>
-        <div class="nav-item"><span class="icon">⚙️</span>Settings</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar">AU</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Admin User</div><div style="font-size:9px;color:#4B5563">ADMIN</div></div></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item on">&#127968; Dashboard</div>
+      <div class="sb-item">&#128203; Orders</div>
+      <div class="sb-item">&#11036; Kanban Board</div>
+      <div class="sb-item">&#127912; CAD Files</div>
+      <div class="sb-item">&#127991;&#65039; SKU Management</div>
+      <div class="sb-item">&#127981; Manufacturing</div>
+      <div class="sb-item">&#128666; Shipping</div>
+      <div class="sb-item">&#128295; Repairs</div>
+      <div class="sb-item">&#128101; Customers</div>
+      <div class="sb-item">&#9881;&#65039; Settings</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Admin User</div><div style="font-size:10px;color:#4B5563;">ADMIN</div></div>
+  </div>
+  <div class="main">
+    <div class="flex-sb" style="margin-bottom:20px;">
+      <div><div style="font-size:18px;font-weight:800;color:#F1F5F9;">Dashboard</div><div style="font-size:12px;color:#64748B;">Welcome back, Admin</div></div>
+      <button class="btn-gold">+ New Order</button>
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">Dashboard</div><div class="topbar-sub">JewelFlow OS — Custom Order Management</div></div>
-        <div class="topbar-right">
-          <span style="font-size:10px;padding:4px 10px;border-radius:99px;background:rgba(16,185,129,.15);color:#10B981;font-weight:600">● Live API</span>
-          <div class="btn btn-gold" style="font-size:11px;padding:7px 14px;border-radius:8px">+ New Order</div>
-          <div style="background:#0F0F14;border:1px solid #1E1E2E;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:14px">🔔</div>
-          <div class="avatar" style="width:30px;height:30px">AU</div>
-        </div>
-      </div>
-      <div class="main">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-          <div class="kpi"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:18px">📋</span><span class="kpi-delta">+3 today</span></div><div class="kpi-val blue">48</div><div class="kpi-label">Active Orders</div></div>
-          <div class="kpi"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:18px">💰</span><span class="kpi-delta">+$12k this week</span></div><div class="kpi-val green">$187,400</div><div class="kpi-label">Total Revenue</div></div>
-          <div class="kpi"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:18px">🎨</span><span class="kpi-delta">Avg 3.2 days</span></div><div class="kpi-val purple">9</div><div class="kpi-label">In CAD Design</div></div>
-          <div class="kpi"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:18px">🚚</span><span class="kpi-delta">Action needed</span></div><div class="kpi-val amber">6</div><div class="kpi-label">Ready to Ship</div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 260px;gap:16px">
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <div style="font-size:13px;font-weight:700;color:#CBD5E1">Recent Orders</div>
-              <span style="font-size:11px;color:#F6D860">View all →</span>
-            </div>
-            <div class="order-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="order-po">KJ-2025-001</div><div class="order-meta"><span>💍 Engagement Ring</span><span>✨ 18K White Gold</span><span>💎 Round 1.20ct</span><span style="color:#818CF8">Brilliant Earth</span></div></div><span class="badge status-cad">CAD In Progress</span></div><div class="progress-bar" style="margin-top:10px"><div class="progress-fill" style="width:35%;background:#6366F1"></div></div></div>
-            <div class="order-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="order-po">KJ-2025-002</div><div class="order-meta"><span>💍 Necklace</span><span>✨ 14K Yellow Gold</span><span>💎 Oval 0.75ct</span><span style="color:#818CF8">Kay Jewelers</span></div></div><span class="badge status-approved">Customer Approved</span></div><div class="progress-bar" style="margin-top:10px"><div class="progress-fill" style="width:55%;background:#10B981"></div></div></div>
-            <div class="order-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="order-po">KJ-2025-003</div><div class="order-meta"><span>💍 Earrings</span><span>✨ Platinum</span><span>💎 Princess 0.50ct</span><span style="color:#818CF8">Tiffany & Co</span></div></div><span class="badge status-wait">Waiting Confirmation</span></div><div class="progress-bar" style="margin-top:10px"><div class="progress-fill" style="width:8%;background:#F59E0B"></div></div></div>
-          </div>
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#CBD5E1;margin-bottom:12px">Pipeline Status</div>
-            <div class="bg-card" style="padding:14px">
-              ${[
-                ['Waiting Confirmation','#F59E0B',7,48],
-                ['CAD In Progress','#6366F1',9,48],
-                ['Customer Approved','#10B981',5,48],
-                ['VPO Issued','#0EA5E9',8,48],
-                ['Ready to Ship','#3B82F6',6,48],
-                ['Shipped','#6366F1',13,48],
-              ].map(([label,color,n,t])=>`
-              <div style="margin-bottom:10px">
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                  <span style="font-size:10px;color:#64748B">${label}</span>
-                  <span style="font-size:10px;color:${color};font-weight:700">${n}</span>
-                </div>
-                <div style="height:4px;background:#1A1A24;border-radius:99px;overflow:hidden">
-                  <div style="height:100%;width:${Math.round(n/t*100)}%;background:${color};border-radius:99px"></div>
-                </div>
-              </div>`).join('')}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-val">48</div><div class="kpi-lbl">Active Orders</div><div class="kpi-chg">&#8593; 12% this month</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:#10B981;">$187k</div><div class="kpi-lbl">Total Revenue</div><div class="kpi-chg">&#8593; 8% this month</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:#6366F1;">9</div><div class="kpi-lbl">CAD Pending</div><div class="kpi-chg" style="color:#F59E0B;">Needs attention</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:#3B82F6;">6</div><div class="kpi-lbl">Ready to Ship</div><div class="kpi-chg">3 new today</div></div>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Recent Orders</div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="tbl">
+        <thead><tr><th>PO #</th><th>Customer</th><th>Product</th><th>Metal</th><th>Status</th><th>Progress</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;">KJ-2025-001</td><td>Jennifer M.</td><td>Engagement Ring</td><td>18K White Gold</td><td><span class="badge b-cad">CAD In Progress</span></td><td><div class="pbar" style="width:80px;"><div style="width:35%;background:#6366F1;"></div></div></td></tr>
+          <tr><td style="font-weight:600;">KJ-2025-002</td><td>Robert K.</td><td>Necklace</td><td>14K Yellow Gold</td><td><span class="badge b-approved">Cust. Approved</span></td><td><div class="pbar" style="width:80px;"><div style="width:60%;background:#10B981;"></div></div></td></tr>
+          <tr><td style="font-weight:600;">KJ-2025-003</td><td>Lisa P.</td><td>Earrings</td><td>Platinum</td><td><span class="badge b-wait">Waiting Confirm</span></td><td><div class="pbar" style="width:80px;"><div style="width:10%;background:#F59E0B;"></div></div></td></tr>
+          <tr><td style="font-weight:600;">KJ-CUST-0001</td><td>Emma T.</td><td>Wedding Band</td><td>18K Rose Gold</td><td><span class="badge b-ship">Shipped</span></td><td><div class="pbar" style="width:80px;"><div style="width:90%;background:#3B82F6;"></div></div></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 5: ORDERS LIST ===================== -->
 <div class="slide" id="s5">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div><div class="sub">Workflow Management</div></div>
-      <nav>
-        <div class="nav-item"><span class="icon">🏠</span>Dashboard</div>
-        <div class="nav-item active"><span class="icon">📋</span>Orders</div>
-        <div class="nav-item"><span class="icon">🔲</span>Kanban Board</div>
-        <div class="nav-item"><span class="icon">🎨</span>CAD Files</div>
-        <div class="nav-item"><span class="icon">🏷️</span>SKU Management</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar" style="background:linear-gradient(135deg,#10B981,#059669);color:#fff">SC</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Sarah Chen</div><div style="font-size:9px;color:#4B5563">SALES_REP</div></div></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#127968; Dashboard</div>
+      <div class="sb-item on">&#128203; Orders</div>
+      <div class="sb-item">&#11036; Kanban Board</div>
+      <div class="sb-item">&#128101; Customers</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Sarah Chen</div><div style="font-size:10px;color:#4B5563;">SALES_REP</div></div>
+  </div>
+  <div class="main">
+    <div class="flex-sb" style="margin-bottom:16px;">
+      <div><div style="font-size:18px;font-weight:800;color:#F1F5F9;">Orders</div><div style="font-size:12px;color:#64748B;">48 total orders</div></div>
+      <button class="btn-gold" style="font-size:12px;padding:7px 14px;">+ New Order</button>
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">Orders</div><div class="topbar-sub">5 total orders</div></div>
-        <div class="topbar-right"><div class="btn btn-gold" style="font-size:11px;padding:7px 14px;border-radius:8px">+ New Order</div></div>
-      </div>
-      <div class="main">
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-          <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:8px 14px;color:#4B5563;font-size:12px;width:260px">🔍  Search PO number, store, SKU…</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:rgba(230,168,23,.2);color:#F6D860;outline:1px solid #E6A817">All</span>
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:#111118;color:#64748B;outline:1px solid #1E1E2E">Waiting</span>
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:#111118;color:#64748B;outline:1px solid #1E1E2E">CAD</span>
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:#111118;color:#64748B;outline:1px solid #1E1E2E">Approved</span>
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:#111118;color:#64748B;outline:1px solid #1E1E2E">Ready to Ship</span>
-            <span style="padding:5px 11px;border-radius:7px;font-size:11px;background:#111118;color:#64748B;outline:1px solid #1E1E2E">Shipped</span>
-          </div>
-        </div>
-        <div style="margin-bottom:10px"><span style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:6px 13px;color:#818CF8;font-size:11px;font-weight:500">🔲 Switch to Kanban view →</span></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          ${[
-            ['KJ-2025-001','Engagement Ring','18K White Gold','Round 1.20ct','Brilliant Earth','cad','CAD In Progress'],
-            ['KJ-2025-002','Necklace','14K Yellow Gold','Oval 0.75ct','Kay Jewelers','approved','Customer Approved'],
-            ['KJ-2025-003','Earrings','Platinum','Princess 0.50ct','Tiffany & Co','wait','Waiting Confirmation'],
-            ['KJ-CUST-0004','Engagement Ring','18K White Gold','Round 1.50ct','Emma Thompson','wait','Waiting Confirmation'],
-            ['KJ-CUST-0005','Wedding Band','14K Rose Gold','—','Emma Thompson','wait','Waiting Confirmation'],
-          ].map(([po,type,metal,stone,store,status,label])=>`
-          <div class="order-card" style="cursor:pointer">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-              <div>
-                <div class="order-po">${po}</div>
-                <div class="order-meta"><span>💍 ${type}</span><span>✨ ${metal}</span>${stone!=='—'?`<span>💎 ${stone}</span>`:''}</div>
-              </div>
-              <span class="badge status-${status}" style="white-space:nowrap;font-size:9px">${label}</span>
-            </div>
-            <div style="font-size:10px;color:#4B5563">${store}</div>
-          </div>`).join('')}
-        </div>
-      </div>
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+      <span style="background:#1E1E2E;color:#F6D860;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;">All (48)</span>
+      <span style="background:#111118;border:1px solid #1E1E2E;color:#64748B;padding:5px 12px;border-radius:8px;font-size:11px;">Waiting (8)</span>
+      <span style="background:#111118;border:1px solid #1E1E2E;color:#64748B;padding:5px 12px;border-radius:8px;font-size:11px;">CAD Stage (9)</span>
+      <span style="background:#111118;border:1px solid #1E1E2E;color:#64748B;padding:5px 12px;border-radius:8px;font-size:11px;">Approved (11)</span>
+      <span style="background:#111118;border:1px solid #1E1E2E;color:#64748B;padding:5px 12px;border-radius:8px;font-size:11px;">Manufacturing (7)</span>
+      <span style="background:#111118;border:1px solid #1E1E2E;color:#64748B;padding:5px 12px;border-radius:8px;font-size:11px;">Shipped (6)</span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="tbl">
+        <thead><tr><th>PO #</th><th>Customer</th><th>Type</th><th>Metal</th><th>SKU</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;color:#F6D860;">KJ-2025-001</td><td>Jennifer M.</td><td>Engagement Ring</td><td>18K WG, Round 1.2ct</td><td style="font-size:10px;color:#6366F1;">KJ-RING-18KWG-0001</td><td><span class="badge b-cad">CAD In Progress</span></td><td style="color:#4B5563;">May 18</td></tr>
+          <tr><td style="font-weight:600;color:#F6D860;">KJ-2025-002</td><td>Robert K.</td><td>Necklace</td><td>14K YG, Oval 0.75ct</td><td style="font-size:10px;color:#6366F1;">KJ-NECK-14KYG-0002</td><td><span class="badge b-approved">Cust. Approved</span></td><td style="color:#4B5563;">May 16</td></tr>
+          <tr><td style="font-weight:600;color:#F6D860;">KJ-2025-003</td><td>Lisa P.</td><td>Earrings</td><td>Platinum</td><td style="font-size:10px;color:#4B5563;">--</td><td><span class="badge b-wait">Waiting Confirm</span></td><td style="color:#4B5563;">May 20</td></tr>
+          <tr><td style="font-weight:600;color:#F6D860;">KJ-2025-004</td><td>Mark T.</td><td>Wedding Band</td><td>18K Rose Gold</td><td style="font-size:10px;color:#6366F1;">KJ-BAND-18KRG-0004</td><td><span class="badge b-mfg">Manufacturing</span></td><td style="color:#4B5563;">May 12</td></tr>
+          <tr><td style="font-weight:600;color:#F6D860;">KJ-CUST-0001</td><td>Emma T.</td><td>Wedding Band</td><td>18K RG, Cushion 0.8ct</td><td style="font-size:10px;color:#6366F1;">KJ-BAND-18KRG-0005</td><td><span class="badge b-ship">Shipped</span></td><td style="color:#4B5563;">May 8</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 6: ORDER DETAIL ===================== -->
 <div class="slide" id="s6">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div></div>
-      <nav>
-        <div class="nav-item"><span class="icon">🏠</span>Dashboard</div>
-        <div class="nav-item active"><span class="icon">📋</span>Orders</div>
-        <div class="nav-item"><span class="icon">🔲</span>Kanban Board</div>
-        <div class="nav-item"><span class="icon">🎨</span>CAD Files</div>
-        <div class="nav-item"><span class="icon">🏷️</span>SKU Management</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar" style="background:linear-gradient(135deg,#10B981,#059669);color:#fff">SC</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Sarah Chen</div><div style="font-size:9px;color:#4B5563">SALES_REP</div></div></div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">KJ-2025-001</div><div class="topbar-sub">Brilliant Earth</div></div>
-        <div class="topbar-right"><div class="btn btn-outline" style="font-size:11px;padding:7px 14px;border-radius:8px">← Back to Orders</div></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#127968; Dashboard</div>
+      <div class="sb-item on">&#128203; Orders</div>
+      <div class="sb-item">&#128101; Customers</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Admin User</div><div style="font-size:10px;color:#4B5563;">ADMIN</div></div>
+  </div>
+  <div class="main">
+    <div class="flex-sb" style="margin-bottom:16px;">
+      <div>
+        <button class="btn-dark" style="font-size:11px;padding:5px 10px;margin-bottom:8px;">&#8592; Back to Orders</button>
+        <div style="font-size:18px;font-weight:800;color:#F1F5F9;">KJ-2025-001</div>
+        <div style="font-size:12px;color:#64748B;">Engagement Ring &middot; 18K White Gold</div>
       </div>
-      <div class="main" style="overflow:auto">
-        <div style="display:grid;grid-template-columns:1fr 260px;gap:16px">
-          <div style="display:flex;flex-direction:column;gap:12px">
-            ${[
-              ['Order Details',[['PO Number','KJ-2025-001'],['Kira SKU','KJ-RING-18KWG-0001'],['Order Type','Engagement Ring'],['Manufacturing Path','STANDARD']]],
-              ['Customer',[['Store Name','Brilliant Earth'],['Customer Name','Emma Thompson'],['Customer Email','emma.t@example.com']]],
-              ['Product Specs',[['Metal Type','18K'],['Metal Color','White Gold'],['Size','6.5'],['Diamond Type','Lab Grown'],['Diamond Quality','VS1'],['Stone Shape','Round'],['Carat Weight','1.20ct']]],
-              ['Pricing & Logistics',[['Quoted Cost','$3,200'],['Vendor','Stuller'],['Ship Method','FedEx Overnight'],['Tracking #','FX123456789']]],
-            ].map(([title,fields])=>`
-            <div class="bg-card" style="padding:16px">
-              <div class="sec">${title}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                ${fields.map(([l,v])=>`<div><div style="font-size:9px;color:#4B5563;margin-bottom:2px">${l}</div><div style="font-size:12px;color:#E2E8F0;font-weight:500">${v}</div></div>`).join('')}
-              </div>
-            </div>`).join('')}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div class="bg-card" style="padding:16px;border-color:rgba(99,102,241,.3)">
-              <div style="font-size:10px;color:#64748B;margin-bottom:8px">CURRENT STATUS</div>
-              <span class="badge status-cad" style="font-size:13px;font-weight:700;padding:6px 14px;border-radius:8px">CAD In Progress</span>
-            </div>
-            <div class="bg-card" style="padding:16px">
-              <div style="font-size:10px;color:#64748B;margin-bottom:10px">MOVE TO STAGE</div>
-              <div style="display:flex;flex-direction:column;gap:5px">
-                <div style="background:#0F0F14;border:1px solid rgba(245,158,11,.3);border-radius:7px;padding:7px 11px;color:#F59E0B;font-size:11px">Waiting Confirmation</div>
-                <div style="background:#0F0F14;border:1px solid rgba(16,185,129,.3);border-radius:7px;padding:7px 11px;color:#10B981;font-size:11px">Customer Approved</div>
-                <div style="background:#0F0F14;border:1px solid rgba(14,165,233,.3);border-radius:7px;padding:7px 11px;color:#0EA5E9;font-size:11px">VPO Issued</div>
-                <div style="background:#0F0F14;border:1px solid rgba(59,130,246,.3);border-radius:7px;padding:7px 11px;color:#3B82F6;font-size:11px">Ready to Ship</div>
-              </div>
-              <div style="margin-top:8px;padding:8px;background:rgba(245,158,11,.08);border-radius:7px;font-size:10px;color:#F59E0B">Sales Rep can move orders through the pipeline</div>
-            </div>
-            <div class="bg-card" style="padding:16px">
-              <div style="font-size:10px;color:#64748B;margin-bottom:10px">TIMELINE</div>
-              <div class="trow"><span class="tk">Created</span><span class="tv">May 25, 2026</span></div>
-              <div class="trow"><span class="tk">Updated</span><span class="tv">May 25, 2026</span></div>
-            </div>
-          </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select style="background:#111118;border:1px solid #2D2D3D;border-radius:8px;padding:7px 12px;color:#E2E8F0;font-size:12px;outline:none;"><option>CAD In Progress</option></select>
+        <button class="btn-gold" style="font-size:12px;padding:7px 14px;">Save Status</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="tl-row" style="margin:8px 0;">
+        <div class="tl-step"><div class="tl-dot done"></div><div class="tl-lbl done">Received</div></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step"><div class="tl-dot done"></div><div class="tl-lbl done">Confirmed</div></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step"><div class="tl-dot cur"></div><div class="tl-lbl cur">CAD Design</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Cust. Review</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Approved</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Mfg.</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Ready Ship</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Delivered</div></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="sec-lbl">Product Specs</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Order Type</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">Engagement Ring</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Metal</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">18K White Gold</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Ring Size</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">6.5</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Stone Type</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">Natural Diamond</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Quality</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">VS1</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Shape</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">Round</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:#4B5563;">Carat Weight</span><span style="font-size:12px;color:#CBD5E1;font-weight:500;">1.20ct</span></div>
+      </div>
+      <div class="card">
+        <div class="sec-lbl">Order Info</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">SKU</span><span style="font-size:12px;color:#6366F1;font-weight:600;">KJ-RING-18KWG-0001</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Customer Email</span><span style="font-size:12px;color:#CBD5E1;">jennifer@email.com</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#4B5563;">Placed</span><span style="font-size:12px;color:#CBD5E1;">May 18, 2025</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:14px;"><span style="font-size:12px;color:#4B5563;">Updated</span><span style="font-size:12px;color:#CBD5E1;">May 21</span></div>
+        <div style="padding:10px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:8px;">
+          <div style="font-size:10px;color:#64748B;margin-bottom:4px;">CUSTOMER NOTES</div>
+          <div style="font-size:12px;color:#94A3B8;">Pave band, hidden halo preferred. Milgrain edge detail if possible.</div>
         </div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 7: KANBAN BOARD ===================== -->
 <div class="slide" id="s7">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div></div>
-      <nav>
-        <div class="nav-item"><span class="icon">🏠</span>Dashboard</div>
-        <div class="nav-item"><span class="icon">📋</span>Orders</div>
-        <div class="nav-item active"><span class="icon">🔲</span>Kanban Board</div>
-        <div class="nav-item"><span class="icon">🎨</span>CAD Files</div>
-        <div class="nav-item"><span class="icon">🏷️</span>SKU Management</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar">AU</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Admin User</div><div style="font-size:9px;color:#4B5563">ADMIN</div></div></div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">Kanban Board</div><div class="topbar-sub">Drag-and-drop order pipeline</div></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#127968; Dashboard</div>
+      <div class="sb-item">&#128203; Orders</div>
+      <div class="sb-item on">&#11036; Kanban Board</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Sarah Chen</div><div style="font-size:10px;color:#4B5563;">SALES_REP</div></div>
+  </div>
+  <div class="main" style="overflow-x:auto;">
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:16px;">Kanban Pipeline</div>
+    <div style="display:flex;gap:12px;min-width:900px;padding-bottom:20px;">
+      <div class="kanban-col">
+        <h4 style="color:#F59E0B;">Waiting (3)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-003</div><div class="meta">Earrings - Platinum</div></div>
+        <div class="kanban-card"><div class="po">KJ-CUST-0004</div><div class="meta">Necklace - 14K YG</div></div>
+        <div class="kanban-card"><div class="po">KJ-2025-007</div><div class="meta">Bracelet - Sterling</div></div>
       </div>
-      <div style="flex:1;overflow:auto;padding:16px 20px">
-        <div style="display:flex;gap:12px;min-width:max-content;height:calc(100%-8px)">
-          ${[
-            ['Waiting Confirmation','#F59E0B',[['KJ-2025-003','Earrings · Platinum'],['KJ-CUST-0004','Engagement Ring · 18K WG'],['KJ-CUST-0005','Wedding Band · 14K RG']]],
-            ['Pending CAD','#8B5CF6',[['KJ-2025-004','Bracelet · 14K RG']]],
-            ['CAD In Progress','#6366F1',[['KJ-2025-001','Engagement Ring · 18K WG']]],
-            ['Customer Approved','#10B981',[['KJ-2025-002','Necklace · 14K YG']]],
-            ['VPO Issued','#0EA5E9',[]],
-            ['Ready to Ship','#3B82F6',[]],
-            ['Shipped','#6366F1',[]],
-          ].map(([col,color,cards])=>`
-          <div class="kan-col" style="width:170px;border-top:3px solid ${color}">
-            <div class="kan-head"><span style="color:${color}">${col}</span><span style="background:${color}20;color:${color};padding:2px 7px;border-radius:99px;font-size:9px">${cards.length}</span></div>
-            ${cards.map(([po,meta])=>`<div class="kan-card"><div class="kan-po">${po}</div><div class="kan-meta">${meta}</div></div>`).join('')}
-            ${cards.length===0?`<div style="color:#2D2D3D;font-size:10px;text-align:center;padding:20px 0">No orders</div>`:''}
-          </div>`).join('')}
-        </div>
+      <div class="kanban-col">
+        <h4 style="color:#6366F1;">CAD (2)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-001</div><div class="meta">Eng. Ring - 18K WG</div></div>
+        <div class="kanban-card"><div class="po">KJ-2025-005</div><div class="meta">Pendant - Platinum</div></div>
+      </div>
+      <div class="kanban-col">
+        <h4 style="color:#F59E0B;">Review (1)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-008</div><div class="meta">Ring - 14K RG - Oval</div></div>
+      </div>
+      <div class="kanban-col">
+        <h4 style="color:#10B981;">Approved (2)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-002</div><div class="meta">Necklace - 14K YG</div></div>
+        <div class="kanban-card"><div class="po">KJ-CUST-0002</div><div class="meta">Wedding Band - RG</div></div>
+      </div>
+      <div class="kanban-col">
+        <h4 style="color:#A855F7;">Mfg. (2)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-004</div><div class="meta">Band - 18K RG</div></div>
+        <div class="kanban-card"><div class="po">KJ-2025-006</div><div class="meta">Brooch - 18K YG</div></div>
+      </div>
+      <div class="kanban-col">
+        <h4 style="color:#3B82F6;">Shipped (1)</h4>
+        <div class="kanban-card"><div class="po">KJ-CUST-0001</div><div class="meta">Band - Rose Gold</div></div>
+      </div>
+      <div class="kanban-col">
+        <h4 style="color:#10B981;">Delivered (1)</h4>
+        <div class="kanban-card"><div class="po">KJ-2025-000</div><div class="meta">Ring - Platinum</div></div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 8: CAD DESIGNER VIEW ===================== -->
 <div class="slide" id="s8">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div></div>
-      <nav>
-        <div class="nav-item"><span class="icon">📋</span>Orders <span style="font-size:9px;margin-left:auto;color:#8B5CF6;background:rgba(139,92,246,.15);padding:2px 6px;border-radius:99px">CAD only</span></div>
-        <div class="nav-item active"><span class="icon">🎨</span>CAD Files</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar cad">MP</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Maya Patel</div><div style="font-size:9px;color:#4B5563">CAD_DESIGNER</div></div></div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">CAD Files</div><div class="topbar-sub">Upload designs, send for approval, track revisions</div></div>
-      </div>
-      <div class="main" style="overflow:auto">
-        <div class="bg-card" style="padding:18px;margin-bottom:18px">
-          <div style="font-size:12px;font-weight:700;color:#CBD5E1;margin-bottom:14px">Upload New CAD File</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end">
-            <div><label style="font-size:10px;color:#64748B;display:block;margin-bottom:4px">ORDER *</label><div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:8px 12px;color:#E2E8F0;font-size:12px">KJ-2025-001 — Brilliant Earth</div></div>
-            <div><label style="font-size:10px;color:#64748B;display:block;margin-bottom:4px">FILE *</label><div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:8px 12px;color:#E2E8F0;font-size:12px">engagement_ring_v2.stl</div></div>
-            <div><label style="font-size:10px;color:#64748B;display:block;margin-bottom:4px">DESIGNER NOTES</label><div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:8px 12px;color:#4B5563;font-size:12px">Adjusted prong setting…</div></div>
-            <div class="btn btn-gold" style="padding:8px 16px;font-size:11px;border-radius:8px;white-space:nowrap">↑ Upload</div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#128203; Orders</div>
+      <div class="sb-item on">&#127912; CAD Files</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Maya Patel</div><div style="font-size:10px;color:#4B5563;">CAD_DESIGNER</div></div>
+  </div>
+  <div class="main">
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:4px;">CAD Files</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:20px;">Only orders in CAD stage are shown to CAD designers</div>
+    <div class="g2">
+      <div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="sec-lbl">Upload CAD File &mdash; KJ-2025-001</div>
+          <div style="border:2px dashed #2D2D3D;border-radius:10px;padding:24px;text-align:center;margin-top:8px;cursor:pointer;">
+            <div style="font-size:28px;margin-bottom:8px;">&#128193;</div>
+            <div style="font-size:12px;color:#64748B;">Drop CAD file here or <span style="color:#6366F1;">browse</span></div>
+            <div style="font-size:10px;color:#4B5563;margin-top:4px;">DWG, DXF, STL, OBJ, PDF supported</div>
           </div>
+          <div class="field" style="margin-top:14px;margin-bottom:14px;"><label>Designer Notes</label><textarea rows="2" placeholder="Notes for customer or team..."></textarea></div>
+          <button class="btn-gold" style="width:100%;">Upload &amp; Send for Approval</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <div class="cad-card" style="background:#111118;border:1px solid rgba(99,102,241,.25)">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-              <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:700;color:#E2E8F0">📎 engagement_ring_v2.stl</span><span class="badge" style="background:rgba(245,158,11,.15);color:#F59E0B;font-size:9px">Sent for Approval</span><span style="font-size:9px;color:#4B5563">Rev #2</span></div><div style="font-size:11px;color:#64748B">Order: <span class="gold">KJ-2025-001</span> — Brilliant Earth · By: maya.patel</div></div>
-              <div style="font-size:10px;color:#4B5563">May 25, 2026</div>
+      </div>
+      <div>
+        <div class="sec-lbl" style="margin-bottom:10px;">CAD File History</div>
+        <div class="cad-file">
+          <div class="flex-sb" style="margin-bottom:6px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#E2E8F0;">KJ-2025-001_v2.dwg</div>
+              <div style="font-size:10px;color:#4B5563;margin-top:2px;">KJ-2025-001 &middot; Rev #2</div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <div style="padding:6px 13px;border-radius:7px;font-size:11px;font-weight:600;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10B981">✅ Approve</div>
-              <div style="padding:6px 13px;border-radius:7px;font-size:11px;font-weight:600;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#EF4444">❌ Reject</div>
-              <div style="padding:6px 13px;border-radius:7px;font-size:11px;font-weight:600;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);color:#8B5CF6">🔄 Request Revision</div>
-              <div style="flex:1;background:#0F0F14;border:1px solid #2D2D3D;border-radius:7px;padding:6px 10px;color:#4B5563;font-size:11px">Add feedback…</div>
-            </div>
+            <span class="badge b-wait">Awaiting Approval</span>
           </div>
-          <div class="cad-card" style="background:#111118;border:1px solid rgba(16,185,129,.2)">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:700;color:#E2E8F0">📎 necklace_design_v1.obj</span><span class="badge" style="background:rgba(16,185,129,.15);color:#10B981;font-size:9px">Approved</span><span style="font-size:9px;color:#4B5563">Rev #1</span></div><div style="font-size:11px;color:#64748B">Order: <span class="gold">KJ-2025-002</span> — Kay Jewelers · By: maya.patel</div></div>
-              <span style="font-size:11px;color:#10B981">✅ Approved by emma.thompson on May 24</span>
+          <div style="font-size:11px;color:#94A3B8;">Designer note: Updated pave band per customer request</div>
+        </div>
+        <div class="cad-file">
+          <div class="flex-sb" style="margin-bottom:6px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#E2E8F0;">KJ-2025-005_v1.stl</div>
+              <div style="font-size:10px;color:#4B5563;margin-top:2px;">KJ-2025-005 &middot; Rev #1</div>
             </div>
+            <span class="badge b-cad">Uploaded</span>
           </div>
+          <div style="font-size:11px;color:#94A3B8;">Initial pendant design - classic solitaire style</div>
+        </div>
+        <div class="cad-file" style="border-color:rgba(16,185,129,0.3);">
+          <div class="flex-sb" style="margin-bottom:6px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#E2E8F0;">KJ-2025-002_v3.dwg</div>
+              <div style="font-size:10px;color:#4B5563;margin-top:2px;">KJ-2025-002 &middot; Rev #3</div>
+            </div>
+            <span class="badge b-approved">Approved</span>
+          </div>
+          <div style="font-size:11px;color:#F59E0B;">Customer feedback: Perfect! Approved on May 20</div>
         </div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 9: SKU MANAGEMENT ===================== -->
 <div class="slide" id="s9">
-  <div class="app-shell">
-    <div class="sidebar">
-      <div class="sidebar-logo"><div class="title">💎 JewelFlow OS</div></div>
-      <nav>
-        <div class="nav-item"><span class="icon">📋</span>Orders</div>
-        <div class="nav-item active"><span class="icon">🏷️</span>SKU Management</div>
-      </nav>
-      <div class="sidebar-user"><div class="avatar" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:#000">JM</div><div><div style="font-size:11px;font-weight:600;color:#CBD5E1">Jake Morris</div><div style="font-size:9px;color:#4B5563">SKU_MANAGER</div></div></div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-      <div class="topbar">
-        <div><div class="topbar-title">SKU Management</div><div class="topbar-sub">Generate and manage product SKUs</div></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#127968; Dashboard</div>
+      <div class="sb-item">&#128203; Orders</div>
+      <div class="sb-item on">&#127991;&#65039; SKU Management</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Jake Morris</div><div style="font-size:10px;color:#4B5563;">SKU_MANAGER</div></div>
+  </div>
+  <div class="main">
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:4px;">SKU Management</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:20px;">Format: KJ-[TYPE]-[METAL][COLOR]-[SEQ] &nbsp;&mdash;&nbsp; e.g. KJ-RING-18KWG-0001</div>
+    <div class="g2">
+      <div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="sec-lbl">Generate SKU</div>
+          <div class="field" style="margin-top:10px;"><label>Order Type</label><select><option>Engagement Ring</option><option>Wedding Band</option><option>Necklace</option><option>Earrings</option></select></div>
+          <div class="g2"><div class="field"><label>Metal Type</label><select><option>18K</option><option>14K</option><option>Platinum</option></select></div><div class="field"><label>Metal Color</label><select><option>White Gold</option><option>Yellow Gold</option><option>Rose Gold</option></select></div></div>
+          <div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:14px;text-align:center;margin:10px 0;">
+            <div style="font-size:11px;color:#64748B;margin-bottom:4px;">GENERATED SKU</div>
+            <div style="font-size:20px;font-weight:800;color:#F6D860;letter-spacing:1px;">KJ-RING-18KWG-0042</div>
+          </div>
+          <button class="btn-gold" style="width:100%;">Assign SKU to Order</button>
+        </div>
       </div>
-      <div class="main" style="overflow:auto">
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:16px">
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-              <div style="font-size:12px;font-weight:700;color:#CBD5E1">4 SKUs Generated</div>
-              <div style="background:#111118;border:1px solid #1E1E2E;border-radius:8px;padding:7px 12px;color:#4B5563;font-size:12px;width:200px">🔍  Search SKUs…</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:7px">
-              ${[
-                ['KJ-RING-18KWG-0001','RING','18K','White Gold','Round','1.20ct','KJ-2025-001'],
-                ['KJ-NECK-14KYG-0002','NECKLACE','14K','Yellow Gold','Oval','0.75ct','KJ-2025-002'],
-                ['KJ-EARR-PLAT-0003','EARRINGS','Platinum','Platinum','Princess','0.50ct','KJ-2025-003'],
-                ['KJ-RING-18KWG-0004','RING','18K','White Gold','Round','1.50ct','KJ-CUST-0004'],
-              ].map(([sku,type,metal,color,shape,ct,po])=>`
-              <div style="background:#111118;border:1px solid #1E1E2E;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
-                <div><div style="font-size:16px;font-weight:800;color:#F6D860;margin-bottom:4px">${sku}</div><div style="font-size:11px;color:#64748B;display:flex;gap:10px"><span>💍 ${type}</span><span>✨ ${metal} ${color}</span><span>💎 ${shape}</span><span>⚖️ ${ct}</span><span style="color:#818CF8">📋 ${po}</span></div></div>
-                <div style="font-size:10px;color:#4B5563">May 25</div>
-              </div>`).join('')}
-            </div>
-          </div>
-          <div class="bg-card" style="padding:16px;align-self:start">
-            <div style="font-size:12px;font-weight:700;color:#CBD5E1;margin-bottom:4px">Generate SKU</div>
-            <p style="font-size:11px;color:#4B5563;margin-bottom:14px">Select an order that doesn't have a SKU yet.</p>
-            <div style="background:#0F0F14;border:1px solid #1E1E2E;border-radius:8px;padding:10px;margin-bottom:12px">
-              <div style="font-size:10px;color:#4B5563;margin-bottom:3px">SKU FORMAT</div>
-              <div style="font-size:13px;color:#F6D860;font-family:monospace">KJ-[TYPE]-[METAL][COLOR]-[SEQ]</div>
-              <div style="font-size:10px;color:#4B5563;margin-top:3px">e.g. KJ-RING-18KWG-0001</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:7px">
-              <div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:9px 11px;display:flex;justify-content:space-between;align-items:center">
-                <div><div style="font-size:12px;font-weight:600;color:#E2E8F0">KJ-CUST-0005</div><div style="font-size:10px;color:#4B5563;margin-top:2px">WEDDING BAND · 14K Rose Gold</div></div>
-                <div style="background:rgba(230,168,23,.15);border:1px solid rgba(230,168,23,.4);border-radius:7px;padding:5px 11px;color:#F6D860;font-size:10px;font-weight:700">+ Generate</div>
-              </div>
-            </div>
-          </div>
+      <div>
+        <div class="sec-lbl" style="margin-bottom:10px;">Recent SKUs</div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <table class="tbl">
+            <thead><tr><th>SKU Code</th><th>Order</th><th>Type</th><th>Assigned</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#6366F1;font-weight:600;font-size:11px;">KJ-RING-18KWG-0001</td><td>KJ-2025-001</td><td>Eng. Ring</td><td style="color:#4B5563;">May 18</td></tr>
+              <tr><td style="color:#6366F1;font-weight:600;font-size:11px;">KJ-NECK-14KYG-0002</td><td>KJ-2025-002</td><td>Necklace</td><td style="color:#4B5563;">May 16</td></tr>
+              <tr><td style="color:#6366F1;font-weight:600;font-size:11px;">KJ-BAND-18KRG-0004</td><td>KJ-2025-004</td><td>Band</td><td style="color:#4B5563;">May 12</td></tr>
+              <tr><td style="color:#6366F1;font-weight:600;font-size:11px;">KJ-BAND-18KRG-0005</td><td>KJ-CUST-0001</td><td>Band</td><td style="color:#4B5563;">May 10</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 10: CUSTOMER PORTAL - MY ORDERS ===================== -->
 <div class="slide" id="s10">
-  <div style="display:flex;flex-direction:column;height:100vh">
-    <div class="cust-topbar">
-      <div style="display:flex;align-items:center;gap:20px">
-        <div style="font-size:17px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💎 JewelFlow</div>
-        <nav class="cust-nav">
-          <a href="#" class="active">My Orders</a>
-          <a href="#">Place Order</a>
-        </nav>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="avatar cust" style="width:26px;height:26px;font-size:10px">ET</div>
-        <span style="font-size:11px;color:#CBD5E1">Emma Thompson</span>
-        <div style="background:none;border:1px solid #2D2D3D;border-radius:6px;padding:3px 9px;color:#64748B;font-size:10px">Sign out</div>
-      </div>
-    </div>
-    <div style="background:#111118;border-bottom:1px solid #1E1E2E;padding:14px 28px;display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-size:19px;font-weight:700">My Orders</div><div style="font-size:11px;color:#4B5563;margin-top:2px">2 orders</div></div>
-      <div class="btn btn-gold" style="font-size:12px;padding:8px 18px;border-radius:8px">+ Place New Order</div>
-    </div>
-    <div style="flex:1;overflow:auto;padding:24px;max-width:860px;margin:0 auto;width:100%">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="background:#111118;border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:16px 18px;cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-            <div><div style="font-size:14px;font-weight:700;color:#E2E8F0;margin-bottom:4px">KJ-CUST-0004</div><div style="font-size:11px;color:#64748B;display:flex;gap:10px"><span>💍 Engagement Ring</span><span>✨ 18K White Gold</span><span>💎 Round</span></div></div>
-            <div style="text-align:right"><span class="badge status-wait" style="font-size:10px">Waiting Confirmation</span><div style="font-size:9px;color:#4B5563;margin-top:4px">May 25, 2026</div></div>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:8%;background:#F59E0B"></div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="font-size:9px;color:#2D2D3D">Order placed</span><span style="font-size:9px;color:#4B5563">8% complete</span><span style="font-size:9px;color:#2D2D3D">Delivered</span></div>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="sb-name">&#128142; JewelFlow OS</div><div class="sb-sub">Workflow Management</div></div>
+    <nav class="sb-nav">
+      <div class="sb-item">&#127968; Dashboard</div>
+      <div class="sb-item">&#128203; Orders</div>
+      <div class="sb-item on">&#127981; Manufacturing</div>
+      <div class="sb-item">&#128666; Shipping</div>
+    </nav>
+    <div class="sb-user"><div style="font-size:12px;font-weight:600;color:#CBD5E1;">Admin User</div><div style="font-size:10px;color:#4B5563;">ADMIN</div></div>
+  </div>
+  <div class="main">
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:20px;">Manufacturing &amp; Shipping</div>
+    <div class="g2">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#A855F7;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Manufacturing Queue</div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <table class="tbl">
+            <thead><tr><th>Order</th><th>Product</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:600;">KJ-2025-004</td><td style="font-size:11px;color:#94A3B8;">Band - 18K RG</td><td><span class="badge b-mfg">In Production</span></td><td><button style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:4px 10px;color:#A855F7;font-size:10px;cursor:pointer;">Mark Ready</button></td></tr>
+              <tr><td style="font-weight:600;">KJ-2025-006</td><td style="font-size:11px;color:#94A3B8;">Brooch - 18K YG</td><td><span class="badge b-mfg">In Production</span></td><td><button style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:4px 10px;color:#A855F7;font-size:10px;cursor:pointer;">Mark Ready</button></td></tr>
+              <tr><td style="font-weight:600;">KJ-2025-002</td><td style="font-size:11px;color:#94A3B8;">Necklace - 14K YG</td><td><span class="badge b-approved">Approved - Queue</span></td><td><button style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:4px 10px;color:#A855F7;font-size:10px;cursor:pointer;">Start Mfg</button></td></tr>
+            </tbody>
+          </table>
         </div>
-        <div style="background:#111118;border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:16px 18px;cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-            <div><div style="font-size:14px;font-weight:700;color:#E2E8F0;margin-bottom:4px">KJ-CUST-0005</div><div style="font-size:11px;color:#64748B;display:flex;gap:10px"><span>💍 Wedding Band</span><span>✨ 14K Rose Gold</span></div></div>
-            <div style="text-align:right"><span class="badge status-wait" style="font-size:10px">Waiting Confirmation</span><div style="font-size:9px;color:#4B5563;margin-top:4px">May 25, 2026</div></div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#3B82F6;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Shipping Queue</div>
+        <div class="card">
+          <div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div class="flex-sb" style="margin-bottom:10px;">
+              <div><div style="font-size:12px;font-weight:700;">KJ-CUST-0001</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">Wedding Band - Emma T.</div></div>
+              <span class="badge b-ship">Ready to Ship</span>
+            </div>
+            <div class="field" style="margin-bottom:8px;"><label>Tracking Number</label><input value="1Z999AA10123456784" readonly/></div>
+            <button style="width:100%;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:7px;padding:8px;color:#3B82F6;font-size:12px;font-weight:600;cursor:pointer;">Mark as Shipped</button>
           </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:8%;background:#F59E0B"></div></div>
-          <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="font-size:9px;color:#2D2D3D">Order placed</span><span style="font-size:9px;color:#4B5563">8% complete</span><span style="font-size:9px;color:#2D2D3D">Delivered</span></div>
+          <div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:14px;">
+            <div class="flex-sb">
+              <div><div style="font-size:12px;font-weight:700;">KJ-2025-004</div><div style="font-size:10px;color:#4B5563;margin-top:2px;">Band - Mark T.</div></div>
+              <span class="badge b-mfg">In Production</span>
+            </div>
+            <div style="font-size:10px;color:#4B5563;margin-top:8px;">Awaiting manufacturing completion</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 11: CUSTOMER - PLACE ORDER ===================== -->
 <div class="slide" id="s11">
-  <div style="display:flex;flex-direction:column;height:100vh">
-    <div class="cust-topbar">
-      <div style="display:flex;align-items:center;gap:20px">
-        <div style="font-size:17px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💎 JewelFlow</div>
-        <nav class="cust-nav"><a href="#">My Orders</a><a href="#" class="active">Place Order</a></nav>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px"><div class="avatar cust" style="width:26px;height:26px;font-size:10px">ET</div><span style="font-size:11px;color:#CBD5E1">Emma Thompson</span></div>
+<div style="display:flex;flex-direction:column;height:calc(100vh - 52px);">
+  <div class="cust-nav">
+    <div class="cust-logo">&#128142; JewelFlow OS</div>
+    <div style="display:flex;gap:4px;">
+      <div class="cust-link on">My Orders</div>
+      <div class="cust-link">Place New Order</div>
     </div>
-    <div style="background:#111118;border-bottom:1px solid #1E1E2E;padding:14px 28px"><div style="font-size:19px;font-weight:700">Place a New Order</div><div style="font-size:11px;color:#4B5563;margin-top:2px">Tell us about your custom piece</div></div>
-    <div style="flex:1;overflow:auto;padding:24px;max-width:600px;margin:0 auto;width:100%">
-      <div class="bg-card" style="padding:24px">
-        <div class="sec">Jewelry Details</div>
-        <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#10B981;display:flex;align-items:center;gap:8px">✓ Customer is logged in — order automatically linked to their account</div>
-        <div style="display:grid;grid-template-columns:1fr;gap:0">
-          <div class="field"><label>Order Type *</label><div class="field-val">Engagement Ring</div></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F6D860,#E6A817);display:flex;align-items:center;justify-content:center;font-size:12px;">&#128100;</div>
+      <div style="font-size:11px;color:#CBD5E1;">Emma T.</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:24px 24px 80px;">
+    <div class="flex-sb" style="margin-bottom:20px;">
+      <div><div style="font-size:18px;font-weight:800;color:#F1F5F9;">My Orders</div><div style="font-size:12px;color:#64748B;">Track your jewelry orders</div></div>
+      <button class="btn-gold">+ Place New Order</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card">
+        <div class="flex-sb" style="margin-bottom:10px;">
+          <div><div style="font-size:14px;font-weight:700;color:#E2E8F0;">KJ-CUST-0001</div><div style="font-size:11px;color:#64748B;margin-top:2px;">Wedding Band &middot; 18K Rose Gold &middot; Cushion 0.80ct</div></div>
+          <span class="badge b-ship">Shipped</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field"><label>Metal Type *</label><div class="field-val">18K</div></div>
-          <div class="field"><label>Metal Color *</label><div class="field-val">White Gold</div></div>
-        </div>
-        <div class="field"><label>Ring Size</label><div class="field-val">6.5</div></div>
-        <div class="sec" style="margin-top:8px">Stone Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field"><label>Diamond / Stone Type</label><div class="field-val">Lab Grown Diamond</div></div>
-          <div class="field"><label>Quality / Grade</label><div class="field-val">VS1</div></div>
-          <div class="field"><label>Stone Shape</label><div class="field-val">Round</div></div>
-          <div class="field"><label>Approx. Carat Weight</label><div class="field-val">1.25</div></div>
-        </div>
-        <div class="sec" style="margin-top:8px">Special Instructions</div>
-        <div style="background:#0F0F14;border:1px solid #2D2D3D;border-radius:8px;padding:10px 14px;color:#94A3B8;font-size:12px;height:70px;margin-bottom:20px">Surprise proposal — please keep confidential. Looking for something elegant and timeless.</div>
-        <div style="display:flex;gap:10px">
-          <div class="btn btn-outline" style="flex:1;justify-content:center;padding:11px;border-radius:8px;font-size:12px">Cancel</div>
-          <div class="btn btn-gold" style="flex:2;justify-content:center;padding:11px;border-radius:8px;font-size:13px">Place Order</div>
-        </div>
+        <div style="font-size:10px;color:#3B82F6;margin-bottom:6px;">Tracking: 1Z999AA10123456784</div>
+        <div class="pbar"><div style="width:90%;background:#3B82F6;"></div></div>
+        <div style="font-size:10px;color:#4B5563;margin-top:4px;">Step 7 of 8 &mdash; In transit to you</div>
       </div>
-      <div style="margin-top:14px;padding:13px 16px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;font-size:11px;color:#818CF8;line-height:1.6">After placing your order, our team will review it and provide a quote. You'll receive CAD designs to approve before manufacturing begins.</div>
+      <div class="card" style="border-color:rgba(245,158,11,0.3);">
+        <div class="flex-sb" style="margin-bottom:10px;">
+          <div><div style="font-size:14px;font-weight:700;color:#E2E8F0;">KJ-CUST-0002</div><div style="font-size:11px;color:#64748B;margin-top:2px;">Engagement Ring &middot; 18K White Gold &middot; Round 1.10ct</div></div>
+          <span class="badge b-wait" style="font-size:11px;padding:5px 12px;">&#9888;&#65039; Awaiting Your Approval</span>
+        </div>
+        <div class="pbar"><div style="width:38%;background:#F59E0B;"></div></div>
+        <div style="font-size:10px;color:#F59E0B;margin-top:4px;">Step 3 of 8 &mdash; CAD design ready for your review</div>
+      </div>
+      <div class="card">
+        <div class="flex-sb" style="margin-bottom:10px;">
+          <div><div style="font-size:14px;font-weight:700;color:#E2E8F0;">KJ-CUST-0003</div><div style="font-size:11px;color:#64748B;margin-top:2px;">Necklace &middot; 14K Yellow Gold &middot; Pear 0.60ct</div></div>
+          <span class="badge b-cad">CAD In Progress</span>
+        </div>
+        <div class="pbar"><div style="width:25%;background:#6366F1;"></div></div>
+        <div style="font-size:10px;color:#4B5563;margin-top:4px;">Step 2 of 8 &mdash; Designer is working on your piece</div>
+      </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 12: CUSTOMER - ORDER DETAIL + CAD APPROVAL ===================== -->
 <div class="slide" id="s12">
-  <div style="display:flex;flex-direction:column;height:100vh">
-    <div class="cust-topbar">
-      <div style="display:flex;align-items:center;gap:20px">
-        <div style="font-size:17px;font-weight:800;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💎 JewelFlow</div>
-        <nav class="cust-nav"><a href="#" class="active">My Orders</a><a href="#">Place Order</a></nav>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px"><div class="btn btn-outline" style="font-size:11px;padding:6px 12px;border-radius:7px">← My Orders</div></div>
+<div style="display:flex;flex-direction:column;height:calc(100vh - 52px);">
+  <div class="cust-nav">
+    <div class="cust-logo">&#128142; JewelFlow OS</div>
+    <div style="display:flex;gap:4px;">
+      <div class="cust-link">My Orders</div>
+      <div class="cust-link on">Place New Order</div>
     </div>
-    <div style="background:#111118;border-bottom:1px solid #1E1E2E;padding:14px 28px"><div style="font-size:19px;font-weight:700">KJ-CUST-0004</div><div style="font-size:11px;color:#4B5563;margin-top:2px">Engagement Ring · 18K White Gold</div></div>
-    <div style="flex:1;overflow:auto;padding:20px 24px;max-width:860px;margin:0 auto;width:100%">
-      <!-- Status timeline -->
-      <div style="background:#111118;border:1px solid rgba(99,102,241,.3);border-radius:12px;padding:18px;margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><span style="font-size:11px;color:#64748B">CURRENT STATUS</span><span class="badge status-cad" style="font-size:12px;font-weight:700;padding:6px 13px;border-radius:8px">CAD In Progress</span></div>
-        <div class="timeline">
-          ${[
-            ['done','Order\nReceived'],
-            ['done','CAD\nDesign'],
-            ['active','Design\nReview'],
-            ['','Approved'],
-            ['','Mfg'],
-            ['','Ship'],
-            ['','Done'],
-          ].map(([state,label],i,arr)=>`
-          <div class="tl-step">
-            <div class="tl-dot ${state}"></div>
-            <div class="tl-label ${state}">${label}</div>
-          </div>
-          ${i<arr.length-1?`<div class="tl-line ${state==='done'?'done':''}"></div>`:''}`).join('')}
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F6D860,#E6A817);display:flex;align-items:center;justify-content:center;font-size:12px;">&#128100;</div>
+      <div style="font-size:11px;color:#CBD5E1;">Emma T.</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:24px 24px 80px;">
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:4px;">Place a New Order</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:20px;">Tell us about your custom piece</div>
+    <div style="max-width:580px;">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="sec-lbl" style="margin-bottom:14px;">Jewelry Details</div>
+        <div class="field"><label>Order Type *</label><select><option>Engagement Ring</option><option>Wedding Band</option><option>Necklace</option><option>Earrings</option></select></div>
+        <div class="g2">
+          <div class="field"><label>Metal Type *</label><select><option>18K</option><option>14K</option><option>Platinum</option></select></div>
+          <div class="field"><label>Metal Color *</label><select><option>White Gold</option><option>Yellow Gold</option><option>Rose Gold</option></select></div>
+        </div>
+        <div class="field"><label>Ring Size (if applicable)</label><input placeholder="e.g. 6.5"/></div>
+        <div class="sec-lbl" style="margin-top:6px;margin-bottom:14px;">Stone Details</div>
+        <div class="g2">
+          <div class="field"><label>Stone Type</label><select><option>Natural Diamond</option><option>Lab Grown Diamond</option><option>Sapphire</option><option>No Stone</option></select></div>
+          <div class="field"><label>Quality / Grade</label><select><option>VS1</option><option>VS2</option><option>VVS1</option><option>SI1</option></select></div>
+        </div>
+        <div class="g2">
+          <div class="field"><label>Stone Shape</label><select><option>Round</option><option>Oval</option><option>Cushion</option><option>Princess</option></select></div>
+          <div class="field"><label>Approx. Carat Weight</label><input placeholder="e.g. 1.25"/></div>
+        </div>
+        <div class="sec-lbl" style="margin-top:6px;margin-bottom:10px;">Special Instructions</div>
+        <div class="field" style="margin-bottom:20px;"><textarea rows="3" placeholder="Any special requests, engraving, references, or design notes..."></textarea></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-dark" style="flex:1;">Cancel</button>
+          <button class="btn-gold" style="flex:2;">Place Order</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-        <div class="bg-card" style="padding:16px"><div class="sec">Product Specs</div>
-          ${[['Order Type','Engagement Ring'],['Metal','18K White Gold'],['Size','6.5'],['Stone','Lab Grown Diamond'],['Quality','VS1'],['Shape','Round'],['Carat','1.25ct']].map(([k,v])=>`<div class="trow"><span class="tk">${k}</span><span class="tv">${v}</span></div>`).join('')}
-        </div>
-        <div class="bg-card" style="padding:16px"><div class="sec">Order Info</div>
-          ${[['Order #','KJ-CUST-0004'],['Placed','May 25, 2026'],['Status','CAD In Progress']].map(([k,v])=>`<div class="trow"><span class="tk">${k}</span><span class="tv">${v}</span></div>`).join('')}
-          <div style="margin-top:12px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;font-size:11px;color:#F59E0B">Action needed: Review and approve your design file below.</div>
-        </div>
-      </div>
-      <!-- CAD file approval -->
-      <div class="bg-card" style="padding:16px">
-        <div class="sec">Design Files (1)</div>
-        <div style="background:#0F0F14;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:14px 16px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
-            <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px">📎</span><span style="font-size:12px;font-weight:600;color:#E2E8F0">engagement_ring_v2.stl</span><span class="badge" style="background:rgba(245,158,11,.15);color:#F59E0B;font-size:9px">Awaiting Your Approval</span><span style="font-size:9px;color:#4B5563">Rev #2</span></div><div style="font-size:11px;color:#94A3B8;margin-top:2px">Designer note: Adjusted prong setting as requested. Pave diamonds added to band.</div></div>
-            <div style="font-size:10px;color:#4B5563">May 25</div>
-          </div>
-          <div style="font-size:11px;color:#F59E0B;font-weight:600;margin-bottom:10px">This design is waiting for your review and approval.</div>
-          <div style="background:#111118;border:1px solid #2D2D3D;border-radius:7px;padding:8px 10px;color:#4B5563;font-size:11px;margin-bottom:10px;height:40px">Optional feedback or revision notes…</div>
-          <div style="display:flex;gap:8px">
-            <div style="flex:1;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.4);border-radius:7px;padding:8px;color:#10B981;font-size:11px;font-weight:600;text-align:center">✅ Approve Design</div>
-            <div style="flex:1;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);border-radius:7px;padding:8px;color:#8B5CF6;font-size:11px;font-weight:600;text-align:center">🔄 Request Changes</div>
-            <div style="flex:1;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:7px;padding:8px;color:#EF4444;font-size:11px;font-weight:600;text-align:center">❌ Reject</div>
-          </div>
-        </div>
+      <div style="padding:12px 16px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;font-size:11px;color:#818CF8;line-height:1.6;">
+        After placing your order, our team will review it and provide a quote. You will receive CAD designs to approve before manufacturing begins.
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 13: SECURITY + TECH STACK ===================== -->
 <div class="slide" id="s13">
-  <div style="display:flex;height:100vh;align-items:center;justify-content:center;background:#0B0B10">
-    <div style="max-width:860px;width:100%;padding:28px">
-      <h2 style="font-size:24px;font-weight:800;color:#E2E8F0;margin-bottom:6px">Security & Architecture</h2>
-      <p style="font-size:13px;color:#4B5563;margin-bottom:28px">Every request authenticated. Every role enforced server-side.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-        <div class="bg-card" style="padding:20px">
-          <div style="font-size:18px;margin-bottom:10px">🔐</div>
-          <div style="font-size:14px;font-weight:700;color:#6366F1;margin-bottom:8px">JWT Authentication</div>
-          <div style="font-size:12px;color:#64748B;line-height:1.8">• All API endpoints protected by default<br>• Bearer token required on every request<br>• Tokens expire after 7 days<br>• bcrypt password hashing (10 rounds)<br>• Public routes explicitly opt-out with @Public()</div>
-        </div>
-        <div class="bg-card" style="padding:20px">
-          <div style="font-size:18px;margin-bottom:10px">🛡️</div>
-          <div style="font-size:14px;font-weight:700;color:#10B981;margin-bottom:8px">Role-Based Access Control</div>
-          <div style="font-size:12px;color:#64748B;line-height:1.8">• @Roles() decorator on each endpoint<br>• RolesGuard checks JWT payload server-side<br>• Customer data isolated by email filter<br>• CAD Designer sees only CAD-stage orders<br>• Status changes restricted to Sales/Admin</div>
-        </div>
-        <div class="bg-card" style="padding:20px">
-          <div style="font-size:18px;margin-bottom:10px">⚡</div>
-          <div style="font-size:14px;font-weight:700;color:#F59E0B;margin-bottom:8px">Tech Stack</div>
-          <div style="font-size:12px;color:#64748B;line-height:1.8">• <span style="color:#818CF8">Frontend:</span> Next.js 14, TypeScript, Zustand<br>• <span style="color:#818CF8">Backend:</span> NestJS, TypeORM, Passport.js<br>• <span style="color:#818CF8">Auth:</span> JWT, bcryptjs<br>• <span style="color:#818CF8">Storage:</span> SQLite (production: PostgreSQL)<br>• <span style="color:#818CF8">Files:</span> Multer disk storage</div>
-        </div>
-        <div class="bg-card" style="padding:20px">
-          <div style="font-size:18px;margin-bottom:10px">🔄</div>
-          <div style="font-size:14px;font-weight:700;color:#8B5CF6;margin-bottom:8px">Order Workflow</div>
-          <div style="font-size:12px;color:#64748B;line-height:1.8">• 15-stage pipeline from Confirmation → Delivered<br>• CAD upload auto-advances order status<br>• Customer approval triggers pipeline move<br>• SKU auto-generated from order specs<br>• Real-time notification bell (30s poll)</div>
-        </div>
+<div style="display:flex;flex-direction:column;height:calc(100vh - 52px);">
+  <div class="cust-nav">
+    <div class="cust-logo">&#128142; JewelFlow OS</div>
+    <div style="display:flex;gap:4px;">
+      <div class="cust-link on">My Orders</div>
+      <div class="cust-link">Place New Order</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#F6D860,#E6A817);display:flex;align-items:center;justify-content:center;font-size:12px;">&#128100;</div>
+      <div style="font-size:11px;color:#CBD5E1;">Emma T.</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px 24px 80px;">
+    <button class="btn-dark" style="font-size:11px;padding:5px 10px;margin-bottom:12px;">&#8592; My Orders</button>
+    <div style="font-size:18px;font-weight:800;color:#F1F5F9;margin-bottom:2px;">KJ-CUST-0002</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:16px;">Engagement Ring &middot; 18K White Gold</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="flex-sb" style="margin-bottom:14px;">
+        <div style="font-size:10px;color:#64748B;">CURRENT STATUS</div>
+        <span style="background:rgba(245,158,11,0.15);color:#F59E0B;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;">Awaiting Your Approval</span>
       </div>
-      <div style="background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:16px;display:flex;gap:28px;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#F6D860">5</div>
-          <div style="font-size:11px;color:#4B5563">User Roles</div>
+      <div class="tl-row" style="margin:8px 0;">
+        <div class="tl-step"><div class="tl-dot done"></div><div class="tl-lbl done">Received</div></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step"><div class="tl-dot done"></div><div class="tl-lbl done">Confirmed</div></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step"><div class="tl-dot done"></div><div class="tl-lbl done">CAD Design</div></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step"><div class="tl-dot cur"></div><div class="tl-lbl cur">Your Review</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Approved</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Mfg.</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Shipped</div></div>
+        <div class="tl-line"></div>
+        <div class="tl-step"><div class="tl-dot"></div><div class="tl-lbl">Delivered</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-lbl">Design Files (1)</div>
+      <div class="cad-file" style="margin-top:10px;border-color:rgba(245,158,11,0.3);">
+        <div class="flex-sb" style="margin-bottom:10px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>&#128206;</span>
+              <span style="font-size:13px;font-weight:600;color:#E2E8F0;">KJ-CUST-0002_v1.dwg</span>
+              <span class="badge b-wait">Awaiting Your Approval</span>
+              <span style="font-size:10px;color:#4B5563;">Rev #1</span>
+            </div>
+            <div style="font-size:11px;color:#94A3B8;margin-top:5px;">Designer note: Classic solitaire with 6-prong setting, knife-edge band</div>
+          </div>
+          <div style="font-size:10px;color:#4B5563;flex-shrink:0;margin-left:12px;">May 21, 2025</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#818CF8">15</div>
-          <div style="font-size:11px;color:#4B5563">Order Stages</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#10B981">100%</div>
-          <div style="font-size:11px;color:#4B5563">Endpoints Authenticated</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#8B5CF6">CAD</div>
-          <div style="font-size:11px;color:#4B5563">File Upload + Approval</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#F59E0B">SKU</div>
-          <div style="font-size:11px;color:#4B5563">Auto-Generated</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#F97316">Portal</div>
-          <div style="font-size:11px;color:#4B5563">Customer Self-Service</div>
+        <div style="font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:10px;">This design is waiting for your review and approval.</div>
+        <textarea rows="2" placeholder="Optional feedback or revision notes..." style="width:100%;background:#111118;border:1px solid #2D2D3D;border-radius:7px;padding:8px 10px;color:#E2E8F0;font-size:12px;outline:none;resize:none;box-sizing:border-box;margin-bottom:10px;font-family:inherit;"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button style="flex:1;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);border-radius:7px;padding:9px;color:#10B981;font-size:12px;font-weight:600;cursor:pointer;">&#9989; Approve Design</button>
+          <button style="flex:1;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);border-radius:7px;padding:9px;color:#8B5CF6;font-size:12px;font-weight:600;cursor:pointer;">&#128260; Request Changes</button>
+          <button style="flex:1;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:7px;padding:9px;color:#EF4444;font-size:12px;font-weight:600;cursor:pointer;">&#10060; Reject</button>
         </div>
       </div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===================== SLIDE 14: CLOSE ===================== -->
 <div class="slide" id="s14">
-  <div class="title-slide">
-    <div style="font-size:56px;margin-bottom:16px">💎</div>
-    <h1 style="font-size:38px;font-weight:900;background:linear-gradient(135deg,#F6D860,#E6A817);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px">JewelFlow OS</h1>
-    <p style="font-size:15px;color:#94A3B8;margin-bottom:36px;max-width:520px;line-height:1.7;text-align:center">A complete custom jewelry workflow management platform — from customer order to final delivery, with role-based portals, CAD design approval, and auto-generated SKUs.</p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:620px;width:100%;margin-bottom:36px;padding:0 20px">
-      <div class="bg-card" style="padding:16px;text-align:center"><div style="font-size:22px;margin-bottom:6px">🔐</div><div style="font-size:11px;color:#64748B">Secure JWT<br>Authentication</div></div>
-      <div class="bg-card" style="padding:16px;text-align:center"><div style="font-size:22px;margin-bottom:6px">👥</div><div style="font-size:11px;color:#64748B">5 Role-Based<br>Portals</div></div>
-      <div class="bg-card" style="padding:16px;text-align:center"><div style="font-size:22px;margin-bottom:6px">🎨</div><div style="font-size:11px;color:#64748B">CAD Design<br>Approval Flow</div></div>
-    </div>
-    <div style="background:#111118;border:1px solid #1E1E2E;border-radius:12px;padding:16px 24px;text-align:left;max-width:420px">
-      <div style="font-size:10px;color:#4B5563;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase">Run Locally</div>
-      <div style="font-family:monospace;font-size:11px;color:#94A3B8;line-height:2">
-        <span style="color:#4B5563">Backend:</span> <span style="color:#F6D860">node dist/main.js</span> (port 4000)<br>
-        <span style="color:#4B5563">Frontend:</span> <span style="color:#F6D860">npm run dev</span> (port 3000)<br>
-        <span style="color:#4B5563">Admin login:</span> <span style="color:#10B981">admin@kirajewels.one / admin123</span><br>
-        <span style="color:#4B5563">Customer:</span> <span style="color:#F97316">customer@example.com / customer123</span>
+<div class="page">
+  <div style="font-size:22px;font-weight:800;color:#F1F5F9;">Architecture &amp; Security</div>
+  <div style="font-size:13px;color:#64748B;margin-bottom:24px;">Production-grade stack with role-based access control enforced at every layer</div>
+  <div class="g2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="sec-lbl" style="margin-bottom:12px;">Frontend</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Framework</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">Next.js 14 (Pages Router)</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Language</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">TypeScript</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">State</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">Zustand</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Auth</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">JWT in localStorage + apiFetch helper</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Customer</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">Separate portal at /customer/*</span></div>
       </div>
     </div>
-    <p style="margin-top:24px;font-size:12px;color:#2D2D3D">Built for Kira Jewels · JewelFlow OS</p>
+    <div class="card">
+      <div class="sec-lbl" style="margin-bottom:12px;">Backend</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Framework</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">NestJS (Node.js)</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Database</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">sql.js (SQLite in-memory)</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">ORM</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">TypeORM</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Auth</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">Passport JWT (global APP_GUARD)</span></div>
+        <div class="flex-sb"><span style="font-size:12px;color:#94A3B8;">Passwords</span><span style="font-size:12px;color:#E2E8F0;font-weight:600;">bcryptjs (hashed, never plain text)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="sec-lbl" style="margin-bottom:12px;">Security Model</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div style="background:#0F0F14;border:1px solid #1E1E2E;border-radius:8px;padding:12px;">
+        <div style="font-size:18px;margin-bottom:6px;">&#128272;</div>
+        <div style="font-size:12px;font-weight:700;color:#6366F1;margin-bottom:4px;">Global JWT Guard</div>
+        <div style="font-size:11px;color:#64748B;line-height:1.5;">All endpoints protected by default. Only /auth/login is public via @Public() decorator.</div>
+      </div>
+      <div style="background:#0F0F14;border:1px solid #1E1E2E;border-radius:8px;padding:12px;">
+        <div style="font-size:18px;margin-bottom:6px;">&#127917;</div>
+        <div style="font-size:12px;font-weight:700;color:#10B981;margin-bottom:4px;">Role-Based Access</div>
+        <div style="font-size:11px;color:#64748B;line-height:1.5;">@Roles() decorator + RolesGuard enforces per-endpoint permissions at the API level.</div>
+      </div>
+      <div style="background:#0F0F14;border:1px solid #1E1E2E;border-radius:8px;padding:12px;">
+        <div style="font-size:18px;margin-bottom:6px;">&#128269;</div>
+        <div style="font-size:12px;font-weight:700;color:#F59E0B;margin-bottom:4px;">Data Filtering</div>
+        <div style="font-size:11px;color:#64748B;line-height:1.5;">CUSTOMER sees only their orders by email. CAD_DESIGNER sees only CAD-stage orders. Server-enforced.</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-lbl" style="margin-bottom:10px;">Quick Start (Run Locally)</div>
+    <div style="background:#0A0A12;border:1px solid #1E1E2E;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;color:#94A3B8;line-height:2.2;">
+      <div><span style="color:#4B5563;"># 1. Backend (port 4000)</span></div>
+      <div><span style="color:#6366F1;">cd</span> jewelflow-os/backend &amp;&amp; <span style="color:#10B981;">npm install</span> &amp;&amp; <span style="color:#10B981;">npm run start:dev</span></div>
+      <div style="margin-top:4px;"><span style="color:#4B5563;"># 2. Frontend (port 3000)</span></div>
+      <div><span style="color:#6366F1;">cd</span> jewelflow-os/frontend &amp;&amp; <span style="color:#10B981;">npm install</span> &amp;&amp; <span style="color:#10B981;">npm run dev</span></div>
+      <div style="margin-top:8px;color:#F59E0B;">Demo accounts are auto-seeded on backend start. Open localhost:3000 to begin.</div>
+    </div>
   </div>
 </div>
-
-<!-- ===================== NAV BAR ===================== -->
-<div class="nav">
-  <button class="nav-btn" onclick="go(-1)">← Prev</button>
-  <span class="slide-counter" id="counter">1 / 14</span>
-  <button class="nav-btn primary" onclick="go(1)">Next →</button>
 </div>
 
+<div class="slide" id="s15">
+<div style="display:flex;justify-content:center;align-items:center;height:calc(100vh - 52px);padding:40px 20px 80px;flex-direction:column;text-align:center;">
+  <div style="font-size:56px;margin-bottom:16px;">&#128142;</div>
+  <h1 style="font-size:40px;font-weight:900;color:#F6D860;margin-bottom:12px;">JewelFlow OS</h1>
+  <p style="color:#94A3B8;font-size:16px;max-width:620px;line-height:1.8;margin-bottom:32px;">A complete end-to-end workflow platform &mdash; from customer order placement through CAD design approval, manufacturing, and final delivery.</p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:700px;margin-bottom:28px;">
+    <div class="card" style="text-align:center;padding:20px;">
+      <div style="font-size:28px;margin-bottom:8px;">&#128101;</div>
+      <div style="font-size:13px;font-weight:700;color:#E2E8F0;">7 User Roles</div>
+      <div style="font-size:11px;color:#4B5563;margin-top:4px;">Admin, Sales, CAD, SKU, Factory, Shipping, Customer</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px;">
+      <div style="font-size:28px;margin-bottom:8px;">&#128260;</div>
+      <div style="font-size:13px;font-weight:700;color:#E2E8F0;">15 Order Stages</div>
+      <div style="font-size:11px;color:#4B5563;margin-top:4px;">Full pipeline from receipt to delivery</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px;">
+      <div style="font-size:28px;margin-bottom:8px;">&#128274;</div>
+      <div style="font-size:13px;font-weight:700;color:#E2E8F0;">API-Level Security</div>
+      <div style="font-size:11px;color:#4B5563;margin-top:4px;">JWT + RBAC enforced server-side</div>
+    </div>
+  </div>
+  <div style="padding:14px 24px;background:rgba(246,216,96,0.08);border:1px solid rgba(246,216,96,0.2);border-radius:10px;font-size:13px;color:#94A3B8;">
+    GitHub: <strong style="color:#F6D860;">github.com/usajerry2004-glitch/customjewelry</strong>
+  </div>
+</div>
+</div>
+
+<div class="nav-bar">
+  <button onclick="prev()">&#8592; Prev</button>
+  <div id="dots" style="display:flex;gap:4px;align-items:center;"></div>
+  <span class="slide-counter" id="ctr">1 / 15</span>
+  <button onclick="next()">Next &#8594;</button>
+</div>
 <script>
-const SLIDES = [
-  {id:'s1',label:'Title'},
-  {id:'s2',label:'Roles Overview'},
-  {id:'s3',label:'Login'},
-  {id:'s4',label:'Admin Dashboard'},
-  {id:'s5',label:'Orders List'},
-  {id:'s6',label:'Order Detail'},
-  {id:'s7',label:'Kanban Board'},
-  {id:'s8',label:'CAD Designer'},
-  {id:'s9',label:'SKU Management'},
-  {id:'s10',label:'Customer — My Orders'},
-  {id:'s11',label:'Customer — Place Order'},
-  {id:'s12',label:'Customer — CAD Approval'},
-  {id:'s13',label:'Security & Tech'},
-  {id:'s14',label:'Summary'},
-];
-let cur = 0;
-function go(dir) {
-  document.getElementById(SLIDES[cur].id).classList.remove('active');
-  cur = Math.max(0, Math.min(SLIDES.length - 1, cur + dir));
-  document.getElementById(SLIDES[cur].id).classList.add('active');
-  document.getElementById('counter').textContent = (cur+1)+' / '+SLIDES.length+' — '+SLIDES[cur].label;
+var cur = 1;
+var total = document.querySelectorAll('.slide').length;
+function buildDots() {
+  var c = document.getElementById('dots');
+  for (var i = 1; i <= total; i++) {
+    var d = document.createElement('div');
+    d.className = 'dot' + (i === 1 ? ' active' : '');
+    d.onclick = (function(n){ return function(){ go(n); }; })(i);
+    d.title = 'Slide ' + i;
+    c.appendChild(d);
+  }
 }
-document.addEventListener('keydown', e => {
-  if(e.key==='ArrowRight'||e.key===' ') go(1);
-  if(e.key==='ArrowLeft') go(-1);
+function go(n) {
+  document.querySelectorAll('.slide').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.dot').forEach(function(d, i){ d.classList.toggle('active', i + 1 === n); });
+  document.getElementById('s' + n).classList.add('active');
+  document.getElementById('ctr').textContent = n + ' / ' + total;
+  cur = n;
+}
+function next() { if (cur < total) go(cur + 1); }
+function prev() { if (cur > 1) go(cur - 1); }
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
 });
-go(0);
+buildDots();
 </script>
 </body>
 </html>
