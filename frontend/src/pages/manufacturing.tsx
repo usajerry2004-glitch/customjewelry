@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, STATUS_CONFIG } from '../utils/types';
+import { Order, OrderStatus, STATUS_CONFIG } from '../utils/types';
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -107,7 +107,7 @@ export default function ManufacturingPage() {
                   </div>
 
                   {/* SKU_CREATION / CUSTOMER_APPROVED → start production */}
-                  {(order.status === 'SKU_CREATION' || order.status === 'CUSTOMER_APPROVED') && (
+                  {(order.status === OrderStatus.SKU_CREATION || order.status === OrderStatus.CUSTOMER_APPROVED) && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                       <input value={inputs.vpo} onChange={e => setVpo(order.id, 'vpo', e.target.value)} placeholder="VPO Number"
                         style={{ background: '#111118', border: '1px solid #2D2D3D', borderRadius: '7px', padding: '8px 10px', color: '#E2E8F0', fontSize: '12px', outline: 'none' }} />
@@ -124,7 +124,7 @@ export default function ManufacturingPage() {
                   )}
 
                   {/* VPO_ISSUED → create job bag */}
-                  {order.status === 'VPO_ISSUED' && (
+                  {order.status === OrderStatus.VPO_ISSUED && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                       <input value={inputs.jobBag} onChange={e => setVpo(order.id, 'jobBag', e.target.value)} placeholder="Job Bag Number"
                         style={{ background: '#111118', border: '1px solid #2D2D3D', borderRadius: '7px', padding: '8px 10px', color: '#E2E8F0', fontSize: '12px', outline: 'none' }} />
@@ -141,7 +141,7 @@ export default function ManufacturingPage() {
                   )}
 
                   {/* ORDER_JOB_BAG_CREATED → complete */}
-                  {order.status === 'ORDER_JOB_BAG_CREATED' && (
+                  {order.status === OrderStatus.ORDER_JOB_BAG_CREATED && (
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
                       <button
                         onClick={() => action(order.id, 'complete')}
@@ -153,7 +153,7 @@ export default function ManufacturingPage() {
                     </div>
                   )}
 
-                  {order.status === 'ORDER_JOB_BAG_CREATED' && (
+                  {order.status === OrderStatus.ORDER_JOB_BAG_CREATED && (
                     <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '6px' }}>
                       Completing will notify the authorizer and customer that the order is ready for shipment.
                     </div>

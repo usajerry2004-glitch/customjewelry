@@ -1,16 +1,18 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 
 export class OrderFilterDto {
-  search?: string;
-  status?: OrderStatus;
-  vendorName?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  offset?: number;
-  limit?: number;
+  @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() status?: OrderStatus;
+  @IsOptional() @IsString() vendorName?: string;
+  @IsOptional() @IsString() dateFrom?: string;
+  @IsOptional() @IsString() dateTo?: string;
+  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) offset?: number;
+  @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
 }
 
 const CAD_STATUSES = [
@@ -31,9 +33,16 @@ export class OrdersService {
     const qb = this.orderRepo.createQueryBuilder('order');
 
     if (user?.role === 'CUSTOMER') {
-      qb.andWhere('order.customerEmail = :email', { email: user.email });
+      qb.andWhere(
+        '(order.customerEmail = :email OR order.customerId = :uid)',
+        { email: user.email, uid: user.id },
+      );
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
+    } else if (user?.role === 'SKU_MANAGER') {
+      qb.andWhere('order.status IN (:...skuStatuses)', {
+        skuStatuses: [OrderStatus.CUSTOMER_APPROVED, OrderStatus.SKU_CREATION],
+      });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });

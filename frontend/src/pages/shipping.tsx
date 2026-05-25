@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order } from '../utils/types';
+import { Order, OrderStatus } from '../utils/types';
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -66,8 +66,8 @@ export default function ShippingPage() {
   const OrderCard = ({ order, isReady }: { order: Order; isReady: boolean }) => {
     const inputs = getTracking(order.id);
     const busy = !!actionLoading;
-    const statusColor = isReady ? '#3B82F6' : order.status === 'DELIVERED' ? '#10B981' : '#6366F1';
-    const statusLabel = isReady ? 'Ready to Ship' : order.status === 'DELIVERED' ? 'Delivered' : 'Shipped';
+    const statusColor = isReady ? '#3B82F6' : order.status === OrderStatus.DELIVERED ? '#10B981' : '#6366F1';
+    const statusLabel = isReady ? 'Ready to Ship' : order.status === OrderStatus.DELIVERED ? 'Delivered' : 'Shipped';
 
     return (
       <div style={{ background: '#0F0F14', border: `1px solid ${statusColor}30`, borderRadius: '12px', padding: '18px', marginBottom: '10px' }}>
@@ -124,7 +124,7 @@ export default function ShippingPage() {
           </div>
         )}
 
-        {!isReady && order.status === 'SHIPPED' && (
+        {!isReady && order.status === OrderStatus.SHIPPED && (
           <div style={{ marginTop: '10px' }}>
             <button
               onClick={() => markDelivered(order.id)}
