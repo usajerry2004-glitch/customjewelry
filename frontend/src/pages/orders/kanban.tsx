@@ -3,8 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { Order, STATUS_CONFIG } from '../../utils/types';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../../utils/apiFetch';
 
 interface KanbanColumn {
   status: string;
@@ -35,7 +34,7 @@ export default function KanbanPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API}/orders/kanban`);
+        const res = await apiFetch(`${API}/orders/kanban`);
         if (res.ok) {
           const data: KanbanColumn[] = await res.json();
           const sorted = [...data].sort((a, b) =>
@@ -51,9 +50,8 @@ export default function KanbanPage() {
   }, []);
 
   const updateStatus = async (orderId: string, newStatus: string) => {
-    await fetch(`${API}/orders/${orderId}/status`, {
+    await apiFetch(`${API}/orders/${orderId}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     });
     setColumns(prev => {

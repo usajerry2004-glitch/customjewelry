@@ -4,8 +4,7 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { MetricsPanel } from '../components/dashboard/MetricsPanel';
 import { OrderCard } from '../components/orders/OrderCard';
 import { Order, OrderStatus } from '../utils/types';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../utils/apiFetch';
 
 interface Metrics {
   total: number;
@@ -45,8 +44,8 @@ export default function Dashboard() {
     const load = async () => {
       try {
         const [mRes, oRes] = await Promise.all([
-          fetch(`${API}/orders/metrics`),
-          fetch(`${API}/orders?limit=20`),
+          apiFetch(`${API}/orders/metrics`),
+          apiFetch(`${API}/orders?limit=20`),
         ]);
         if (mRes.ok && oRes.ok) {
           const mData = await mRes.json();

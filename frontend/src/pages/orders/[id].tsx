@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, STATUS_CONFIG } from '../../utils/types';
+import { apiFetch, API } from '../../utils/apiFetch';
 
 export async function getServerSideProps() {
   return { props: {} };
 }
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 const FIELD_GROUPS = [
   {
@@ -61,7 +60,7 @@ export default function OrderDetail() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    fetch(`${API}/orders/${id}`)
+    apiFetch(`${API}/orders/${id}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { setOrder(data); setLoading(false); });
   }, [id]);
@@ -69,9 +68,8 @@ export default function OrderDetail() {
   const moveStatus = async (newStatus: OrderStatus) => {
     if (!order?.id) return;
     setUpdatingStatus(true);
-    const res = await fetch(`${API}/orders/${order.id}/status`, {
+    const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     });
     if (res.ok) setOrder(prev => prev ? { ...prev, status: newStatus } : prev);

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -76,6 +76,18 @@ export class CadService {
 
   async getAll(): Promise<CadFile[]> {
     return this.cadRepo.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async assertCustomerOwnsOrder(orderId: string, customerEmail: string): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order || order.customerEmail !== customerEmail) {
+      throw new ForbiddenException('Access denied');
+    }
+  }
+
+  async assertCustomerOwnsCadFile(cadId: string, customerEmail: string): Promise<void> {
+    const cad = await this.findOne(cadId);
+    await this.assertCustomerOwnsOrder(cad.orderId, customerEmail);
   }
 
   private async findOne(id: string): Promise<CadFile> {

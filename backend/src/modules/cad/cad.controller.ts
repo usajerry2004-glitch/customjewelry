@@ -1,13 +1,15 @@
 import {
   Controller, Post, Get, Patch, Param, Body, UploadedFile,
-  UseInterceptors, Request,
+  UseInterceptors, Request, UseGuards, ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
 import { CadService } from './cad.service';
-import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { UserRole } from '../../database/entities/user.entity';
 
 const storage = diskStorage({
   destination: join(process.cwd(), 'uploads', 'cad'),
@@ -23,23 +25,27 @@ const storage = diskStorage({
 export class CadController {
   constructor(private readonly cadService: CadService) {}
 
-  @Public()
   @Get()
-  @ApiOperation({ summary: 'Get all CAD files' })
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Get all CAD files (staff only)' })
   getAll() {
     return this.cadService.getAll();
   }
 
-  @Public()
   @Get('order/:orderId')
   @ApiOperation({ summary: 'Get CAD files for an order' })
-  getByOrder(@Param('orderId') orderId: string) {
+  async getByOrder(@Param('orderId') orderId: string, @Request() req: any) {
+    if (req.user?.role === UserRole.CUSTOMER) {
+      await this.cadService.assertCustomerOwnsOrder(orderId, req.user.email);
+    }
     return this.cadService.getByOrder(orderId);
   }
 
-  @Public()
   @Post('upload/:orderId')
-  @ApiOperation({ summary: 'Upload a CAD file for an order' })
+  @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Upload a CAD file' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { storage }))
   upload(
@@ -48,36 +54,47 @@ export class CadController {
     @Body('designerNotes') designerNotes: string,
     @Request() req: any,
   ) {
-    const uploadedBy = req.user?.email || 'designer@kirajewels.one';
-    return this.cadService.upload(orderId, file, uploadedBy, designerNotes);
+    return this.cadService.upload(orderId, file, req.user?.email || 'designer', designerNotes);
   }
 
-  @Public()
   @Patch(':id/send')
-  @ApiOperation({ summary: 'Send CAD file to customer for approval' })
+  @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Send CAD to customer for approval' })
   send(@Param('id') id: string) {
     return this.cadService.sendForApproval(id);
   }
 
-  @Public()
   @Patch(':id/approve')
-  @ApiOperation({ summary: 'Approve a CAD file' })
-  approve(@Param('id') id: string, @Request() req: any) {
-    const by = req.user?.email || 'customer@example.com';
-    return this.cadService.approve(id, by);
+  @ApiOperation({ summary: 'Approve a CAD file (Customer or Admin)' })
+  async approve(@Param('id') id: string, @Request() req: any) {
+    if (req.user?.role === UserRole.CUSTOMER) {
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+    } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
+      throw new ForbiddenException('Not authorized');
+    }
+    return this.cadService.approve(id, req.user?.email);
   }
 
-  @Public()
   @Patch(':id/reject')
-  @ApiOperation({ summary: 'Reject a CAD file' })
-  reject(@Param('id') id: string, @Body('feedback') feedback: string) {
+  @ApiOperation({ summary: 'Reject a CAD file (Customer or Admin)' })
+  async reject(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
+    if (req.user?.role === UserRole.CUSTOMER) {
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+    } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
+      throw new ForbiddenException('Not authorized');
+    }
     return this.cadService.reject(id, feedback || 'Rejected');
   }
 
-  @Public()
   @Patch(':id/revision')
-  @ApiOperation({ summary: 'Request a revision on a CAD file' })
-  revision(@Param('id') id: string, @Body('feedback') feedback: string) {
+  @ApiOperation({ summary: 'Request revision (Customer or Admin)' })
+  async revision(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
+    if (req.user?.role === UserRole.CUSTOMER) {
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+    } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
+      throw new ForbiddenException('Not authorized');
+    }
     return this.cadService.requestRevision(id, feedback || 'Please revise');
   }
 }

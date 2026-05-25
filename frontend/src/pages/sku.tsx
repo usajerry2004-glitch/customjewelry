@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../utils/apiFetch';
 
 interface Sku {
   id: string;
@@ -30,8 +29,8 @@ export default function SKUPage() {
     setLoading(true);
     try {
       const [sRes, oRes] = await Promise.all([
-        fetch(`${API}/sku${search ? `?search=${search}` : ''}`),
-        fetch(`${API}/orders?limit=100`),
+        apiFetch(`${API}/sku${search ? `?search=${search}` : ''}`),
+        apiFetch(`${API}/orders?limit=100`),
       ]);
       if (sRes.ok) setSkus(await sRes.json());
       if (oRes.ok) { const d = await oRes.json(); setOrders(d.orders || []); }
@@ -43,7 +42,7 @@ export default function SKUPage() {
   const generate = async (orderId: string) => {
     setGenerating(orderId);
     try {
-      const res = await fetch(`${API}/sku/generate/${orderId}`, { method: 'POST' });
+      const res = await apiFetch(`${API}/sku/generate/${orderId}`, { method: 'POST' });
       if (res.ok) await loadAll();
     } finally { setGenerating(null); }
   };

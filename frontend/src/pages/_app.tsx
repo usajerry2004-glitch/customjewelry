@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/auth.store';
 import '../styles/globals.css';
 
 const PUBLIC_ROUTES = ['/login'];
+const CUSTOMER_ROUTES = ['/customer/orders', '/customer/orders/new'];
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -16,11 +17,23 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.includes(router.pathname);
-    if (!user && !isPublic) {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('jf_token') : null;
-      if (!stored) router.replace('/login');
+    const isCustomerRoute = router.pathname.startsWith('/customer');
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('jf_token') : null;
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('jf_user') : null;
+    const role = storedUser ? JSON.parse(storedUser).role : null;
+
+    if (!stored && !isPublic) {
+      router.replace('/login');
+      return;
     }
-  }, [user, router.pathname]);
+    if (stored && !isPublic) {
+      if (role === 'CUSTOMER' && !isCustomerRoute) {
+        router.replace('/customer/orders');
+      } else if (role !== 'CUSTOMER' && isCustomerRoute) {
+        router.replace('/dashboard');
+      }
+    }
+  }, [router.pathname]);
 
   return <Component {...pageProps} />;
 }

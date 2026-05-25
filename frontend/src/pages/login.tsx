@@ -7,8 +7,9 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 const DEMO_ACCOUNTS = [
   { label: 'Admin', email: 'admin@kirajewels.one', password: 'admin123', role: 'ADMIN', color: '#6366F1' },
   { label: 'Sales Rep', email: 'sales@kirajewels.one', password: 'sales123', role: 'SALES_REP', color: '#10B981' },
-  { label: 'CAD Designer', email: 'cad@kirajewels.one', password: 'cad12345', role: 'CAD_DESIGNER', color: '#8B5CF6' },
-  { label: 'SKU Manager', email: 'sku@kirajewels.one', password: 'sku12345', role: 'SKU_MANAGER', color: '#F59E0B' },
+  { label: 'CAD Designer', email: 'cad@kirajewels.one', password: 'cad123', role: 'CAD_DESIGNER', color: '#8B5CF6' },
+  { label: 'SKU Manager', email: 'sku@kirajewels.one', password: 'sku123', role: 'SKU_MANAGER', color: '#F59E0B' },
+  { label: 'Customer', email: 'customer@example.com', password: 'customer123', role: 'CUSTOMER', color: '#F97316' },
 ];
 
 export default function LoginPage() {
@@ -24,7 +25,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (user) router.replace('/dashboard');
+    if (user) router.replace(user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
   }, [user]);
 
   const handleLogin = async (e?: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
@@ -40,7 +41,7 @@ export default function LoginPage() {
       if (res.ok) {
         const data = await res.json();
         setAuth(data.user, data.access_token);
-        router.replace('/dashboard');
+        router.replace(data.user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
       } else {
         const err = await res.json();
         setError(err.message || 'Invalid credentials');

@@ -1,9 +1,11 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 import { Order } from './database/entities/order.entity';
 import { User } from './database/entities/user.entity';
@@ -42,6 +44,9 @@ import { AuthService } from './modules/auth/auth.service';
     CadModule,
     SkuModule,
     NotificationsModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })
 export class AppModule implements OnModuleInit {

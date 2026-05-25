@@ -28,3 +28,13 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# TypeScript incremental build info
+**/*.tsbuildinfo
+
+# Uploads (user-generated files)
+backend/uploads/

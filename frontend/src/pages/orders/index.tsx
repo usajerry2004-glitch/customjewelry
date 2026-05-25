@@ -3,8 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { Order, OrderStatus, STATUS_CONFIG } from '../../utils/types';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../../utils/apiFetch';
 
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
@@ -34,7 +33,7 @@ export default function OrdersPage() {
       const params = new URLSearchParams({ limit: '50' });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
-      const res = await fetch(`${API}/orders?${params}`);
+      const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || []);
@@ -51,9 +50,8 @@ export default function OrdersPage() {
     if (!newOrder.poNumber.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API}/orders`, {
+      const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newOrder, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD' }),
       });
       if (res.ok) { setShowNew(false); setNewOrder({ poNumber: '', storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' }); load(); }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../utils/apiFetch';
 
 const STATUS_COLORS: Record<string, { color: string; label: string }> = {
   UPLOADED:            { color: '#6366F1', label: 'Uploaded' },
@@ -43,8 +42,8 @@ export default function CADPage() {
     setLoading(true);
     try {
       const [fRes, oRes] = await Promise.all([
-        fetch(`${API}/cad`),
-        fetch(`${API}/orders?limit=100`),
+        apiFetch(`${API}/cad`),
+        apiFetch(`${API}/orders?limit=100`),
       ]);
       if (fRes.ok) setFiles(await fRes.json());
       if (oRes.ok) { const d = await oRes.json(); setOrders(d.orders || []); }
@@ -63,7 +62,7 @@ export default function CADPage() {
       const fd = new FormData();
       fd.append('file', file);
       if (notes) fd.append('designerNotes', notes);
-      const res = await fetch(`${API}/cad/upload/${selectedOrderId}`, { method: 'POST', body: fd });
+      const res = await apiFetch(`${API}/cad/upload/${selectedOrderId}`, { method: 'POST', body: fd });
       if (res.ok) { setNotes(''); setSelectedOrderId(''); if (fileRef.current) fileRef.current.value = ''; await loadAll(); }
     } finally { setUploading(false); }
   };
@@ -71,9 +70,8 @@ export default function CADPage() {
   const action = async (id: string, endpoint: string, body?: object) => {
     setActionLoading(id + endpoint);
     try {
-      await fetch(`${API}/cad/${id}/${endpoint}`, {
+      await apiFetch(`${API}/cad/${id}/${endpoint}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined,
       });
       await loadAll();

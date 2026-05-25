@@ -3,8 +3,7 @@ import { useRouter } from 'next/router';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+import { apiFetch, API } from '../../utils/apiFetch';
 
 interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; }
 
@@ -25,7 +24,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API}/notifications/unread-count`);
+        const res = await apiFetch(`${API}/notifications/unread-count`);
         if (res.ok) { const d = await res.json(); setUnread(d.count); }
       } catch {}
     };
@@ -37,7 +36,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const openNotifs = async () => {
     if (!showNotifs) {
       try {
-        const res = await fetch(`${API}/notifications`);
+        const res = await apiFetch(`${API}/notifications`);
         if (res.ok) setNotifs(await res.json());
       } catch {}
     }
@@ -45,7 +44,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   };
 
   const markAllRead = async () => {
-    await fetch(`${API}/notifications/read-all`, { method: 'PATCH' });
+    await apiFetch(`${API}/notifications/read-all`, { method: 'PATCH' });
     setUnread(0);
     setNotifs(p => p.map(n => ({ ...n, isRead: true })));
   };

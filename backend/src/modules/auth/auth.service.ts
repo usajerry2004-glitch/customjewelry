@@ -44,16 +44,19 @@ export class AuthService {
   }
 
   async seedAdmin() {
-    const exists = await this.userRepo.findOne({ where: { email: 'admin@kirajewels.one' } });
-    if (exists) return;
-    const passwordHash = await bcrypt.hash('admin123', 10);
-    await this.userRepo.save(this.userRepo.create({
-      firstName: 'Admin',
-      lastName: 'User',
-      email: 'admin@kirajewels.one',
-      passwordHash,
-      role: UserRole.ADMIN,
-    }));
+    const seeds = [
+      { firstName: 'Admin', lastName: 'User', email: 'admin@kirajewels.one', password: 'admin123', role: UserRole.ADMIN },
+      { firstName: 'Sarah', lastName: 'Chen', email: 'sales@kirajewels.one', password: 'sales123', role: UserRole.SALES_REP },
+      { firstName: 'Maya', lastName: 'Patel', email: 'cad@kirajewels.one', password: 'cad123', role: UserRole.CAD_DESIGNER },
+      { firstName: 'Jake', lastName: 'Morris', email: 'sku@kirajewels.one', password: 'sku123', role: UserRole.SKU_MANAGER },
+      { firstName: 'Emma', lastName: 'Thompson', email: 'customer@example.com', password: 'customer123', role: UserRole.CUSTOMER },
+    ];
+    for (const seed of seeds) {
+      const exists = await this.userRepo.findOne({ where: { email: seed.email } });
+      if (exists) continue;
+      const passwordHash = await bcrypt.hash(seed.password, 10);
+      await this.userRepo.save(this.userRepo.create({ ...seed, passwordHash }));
+    }
   }
 
   async me(userId: string) {
