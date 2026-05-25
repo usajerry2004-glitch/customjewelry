@@ -56,6 +56,7 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Partial<Order> | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [authorizing, setAuthorizing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -64,6 +65,17 @@ export default function OrderDetail() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { setOrder(data); setLoading(false); });
   }, [id]);
+
+  const authorizeOrder = async () => {
+    if (!order?.id) return;
+    setAuthorizing(true);
+    const res = await apiFetch(`${API}/orders/${order.id}/authorize`, { method: 'PATCH' });
+    if (res.ok) {
+      const updated = await res.json();
+      setOrder(updated);
+    }
+    setAuthorizing(false);
+  };
 
   const moveStatus = async (newStatus: OrderStatus) => {
     if (!order?.id) return;
@@ -144,6 +156,23 @@ export default function OrderDetail() {
               {cfg.label}
             </div>
           </div>
+
+          {/* Authorize button — only for WAITING_CONFIRMATION */}
+          {order.status === OrderStatus.WAITING_CONFIRMATION && (
+            <div style={{ background: '#111118', border: '1px solid rgba(246,216,96,0.3)', borderRadius: '12px', padding: '18px' }}>
+              <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '10px', letterSpacing: '0.5px' }}>AWAITING AUTHORIZATION</div>
+              <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.5 }}>
+                Review and authorize this order to release it to the CAD design team.
+              </p>
+              <button
+                onClick={authorizeOrder}
+                disabled={authorizing}
+                style={{ width: '100%', background: 'linear-gradient(135deg, rgba(246,216,96,0.15), rgba(230,168,23,0.15))', border: '1px solid rgba(246,216,96,0.5)', borderRadius: '8px', padding: '10px', color: '#F6D860', fontSize: '13px', fontWeight: 700, cursor: authorizing ? 'not-allowed' : 'pointer', opacity: authorizing ? 0.7 : 1 }}
+              >
+                {authorizing ? 'Authorizing…' : '✅ Authorize Order'}
+              </button>
+            </div>
+          )}
 
           {/* Move to next status */}
           <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>

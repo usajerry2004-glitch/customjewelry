@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sku } from '../../database/entities/sku.entity';
-import { Order } from '../../database/entities/order.entity';
+import { Order, OrderStatus } from '../../database/entities/order.entity';
 
 const TYPE_CODES: Record<string, string> = {
   'Engagement Ring': 'RING',
@@ -60,7 +60,7 @@ export class SkuService {
       generatedBy: generatedBy || 'sku-manager@kirajewels.one',
     });
     const saved = await this.skuRepo.save(sku);
-    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber });
+    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber, status: OrderStatus.SKU_CREATION });
     return saved;
   }
 

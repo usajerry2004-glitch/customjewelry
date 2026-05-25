@@ -18,6 +18,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CadModule } from './modules/cad/cad.module';
 import { SkuModule } from './modules/sku/sku.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
+import { ShippingModule } from './modules/shipping/shipping.module';
 import { AuthService } from './modules/auth/auth.service';
 
 @Module({
@@ -31,11 +33,15 @@ import { AuthService } from './modules/auth/auth.service';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
-        type: 'sqljs',
+        type: 'postgres',
+        host: config.get('DB_HOST', 'localhost'),
+        port: config.get<number>('DB_PORT', 5432),
+        username: config.get('DB_USERNAME', 'jewelflow'),
+        password: config.get('DB_PASSWORD', 'jewelflow123'),
+        database: config.get('DB_NAME', 'jewelflow'),
         entities: [Order, User, CadFile, Sku, Notification],
-        synchronize: config.get('NODE_ENV') !== 'production',
+        synchronize: true,
         logging: false,
-        autoSave: false,
       }),
       inject: [ConfigService],
     }),
@@ -44,6 +50,8 @@ import { AuthService } from './modules/auth/auth.service';
     CadModule,
     SkuModule,
     NotificationsModule,
+    ManufacturingModule,
+    ShippingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

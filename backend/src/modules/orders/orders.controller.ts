@@ -61,4 +61,12 @@ export class OrdersController {
   updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
     return this.ordersService.updateStatus(id, status);
   }
+
+  @Patch(':id/authorize')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Authorize order — moves to PENDING_CAD' })
+  authorize(@Param('id') id: string) {
+    return this.ordersService.authorize(id);
+  }
 }

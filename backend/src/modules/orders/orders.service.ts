@@ -89,6 +89,32 @@ export class OrdersService {
     return this.update(id, { status }, user);
   }
 
+  async authorize(id: string): Promise<Order> {
+    const order = await this.findOne(id);
+    if (order.status !== OrderStatus.WAITING_CONFIRMATION) {
+      throw new ForbiddenException('Order must be in WAITING_CONFIRMATION status to authorize');
+    }
+    return this.orderRepo.save({ ...order, status: OrderStatus.PENDING_CAD });
+  }
+
+  async getForFactory() {
+    return this.orderRepo.find({
+      where: [
+        { status: OrderStatus.SKU_CREATION },
+        { status: OrderStatus.VPO_ISSUED },
+        { status: OrderStatus.ORDER_JOB_BAG_CREATED },
+      ],
+      order: { updatedAt: 'ASC' },
+    });
+  }
+
+  async getForShipping() {
+    return this.orderRepo.find({
+      where: { status: OrderStatus.READY_TO_SHIP },
+      order: { updatedAt: 'ASC' },
+    });
+  }
+
   async getKanbanBoard(user?: { role: string }) {
     const statuses = Object.values(OrderStatus);
     return Promise.all(

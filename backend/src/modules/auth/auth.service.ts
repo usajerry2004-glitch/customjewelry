@@ -47,8 +47,11 @@ export class AuthService {
     const seeds = [
       { firstName: 'Admin', lastName: 'User', email: 'admin@kirajewels.one', password: 'admin123', role: UserRole.ADMIN },
       { firstName: 'Sarah', lastName: 'Chen', email: 'sales@kirajewels.one', password: 'sales123', role: UserRole.SALES_REP },
+      { firstName: 'Raj', lastName: 'Sharma', email: 'authorizer@kirajewels.one', password: 'auth123', role: UserRole.AUTHORIZER },
       { firstName: 'Maya', lastName: 'Patel', email: 'cad@kirajewels.one', password: 'cad123', role: UserRole.CAD_DESIGNER },
       { firstName: 'Jake', lastName: 'Morris', email: 'sku@kirajewels.one', password: 'sku123', role: UserRole.SKU_MANAGER },
+      { firstName: 'Arjun', lastName: 'Singh', email: 'factory@kirajewels.one', password: 'factory123', role: UserRole.FACTORY_MANAGER },
+      { firstName: 'Lisa', lastName: 'Nguyen', email: 'shipping@kirajewels.one', password: 'shipping123', role: UserRole.SHIPPING_MANAGER },
       { firstName: 'Emma', lastName: 'Thompson', email: 'customer@example.com', password: 'customer123', role: UserRole.CUSTOMER },
     ];
     for (const seed of seeds) {
