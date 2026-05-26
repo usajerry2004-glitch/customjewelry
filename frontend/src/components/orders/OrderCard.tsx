@@ -8,70 +8,80 @@ interface OrderCardProps {
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact }) => {
-  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#64748B', bg: '#F1F5F9' };
+  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
 
   return (
     <div
       onClick={() => onClick?.(order)}
       style={{
-        background: '#1A1A24',
-        border: '1px solid #2D2D3D',
-        borderRadius: '10px',
-        padding: compact ? '12px' : '16px',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: compact ? '12px 16px' : '16px 20px',
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
+        transition: 'box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
         marginBottom: '8px',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)';
+        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)';
+        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-sm)';
+        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)';
+        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
         <div>
-          <span style={{ color: '#F6D860', fontWeight: 700, fontSize: '13px' }}>{order.poNumber}</span>
+          <span style={{ color: 'var(--navy)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.3px' }}>
+            {order.poNumber}
+          </span>
           {order.kiraSkuNumber && (
-            <span style={{ color: '#64748B', fontSize: '11px', marginLeft: '8px' }}>{order.kiraSkuNumber}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px' }}>{order.kiraSkuNumber}</span>
           )}
         </div>
         <span style={{
           background: cfg.bg,
           color: cfg.color,
-          padding: '2px 8px',
+          padding: '3px 9px',
           borderRadius: '99px',
           fontSize: '10px',
           fontWeight: 600,
           whiteSpace: 'nowrap',
+          letterSpacing: '0.3px',
         }}>
           {cfg.label}
         </span>
       </div>
-      <div style={{ color: '#CBD5E1', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+
+      <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
         {order.storeName || order.customerFullName || 'Unknown Store'}
       </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        {order.orderType && (
-          <Tag icon="💍" text={order.orderType} />
-        )}
-        {order.metalType && order.metalColor && (
-          <Tag icon="✨" text={`${order.metalType} ${order.metalColor}`} />
-        )}
-        {order.quotedCost && (
-          <Tag icon="💰" text={`$${order.quotedCost.toLocaleString()}`} color="#10B981" />
-        )}
+
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {order.orderType && <Tag text={order.orderType} />}
+        {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
+        {order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
       </div>
     </div>
   );
 };
 
-const Tag: React.FC<{ icon: string; text: string; color?: string }> = ({ icon, text, color }) => (
+const Tag: React.FC<{ text: string; gold?: boolean }> = ({ text, gold }) => (
   <span style={{
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '3px',
-    background: '#0F0F14',
-    border: '1px solid #2D2D3D',
-    borderRadius: '6px',
-    padding: '2px 6px',
+    background: gold ? 'rgba(192,155,88,0.1)' : 'var(--bg-input)',
+    border: `1px solid ${gold ? 'rgba(192,155,88,0.25)' : 'var(--border)'}`,
+    borderRadius: '5px',
+    padding: '2px 8px',
     fontSize: '11px',
-    color: color || '#94A3B8',
+    color: gold ? 'var(--accent-dark)' : 'var(--text-secondary)',
+    fontWeight: gold ? 600 : 400,
   }}>
-    {icon} {text}
+    {text}
   </span>
 );

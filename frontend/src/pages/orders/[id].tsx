@@ -1,13 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, STATUS_CONFIG } from '../../utils/types';
+import { Order, OrderStatus, STATUS_CONFIG, UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
 export async function getServerSideProps() {
   return { props: {} };
 }
+
+// Statuses each role is permitted to move an order into
+const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
+  [UserRole.ADMIN]: Object.values(OrderStatus).filter(s => s !== OrderStatus.CANCELLED),
+  [UserRole.SALES_REP]: [OrderStatus.WAITING_CONFIRMATION, OrderStatus.CANCELLED],
+  [UserRole.AUTHORIZER]: [OrderStatus.PENDING_CAD, OrderStatus.CANCELLED],
+  [UserRole.CAD_DESIGNER]: [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CUSTOMER_APPROVED, OrderStatus.CUSTOMER_REJECTED],
+  [UserRole.SKU_MANAGER]: [OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED],
+  [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.ORDER_JOB_BAG_CREATED, OrderStatus.READY_TO_INVOICE],
+  [UserRole.SHIPPING_MANAGER]: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+  [UserRole.STONE_MANAGER]: [],
+  [UserRole.US_SETTER]: [OrderStatus.REPAIR],
+  [UserRole.CUSTOMER]: [],
+};
 
 const FIELD_GROUPS = [
   {
@@ -51,6 +65,14 @@ const FIELD_GROUPS = [
   },
 ];
 
+const cardStyle = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  padding: '20px 22px',
+  boxShadow: 'var(--shadow-sm)',
+};
+
 export default function OrderDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -81,10 +103,7 @@ export default function OrderDetail() {
     if (!order?.id) return;
     setAuthorizing(true);
     const res = await apiFetch(`${API}/orders/${order.id}/authorize`, { method: 'PATCH' });
-    if (res.ok) {
-      const updated = await res.json();
-      setOrder(updated);
-    }
+    if (res.ok) setOrder(await res.json());
     setAuthorizing(false);
   };
 
@@ -92,10 +111,7 @@ export default function OrderDetail() {
     if (!order?.id) return;
     setSummaryLoading(true);
     const res = await apiFetch(`${API}/orders/${order.id}/summary`);
-    if (res.ok) {
-      const data = await res.json();
-      setSummary(data.summary);
-    }
+    if (res.ok) { const d = await res.json(); setSummary(d.summary); }
     setSummaryLoading(false);
   };
 
@@ -113,7 +129,7 @@ export default function OrderDetail() {
   if (loading) {
     return (
       <AppLayout title="Order Detail">
-        <div style={{ color: '#4B5563', padding: '40px 0', textAlign: 'center' }}>Loading…</div>
+        <div style={{ color: 'var(--text-muted)', padding: '60px 0', textAlign: 'center', fontSize: '14px' }}>Loading…</div>
       </AppLayout>
     );
   }
@@ -121,151 +137,186 @@ export default function OrderDetail() {
   if (!order) {
     return (
       <AppLayout title="Order Not Found">
-        <div style={{ color: '#EF4444', padding: '40px 0', textAlign: 'center' }}>
-          Order not found. <a href="/orders" style={{ color: '#F6D860' }}>Back to orders</a>
+        <div style={{ color: 'var(--danger)', padding: '60px 0', textAlign: 'center' }}>
+          Order not found. <a href="/orders" style={{ color: 'var(--accent)', fontWeight: 600 }}>Back to orders</a>
         </div>
       </AppLayout>
     );
   }
 
-  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#64748B', bg: '#1A1A24' };
+  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
+  const userRole = currentUser?.role || '';
+  const allowedStatuses = ROLE_STAGE_PERMISSIONS[userRole] || [];
+  const movableStatuses = allowedStatuses.filter(s => s !== order.status);
 
   return (
     <AppLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.storeName || order.customerFullName || ''}
       actions={
-        <button onClick={() => router.push('/orders')} style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '7px 14px', color: '#94A3B8', fontSize: '12px', cursor: 'pointer' }}>
+        <button
+          onClick={() => router.push('/orders')}
+          style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
+        >
           ← Back to Orders
         </button>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '20px', alignItems: 'start' }}>
-        {/* Field groups */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {FIELD_GROUPS.map(group => (
-            <div key={group.title} style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px 20px' }}>
-              <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px' }}>{group.title}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                {group.fields.map(({ key, label, format }) => {
-                  const raw = (order as any)[key];
-                  const val = format ? format(raw) : (raw ?? '—');
-                  return (
-                    <div key={key}>
-                      <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '3px', letterSpacing: '0.5px' }}>{label}</div>
-                      <div style={{ fontSize: '13px', color: raw ? '#E2E8F0' : '#2D2D3D', fontWeight: raw ? 500 : 400 }}>{val || '—'}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '24px', alignItems: 'start' }}>
 
-          {order.customerNotes && (
-            <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px 20px' }}>
-              <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '10px' }}>Customer Notes</h3>
-              <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: 1.6 }}>{order.customerNotes}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Status sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Current status */}
-          <div style={{ background: '#111118', border: `1px solid ${cfg.color}30`, borderRadius: '12px', padding: '18px' }}>
-            <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '8px', letterSpacing: '0.5px' }}>CURRENT STATUS</div>
-            <div style={{ display: 'inline-block', background: `${cfg.color}20`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
-              {cfg.label}
-            </div>
-          </div>
-
-          {/* Authorize panel — only for WAITING_CONFIRMATION */}
-          {order.status === OrderStatus.WAITING_CONFIRMATION && (
-            <div style={{ background: '#111118', border: '1px solid rgba(246,216,96,0.3)', borderRadius: '12px', padding: '18px' }}>
-              <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '10px', letterSpacing: '0.5px' }}>AWAITING AUTHORIZATION</div>
-
-              {/* AI Summary */}
-              {summary ? (
-                <div style={{ background: '#0A0A12', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
-                  <div style={{ fontSize: '10px', color: '#F6D860', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Order Brief</div>
-                  <p style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: 1.65, margin: 0 }}>{summary}</p>
-                </div>
-              ) : (
-                <button
-                  onClick={loadSummary}
-                  disabled={summaryLoading}
-                  style={{ width: '100%', marginBottom: '10px', background: '#0A0A12', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '9px', color: '#64748B', fontSize: '12px', cursor: 'pointer', opacity: summaryLoading ? 0.7 : 1 }}
-                >
-                  {summaryLoading ? '✨ Generating summary…' : '✨ Generate AI Order Brief'}
-                </button>
-              )}
-
-              <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.5 }}>
-                Review and authorize this order to release it to the CAD design team.
-              </p>
-              <button
-                onClick={authorizeOrder}
-                disabled={authorizing}
-                style={{ width: '100%', background: 'linear-gradient(135deg, rgba(246,216,96,0.15), rgba(230,168,23,0.15))', border: '1px solid rgba(246,216,96,0.5)', borderRadius: '8px', padding: '10px', color: '#F6D860', fontSize: '13px', fontWeight: 700, cursor: authorizing ? 'not-allowed' : 'pointer', opacity: authorizing ? 0.7 : 1 }}
-              >
-                {authorizing ? 'Authorizing…' : '✅ Authorize Order'}
-              </button>
-            </div>
-          )}
-
-          {/* Move to next status */}
-          <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-            <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '12px', letterSpacing: '0.5px' }}>MOVE TO STAGE</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {Object.values(OrderStatus)
-                .filter(s => s !== order.status && s !== OrderStatus.CANCELLED)
-                .map(s => {
-                  const sc = STATUS_CONFIG[s];
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => moveStatus(s)}
-                      disabled={updatingStatus}
-                      style={{
-                        background: '#0F0F14', border: `1px solid ${sc.color}30`, borderRadius: '7px', padding: '8px 12px',
-                        color: sc.color, fontSize: '12px', cursor: 'pointer', textAlign: 'left', opacity: updatingStatus ? 0.5 : 1,
-                      }}
-                    >
-                      {sc.label}
-                    </button>
-                  );
-                })
-              }
-            </div>
-          </div>
-
-          {/* Dates */}
-          <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-            <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '12px', letterSpacing: '0.5px' }}>TIMELINE</div>
-            {[
-              { label: 'Created', value: order.createdAt },
-              { label: 'Updated', value: order.updatedAt },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ marginBottom: '8px' }}>
-                <div style={{ fontSize: '10px', color: '#4B5563' }}>{label}</div>
-                <div style={{ fontSize: '12px', color: '#94A3B8' }}>
-                  {value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+          {/* Field groups */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {FIELD_GROUPS.map(group => (
+              <div key={group.title} style={cardStyle}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '16px' }}>
+                  {group.title}
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+                  {group.fields.map(({ key, label, format }) => {
+                    const raw = (order as any)[key];
+                    const val = format ? format(raw) : (raw ?? '—');
+                    return (
+                      <div key={key}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                          {label}
+                        </div>
+                        <div style={{ fontSize: '13px', color: raw ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: raw ? 500 : 400 }}>
+                          {val || '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
+
+            {order.customerNotes && (
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px' }}>
+                  Customer Notes
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>{order.customerNotes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Status sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Current status */}
+            <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Current Status
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: cfg.bg, color: cfg.color, padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+                {cfg.label}
+              </div>
+            </div>
+
+            {/* Authorize panel — only for WAITING_CONFIRMATION and authorizers/admin */}
+            {order.status === OrderStatus.WAITING_CONFIRMATION &&
+              (userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) && (
+              <div style={{ ...cardStyle, borderLeft: '3px solid var(--accent)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  Awaiting Authorization
+                </div>
+
+                {summary ? (
+                  <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      AI Order Brief
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{summary}</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={loadSummary}
+                    disabled={summaryLoading}
+                    style={{ width: '100%', marginBottom: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', opacity: summaryLoading ? 0.7 : 1 }}
+                  >
+                    {summaryLoading ? '✨ Generating…' : '✨ Generate AI Order Brief'}
+                  </button>
+                )}
+
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.6 }}>
+                  Review and authorize to release to the CAD design team.
+                </p>
+                <button
+                  onClick={authorizeOrder}
+                  disabled={authorizing}
+                  style={{ width: '100%', background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '11px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: authorizing ? 'not-allowed' : 'pointer', opacity: authorizing ? 0.7 : 1, letterSpacing: '0.3px' }}
+                >
+                  {authorizing ? 'Authorizing…' : 'Authorize Order'}
+                </button>
+              </div>
+            )}
+
+            {/* Move to Stage — role-filtered */}
+            {movableStatuses.length > 0 && (
+              <div style={cardStyle}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  Move to Stage
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {movableStatuses.map(s => {
+                    const sc = STATUS_CONFIG[s];
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => moveStatus(s)}
+                        disabled={updatingStatus}
+                        style={{
+                          background: sc.bg,
+                          border: `1px solid ${sc.color}40`,
+                          borderRadius: '8px',
+                          padding: '9px 14px',
+                          color: sc.color,
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: updatingStatus ? 'not-allowed' : 'pointer',
+                          textAlign: 'left',
+                          opacity: updatingStatus ? 0.6 : 1,
+                          transition: 'opacity 0.15s',
+                          letterSpacing: '0.2px',
+                        }}
+                      >
+                        → {sc.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Timeline
+              </div>
+              {[
+                { label: 'Created', value: order.createdAt },
+                { label: 'Updated', value: order.updatedAt },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    {value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Conversation */}
-      {order.id && currentUser && (
-        <OrderConversation
-          orderId={order.id}
-          currentUserRole={currentUser.role}
-          currentUserId={currentUser.id}
-        />
-      )}
+        {/* Conversation */}
+        {order.id && currentUser && (
+          <OrderConversation
+            orderId={order.id}
+            currentUserRole={currentUser.role}
+            currentUserId={currentUser.id}
+          />
+        )}
       </div>
     </AppLayout>
   );

@@ -14,42 +14,69 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
   const { user, clearAuth } = useAuthStore();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0B0B10', color: '#E2E8F0' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-page)', color: 'var(--text-primary)' }}>
       {/* Top nav */}
-      <div style={{ background: '#111118', borderBottom: '1px solid #1E1E2E', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <div style={{ fontSize: '18px', fontWeight: 800, background: 'linear-gradient(135deg, #F6D860, #E6A817)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            💎 JewelFlow
+      <div style={{
+        background: 'var(--sidebar-bg)',
+        padding: '0 36px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: '64px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '36px' }}>
+          <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '1px' }}>
+            KIRA JEWELS
           </div>
           <nav style={{ display: 'flex', gap: '4px' }}>
             {[
               { label: 'My Orders', path: '/customer/orders' },
               { label: 'Place Order', path: '/customer/orders/new' },
-            ].map(item => (
-              <a
-                key={item.path}
-                href={item.path}
-                style={{
-                  padding: '6px 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500,
-                  textDecoration: 'none', color: router.pathname === item.path ? '#F6D860' : '#64748B',
-                  background: router.pathname === item.path ? 'rgba(246,216,96,0.1)' : 'transparent',
-                }}
-              >
-                {item.label}
-              </a>
-            ))}
+            ].map(item => {
+              const isActive = router.pathname === item.path;
+              return (
+                <a
+                  key={item.path}
+                  href={item.path}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    color: isActive ? '#EDD48B' : 'rgba(255,255,255,0.5)',
+                    background: isActive ? 'rgba(192,155,88,0.15)' : 'transparent',
+                    letterSpacing: '0.2px',
+                  }}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
           </nav>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {user && (
             <>
-              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #F97316, #EA580C)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff' }}>
+              <div style={{
+                width: '30px', height: '30px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '11px', fontWeight: 700, color: '#fff',
+              }}>
                 {user.firstName[0]}{user.lastName[0]}
               </div>
-              <span style={{ fontSize: '12px', color: '#CBD5E1' }}>{user.firstName} {user.lastName}</span>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
+                {user.firstName} {user.lastName}
+              </span>
               <button
                 onClick={() => { clearAuth(); router.replace('/login'); }}
-                style={{ background: 'none', border: '1px solid #2D2D3D', borderRadius: '6px', padding: '4px 10px', color: '#64748B', fontSize: '11px', cursor: 'pointer' }}
+                style={{
+                  background: 'none', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px', padding: '5px 12px',
+                  color: 'rgba(255,255,255,0.5)', fontSize: '11px', cursor: 'pointer',
+                }}
               >
                 Sign out
               </button>
@@ -60,16 +87,28 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
 
       {/* Page header */}
       {(title || actions) && (
-        <div style={{ background: '#111118', borderBottom: '1px solid #1E1E2E', padding: '16px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{
+          background: 'var(--bg-card)',
+          borderBottom: '1px solid var(--border-light)',
+          padding: '20px 36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 1px 0 rgba(26,39,64,0.06)',
+        }}>
           <div>
-            {title && <div style={{ fontSize: '20px', fontWeight: 700 }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: '12px', color: '#4B5563', marginTop: '2px' }}>{subtitle}</div>}
+            {title && (
+              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.3px' }}>
+                {title}
+              </div>
+            )}
+            {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{subtitle}</div>}
           </div>
           {actions && <div>{actions}</div>}
         </div>
       )}
 
-      <div style={{ padding: '28px', maxWidth: '900px', margin: '0 auto' }}>
+      <div style={{ padding: '32px 36px', maxWidth: '900px', margin: '0 auto' }}>
         {children}
       </div>
     </div>

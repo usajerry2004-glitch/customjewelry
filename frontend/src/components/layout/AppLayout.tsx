@@ -52,15 +52,42 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const role = (user?.role as UserRole) || UserRole.ADMIN;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0B10' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
       <Sidebar activeRole={role} activePath={router.pathname} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
         {/* Topbar */}
-        <div style={{ background: '#111118', borderBottom: '1px solid #1E1E2E', padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{
+          background: 'var(--topbar-bg)',
+          borderBottom: '1px solid var(--border-light)',
+          padding: '0 28px',
+          height: '62px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+          boxShadow: '0 1px 0 rgba(26,39,64,0.06)',
+        }}>
           <div>
-            {title && <div style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 600, letterSpacing: '0.5px' }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: '12px', color: '#4B5563', marginTop: '2px' }}>{subtitle}</div>}
+            {title && (
+              <div style={{
+                fontFamily: 'Cormorant Garamond, Georgia, serif',
+                fontSize: '24px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                letterSpacing: '0.3px',
+                lineHeight: 1,
+              }}>
+                {title}
+              </div>
+            )}
+            {subtitle && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', letterSpacing: '0.2px' }}>
+                {subtitle}
+              </div>
+            )}
           </div>
+
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {actions}
 
@@ -68,30 +95,62 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             <div style={{ position: 'relative' }}>
               <button
                 onClick={openNotifs}
-                style={{ background: '#0F0F14', border: '1px solid #1E1E2E', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  width: '36px',
+                  height: '36px',
+                  cursor: 'pointer',
+                  fontSize: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  color: 'var(--text-secondary)',
+                }}
               >
                 🔔
                 {unread > 0 && (
-                  <span style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#EF4444', color: '#fff', fontSize: '9px', fontWeight: 700, borderRadius: '99px', padding: '1px 5px', minWidth: '16px', textAlign: 'center' }}>
+                  <span style={{
+                    position: 'absolute', top: '-4px', right: '-4px',
+                    background: '#DC2626', color: '#fff', fontSize: '9px', fontWeight: 700,
+                    borderRadius: '99px', padding: '1px 5px', minWidth: '16px', textAlign: 'center',
+                  }}>
                     {unread > 99 ? '99+' : unread}
                   </span>
                 )}
               </button>
 
               {showNotifs && (
-                <div style={{ position: 'absolute', right: 0, top: '44px', width: '320px', background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', zIndex: 100, overflow: 'hidden' }}>
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #1E1E2E', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#CBD5E1' }}>Notifications</span>
-                    {unread > 0 && <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: '#6366F1', fontSize: '11px', cursor: 'pointer' }}>Mark all read</button>}
+                <div style={{
+                  position: 'absolute', right: 0, top: '44px', width: '320px',
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 100, overflow: 'hidden',
+                }}>
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
+                    {unread > 0 && (
+                      <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                        Mark all read
+                      </button>
+                    )}
                   </div>
                   <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
                     {notifs.length === 0 ? (
-                      <div style={{ padding: '20px', textAlign: 'center', color: '#4B5563', fontSize: '13px' }}>No notifications</div>
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>
                     ) : notifs.map(n => (
-                      <div key={n.id} style={{ padding: '12px 16px', borderBottom: '1px solid #0F0F14', background: n.isRead ? 'transparent' : 'rgba(99,102,241,0.06)' }}>
-                        <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 700, color: n.isRead ? '#94A3B8' : '#E2E8F0', marginBottom: '2px' }}>{n.title}</div>
-                        <div style={{ fontSize: '11px', color: '#4B5563' }}>{n.message}</div>
-                        <div style={{ fontSize: '10px', color: '#2D2D3D', marginTop: '4px' }}>{new Date(n.createdAt).toLocaleString()}</div>
+                      <div key={n.id} style={{
+                        padding: '12px 16px', borderBottom: '1px solid var(--border-light)',
+                        background: n.isRead ? 'transparent' : 'rgba(192,155,88,0.05)',
+                      }}>
+                        <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 600, color: n.isRead ? 'var(--text-secondary)' : 'var(--text-primary)', marginBottom: '2px' }}>
+                          {n.title}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{n.message}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', opacity: 0.7 }}>
+                          {new Date(n.createdAt).toLocaleString()}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -102,14 +161,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             {/* User menu */}
             {user && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #F6D860, #E6A817)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#000' }}>
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11px', fontWeight: 700, color: '#fff',
+                }}>
                   {user.firstName[0]}{user.lastName[0]}
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#CBD5E1' }}>{user.firstName} {user.lastName}</div>
-                  <div style={{ fontSize: '9px', color: '#4B5563' }}>{user.role}</div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.firstName} {user.lastName}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{user.role}</div>
                 </div>
-                <button onClick={() => { clearAuth(); router.replace('/login'); }} style={{ background: 'none', border: '1px solid #2D2D3D', borderRadius: '6px', padding: '4px 8px', color: '#64748B', fontSize: '11px', cursor: 'pointer' }}>
+                <button
+                  onClick={() => { clearAuth(); router.replace('/login'); }}
+                  style={{
+                    background: 'none', border: '1px solid var(--border)', borderRadius: '6px',
+                    padding: '5px 10px', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer',
+                  }}
+                >
                   Sign out
                 </button>
               </div>
@@ -117,12 +187,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '28px 32px' }}>
           {children}
         </div>
       </div>
 
-      {/* Close notif panel on outside click */}
       {showNotifs && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNotifs(false)} />}
     </div>
   );

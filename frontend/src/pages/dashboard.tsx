@@ -33,6 +33,13 @@ const MOCK_METRICS: Metrics = {
   ],
 };
 
+const KPI_CARDS = (metrics: Metrics) => [
+  { label: 'Active Orders',   value: metrics.total,            color: '#1A2740', icon: '◻', delta: '+3 today' },
+  { label: 'Total Revenue',   value: `$${Number(metrics.totalRevenue).toLocaleString()}`, color: '#059669', icon: '◈', delta: '+$12k this week' },
+  { label: 'In CAD Design',   value: metrics.byStatus.find(s => s.status === 'CAD_IN_PROGRESS')?.count || '0', color: '#7C3AED', icon: '◎', delta: 'Avg 3.2 days' },
+  { label: 'Ready to Ship',   value: metrics.byStatus.find(s => s.status === 'READY_TO_SHIP')?.count || '0',  color: '#C09B58', icon: '▷', delta: 'Action needed' },
+];
+
 export default function Dashboard() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<Metrics>(MOCK_METRICS);
@@ -65,15 +72,11 @@ export default function Dashboard() {
     load();
   }, []);
 
-  const statusBadge = (
-    <span style={{
-      fontSize: '11px', padding: '4px 10px', borderRadius: '99px', fontWeight: 600,
-      background: apiStatus === 'live' ? 'rgba(16,185,129,0.15)' : apiStatus === 'connecting' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)',
-      color: apiStatus === 'live' ? '#10B981' : apiStatus === 'connecting' ? '#818CF8' : '#F59E0B',
-    }}>
-      {apiStatus === 'live' ? '● Live API' : apiStatus === 'connecting' ? '● Connecting…' : '● Demo Mode'}
-    </span>
-  );
+  const statusDot = {
+    live: { bg: 'rgba(5,150,105,0.1)', color: '#059669', label: '● Live' },
+    connecting: { bg: 'rgba(124,58,237,0.1)', color: '#7C3AED', label: '● Connecting…' },
+    demo: { bg: 'rgba(192,155,88,0.1)', color: '#C09B58', label: '● Demo' },
+  }[apiStatus];
 
   return (
     <AppLayout
@@ -81,10 +84,12 @@ export default function Dashboard() {
       subtitle="JewelFlow OS — Custom Order Management"
       actions={
         <>
-          {statusBadge}
+          <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '99px', fontWeight: 600, background: statusDot.bg, color: statusDot.color }}>
+            {statusDot.label}
+          </span>
           <button
             onClick={() => router.push('/orders')}
-            style={{ background: 'linear-gradient(135deg, #F6D860, #E6A817)', color: '#000', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
           >
             + New Order
           </button>
@@ -92,44 +97,55 @@ export default function Dashboard() {
       }
     >
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
-        {[
-          { label: 'Active Orders', value: metrics.total, icon: '📋', color: '#6366F1', delta: '+3 today' },
-          { label: 'Total Revenue', value: `$${Number(metrics.totalRevenue).toLocaleString()}`, icon: '💰', color: '#10B981', delta: '+$12k this week' },
-          { label: 'In CAD Design', value: metrics.byStatus.find(s => s.status === 'CAD_IN_PROGRESS')?.count || '0', icon: '🎨', color: '#8B5CF6', delta: 'Avg 3.2 days' },
-          { label: 'Ready to Ship', value: metrics.byStatus.find(s => s.status === 'READY_TO_SHIP')?.count || '0', icon: '🚚', color: '#F59E0B', delta: 'Action needed' },
-        ].map((kpi) => (
-          <div key={kpi.label} style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-              <span style={{ fontSize: '20px' }}>{kpi.icon}</span>
-              <span style={{ fontSize: '10px', color: '#4B5563', background: '#0F0F14', padding: '2px 7px', borderRadius: '6px' }}>{kpi.delta}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+        {KPI_CARDS(metrics).map((kpi) => (
+          <div key={kpi.label} style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)', padding: '20px 22px',
+            boxShadow: 'var(--shadow-sm)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+              <span style={{ fontSize: '18px', color: kpi.color, opacity: 0.8 }}>{kpi.icon}</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 7px', borderRadius: '5px', letterSpacing: '0.2px' }}>
+                {kpi.delta}
+              </span>
             </div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: kpi.color, marginBottom: '4px' }}>{kpi.value}</div>
-            <div style={{ fontSize: '12px', color: '#64748B' }}>{kpi.label}</div>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '30px', fontWeight: 600, color: kpi.color, marginBottom: '4px', lineHeight: 1 }}>
+              {kpi.value}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>{kpi.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px' }}>
+        {/* Recent Orders */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#CBD5E1' }}>Recent Orders</h2>
-            <a href="/orders" style={{ fontSize: '12px', color: '#F6D860', fontWeight: 500 }}>View all →</a>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Recent Orders
+            </h2>
+            <a href="/orders" style={{ fontSize: '12px', color: 'var(--accent)', fontWeight: 600, letterSpacing: '0.3px' }}>
+              View all →
+            </a>
           </div>
+
           {loading ? (
-            <div style={{ color: '#4B5563', fontSize: '13px', padding: '20px 0' }}>Loading orders…</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '40px 0', textAlign: 'center' }}>Loading orders…</div>
           ) : orders.length === 0 ? (
-            <div style={{ color: '#4B5563', fontSize: '13px', padding: '20px 0' }}>No orders yet.</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '40px 0', textAlign: 'center' }}>No orders yet.</div>
           ) : (
             orders.map((order) => (
               <OrderCard key={order.id} order={order} onClick={() => router.push(`/orders/${order.id}`)} />
             ))
           )}
         </div>
+
+        {/* Pipeline */}
         <div>
-          <div style={{ marginBottom: '14px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#CBD5E1' }}>Pipeline Status</h2>
-          </div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+            Pipeline
+          </h2>
           <MetricsPanel metrics={metrics} />
         </div>
       </div>
