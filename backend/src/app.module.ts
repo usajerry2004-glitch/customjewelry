@@ -21,6 +21,7 @@ import { SkuModule } from './modules/sku/sku.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
+import { UsersModule } from './modules/users/users.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { SummaryModule } from './modules/summary/summary.module';
 import { ImportModule } from './modules/import/import.module';
@@ -56,6 +57,7 @@ import { AuthService } from './modules/auth/auth.service';
     NotificationsModule,
     ManufacturingModule,
     ShippingModule,
+    UsersModule,
     MessagesModule,
     SummaryModule,
     ImportModule,
