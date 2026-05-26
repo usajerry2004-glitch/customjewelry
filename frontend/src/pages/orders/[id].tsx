@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, STATUS_CONFIG } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
+import { OrderConversation } from '../../components/OrderConversation';
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -57,6 +58,16 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('jf_user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +86,17 @@ export default function OrderDetail() {
       setOrder(updated);
     }
     setAuthorizing(false);
+  };
+
+  const loadSummary = async () => {
+    if (!order?.id) return;
+    setSummaryLoading(true);
+    const res = await apiFetch(`${API}/orders/${order.id}/summary`);
+    if (res.ok) {
+      const data = await res.json();
+      setSummary(data.summary);
+    }
+    setSummaryLoading(false);
   };
 
   const moveStatus = async (newStatus: OrderStatus) => {
@@ -118,6 +140,7 @@ export default function OrderDetail() {
         </button>
       }
     >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '20px', alignItems: 'start' }}>
         {/* Field groups */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -157,10 +180,27 @@ export default function OrderDetail() {
             </div>
           </div>
 
-          {/* Authorize button — only for WAITING_CONFIRMATION */}
+          {/* Authorize panel — only for WAITING_CONFIRMATION */}
           {order.status === OrderStatus.WAITING_CONFIRMATION && (
             <div style={{ background: '#111118', border: '1px solid rgba(246,216,96,0.3)', borderRadius: '12px', padding: '18px' }}>
               <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '10px', letterSpacing: '0.5px' }}>AWAITING AUTHORIZATION</div>
+
+              {/* AI Summary */}
+              {summary ? (
+                <div style={{ background: '#0A0A12', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '10px', color: '#F6D860', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Order Brief</div>
+                  <p style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: 1.65, margin: 0 }}>{summary}</p>
+                </div>
+              ) : (
+                <button
+                  onClick={loadSummary}
+                  disabled={summaryLoading}
+                  style={{ width: '100%', marginBottom: '10px', background: '#0A0A12', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '9px', color: '#64748B', fontSize: '12px', cursor: 'pointer', opacity: summaryLoading ? 0.7 : 1 }}
+                >
+                  {summaryLoading ? '✨ Generating summary…' : '✨ Generate AI Order Brief'}
+                </button>
+              )}
+
               <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '12px', lineHeight: 1.5 }}>
                 Review and authorize this order to release it to the CAD design team.
               </p>
@@ -216,6 +256,16 @@ export default function OrderDetail() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Conversation */}
+      {order.id && currentUser && (
+        <OrderConversation
+          orderId={order.id}
+          currentUserRole={currentUser.role}
+          currentUserId={currentUser.id}
+        />
+      )}
       </div>
     </AppLayout>
   );

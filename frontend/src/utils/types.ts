@@ -54,6 +54,18 @@ export interface Order {
   updatedAt: string;
 }
 
+export interface OrderMessage {
+  id: string;
+  orderId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  content: string;
+  isInternal: boolean;
+  mentions: string[];
+  createdAt: string;
+}
+
 export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   WAITING_CONFIRMATION: { label: 'Waiting Confirmation', color: '#F59E0B', bg: '#FEF3C7' },
   PENDING_CAD: { label: 'Pending CAD', color: '#8B5CF6', bg: '#EDE9FE' },

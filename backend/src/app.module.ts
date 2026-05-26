@@ -12,6 +12,7 @@ import { User } from './database/entities/user.entity';
 import { CadFile } from './database/entities/cad-file.entity';
 import { Sku } from './database/entities/sku.entity';
 import { Notification } from './database/entities/notification.entity';
+import { OrderMessage } from './database/entities/order-message.entity';
 
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -20,6 +21,9 @@ import { SkuModule } from './modules/sku/sku.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { SummaryModule } from './modules/summary/summary.module';
+import { ImportModule } from './modules/import/import.module';
 import { AuthService } from './modules/auth/auth.service';
 
 @Module({
@@ -39,7 +43,7 @@ import { AuthService } from './modules/auth/auth.service';
         username: config.get('DB_USERNAME', 'jewelflow'),
         password: config.get('DB_PASSWORD', 'jewelflow123'),
         database: config.get('DB_NAME', 'jewelflow'),
-        entities: [Order, User, CadFile, Sku, Notification],
+        entities: [Order, User, CadFile, Sku, Notification, OrderMessage],
         synchronize: true,
         logging: false,
       }),
@@ -52,6 +56,9 @@ import { AuthService } from './modules/auth/auth.service';
     NotificationsModule,
     ManufacturingModule,
     ShippingModule,
+    MessagesModule,
+    SummaryModule,
+    ImportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

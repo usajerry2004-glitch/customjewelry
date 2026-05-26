@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../../../utils/types';
+import { OrderConversation } from '../../../components/OrderConversation';
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -45,6 +46,14 @@ export default function CustomerOrderDetail() {
   const [loading, setLoading] = useState(true);
   const [cadFeedback, setCadFeedback] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('jf_user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   const reload = async () => {
     if (!id) return;
@@ -266,6 +275,17 @@ export default function CustomerOrderDetail() {
           </div>
         )}
       </div>
+
+      {/* Conversation with the team */}
+      {order.id && currentUser && (
+        <div style={{ marginTop: '20px' }}>
+          <OrderConversation
+            orderId={order.id}
+            currentUserRole={currentUser.role}
+            currentUserId={currentUser.id}
+          />
+        </div>
+      )}
     </CustomerLayout>
   );
 }

@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
-  UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index
+  UpdateDateColumn, Index
 } from 'typeorm';
 
 export enum OrderStatus {
@@ -146,6 +146,24 @@ export class Order {
 
   @Column({ default: false })
   sentToCustomer: boolean;
+
+  @Column({ nullable: true })
+  headStyle: string;
+
+  @Column({ nullable: true })
+  shankStyle: string;
+
+  @Column({ nullable: true })
+  timeFrame: string;
+
+  @Column({ nullable: true })
+  phoneNumber: string;
+
+  @Column({ nullable: true })
+  refCustomerPo: string;
+
+  @Column({ type: 'text', nullable: true })
+  aiSummary: string;
 
   @CreateDateColumn()
   createdAt: Date;
