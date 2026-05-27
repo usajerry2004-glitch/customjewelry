@@ -68,3 +68,138 @@ input:focus, select:focus, textarea:focus {
 input::placeholder, textarea::placeholder {
   color: var(--text-muted);
 }
+
+/* ─── Responsive Layout ─── */
+
+/* Sidebar overlay on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(13,27,53,0.6);
+  z-index: 199;
+}
+.sidebar-overlay.open { display: block; }
+
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed !important;
+    left: -240px !important;
+    top: 0;
+    bottom: 0;
+    z-index: 200;
+    transition: left 0.25s ease;
+    width: 240px !important;
+  }
+  .app-sidebar.open {
+    left: 0 !important;
+  }
+  .app-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .hamburger-btn {
+    display: flex !important;
+  }
+  .topbar-title { font-size: 18px !important; }
+  .topbar-user-name { display: none !important; }
+  .topbar-signout { display: none !important; }
+  .main-content-pad {
+    padding: 16px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hamburger-btn { display: none !important; }
+}
+
+/* Dashboard KPI grid */
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Dashboard 2-column layout */
+@media (max-width: 900px) {
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Order detail 2-col */
+@media (max-width: 900px) {
+  .order-detail-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Customers table — hide less important columns on small screens */
+@media (max-width: 640px) {
+  .customers-table th:nth-child(3),
+  .customers-table td:nth-child(3),
+  .customers-table th:nth-child(4),
+  .customers-table td:nth-child(4) {
+    display: none;
+  }
+  .customers-table th:nth-child(5),
+  .customers-table td:nth-child(5) {
+    display: none;
+  }
+}
+
+/* Modal full-screen on mobile */
+@media (max-width: 540px) {
+  .modal-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin: 0 !important;
+    max-height: 90vh !important;
+  }
+  .modal-bg {
+    align-items: flex-end !important;
+  }
+}
+
+/* Order cards grid */
+@media (max-width: 640px) {
+  .orders-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Filter pills wrap nicely */
+@media (max-width: 640px) {
+  .filter-row { flex-direction: column !important; align-items: stretch !important; }
+  .filter-row input { width: 100% !important; }
+}
+
+/* Login page */
+@media (max-width: 640px) {
+  .login-left-panel { display: none !important; }
+  .login-right-panel { padding: 24px 16px !important; }
+}
+
+/* Manufacturing / Shipping / CAD grids */
+@media (max-width: 900px) {
+  .mfg-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 640px) {
+  .card-grid-2 { grid-template-columns: 1fr !important; }
+}
+
+/* Topbar actions — hide subtitle on very small */
+@media (max-width: 400px) {
+  .topbar-subtitle { display: none !important; }
+}
+
+/* Customer portal responsive */
+@media (max-width: 640px) {
+  .customer-layout-main { padding: 16px !important; }
+  .customer-order-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Kanban pipeline board — 4→2→1 columns */
+@media (max-width: 1024px) {
+  .kanban-phase-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 540px) {
+  .kanban-phase-grid { grid-template-columns: 1fr !important; }
+}

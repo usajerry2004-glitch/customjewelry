@@ -38,6 +38,11 @@ const TIMELINE = [
   { status: 'DELIVERED', label: 'Delivered' },
 ];
 
+const card: React.CSSProperties = {
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)', padding: '18px', marginBottom: '16px',
+};
+
 export default function CustomerOrderDetail() {
   const router = useRouter();
   const { id } = router.query;
@@ -82,7 +87,7 @@ export default function CustomerOrderDetail() {
   if (loading) {
     return (
       <CustomerLayout title="Order Detail">
-        <div style={{ color: '#4B5563', textAlign: 'center', padding: '60px 0' }}>Loading…</div>
+        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px 0' }}>Loading…</div>
       </CustomerLayout>
     );
   }
@@ -90,8 +95,8 @@ export default function CustomerOrderDetail() {
   if (!order) {
     return (
       <CustomerLayout title="Not Found">
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#EF4444' }}>
-          Order not found. <a href="/customer/orders" style={{ color: '#F6D860' }}>Back to orders</a>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--danger)' }}>
+          Order not found. <a href="/customer/orders" style={{ color: 'var(--accent-dark)' }}>Back to orders</a>
         </div>
       </CustomerLayout>
     );
@@ -105,16 +110,16 @@ export default function CustomerOrderDetail() {
       title={order.poNumber || 'Order Detail'}
       subtitle={order.orderType ? `${order.orderType} · ${order.metalType} ${order.metalColor}` : undefined}
       actions={
-        <button onClick={() => router.push('/customer/orders')} style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '7px 14px', color: '#94A3B8', fontSize: '12px', cursor: 'pointer' }}>
+        <button onClick={() => router.push('/customer/orders')} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>
           ← My Orders
         </button>
       }
     >
       {/* Status + Timeline */}
-      <div style={{ background: '#111118', border: `1px solid ${cfg.color}30`, borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+      <div style={{ ...card, border: `1px solid ${cfg.color}30`, padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ fontSize: '12px', color: '#64748B' }}>CURRENT STATUS</div>
-          <div style={{ background: `${cfg.color}20`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Current Status</div>
+          <div style={{ background: `${cfg.color}18`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
             {cfg.label}
           </div>
         </div>
@@ -129,17 +134,17 @@ export default function CustomerOrderDetail() {
                   <div style={{
                     width: active ? '14px' : '10px', height: active ? '14px' : '10px',
                     borderRadius: '50%', flexShrink: 0, zIndex: 1,
-                    background: done ? cfg.color : '#1A1A24',
-                    border: `2px solid ${done ? cfg.color : '#2D2D3D'}`,
-                    boxShadow: active ? `0 0 8px ${cfg.color}80` : 'none',
+                    background: done ? cfg.color : 'var(--border)',
+                    border: `2px solid ${done ? cfg.color : 'var(--border)'}`,
+                    boxShadow: active ? `0 0 8px ${cfg.color}60` : 'none',
                     transition: 'all 0.2s',
                   }} />
-                  <div style={{ fontSize: '9px', color: done ? cfg.color : '#2D2D3D', marginTop: '5px', textAlign: 'center', lineHeight: 1.2, maxWidth: '60px' }}>
+                  <div style={{ fontSize: '9px', color: done ? cfg.color : 'var(--text-muted)', marginTop: '5px', textAlign: 'center', lineHeight: 1.2, maxWidth: '60px' }}>
                     {step.label}
                   </div>
                 </div>
                 {i < TIMELINE.length - 1 && (
-                  <div style={{ height: '2px', flex: 1, background: i < currentIdx ? cfg.color : '#1A1A24', flexShrink: 0 }} />
+                  <div style={{ height: '2px', flex: 1, background: i < currentIdx ? cfg.color : 'var(--border)', flexShrink: 0 }} />
                 )}
               </React.Fragment>
             );
@@ -147,10 +152,10 @@ export default function CustomerOrderDetail() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      <div className="customer-order-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         {/* Order specs */}
-        <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-          <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px' }}>Product Specs</h3>
+        <div style={card}>
+          <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>Product Specs</h3>
           {[
             { label: 'Order Type', value: order.orderType },
             { label: 'Metal', value: order.metalType ? `${order.metalType} ${order.metalColor || ''}`.trim() : null },
@@ -161,15 +166,15 @@ export default function CustomerOrderDetail() {
             { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight}ct` : null },
           ].map(({ label, value }) => value ? (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#4B5563' }}>{label}</span>
-              <span style={{ fontSize: '12px', color: '#CBD5E1', fontWeight: 500 }}>{value}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{label}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
             </div>
           ) : null)}
         </div>
 
-        {/* Timeline info */}
-        <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-          <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px' }}>Order Info</h3>
+        {/* Order info */}
+        <div style={card}>
+          <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>Order Info</h3>
           {[
             { label: 'Order #', value: order.poNumber },
             { label: 'SKU', value: order.kiraSkuNumber },
@@ -178,8 +183,8 @@ export default function CustomerOrderDetail() {
             { label: 'Updated', value: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null },
           ].map(({ label, value }) => value ? (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#4B5563' }}>{label}</span>
-              <span style={{ fontSize: '12px', color: '#CBD5E1', fontWeight: 500 }}>{value}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{label}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
             </div>
           ) : null)}
         </div>
@@ -187,20 +192,20 @@ export default function CustomerOrderDetail() {
 
       {/* Customer notes */}
       {order.customerNotes && (
-        <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '10px' }}>Your Notes</h3>
-          <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: 1.6, margin: 0 }}>{order.customerNotes}</p>
+        <div style={card}>
+          <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '10px', margin: '0 0 10px' }}>Your Notes</h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>{order.customerNotes}</p>
         </div>
       )}
 
       {/* CAD files */}
-      <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-        <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px' }}>
+      <div style={card}>
+        <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>
           Design Files {cads.length > 0 && `(${cads.length})`}
         </h3>
 
         {cads.length === 0 ? (
-          <div style={{ color: '#2D2D3D', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
             No design files yet. Our CAD team will upload designs once your order is confirmed.
           </div>
         ) : (
@@ -209,25 +214,24 @@ export default function CustomerOrderDetail() {
               const cs = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
               const needsApproval = cad.status === 'SENT_FOR_APPROVAL';
               return (
-                <div key={cad.id} style={{ background: '#0F0F14', border: `1px solid ${cs.color}30`, borderRadius: '10px', padding: '14px 16px' }}>
+                <div key={cad.id} style={{ background: 'var(--bg-input)', border: `1px solid ${cs.color}30`, borderRadius: 'var(--radius)', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: needsApproval ? '14px' : '0' }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '14px' }}>📎</span>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#E2E8F0' }}>{cad.originalName}</span>
-                        <span style={{ fontSize: '10px', background: `${cs.color}20`, color: cs.color, padding: '2px 8px', borderRadius: '99px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
+                        <span style={{ fontSize: '10px', background: `${cs.color}15`, color: cs.color, padding: '2px 8px', borderRadius: '99px' }}>
                           {cs.label}
                         </span>
-                        <span style={{ fontSize: '10px', color: '#4B5563' }}>Rev #{cad.revisionNumber}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
                       </div>
                       {cad.designerNotes && (
-                        <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>Designer note: {cad.designerNotes}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Designer note: {cad.designerNotes}</div>
                       )}
                       {cad.customerFeedback && (
                         <div style={{ fontSize: '12px', color: '#F59E0B', marginTop: '4px' }}>Your feedback: {cad.customerFeedback}</div>
                       )}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#4B5563', flexShrink: 0, marginLeft: '12px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '12px' }}>
                       {new Date(cad.createdAt).toLocaleDateString()}
                     </div>
                   </div>
@@ -242,29 +246,29 @@ export default function CustomerOrderDetail() {
                         onChange={e => setCadFeedback(p => ({ ...p, [cad.id]: e.target.value }))}
                         placeholder="Optional feedback or revision notes…"
                         rows={2}
-                        style={{ width: '100%', background: '#111118', border: '1px solid #2D2D3D', borderRadius: '7px', padding: '8px 10px', color: '#E2E8F0', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '10px' }}
+                        style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '10px' }}
                       />
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                           onClick={() => cadAction(cad.id, 'approve')}
                           disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '7px', padding: '8px', color: '#10B981', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                          style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: '7px', padding: '8px', color: '#059669', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
                         >
-                          ✅ Approve Design
+                          Approve Design
                         </button>
                         <button
                           onClick={() => cadAction(cad.id, 'revision')}
                           disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '7px', padding: '8px', color: '#8B5CF6', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                          style={{ flex: 1, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '7px', padding: '8px', color: '#8B5CF6', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
                         >
-                          🔄 Request Changes
+                          Request Changes
                         </button>
                         <button
                           onClick={() => cadAction(cad.id, 'reject')}
                           disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '7px', padding: '8px', color: '#EF4444', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                          style={{ flex: 1, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '7px', padding: '8px', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
                         >
-                          ❌ Reject
+                          Reject
                         </button>
                       </div>
                     </div>
@@ -278,7 +282,7 @@ export default function CustomerOrderDetail() {
 
       {/* Conversation with the team */}
       {order.id && currentUser && (
-        <div style={{ marginTop: '20px' }}>
+        <div style={{ marginTop: '4px' }}>
           <OrderConversation
             orderId={order.id}
             currentUserRole={currentUser.role}

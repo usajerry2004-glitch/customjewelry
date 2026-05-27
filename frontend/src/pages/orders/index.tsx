@@ -180,7 +180,7 @@ export default function OrdersPage() {
       )}
 
       {/* Search + Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="filter-row" style={{ display: 'flex', gap: '12px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -225,7 +225,7 @@ export default function OrdersPage() {
           No orders found.{search || statusFilter ? ' Try clearing your filters.' : ''}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+        <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
           {orders.map(order => (
             <OrderCard key={order.id} order={order} onClick={() => router.push(`/orders/${order.id}`)} />
           ))}

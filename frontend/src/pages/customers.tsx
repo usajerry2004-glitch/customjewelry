@@ -18,10 +18,15 @@ interface Customer {
 
 interface Stats { totalCustomers: number; activeCustomers: number; totalStaff: number }
 
-const INPUT = {
-  background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '8px',
-  padding: '9px 13px', color: '#E2E8F0', fontSize: '13px', outline: 'none',
-  width: '100%', boxSizing: 'border-box' as const,
+const INPUT: React.CSSProperties = {
+  background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px',
+  padding: '9px 13px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
+  width: '100%', boxSizing: 'border-box',
+};
+
+const LABEL: React.CSSProperties = {
+  display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px',
+  textTransform: 'uppercase', letterSpacing: '0.5px',
 };
 
 const ORDER_FIELDS = [
@@ -136,12 +141,13 @@ export default function CustomersPage() {
   };
 
   const modalBg: React.CSSProperties = {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 100,
+    position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.6)', zIndex: 100,
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
   };
   const modalBox: React.CSSProperties = {
-    background: '#111118', border: '1px solid #2D2D3D', borderRadius: '16px',
+    background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
     padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '85vh', overflowY: 'auto',
+    boxShadow: 'var(--shadow-md)',
   };
 
   return (
@@ -151,7 +157,7 @@ export default function CustomersPage() {
       actions={
         <button
           onClick={() => { setShowCreate(true); setError(''); }}
-          style={{ background: 'linear-gradient(135deg, #F6D860, #E6A817)', color: '#000', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
         >
           + Add Customer
         </button>
@@ -168,50 +174,50 @@ export default function CustomersPage() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '14px', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+        <table className="customers-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #1E1E2E' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
               {['Customer', 'Email', 'Status', 'Joined', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: '#4B5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#4B5563' }}>Loading…</td></tr>
+              <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} style={{ padding: '48px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '10px' }}>👥</div>
-                  <div style={{ fontSize: '14px', color: '#2D2D3D' }}>No customers yet</div>
-                  <div style={{ fontSize: '12px', color: '#1E1E2E', marginTop: '4px' }}>Click "+ Add Customer" to create the first account.</div>
+                  <div style={{ fontSize: '32px', marginBottom: '10px', opacity: 0.3 }}>👥</div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No customers yet</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Click "+ Add Customer" to create the first account.</div>
                 </td>
               </tr>
             ) : filtered.map(c => (
-              <tr key={c.id} style={{ borderBottom: '1px solid #0F0F14' }}>
+              <tr key={c.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#E2E8F0' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.firstName} {c.lastName}</div>
                 </td>
-                <td style={{ padding: '14px 16px', fontSize: '12px', color: '#94A3B8' }}>{c.email}</td>
+                <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>{c.email}</td>
                 <td style={{ padding: '14px 16px' }}>
-                  <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: c.isActive ? '#10B98120' : '#EF444420', color: c.isActive ? '#10B981' : '#EF4444', fontWeight: 600 }}>
+                  <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: c.isActive ? 'rgba(5,150,105,0.12)' : 'rgba(220,38,38,0.1)', color: c.isActive ? '#059669' : '#DC2626', fontWeight: 600 }}>
                     {c.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td style={{ padding: '14px 16px', fontSize: '12px', color: '#4B5563' }}>
+                <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>
                   {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </td>
                 <td style={{ padding: '14px 16px' }}>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button onClick={() => { setShowOrder(c); setError(''); }} style={{ padding: '5px 11px', borderRadius: '6px', border: 'none', background: 'rgba(246,216,96,0.15)', color: '#F6D860', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    <button onClick={() => { setShowOrder(c); setError(''); }} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent-dark)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                       + Order
                     </button>
-                    <button onClick={() => viewOrders(c)} style={{ padding: '5px 11px', borderRadius: '6px', border: 'none', background: '#1A1A24', color: '#94A3B8', fontSize: '11px', cursor: 'pointer' }}>
+                    <button onClick={() => viewOrders(c)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                       View Orders
                     </button>
                     {c.isActive && (
-                      <button onClick={() => deactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: 'none', background: 'rgba(239,68,68,0.1)', color: '#EF4444', fontSize: '11px', cursor: 'pointer' }}>
+                      <button onClick={() => deactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(220,38,38,0.3)', background: 'transparent', color: '#DC2626', fontSize: '11px', cursor: 'pointer' }}>
                         Deactivate
                       </button>
                     )}
@@ -225,14 +231,14 @@ export default function CustomersPage() {
 
       {/* ── Create Customer Modal ── */}
       {showCreate && (
-        <div style={modalBg} onClick={() => setShowCreate(false)}>
-          <div style={modalBox} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#E2E8F0', marginBottom: '20px' }}>Add New Customer</h2>
+        <div className="modal-bg" style={modalBg} onClick={() => setShowCreate(false)}>
+          <div className="modal-box" style={modalBox} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px', margin: '0 0 20px' }}>Add New Customer</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {[['First Name *', 'firstName', 'text'], ['Last Name', 'lastName', 'text']].map(([label, key, type]) => (
                 <div key={key}>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
+                  <label style={LABEL}>{label}</label>
                   <input type={type} value={(newUser as any)[key]} onChange={e => setNewUser(p => ({ ...p, [key]: e.target.value }))} style={INPUT} />
                 </div>
               ))}
@@ -240,23 +246,23 @@ export default function CustomersPage() {
 
             {[['Email *', 'email', 'email'], ['Password *', 'password', 'password']].map(([label, key, type]) => (
               <div key={key} style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
+                <label style={LABEL}>{label}</label>
                 <input type={type} value={(newUser as any)[key]} onChange={e => setNewUser(p => ({ ...p, [key]: e.target.value }))} style={INPUT} placeholder={key === 'password' ? 'Min 6 characters' : ''} />
               </div>
             ))}
 
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Store / Business Name</label>
+              <label style={LABEL}>Store / Business Name</label>
               <input value={newUser.storeName} onChange={e => setNewUser(p => ({ ...p, storeName: e.target.value }))} style={INPUT} placeholder="Optional" />
             </div>
 
-            {error && <div style={{ color: '#EF4444', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={createCustomer} disabled={saving} style={{ flex: 1, background: 'linear-gradient(135deg, #F6D860, #E6A817)', color: '#000', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+              <button onClick={createCustomer} disabled={saving} style={{ flex: 1, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Creating…' : 'Create Customer'}
               </button>
-              <button onClick={() => setShowCreate(false)} style={{ padding: '11px 20px', background: '#1A1A24', border: '1px solid #2D2D3D', borderRadius: '8px', color: '#64748B', fontSize: '13px', cursor: 'pointer' }}>
+              <button onClick={() => setShowCreate(false)} style={{ padding: '11px 20px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
                 Cancel
               </button>
             </div>
@@ -266,20 +272,20 @@ export default function CustomersPage() {
 
       {/* ── Create Order Modal ── */}
       {showOrder && (
-        <div style={modalBg} onClick={() => setShowOrder(null)}>
-          <div style={{ ...modalBox, maxWidth: '620px' }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#E2E8F0', marginBottom: '4px' }}>New Order</h2>
-            <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '20px' }}>
-              For <span style={{ color: '#F6D860', fontWeight: 600 }}>{showOrder.firstName} {showOrder.lastName}</span> ({showOrder.email})
+        <div className="modal-bg" style={modalBg} onClick={() => setShowOrder(null)}>
+          <div className="modal-box" style={{ ...modalBox, maxWidth: '620px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', margin: '0 0 4px' }}>New Order</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px', margin: '4px 0 20px' }}>
+              For <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{showOrder.firstName} {showOrder.lastName}</span> ({showOrder.email})
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {ORDER_FIELDS.map(f => (
                 <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{f.label}</label>
+                  <label style={LABEL}>{f.label}</label>
                   {f.type === 'select' ? (
                     <select value={newOrder[f.key] || ''} onChange={e => setNewOrder(p => ({ ...p, [f.key]: e.target.value }))}
-                      style={{ ...INPUT, color: newOrder[f.key] ? '#E2E8F0' : '#4B5563' }}>
+                      style={{ ...INPUT, color: newOrder[f.key] ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                       <option value="">Select…</option>
                       {f.options!.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
@@ -291,20 +297,20 @@ export default function CustomersPage() {
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer Notes</label>
+              <label style={LABEL}>Customer Notes</label>
               <textarea value={newOrder.customerNotes} onChange={e => setNewOrder(p => ({ ...p, customerNotes: e.target.value }))}
                 placeholder="Special instructions, reference links, etc."
                 rows={3}
                 style={{ ...INPUT, resize: 'vertical', fontFamily: 'inherit' }} />
             </div>
 
-            {error && <div style={{ color: '#EF4444', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={placeOrder} disabled={saving} style={{ flex: 1, background: 'linear-gradient(135deg, #F6D860, #E6A817)', color: '#000', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? 'Creating…' : '🛍️ Place Order'}
+              <button onClick={placeOrder} disabled={saving} style={{ flex: 1, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Creating…' : 'Place Order'}
               </button>
-              <button onClick={() => setShowOrder(null)} style={{ padding: '11px 20px', background: '#1A1A24', border: '1px solid #2D2D3D', borderRadius: '8px', color: '#64748B', fontSize: '13px', cursor: 'pointer' }}>
+              <button onClick={() => setShowOrder(null)} style={{ padding: '11px 20px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
                 Cancel
               </button>
             </div>
@@ -314,39 +320,43 @@ export default function CustomersPage() {
 
       {/* ── Customer Orders Modal ── */}
       {showOrders && (
-        <div style={modalBg} onClick={() => setShowOrders(null)}>
-          <div style={{ ...modalBox, maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-bg" style={modalBg} onClick={() => setShowOrders(null)}>
+          <div className="modal-box" style={{ ...modalBox, maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
-                <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#E2E8F0', margin: 0 }}>
+                <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                   {showOrders.customer.firstName} {showOrders.customer.lastName}
                 </h2>
-                <p style={{ fontSize: '12px', color: '#64748B', margin: '2px 0 0' }}>{showOrders.orders.length} order{showOrders.orders.length !== 1 ? 's' : ''}</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>{showOrders.orders.length} order{showOrders.orders.length !== 1 ? 's' : ''}</p>
               </div>
               <button onClick={() => { setShowOrders(null); setShowOrder(showOrders.customer); setError(''); }}
-                style={{ background: 'rgba(246,216,96,0.15)', border: 'none', borderRadius: '7px', padding: '7px 14px', color: '#F6D860', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                 + New Order
               </button>
             </div>
 
             {showOrders.orders.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px', color: '#2D2D3D', fontSize: '13px' }}>No orders yet for this customer.</div>
+              <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '13px' }}>No orders yet for this customer.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {showOrders.orders.map((o: any) => {
                   const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: '#64748B' };
                   return (
                     <div key={o.id} onClick={() => { setShowOrders(null); router.push(`/orders/${o.id}`); }}
-                      style={{ background: '#0F0F14', border: `1px solid ${cfg.color}25`, borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      style={{ background: 'var(--bg-input)', border: `1px solid ${cfg.color}25`, borderRadius: 'var(--radius)', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        transition: 'box-shadow 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-sm)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'}
+                    >
                       <div>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#E2E8F0', marginBottom: '3px' }}>{o.poNumber}</div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '3px' }}>{o.poNumber}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {o.orderType} {o.metalType && `· ${o.metalType} ${o.metalColor}`}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ background: `${cfg.color}20`, color: cfg.color, padding: '3px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, marginBottom: '3px' }}>{cfg.label}</div>
-                        <div style={{ fontSize: '10px', color: '#4B5563' }}>{new Date(o.createdAt).toLocaleDateString()}</div>
+                        <div style={{ background: `${cfg.color}15`, color: cfg.color, padding: '3px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, marginBottom: '3px' }}>{cfg.label}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(o.createdAt).toLocaleDateString()}</div>
                       </div>
                     </div>
                   );

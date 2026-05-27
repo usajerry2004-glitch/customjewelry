@@ -19,7 +19,7 @@ export class OrdersController {
   }
 
   @Get('kanban')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.STONE_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Kanban board' })
   kanban(@Request() req: any) {
@@ -27,7 +27,7 @@ export class OrdersController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.STONE_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Order metrics' })
   metrics() {
@@ -55,9 +55,9 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update order status (Sales/Admin only)' })
+  @ApiOperation({ summary: 'Update order status' })
   updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
     return this.ordersService.updateStatus(id, status);
   }

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { MetricsPanel } from '../components/dashboard/MetricsPanel';
 import { OrderCard } from '../components/orders/OrderCard';
-import { Order, OrderStatus } from '../utils/types';
+import { Order } from '../utils/types';
 import { apiFetch, API } from '../utils/apiFetch';
 
 interface Metrics {
@@ -12,13 +12,6 @@ interface Metrics {
   byStatus: { status: string; count: string }[];
 }
 
-const MOCK_ORDERS: Partial<Order>[] = [
-  { id: '1', poNumber: 'PO-2025-001', storeName: 'Kira Jewels NYC', status: OrderStatus.CAD_IN_PROGRESS, orderType: 'Engagement Ring', metalType: '18K', metalColor: 'White Gold', quotedCost: 4200 },
-  { id: '2', poNumber: 'PO-2025-002', customerFullName: 'Sarah Mitchell', status: OrderStatus.CUSTOMER_APPROVED, orderType: 'Wedding Band', metalType: '14K', metalColor: 'Yellow Gold', quotedCost: 1850 },
-  { id: '3', poNumber: 'PO-2025-003', storeName: 'Diamond Gallery', status: OrderStatus.VPO_ISSUED, orderType: 'Necklace', metalType: 'Platinum', metalColor: 'Platinum', quotedCost: 7600 },
-  { id: '4', poNumber: 'PO-2025-004', customerFullName: 'James Chen', status: OrderStatus.READY_TO_SHIP, orderType: 'Pendant', metalType: '18K', metalColor: 'Rose Gold', quotedCost: 3100 },
-  { id: '5', poNumber: 'PO-2025-005', storeName: 'Luxury Jewels', status: OrderStatus.WAITING_CONFIRMATION, orderType: 'Bracelet', metalType: '14K', metalColor: 'White Gold', quotedCost: 2400 },
-];
 
 const MOCK_METRICS: Metrics = {
   total: 48,
@@ -43,7 +36,7 @@ const KPI_CARDS = (metrics: Metrics) => [
 export default function Dashboard() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<Metrics>(MOCK_METRICS);
-  const [orders, setOrders] = useState<Partial<Order>[]>(MOCK_ORDERS);
+  const [orders, setOrders] = useState<Partial<Order>[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'demo'>('connecting');
 
@@ -54,15 +47,17 @@ export default function Dashboard() {
           apiFetch(`${API}/orders/metrics`),
           apiFetch(`${API}/orders?limit=20`),
         ]);
-        if (mRes.ok && oRes.ok) {
-          const mData = await mRes.json();
-          const oData = await oRes.json();
-          setMetrics(mData);
-          if (oData.orders?.length) setOrders(oData.orders);
-          setApiStatus('live');
-        } else {
-          setApiStatus('demo');
+        let gotRealData = false;
+        if (mRes.ok) {
+          setMetrics(await mRes.json());
+          gotRealData = true;
         }
+        if (oRes.ok) {
+          const oData = await oRes.json();
+          if (oData.orders?.length) setOrders(oData.orders);
+          gotRealData = true;
+        }
+        setApiStatus(gotRealData ? 'live' : 'demo');
       } catch {
         setApiStatus('demo');
       } finally {
@@ -81,7 +76,7 @@ export default function Dashboard() {
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="JewelFlow OS — Custom Order Management"
+      subtitle="Kira Jewels Custom — Order Management"
       actions={
         <>
           <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '99px', fontWeight: 600, background: statusDot.bg, color: statusDot.color }}>
@@ -97,7 +92,7 @@ export default function Dashboard() {
       }
     >
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
         {KPI_CARDS(metrics).map((kpi) => (
           <div key={kpi.label} style={{
             background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -118,7 +113,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px' }}>
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px' }}>
         {/* Recent Orders */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

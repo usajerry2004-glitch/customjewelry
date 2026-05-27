@@ -3,20 +3,13 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 
 interface Sku {
-  id: string;
-  skuNumber: string;
-  orderId?: string;
-  orderType?: string;
-  metalType?: string;
-  metalColor?: string;
-  centerStoneShape?: string;
-  approximateCaratWeight?: string;
-  generatedBy?: string;
-  isActive: boolean;
-  createdAt: string;
+  id: string; skuNumber: string; orderId?: string; orderType?: string;
+  metalType?: string; metalColor?: string; centerStoneShape?: string;
+  approximateCaratWeight?: string; generatedBy?: string; isActive: boolean; createdAt: string;
 }
-
 interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; kiraSkuNumber?: string; orderType?: string; metalType?: string; metalColor?: string; }
+
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
 
 export default function SKUPage() {
   const [skus, setSkus] = useState<Sku[]>([]);
@@ -51,23 +44,26 @@ export default function SKUPage() {
 
   return (
     <AppLayout title="SKU Management" subtitle="Generate and manage product SKUs">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
+
         {/* SKU list */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#CBD5E1' }}>{skus.length} SKUs Generated</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+            <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {skus.length} SKUs Generated
+            </h3>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="🔍  Search SKUs…"
-              style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '8px 14px', color: '#E2E8F0', fontSize: '13px', width: '220px', outline: 'none' }}
+              placeholder="Search SKUs…"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', color: 'var(--text-primary)', fontSize: '13px', width: '220px', outline: 'none' }}
             />
           </div>
 
           {loading ? (
-            <div style={{ color: '#4B5563', textAlign: 'center', padding: '40px' }}>Loading SKUs…</div>
+            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>Loading SKUs…</div>
           ) : skus.length === 0 ? (
-            <div style={{ color: '#4B5563', textAlign: 'center', padding: '60px 0' }}>
+            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px 0' }}>
               No SKUs yet. Generate one from the panel on the right.
             </div>
           ) : (
@@ -75,20 +71,22 @@ export default function SKUPage() {
               {skus.map(sku => {
                 const order = orders.find(o => o.id === sku.orderId);
                 return (
-                  <div key={sku.id} style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '10px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={sku.id} style={{ ...card, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#F6D860', letterSpacing: '0.5px', marginBottom: '4px' }}>{sku.skuNumber}</div>
-                      <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        {sku.orderType && <span>💍 {sku.orderType}</span>}
-                        {sku.metalType && <span>✨ {sku.metalType} {sku.metalColor}</span>}
-                        {sku.centerStoneShape && <span>💎 {sku.centerStoneShape}</span>}
-                        {sku.approximateCaratWeight && <span>⚖️ {sku.approximateCaratWeight}ct</span>}
-                        {order && <span style={{ color: '#818CF8' }}>📋 {order.poNumber}</span>}
+                      <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--accent-dark)', letterSpacing: '0.5px', marginBottom: '5px' }}>
+                        {sku.skuNumber}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        {sku.orderType && <span>{sku.orderType}</span>}
+                        {sku.metalType && <span>{sku.metalType} {sku.metalColor}</span>}
+                        {sku.centerStoneShape && <span>{sku.centerStoneShape}</span>}
+                        {sku.approximateCaratWeight && <span>{sku.approximateCaratWeight}ct</span>}
+                        {order && <span style={{ color: 'var(--navy)', fontWeight: 600 }}>→ {order.poNumber}</span>}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '16px' }}>
-                      <div style={{ fontSize: '10px', color: '#4B5563' }}>{new Date(sku.createdAt).toLocaleDateString()}</div>
-                      {sku.generatedBy && <div style={{ fontSize: '10px', color: '#4B5563', marginTop: '2px' }}>{sku.generatedBy.split('@')[0]}</div>}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(sku.createdAt).toLocaleDateString()}</div>
+                      {sku.generatedBy && <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{sku.generatedBy.split('@')[0]}</div>}
                     </div>
                   </div>
                 );
@@ -98,34 +96,34 @@ export default function SKUPage() {
         </div>
 
         {/* Generate panel */}
-        <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '18px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#CBD5E1', marginBottom: '4px' }}>Generate SKU</h3>
-          <p style={{ fontSize: '12px', color: '#4B5563', marginBottom: '16px' }}>Select an order that doesn't have a SKU yet. The format will be auto-generated based on the order's product specs.</p>
+        <div style={{ ...card, padding: '22px' }}>
+          <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>Generate SKU</h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '18px', lineHeight: 1.6 }}>
+            Select an order that doesn't have a SKU yet. The format is auto-generated from the product specs.
+          </p>
 
-          <div style={{ marginBottom: '12px', background: '#0F0F14', border: '1px solid #1E1E2E', borderRadius: '8px', padding: '10px 12px' }}>
-            <div style={{ fontSize: '11px', color: '#4B5563', marginBottom: '4px' }}>SKU FORMAT</div>
-            <div style={{ fontSize: '13px', color: '#F6D860', fontFamily: 'monospace' }}>KJ-[TYPE]-[METAL][COLOR]-[SEQ]</div>
-            <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '4px' }}>e.g. KJ-RING-18KWG-0001</div>
+          <div style={{ marginBottom: '16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>SKU Format</div>
+            <div style={{ fontSize: '14px', color: 'var(--accent-dark)', fontFamily: 'monospace', fontWeight: 600 }}>KJ-[TYPE]-[METAL][COLOR]-[SEQ]</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>e.g. KJ-RING-18KWG-0001</div>
           </div>
 
           {ordersWithoutSku.length === 0 ? (
-            <div style={{ color: '#4B5563', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
-              All eligible orders have SKUs.
-            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>All eligible orders have SKUs.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {ordersWithoutSku.map(order => (
-                <div key={order.id} style={{ background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '8px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={order.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#E2E8F0' }}>{order.poNumber}</div>
-                    <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '2px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{order.poNumber}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {order.orderType || '?'} · {order.metalType || '?'} {order.metalColor || ''}
                     </div>
                   </div>
                   <button
                     onClick={() => generate(order.id)}
                     disabled={generating === order.id}
-                    style={{ background: 'rgba(230,168,23,0.15)', border: '1px solid rgba(230,168,23,0.4)', borderRadius: '7px', padding: '6px 12px', color: '#F6D860', fontSize: '11px', fontWeight: 700, cursor: 'pointer', opacity: generating === order.id ? 0.6 : 1 }}
+                    style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '6px 14px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: generating === order.id ? 0.6 : 1 }}
                   >
                     {generating === order.id ? '…' : '+ Generate'}
                   </button>

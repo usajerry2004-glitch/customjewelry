@@ -108,7 +108,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
         </div>
       )}
 
-      <div style={{ padding: '32px 36px', maxWidth: '900px', margin: '0 auto' }}>
+      <div className="customer-layout-main" style={{ padding: '32px 36px', maxWidth: '900px', margin: '0 auto' }}>
         {children}
       </div>
     </div>

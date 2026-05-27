@@ -20,6 +20,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -53,42 +54,57 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
-      <Sidebar activeRole={role} activePath={router.pathname} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <Sidebar activeRole={role} activePath={router.pathname} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Topbar */}
         <div style={{
           background: 'var(--topbar-bg)',
           borderBottom: '1px solid var(--border-light)',
-          padding: '0 28px',
+          padding: '0 20px',
           height: '62px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
           boxShadow: '0 1px 0 rgba(26,39,64,0.06)',
+          gap: '10px',
         }}>
-          <div>
-            {title && (
-              <div style={{
-                fontFamily: 'Cormorant Garamond, Georgia, serif',
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                letterSpacing: '0.3px',
-                lineHeight: 1,
-              }}>
-                {title}
-              </div>
-            )}
-            {subtitle && (
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', letterSpacing: '0.2px' }}>
-                {subtitle}
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            {/* Hamburger */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '20px', color: 'var(--text-primary)', padding: '4px',
+                flexShrink: 0, lineHeight: 1,
+              }}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+            <div style={{ minWidth: 0 }}>
+              {title && (
+                <div className="topbar-title" style={{
+                  fontFamily: 'Cormorant Garamond, Georgia, serif',
+                  fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)',
+                  letterSpacing: '0.3px', lineHeight: 1, whiteSpace: 'nowrap',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {title}
+                </div>
+              )}
+              {subtitle && (
+                <div className="topbar-subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', letterSpacing: '0.2px' }}>
+                  {subtitle}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
             {actions}
 
             {/* Notification Bell */}
@@ -96,18 +112,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               <button
                 onClick={openNotifs}
                 style={{
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  width: '36px',
-                  height: '36px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  color: 'var(--text-secondary)',
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: '8px', width: '36px', height: '36px',
+                  cursor: 'pointer', fontSize: '15px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative', color: 'var(--text-secondary)',
                 }}
               >
                 🔔
@@ -124,9 +133,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
 
               {showNotifs && (
                 <div style={{
-                  position: 'absolute', right: 0, top: '44px', width: '320px',
+                  position: 'absolute', right: 0, top: '44px', width: '300px',
                   background: 'var(--bg-card)', border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 100, overflow: 'hidden',
+                  maxWidth: 'calc(100vw - 32px)',
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
@@ -165,15 +175,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                   width: '32px', height: '32px', borderRadius: '50%',
                   background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: 700, color: '#fff',
+                  fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0,
                 }}>
                   {user.firstName[0]}{user.lastName[0]}
                 </div>
-                <div>
+                <div className="topbar-user-name">
                   <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.firstName} {user.lastName}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{user.role}</div>
                 </div>
                 <button
+                  className="topbar-signout"
                   onClick={() => { clearAuth(); router.replace('/login'); }}
                   style={{
                     background: 'none', border: '1px solid var(--border)', borderRadius: '6px',
@@ -187,7 +198,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '28px 32px' }}>
+        <div className="main-content-pad" style={{ flex: 1, overflow: 'auto', padding: '28px 32px' }}>
           {children}
         </div>
       </div>

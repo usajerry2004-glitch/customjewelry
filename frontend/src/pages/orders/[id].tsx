@@ -163,7 +163,7 @@ export default function OrderDetail() {
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '24px', alignItems: 'start' }}>
+        <div className="order-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '24px', alignItems: 'start' }}>
 
           {/* Field groups */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

@@ -3,14 +3,14 @@ import { apiFetch, API } from '../utils/apiFetch';
 import { OrderMessage } from '../utils/types';
 
 const ROLE_COLORS: Record<string, string> = {
-  ADMIN:            '#F6D860',
+  ADMIN:            '#C09B58',
   AUTHORIZER:       '#F59E0B',
   CAD_DESIGNER:     '#6366F1',
   SKU_MANAGER:      '#F97316',
-  FACTORY_MANAGER:  '#14B8A6',
-  SHIPPING_MANAGER: '#3B82F6',
+  FACTORY_MANAGER:  '#0D9488',
+  SHIPPING_MANAGER: '#2563EB',
   SALES_REP:        '#8B5CF6',
-  CUSTOMER:         '#10B981',
+  CUSTOMER:         '#059669',
 };
 
 const MENTION_ROLES = [
@@ -71,50 +71,60 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   }, {});
 
   return (
-    <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
       {/* Header */}
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid #1E1E2E', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#E2E8F0' }}>
-          💬 Conversation {messages.length > 0 && <span style={{ color: '#4B5563', fontWeight: 400 }}>({messages.length})</span>}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h3 style={{ margin: 0, fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '17px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          Conversation {messages.length > 0 && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '14px' }}>({messages.length})</span>}
         </h3>
         {!isCustomer && (
-          <span style={{ fontSize: '11px', color: '#4B5563' }}>🔒 = internal only</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Internal = visible to staff only</span>
         )}
       </div>
 
       {/* Thread */}
       <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '0' }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#2D2D3D', padding: '24px 0', fontSize: '13px' }}>No messages yet. Start the conversation.</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '13px' }}>No messages yet. Start the conversation.</div>
         )}
         {Object.entries(groupedByDate).map(([date, msgs]) => (
           <div key={date}>
-            <div style={{ textAlign: 'center', margin: '10px 0', fontSize: '10px', color: '#2D2D3D', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{date}</div>
+            <div style={{ textAlign: 'center', margin: '10px 0', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{date}</div>
             {msgs.map(msg => {
               const isMine = msg.authorId === currentUserId;
-              const roleColor = ROLE_COLORS[msg.authorRole] || '#94A3B8';
+              const roleColor = ROLE_COLORS[msg.authorRole] || 'var(--text-muted)';
               const internal = msg.isInternal;
               return (
                 <div key={msg.id} style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
                   {/* Author + time */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                     {internal && !isCustomer && (
-                      <span style={{ fontSize: '10px', background: '#1E1E2E', color: '#6366F1', padding: '1px 6px', borderRadius: '4px' }}>🔒 Internal</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(99,102,241,0.2)' }}>Internal</span>
                     )}
                     <span style={{ fontSize: '11px', color: roleColor, fontWeight: 600 }}>{msg.authorName}</span>
-                    <span style={{ fontSize: '10px', color: '#2D2D3D' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   {/* Bubble */}
                   <div style={{
                     maxWidth: '75%',
-                    background: internal && !isCustomer ? '#1A1A2E' : isMine ? '#1A1E2E' : '#0F0F14',
-                    border: `1px solid ${internal && !isCustomer ? '#6366F130' : isMine ? '#3B82F630' : '#1E1E2E'}`,
+                    background: internal && !isCustomer
+                      ? 'rgba(99,102,241,0.06)'
+                      : isMine
+                        ? 'rgba(26,39,64,0.06)'
+                        : 'var(--bg-input)',
+                    border: `1px solid ${
+                      internal && !isCustomer
+                        ? 'rgba(99,102,241,0.2)'
+                        : isMine
+                          ? 'rgba(26,39,64,0.15)'
+                          : 'var(--border)'
+                    }`,
                     borderRadius: '10px',
                     padding: '10px 14px',
                     fontSize: '13px',
-                    color: '#CBD5E1',
+                    color: 'var(--text-primary)',
                     lineHeight: 1.55,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
@@ -123,7 +133,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                     {msg.mentions?.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                         {msg.mentions.map(m => (
-                          <span key={m} style={{ fontSize: '10px', background: '#1E2A3A', color: '#60A5FA', padding: '2px 6px', borderRadius: '4px' }}>{m}</span>
+                          <span key={m} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>{m}</span>
                         ))}
                       </div>
                     )}
@@ -137,7 +147,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
       </div>
 
       {/* Input */}
-      <div style={{ borderTop: '1px solid #1E1E2E', padding: '14px 18px' }}>
+      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-input)' }}>
         {/* Options row (company only) */}
         {!isCustomer && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -145,31 +155,37 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             <button
               onClick={() => setIsInternal(p => !p)}
               style={{
-                padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                background: isInternal ? '#6366F130' : '#1A1A24',
-                color: isInternal ? '#818CF8' : '#4B5563',
+                padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                border: isInternal ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                background: isInternal ? 'rgba(99,102,241,0.1)' : 'var(--bg-card)',
+                color: isInternal ? '#6366F1' : 'var(--text-secondary)',
               }}
             >
-              🔒 {isInternal ? 'Internal' : 'Public'}
+              {isInternal ? 'Internal' : 'Public'}
             </button>
             {/* Mention */}
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowMentions(p => !p)}
-                style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', background: mentions.length ? '#1E3A2E' : '#1A1A24', color: mentions.length ? '#34D399' : '#4B5563' }}
+                style={{
+                  padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                  border: mentions.length ? '1px solid rgba(5,150,105,0.4)' : '1px solid var(--border)',
+                  background: mentions.length ? 'rgba(5,150,105,0.08)' : 'var(--bg-card)',
+                  color: mentions.length ? '#059669' : 'var(--text-secondary)',
+                }}
               >
                 @ Mention {mentions.length > 0 && `(${mentions.length})`}
               </button>
               {showMentions && (
-                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: '#111118', border: '1px solid #2D2D3D', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '180px' }}>
+                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '180px', boxShadow: 'var(--shadow-md)' }}>
                   {MENTION_ROLES.map(m => (
                     <div
                       key={m}
                       onClick={() => toggleMention(m)}
                       style={{
                         padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px',
-                        color: mentions.includes(m) ? '#60A5FA' : '#94A3B8',
-                        background: mentions.includes(m) ? '#1E2A3A' : 'transparent',
+                        color: mentions.includes(m) ? '#2563EB' : 'var(--text-secondary)',
+                        background: mentions.includes(m) ? 'rgba(37,99,235,0.08)' : 'transparent',
                       }}
                     >
                       {mentions.includes(m) ? '✓ ' : ''}{m}
@@ -179,7 +195,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
               )}
             </div>
             {mentions.length > 0 && mentions.map(m => (
-              <span key={m} style={{ fontSize: '10px', background: '#1E2A3A', color: '#60A5FA', padding: '2px 6px', borderRadius: '4px' }}>{m}</span>
+              <span key={m} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>{m}</span>
             ))}
           </div>
         )}
@@ -192,8 +208,9 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             placeholder={isCustomer ? 'Send a message to the team…' : isInternal ? 'Internal note (not visible to customer)…' : 'Reply to customer or add a note…'}
             rows={2}
             style={{
-              flex: 1, background: '#0F0F14', border: `1px solid ${isInternal ? '#6366F140' : '#2D2D3D'}`,
-              borderRadius: '8px', padding: '9px 12px', color: '#E2E8F0', fontSize: '13px',
+              flex: 1, background: 'var(--bg-card)',
+              border: `1px solid ${isInternal ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+              borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px',
               resize: 'none', outline: 'none', fontFamily: 'inherit',
             }}
           />
@@ -202,16 +219,16 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             disabled={sending || !content.trim()}
             style={{
               alignSelf: 'flex-end', padding: '9px 18px', borderRadius: '8px', border: 'none',
-              background: content.trim() ? 'linear-gradient(135deg, #F6D860, #E6A817)' : '#1A1A24',
-              color: content.trim() ? '#000' : '#4B5563',
-              fontSize: '13px', fontWeight: 700, cursor: content.trim() ? 'pointer' : 'default',
+              background: content.trim() ? 'var(--navy)' : 'var(--border)',
+              color: content.trim() ? '#fff' : 'var(--text-muted)',
+              fontSize: '13px', fontWeight: 600, cursor: content.trim() ? 'pointer' : 'default',
               opacity: sending ? 0.7 : 1,
             }}
           >
             {sending ? '…' : 'Send'}
           </button>
         </div>
-        <div style={{ fontSize: '10px', color: '#2D2D3D', marginTop: '5px' }}>Ctrl+Enter to send</div>
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px' }}>Ctrl+Enter to send</div>
       </div>
     </div>
   );

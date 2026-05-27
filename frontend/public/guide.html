@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kira Jewels Custom — Complete Feature Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy: #0D1B35;
+    --navy-light: #1A2740;
+    --gold: #C09B58;
+    --gold-light: #EDD48B;
+    --bg: #F5F3EF;
+    --card: #FFFFFF;
+    --border: #E5DFD5;
+    --text: #1A2740;
+    --text2: #5C6B7A;
+    --text3: #9BA8B5;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(13,27,53,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); }
+  h1,h2,h3 { font-family: 'Cormorant Garamond', Georgia, serif; }
+
+  /* TOP NAV */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--navy); padding: 0 32px;
+    display: flex; align-items: center; gap: 0;
+    box-shadow: 0 2px 12px rgba(13,27,53,0.35);
+    height: 56px;
+  }
+  .brand { font-family: 'Cormorant Garamond',serif; color: #fff; font-size: 22px; font-weight: 600; letter-spacing: 0.5px; margin-right: 36px; white-space: nowrap; }
+  .brand span { color: var(--gold-light); }
+  .nav-tabs { display: flex; gap: 2px; overflow-x: auto; flex: 1; }
+  .nav-tab {
+    padding: 6px 14px; border-radius: 7px; border: none;
+    background: transparent; color: rgba(255,255,255,0.55);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  }
+  .nav-tab:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .nav-tab.active { background: rgba(192,155,88,0.22); color: var(--gold-light); font-weight: 600; }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1A2E50 100%);
+    padding: 60px 48px 56px;
+    text-align: center;
+    color: #fff;
+  }
+  .hero h1 { font-size: 48px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .hero h1 span { color: var(--gold-light); }
+  .hero p { font-size: 16px; color: rgba(255,255,255,0.65); max-width: 560px; margin: 0 auto 36px; line-height: 1.7; }
+  .role-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.75); border-radius: 99px;
+    padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip:hover { background: rgba(192,155,88,0.2); border-color: var(--gold); color: var(--gold-light); }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* WORKFLOW */
+  .workflow-section { padding: 48px 48px 32px; }
+  .workflow-section h2 { font-size: 30px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .workflow-section p { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
+  .workflow { display: flex; gap: 0; overflow-x: auto; padding-bottom: 8px; }
+  .wf-step {
+    display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 88px;
+    position: relative;
+  }
+  .wf-step::after {
+    content: ''; position: absolute; top: 18px; left: 50%; width: 100%;
+    height: 2px; background: var(--border); z-index: 0;
+  }
+  .wf-step:last-child::after { display: none; }
+  .wf-dot {
+    width: 38px; height: 38px; border-radius: 50%; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; border: 2px solid var(--border);
+    background: var(--card); margin-bottom: 8px;
+    box-shadow: var(--shadow); position: relative;
+  }
+  .wf-dot.done { border-color: var(--gold); background: rgba(192,155,88,0.1); }
+  .wf-label { font-size: 10px; color: var(--text3); text-align: center; line-height: 1.3; max-width: 72px; }
+
+  /* MAIN CONTENT */
+  .content { padding: 0 48px 64px; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ROLE HEADER */
+  .role-header {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 32px;
+    margin-bottom: 24px; box-shadow: var(--shadow);
+    display: flex; align-items: flex-start; gap: 24px;
+  }
+  .role-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+  }
+  .role-header-text h2 { font-size: 28px; font-weight: 600; margin-bottom: 4px; }
+  .role-header-text p { font-size: 13px; color: var(--text2); line-height: 1.7; max-width: 600px; }
+  .access-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .access-chip {
+    font-size: 11px; padding: 3px 10px; border-radius: 6px;
+    background: rgba(13,27,53,0.07); color: var(--text2);
+    border: 1px solid var(--border); font-weight: 500;
+  }
+
+  /* CREDENTIALS BOX */
+  .creds {
+    background: #F0F4FF; border: 1px solid #C7D5F0;
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .creds-icon { font-size: 22px; }
+  .creds-info { font-size: 12px; color: var(--text2); line-height: 1.7; }
+  .creds-info strong { color: var(--text); font-size: 13px; }
+  .creds code { background: rgba(13,27,53,0.08); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--navy); }
+
+  /* STEPS */
+  .steps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .step-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 22px;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .step-card::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 3px; height: 100%; background: var(--step-color, var(--gold));
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--step-color, var(--gold));
+    color: #fff; font-size: 12px; font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .step-card h3 { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .step-card p { font-size: 12px; color: var(--text2); line-height: 1.7; margin-bottom: 10px; }
+  .step-card ul { list-style: none; }
+  .step-card ul li { font-size: 12px; color: var(--text2); line-height: 1.6; padding-left: 14px; position: relative; }
+  .step-card ul li::before { content: '→'; position: absolute; left: 0; color: var(--gold); font-size: 11px; top: 1px; }
+
+  /* MOCK UI SCREENS */
+  .mock-screen {
+    background: #F9F8F5; border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-top: 12px;
+  }
+  .mock-topbar {
+    background: var(--navy); padding: 8px 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .mock-url {
+    flex: 1; background: rgba(255,255,255,0.12); border-radius: 4px;
+    padding: 3px 10px; font-size: 10px; color: rgba(255,255,255,0.6);
+    margin: 0 8px;
+  }
+  .mock-body { padding: 12px 14px; }
+  .mock-row {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 6px; display: flex;
+    justify-content: space-between; align-items: center; font-size: 12px;
+  }
+  .mock-row-title { font-weight: 600; color: var(--text); font-size: 12px; }
+  .mock-row-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 600;
+  }
+  .mock-btn {
+    background: var(--navy); color: #fff; border: none;
+    border-radius: 6px; padding: 5px 12px; font-size: 11px;
+    font-weight: 600; cursor: default; font-family: 'DM Sans',sans-serif;
+  }
+  .mock-btn.gold { background: var(--gold); }
+  .mock-btn.green { background: #059669; }
+  .mock-btn.red { background: #DC2626; }
+  .mock-btn.outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+  .mock-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .mock-field { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 11px; color: var(--text3); }
+  .mock-field label { display: block; font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .mock-field span { color: var(--text); font-weight: 500; font-size: 12px; }
+
+  /* WORKFLOW SECTION per role */
+  .role-workflow {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px;
+    margin-bottom: 24px; box-shadow: var(--shadow);
+  }
+  .role-workflow h3 { font-family: 'DM Sans',sans-serif; font-size: 13px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+  .mini-flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; gap: 4px; }
+  .mini-step {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px;
+    font-size: 11px; font-weight: 500; color: var(--text2);
+  }
+  .mini-step.highlight {
+    background: rgba(192,155,88,0.12); border-color: var(--gold);
+    color: var(--navy-light); font-weight: 600;
+  }
+  .mini-arrow { color: var(--text3); font-size: 14px; }
+
+  /* OVERVIEW SECTION */
+  .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 32px; }
+  .overview-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    box-shadow: var(--shadow); cursor: pointer; transition: all 0.15s;
+    text-decoration: none; display: block;
+  }
+  .overview-card:hover { box-shadow: 0 8px 24px rgba(13,27,53,0.15); transform: translateY(-2px); border-color: var(--gold); }
+  .overview-card .oc-icon { font-size: 28px; margin-bottom: 10px; }
+  .overview-card h3 { font-family: 'DM Sans',sans-serif; font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .overview-card p { font-size: 12px; color: var(--text3); line-height: 1.6; }
+  .overview-card .oc-pages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .oc-page { font-size: 10px; background: var(--bg); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; color: var(--text2); }
+
+  /* FULL FLOW */
+  .full-flow { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 32px; }
+  .full-flow-header { padding: 18px 24px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .full-flow-header h2 { font-size: 22px; font-weight: 600; }
+  .full-flow-header p { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .flow-stage {
+    display: flex; align-items: stretch; border-bottom: 1px solid var(--border-light, #EDE9E2);
+    transition: background 0.15s;
+  }
+  .flow-stage:last-child { border-bottom: none; }
+  .flow-stage:hover { background: #FDFCFB; }
+  .flow-num {
+    width: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond',serif; font-size: 22px; font-weight: 600;
+    color: rgba(192,155,88,0.4); border-right: 1px solid var(--border);
+  }
+  .flow-content { flex: 1; padding: 16px 20px; }
+  .flow-content h4 { font-family: 'DM Sans',sans-serif; font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+  .flow-content p { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 6px; }
+  .flow-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .flow-role { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .flow-status { font-size: 10px; padding: 2px 8px; border-radius: 4px; border: 1px solid; font-weight: 600; }
+
+  /* PAGES SECTION */
+  .pages-section { margin-bottom: 32px; }
+  .pages-section h2 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+  .pages-section p { font-size: 13px; color: var(--text3); margin-bottom: 20px; }
+  .page-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 16px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .page-card-header {
+    padding: 16px 22px; background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer;
+  }
+  .page-card-header h3 { font-family: 'DM Sans',sans-serif; font-size: 14px; font-weight: 700; color: var(--text); }
+  .page-card-header .path { font-size: 11px; color: var(--text3); font-family: monospace; background: rgba(13,27,53,0.06); padding: 2px 8px; border-radius: 4px; }
+  .page-card-body { padding: 18px 22px; display: none; }
+  .page-card-body.open { display: block; }
+  .feature-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .feature-list li {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 12px; color: var(--text2); line-height: 1.5;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .feature-list li .fi { color: var(--gold); flex-shrink: 0; margin-top: 1px; }
+  .feature-list li strong { color: var(--text); display: block; margin-bottom: 1px; font-size: 12px; }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+  /* TIPS */
+  .tip {
+    background: rgba(192,155,88,0.08); border: 1px solid rgba(192,155,88,0.3);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 12px;
+    font-size: 12px; color: var(--text2); line-height: 1.7;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .tip .tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="brand">KIRA JEWELS <span>OS</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('overview')">Overview</button>
+    <button class="nav-tab" onclick="showSection('fullflow')">Full Workflow</button>
+    <button class="nav-tab" onclick="showSection('customer')">Customer</button>
+    <button class="nav-tab" onclick="showSection('salesrep')">Sales Rep</button>
+    <button class="nav-tab" onclick="showSection('authorizer')">Authorizer</button>
+    <button class="nav-tab" onclick="showSection('cad')">CAD Designer</button>
+    <button class="nav-tab" onclick="showSection('sku')">SKU Manager</button>
+    <button class="nav-tab" onclick="showSection('factory')">Factory Manager</button>
+    <button class="nav-tab" onclick="showSection('shipping')">Shipping Manager</button>
+    <button class="nav-tab" onclick="showSection('admin')">Admin</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>JewelFlow <span>OS</span> Guide</h1>
+  <p>Complete walkthrough of every feature — from placing a custom jewelry order to final delivery. Select a role below to see their specific workflow.</p>
+  <div class="role-chips">
+    <div class="chip" onclick="showSection('customer')"><span class="dot" style="background:#059669"></span> Customer</div>
+    <div class="chip" onclick="showSection('salesrep')"><span class="dot" style="background:#8B5CF6"></span> Sales Rep</div>
+    <div class="chip" onclick="showSection('authorizer')"><span class="dot" style="background:#F59E0B"></span> Authorizer</div>
+    <div class="chip" onclick="showSection('cad')"><span class="dot" style="background:#6366F1"></span> CAD Designer</div>
+    <div class="chip" onclick="showSection('sku')"><span class="dot" style="background:#F97316"></span> SKU Manager</div>
+    <div class="chip" onclick="showSection('factory')"><span class="dot" style="background:#0D9488"></span> Factory Manager</div>
+    <div class="chip" onclick="showSection('shipping')"><span class="dot" style="background:#2563EB"></span> Shipping Manager</div>
+    <div class="chip" onclick="showSection('admin')"><span class="dot" style="background:#C09B58"></span> Admin</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="content" style="padding-top:36px">
+
+  <!-- ===== OVERVIEW ===== -->
+  <div id="section-overview" class="section active">
+    <div style="margin-bottom:32px">
+      <h2 style="font-size:34px;font-weight:600;margin-bottom:6px">System Overview</h2>
+      <p style="font-size:14px;color:var(--text3)">Kira Jewels Custom manages the full lifecycle of custom jewelry orders from inquiry to delivery.</p>
+    </div>
+
+    <div class="overview-grid">
+      <a class="overview-card" onclick="showSection('customer')">
+        <div class="oc-icon">💍</div>
+        <h3>Customer</h3>
+        <p>Places orders, reviews CAD designs, tracks progress, communicates with team.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/customer/orders</span>
+          <span class="oc-page">/customer/orders/new</span>
+          <span class="oc-page">/customer/orders/[id]</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('salesrep')">
+        <div class="oc-icon">🛍️</div>
+        <h3>Sales Rep</h3>
+        <p>Creates orders on behalf of customers, manages customer accounts, tracks pipeline.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/dashboard</span>
+          <span class="oc-page">/orders</span>
+          <span class="oc-page">/customers</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('authorizer')">
+        <div class="oc-icon">✅</div>
+        <h3>Authorizer</h3>
+        <p>Reviews new orders and authorizes them to proceed to CAD design stage.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/orders</span>
+          <span class="oc-page">/orders/[id]</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('cad')">
+        <div class="oc-icon">✏️</div>
+        <h3>CAD Designer</h3>
+        <p>Uploads design files, manages revisions, sends designs for customer approval.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/cad</span>
+          <span class="oc-page">/orders/[id]</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('sku')">
+        <div class="oc-icon">🏷️</div>
+        <h3>SKU Manager</h3>
+        <p>Generates unique product SKU codes once designs are approved and ready for manufacturing.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/sku</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('factory')">
+        <div class="oc-icon">🏭</div>
+        <h3>Factory Manager</h3>
+        <p>Issues VPOs, creates job bags, tracks production, moves orders to Ready to Ship.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/manufacturing</span>
+          <span class="oc-page">/orders/[id]</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('shipping')">
+        <div class="oc-icon">📦</div>
+        <h3>Shipping Manager</h3>
+        <p>Dispatches orders with tracking numbers, marks deliveries as completed.</p>
+        <div class="oc-pages">
+          <span class="oc-page">/shipping</span>
+        </div>
+      </a>
+      <a class="overview-card" onclick="showSection('admin')">
+        <div class="oc-icon">👑</div>
+        <h3>Admin</h3>
+        <p>Full access to all features, all stages, all reports, and user management.</p>
+        <div class="oc-pages">
+          <span class="oc-page">All pages</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="full-flow">
+      <div class="full-flow-header">
+        <h2>Order Lifecycle at a Glance</h2>
+        <p>13 stages from order placement to delivery — each owned by a specific role</p>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h4>Order Placed</h4>
+          <p>Customer submits order via portal, or Sales Rep creates it on their behalf. Reference images can be uploaded.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(139,92,246,0.12);color:#7C3AED">Sales Rep / Customer</span>
+            <span class="flow-status" style="color:#6B7280;border-color:#9CA3AF">WAITING_CONFIRMATION</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h4>Authorized for CAD</h4>
+          <p>Authorizer reviews the order details and approves it to proceed. Order moves to CAD queue.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(245,158,11,0.12);color:#D97706">Authorizer</span>
+            <span class="flow-status" style="color:#6366F1;border-color:#6366F1">PENDING_CAD</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h4>CAD Design in Progress</h4>
+          <p>CAD Designer begins work, uploads design files (.jpg, .pdf, .dwg etc). Status updated to reflect active work.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(99,102,241,0.12);color:#4F46E5">CAD Designer</span>
+            <span class="flow-status" style="color:#6366F1;border-color:#6366F1">CAD_IN_PROGRESS</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h4>Design Sent for Customer Approval</h4>
+          <p>CAD Designer marks the file as "Sent for Approval". Customer receives notification and can review, approve, or request changes.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(99,102,241,0.12);color:#4F46E5">CAD Designer</span>
+            <span class="flow-role" style="background:rgba(5,150,105,0.12);color:#059669">Customer</span>
+            <span class="flow-status" style="color:#F59E0B;border-color:#F59E0B">SENT_FOR_APPROVAL</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <h4>Customer Approves Design</h4>
+          <p>Customer clicks "Approve Design" on their portal. Order moves to CUSTOMER_APPROVED. If rejected or revision requested, CAD Designer revises and re-submits.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(5,150,105,0.12);color:#059669">Customer</span>
+            <span class="flow-status" style="color:#059669;border-color:#059669">CUSTOMER_APPROVED</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">6</div>
+        <div class="flow-content">
+          <h4>SKU Generated</h4>
+          <p>SKU Manager generates a unique product code (format: KJ-[TYPE]-[METAL][COLOR]-[SEQ]). This becomes the product's permanent identifier.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(249,115,22,0.12);color:#EA580C">SKU Manager</span>
+            <span class="flow-status" style="color:#F97316;border-color:#F97316">SKU_CREATION</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">7</div>
+        <div class="flow-content">
+          <h4>VPO Issued</h4>
+          <p>Factory Manager enters the VPO Number and Job Bag Number, issuing a Vendor Purchase Order to the factory.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(13,148,136,0.12);color:#0D9488">Factory Manager</span>
+            <span class="flow-status" style="color:#0891B2;border-color:#0891B2">VPO_ISSUED</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">8</div>
+        <div class="flow-content">
+          <h4>Job Bag Created / Sent to Contractor</h4>
+          <p>Factory Manager confirms the job bag is created and assigns a vendor/factory. Order enters active production.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(13,148,136,0.12);color:#0D9488">Factory Manager</span>
+            <span class="flow-status" style="color:#0D9488;border-color:#0D9488">ORDER_JOB_BAG_CREATED</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">9</div>
+        <div class="flow-content">
+          <h4>Manufacturing Complete — Ready to Invoice</h4>
+          <p>Factory Manager clicks "Mark Manufacturing Complete". Order becomes available for invoicing.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(13,148,136,0.12);color:#0D9488">Factory Manager</span>
+            <span class="flow-status" style="color:#2563EB;border-color:#2563EB">READY_TO_INVOICE</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">10</div>
+        <div class="flow-content">
+          <h4>Ready to Ship</h4>
+          <p>Order appears in the Shipping Manager's "Ready to Ship" queue. Tracking number and carrier are entered.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(37,99,235,0.12);color:#1D4ED8">Shipping Manager</span>
+            <span class="flow-status" style="color:#2563EB;border-color:#2563EB">READY_TO_SHIP</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">11</div>
+        <div class="flow-content">
+          <h4>Dispatched / Shipped</h4>
+          <p>Shipping Manager clicks "Dispatch". Tracking number is recorded and customer can see it on their portal.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(37,99,235,0.12);color:#1D4ED8">Shipping Manager</span>
+            <span class="flow-status" style="color:#6366F1;border-color:#6366F1">SHIPPED</span>
+          </div>
+        </div>
+      </div>
+      <div class="flow-stage">
+        <div class="flow-num">12</div>
+        <div class="flow-content">
+          <h4>Delivered</h4>
+          <p>Shipping Manager marks the order as Delivered. Customer's order shows 100% complete on their portal.</p>
+          <div class="flow-meta">
+            <span class="flow-role" style="background:rgba(37,99,235,0.12);color:#1D4ED8">Shipping Manager</span>
+            <span class="flow-status" style="color:#059669;border-color:#059669">DELIVERED</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      <div><strong>Shared feature: Order Conversation</strong> — Every order has a built-in messaging thread available to all roles. Staff can mark messages as "Internal" (hidden from customers) or tag colleagues using @mentions. Customers see only public messages.</div>
+    </div>
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      <div><strong>Kanban Board</strong> — Go to <strong>/orders/kanban</strong> from the Orders page for a visual drag-ready pipeline view of all orders across every stage.</div>
+    </div>
+  </div>
+
+  <!-- ===== FULL WORKFLOW ===== -->
+  <div id="section-fullflow" class="section">
+    <h2 style="font-size:34px;font-weight:600;margin-bottom:6px">Full Workflow Reference</h2>
+    <p style="font-size:14px;color:var(--text3);margin-bottom:28px">Every status, who owns it, and what triggers the transition.</p>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="padding:12px 16px;text-align:left;color:var(--text3);text-transform:uppercase;font-size:10px;letter-spacing:0.8px;font-weight:700">#</th>
+            <th style="padding:12px 16px;text-align:left;color:var(--text3);text-transform:uppercase;font-size:10px;letter-spacing:0.8px;font-weight:700">Status</th>
+            <th style="padding:12px 16px;text-align:left;color:var(--text3);text-transform:uppercase;font-size:10px;letter-spacing:0.8px;font-weight:700">Owner</th>
+            <th style="padding:12px 16px;text-align:left;color:var(--text3);text-transform:uppercase;font-size:10px;letter-spacing:0.8px;font-weight:700">Action Required</th>
+            <th style="padding:12px 16px;text-align:left;color:var(--text3);text-transform:uppercase;font-size:10px;letter-spacing:0.8px;font-weight:700">Next Stage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">1</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(107,114,128,0.1);color:#4B5563">WAITING_CONFIRMATION</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Authorizer</td>
+            <td style="padding:12px 16px;color:var(--text2)">Review order specs, click "Authorize" on order detail page</td>
+            <td style="padding:12px 16px;color:var(--text2)">PENDING_CAD</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">2</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(99,102,241,0.1);color:#4F46E5">PENDING_CAD</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">CAD Designer</td>
+            <td style="padding:12px 16px;color:var(--text2)">Upload design file in /cad or order detail; move status to CAD_IN_PROGRESS</td>
+            <td style="padding:12px 16px;color:var(--text2)">CAD_IN_PROGRESS</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">3</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(99,102,241,0.1);color:#4F46E5">CAD_IN_PROGRESS</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">CAD Designer</td>
+            <td style="padding:12px 16px;color:var(--text2)">In /cad, click "Send for Approval" on the uploaded file</td>
+            <td style="padding:12px 16px;color:var(--text2)">CUSTOMER_APPROVED / REJECTED</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">4</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(5,150,105,0.1);color:#059669">CUSTOMER_APPROVED</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">SKU Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">Go to /sku, find the order, click "+ Generate" to create SKU</td>
+            <td style="padding:12px 16px;color:var(--text2)">SKU_CREATION</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">5</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(249,115,22,0.1);color:#EA580C">SKU_CREATION</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Factory Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">In /manufacturing, enter VPO # and Job Bag #, click "Issue VPO &amp; Start"</td>
+            <td style="padding:12px 16px;color:var(--text2)">VPO_ISSUED</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">6</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(8,145,178,0.1);color:#0891B2">VPO_ISSUED</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Factory Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">Enter Job Bag # and Vendor name, click "Create Job Bag"</td>
+            <td style="padding:12px 16px;color:var(--text2)">ORDER_JOB_BAG_CREATED</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">7</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(13,148,136,0.1);color:#0D9488">ORDER_JOB_BAG_CREATED</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Factory Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">Once production completes, click "Mark Manufacturing Complete"</td>
+            <td style="padding:12px 16px;color:var(--text2)">READY_TO_INVOICE / READY_TO_SHIP</td>
+          </tr>
+          <tr style="border-bottom:1px solid #F0EDE8">
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">8</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(37,99,235,0.1);color:#2563EB">READY_TO_SHIP</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Shipping Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">In /shipping, enter tracking number and carrier, click "Dispatch"</td>
+            <td style="padding:12px 16px;color:var(--text2)">SHIPPED</td>
+          </tr>
+          <tr>
+            <td style="padding:12px 16px;color:var(--text3);font-weight:600">9</td>
+            <td style="padding:12px 16px"><span class="badge" style="background:rgba(99,102,241,0.1);color:#4F46E5">SHIPPED</span></td>
+            <td style="padding:12px 16px;color:var(--text2)">Shipping Manager</td>
+            <td style="padding:12px 16px;color:var(--text2)">Once delivered, click "Mark Delivered" in /shipping</td>
+            <td style="padding:12px 16px;color:var(--text2)">DELIVERED ✓</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== CUSTOMER ===== -->
+  <div id="section-customer" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(5,150,105,0.1)">💍</div>
+      <div class="role-header-text">
+        <h2 style="color:#059669">Customer</h2>
+        <p>The customer portal is a dedicated experience for jewelry buyers. Customers can place orders, upload reference images, track progress through a visual timeline, review and approve CAD designs, and communicate directly with the Kira Jewels team.</p>
+        <div class="access-chips">
+          <span class="access-chip">My Orders</span>
+          <span class="access-chip">Place New Order</span>
+          <span class="access-chip">Order Timeline</span>
+          <span class="access-chip">CAD Design Review</span>
+          <span class="access-chip">Message Team</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (Customer)</strong><br/>
+        URL: <code>http://localhost:3000/login</code> &nbsp;·&nbsp;
+        Email: <code>alice.johnson@gmail.com</code> &nbsp;·&nbsp;
+        Password: <code>test123</code><br/>
+        Any of the 20 seeded customers work. All use password <code>test123</code>. After login, you land on <code>/customer/orders</code>.
+      </div>
+    </div>
+
+    <div class="role-workflow">
+      <h3>Customer Journey</h3>
+      <div class="mini-flow">
+        <div class="mini-step highlight">1. Place Order</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step">Wait for Authorization</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step">CAD Design Phase</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step highlight">2. Review &amp; Approve Design</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step">Manufacturing</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step">Shipping</div>
+        <span class="mini-arrow">→</span>
+        <div class="mini-step highlight">3. Track &amp; Receive</div>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#059669">
+        <div class="step-num">1</div>
+        <h3>View My Orders — /customer/orders</h3>
+        <p>Landing page after login. Shows all orders with live status badges and a progress bar (0–100%) for each order.</p>
+        <ul>
+          <li>Click any order card to open the detail view</li>
+          <li>Progress bar shows journey from "Order placed" to "Delivered"</li>
+          <li>Status badge updates in real time as staff moves the order</li>
+          <li>Click "+ Place New Order" in top right to start a new order</li>
+        </ul>
+        <div class="mock-screen">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#EF4444"></div>
+            <div class="mock-dot" style="background:#F59E0B"></div>
+            <div class="mock-dot" style="background:#22C55E"></div>
+            <div class="mock-url">localhost:3000/customer/orders</div>
+          </div>
+          <div class="mock-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-size:13px;font-weight:700;color:var(--text)">My Orders</div>
+              <button class="mock-btn" style="font-size:10px">+ Place New Order</button>
+            </div>
+            <div class="mock-row">
+              <div><div class="mock-row-title">PO-2026-0042</div><div class="mock-row-sub">Ring · 18K White Gold</div>
+                <div style="margin-top:6px;height:3px;background:var(--border);border-radius:99px;width:140px"><div style="width:45%;height:100%;background:#6366F1;border-radius:99px"></div></div>
+              </div>
+              <span class="badge" style="background:rgba(99,102,241,0.12);color:#4F46E5;font-size:10px">CAD In Progress</span>
+            </div>
+            <div class="mock-row">
+              <div><div class="mock-row-title">PO-2026-0038</div><div class="mock-row-sub">Pendant · 14K Yellow Gold</div>
+                <div style="margin-top:6px;height:3px;background:var(--border);border-radius:99px;width:140px"><div style="width:85%;height:100%;background:#059669;border-radius:99px"></div></div>
+              </div>
+              <span class="badge" style="background:rgba(5,150,105,0.12);color:#059669;font-size:10px">Shipped</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card" style="--step-color:#059669">
+        <div class="step-num">2</div>
+        <h3>Place New Order — /customer/orders/new</h3>
+        <p>Comprehensive order form with all jewelry specifications. Includes a reference image upload section.</p>
+        <ul>
+          <li>Select Order Type (Ring, Pendant, Earrings, Bracelet, etc.)</li>
+          <li>Choose Metal Type (14K, 18K, 10K, Platinum, Silver)</li>
+          <li>Choose Metal Color (Yellow, White, Rose, Two-Tone)</li>
+          <li>Enter stone details (type, quality, shape, carat weight)</li>
+          <li>Upload reference image — drag &amp; drop or click to browse</li>
+          <li>Add special instructions in "Customer Notes"</li>
+          <li>Click "Place Order" to submit</li>
+        </ul>
+      </div>
+
+      <div class="step-card" style="--step-color:#059669">
+        <div class="step-num">3</div>
+        <h3>Order Detail — /customer/orders/[id]</h3>
+        <p>Full order page with timeline, specs, design files, and team conversation.</p>
+        <ul>
+          <li><strong>Status Timeline</strong> — Visual dots showing current stage in the 8-step journey</li>
+          <li><strong>Product Specs</strong> — All details you ordered (metal, stone, size etc.)</li>
+          <li><strong>Design Files</strong> — CAD files uploaded by the designer. When status is "Awaiting Your Approval", action buttons appear</li>
+          <li><strong>Approve Design</strong> — Confirms you're happy with the 3D design</li>
+          <li><strong>Request Changes</strong> — Sends revision back to designer with your notes</li>
+          <li><strong>Reject</strong> — Rejects the design entirely</li>
+          <li><strong>Conversation</strong> — Send messages to the team; they reply here</li>
+        </ul>
+      </div>
+
+      <div class="step-card" style="--step-color:#059669">
+        <div class="step-num">4</div>
+        <h3>Tracking &amp; Delivery</h3>
+        <p>Once shipped, your tracking number appears in the order detail automatically.</p>
+        <ul>
+          <li>Tracking number visible in "Order Info" card</li>
+          <li>Progress bar reaches ~92% at SHIPPED</li>
+          <li>100% shown once Delivered</li>
+          <li>Status badge updates: Shipped → Delivered</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SALES REP ===== -->
+  <div id="section-salesrep" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(139,92,246,0.1)">🛍️</div>
+      <div class="role-header-text">
+        <h2 style="color:#7C3AED">Sales Representative</h2>
+        <p>Sales Reps manage customer relationships and create orders on behalf of customers. They have access to the full order pipeline, customer management, and can create orders with all product specifications.</p>
+        <div class="access-chips">
+          <span class="access-chip">Dashboard</span>
+          <span class="access-chip">All Orders</span>
+          <span class="access-chip">Customers Page</span>
+          <span class="access-chip">Kanban Board</span>
+          <span class="access-chip">Order Detail</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (Sales Rep)</strong><br/>
+        Email: <code>sarah.rep@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code><br/>
+        After login, you land on <code>/dashboard</code> — the main staff view.
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#7C3AED">
+        <div class="step-num">1</div>
+        <h3>Dashboard — /dashboard</h3>
+        <p>KPI overview with real-time metrics and recent orders list.</p>
+        <ul>
+          <li>4 KPI cards: Active Orders, Revenue, In CAD Design, Ready to Ship</li>
+          <li>Recent Orders list — click any order to open its detail page</li>
+          <li>Pipeline chart showing count per status</li>
+          <li>Live / Demo indicator (green = backend connected)</li>
+          <li>Click "+ New Order" to jump to the orders page</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#7C3AED">
+        <div class="step-num">2</div>
+        <h3>Orders List — /orders</h3>
+        <p>Full searchable, filterable list of all orders in the system.</p>
+        <ul>
+          <li>Search by PO number, customer name, store</li>
+          <li>Filter by status using color-coded pills</li>
+          <li>Click any row to open order detail</li>
+          <li>Click "+ New Order" → opens create modal with full spec form</li>
+          <li>After creating, you can upload a reference image</li>
+          <li>Switch to Kanban view via the "⊞ Kanban" button</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#7C3AED">
+        <div class="step-num">3</div>
+        <h3>Customers — /customers</h3>
+        <p>Manage customer accounts and create orders directly from this page.</p>
+        <ul>
+          <li>View all customers with Active/Inactive status</li>
+          <li>Search by name or email</li>
+          <li>Click "+ Add Customer" to create a new customer account</li>
+          <li>Click "+ Order" next to any customer to open the order creation form pre-filled with their info</li>
+          <li>Click "View Orders" to see all orders for that customer</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#7C3AED">
+        <div class="step-num">4</div>
+        <h3>Creating a New Order</h3>
+        <p>From either the Orders page or the Customers page.</p>
+        <ul>
+          <li>All jewelry spec fields: Order Type, Metal, Color, Size, Stone details</li>
+          <li>Customer fields: Full name, email (auto-filled from customer account)</li>
+          <li>Optional: Quoted Cost, Vendor, Sales Rep email</li>
+          <li>Customer Notes for special instructions</li>
+          <li>After create: option to upload reference image for the designer</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AUTHORIZER ===== -->
+  <div id="section-authorizer" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(245,158,11,0.1)">✅</div>
+      <div class="role-header-text">
+        <h2 style="color:#D97706">Authorizer</h2>
+        <p>The Authorizer is the gatekeeper between order placement and production. They review every new order for completeness and accuracy before authorizing it to move to CAD design. They also have access to the full pipeline view.</p>
+        <div class="access-chips">
+          <span class="access-chip">Dashboard</span>
+          <span class="access-chip">All Orders</span>
+          <span class="access-chip">Order Detail + Authorize Action</span>
+          <span class="access-chip">Kanban Board</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (Authorizer)</strong><br/>
+        Email: <code>priya.auth@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#D97706">
+        <div class="step-num">1</div>
+        <h3>Find Orders to Authorize</h3>
+        <p>Go to /orders and filter by "Waiting Confirmation" status.</p>
+        <ul>
+          <li>Click the "WAITING CONFIRMATION" status pill to filter</li>
+          <li>Orders with this status need your approval</li>
+          <li>Click an order to open its detail page</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#D97706">
+        <div class="step-num">2</div>
+        <h3>Review &amp; Authorize — /orders/[id]</h3>
+        <p>The order detail page shows the full spec and an "Authorize Order" panel (only visible to Authorizers and Admins when status is WAITING_CONFIRMATION).</p>
+        <ul>
+          <li>Review all Product Specs, Customer info, Pricing</li>
+          <li>Check Customer &amp; Pricing Details section at the top right</li>
+          <li>Scroll to find the green "Authorize Order" button</li>
+          <li>Click to authorize — order moves to PENDING_CAD immediately</li>
+          <li>Or use "Move to Stage → Cancelled" if order should not proceed</li>
+        </ul>
+        <div class="mock-screen">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#EF4444"></div>
+            <div class="mock-dot" style="background:#F59E0B"></div>
+            <div class="mock-dot" style="background:#22C55E"></div>
+            <div class="mock-url">localhost:3000/orders/[id]</div>
+          </div>
+          <div class="mock-body">
+            <div style="background:rgba(5,150,105,0.06);border:1px solid rgba(5,150,105,0.2);border-radius:8px;padding:12px;margin-bottom:8px">
+              <div style="font-size:11px;color:#059669;font-weight:700;margin-bottom:8px">AUTHORIZE THIS ORDER</div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Review all specs above. Click authorize to move to CAD design queue.</div>
+              <button class="mock-btn green" style="width:100%;font-size:11px">Authorize Order — Move to PENDING_CAD</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-card" style="--step-color:#D97706">
+        <div class="step-num">3</div>
+        <h3>Conversation &amp; Notes</h3>
+        <p>Use the built-in conversation to communicate about an order.</p>
+        <ul>
+          <li>Add internal notes (hidden from customer) to flag issues</li>
+          <li>Use @mentions to tag a specific team member (e.g. @CAD_DESIGNER)</li>
+          <li>Public messages are visible to the customer</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CAD DESIGNER ===== -->
+  <div id="section-cad" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(99,102,241,0.1)">✏️</div>
+      <div class="role-header-text">
+        <h2 style="color:#4F46E5">CAD Designer</h2>
+        <p>CAD Designers receive authorized orders and create 3D design files. They upload files to the system, manage revisions, and send designs for customer approval. They can see their active queue filtered to relevant stages.</p>
+        <div class="access-chips">
+          <span class="access-chip">CAD Files Dashboard</span>
+          <span class="access-chip">Upload Files</span>
+          <span class="access-chip">Send for Approval</span>
+          <span class="access-chip">Handle Revisions</span>
+          <span class="access-chip">Order Detail</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (CAD Designer)</strong><br/>
+        Email: <code>raj.cad@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#4F46E5">
+        <div class="step-num">1</div>
+        <h3>CAD Files Dashboard — /cad</h3>
+        <p>Your main work area. Shows all CAD files with their current approval status and the upload panel.</p>
+        <ul>
+          <li>Left panel: list of all uploaded CAD files with status badges</li>
+          <li>Filter by status: Uploaded, Awaiting Approval, Approved, Rejected, Revision Requested</li>
+          <li>Right panel: Upload a new CAD file for an order</li>
+          <li>KPI cards at top: uploaded count, pending approval, approved, revisions</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#4F46E5">
+        <div class="step-num">2</div>
+        <h3>Upload a Design File</h3>
+        <p>Attach a CAD design to a specific order.</p>
+        <ul>
+          <li>In the right "Upload CAD File" panel, select the order from dropdown</li>
+          <li>Click "Choose File" to select your design file (.pdf, .jpg, .dwg, etc.)</li>
+          <li>Add optional Designer Notes (visible to customer)</li>
+          <li>Click "Upload" — file appears in the files list</li>
+          <li>Status starts as "Uploaded"</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#4F46E5">
+        <div class="step-num">3</div>
+        <h3>Send Design for Customer Approval</h3>
+        <p>Once the design is ready for the customer to review.</p>
+        <ul>
+          <li>Find the file in the CAD list</li>
+          <li>Click "→ Send for Approval" button on the file card</li>
+          <li>File status changes to "Awaiting Your Approval"</li>
+          <li>Customer sees the design on their portal with approve/reject/revision buttons</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#4F46E5">
+        <div class="step-num">4</div>
+        <h3>Handle Revisions &amp; Rejections</h3>
+        <p>When a customer requests changes or rejects a design.</p>
+        <ul>
+          <li>File status changes to "Revision Requested" or "Rejected"</li>
+          <li>Customer's feedback note is visible on the file card</li>
+          <li>Upload a new version of the file (revision number increments automatically)</li>
+          <li>Send new version for approval again</li>
+          <li>Once approved: order moves to CUSTOMER_APPROVED — SKU Manager takes over</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SKU MANAGER ===== -->
+  <div id="section-sku" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(249,115,22,0.1)">🏷️</div>
+      <div class="role-header-text">
+        <h2 style="color:#EA580C">SKU Manager</h2>
+        <p>The SKU Manager generates unique product SKU codes for approved orders. The code format is automatically derived from the product specs. This step bridges design approval and manufacturing.</p>
+        <div class="access-chips">
+          <span class="access-chip">SKU Management Page</span>
+          <span class="access-chip">Generate SKUs</span>
+          <span class="access-chip">Search &amp; Browse SKUs</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (SKU Manager)</strong><br/>
+        Email: <code>meena.sku@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#EA580C">
+        <div class="step-num">1</div>
+        <h3>SKU Management — /sku</h3>
+        <p>Two-panel layout: left shows all existing SKUs, right shows orders ready for SKU generation.</p>
+        <ul>
+          <li>Left: search existing SKUs by number, metal, type</li>
+          <li>Right panel shows orders that have been approved but don't have a SKU yet</li>
+          <li>SKU format preview: <code>KJ-[TYPE]-[METAL][COLOR]-[SEQ]</code></li>
+          <li>Example: <code>KJ-RING-18KWG-0001</code></li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#EA580C">
+        <div class="step-num">2</div>
+        <h3>Generate a SKU</h3>
+        <p>One-click SKU generation from the right panel.</p>
+        <ul>
+          <li>Find the approved order in the right panel</li>
+          <li>Click "+ Generate" next to the order</li>
+          <li>SKU is auto-created from the order's specs</li>
+          <li>New SKU appears in the left panel immediately</li>
+          <li>The order's SKU field is now populated</li>
+          <li>Order status moves to SKU_CREATION</li>
+        </ul>
+        <div class="mock-screen">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#EF4444"></div>
+            <div class="mock-dot" style="background:#F59E0B"></div>
+            <div class="mock-dot" style="background:#22C55E"></div>
+            <div class="mock-url">localhost:3000/sku</div>
+          </div>
+          <div class="mock-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">12 SKUs Generated</div>
+                <div class="mock-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+                  <div style="font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:600;color:#A07C3A">KJ-RING-18KWG-0012</div>
+                  <div style="font-size:10px;color:var(--text3)">Ring · 18K White Gold</div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">Ready to Generate</div>
+                <div class="mock-row">
+                  <div><div class="mock-row-title" style="font-size:11px">PO-2026-0055</div><div class="mock-row-sub">Pendant · 14K RG</div></div>
+                  <button class="mock-btn" style="font-size:10px">+ Generate</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FACTORY MANAGER ===== -->
+  <div id="section-factory" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(13,148,136,0.1)">🏭</div>
+      <div class="role-header-text">
+        <h2 style="color:#0D9488">Factory Manager</h2>
+        <p>The Factory Manager oversees all production activity. They issue Vendor Purchase Orders (VPOs), create job bags for factories, track production progress, and mark orders as complete when manufacturing is done.</p>
+        <div class="access-chips">
+          <span class="access-chip">Manufacturing Queue</span>
+          <span class="access-chip">Issue VPOs</span>
+          <span class="access-chip">Create Job Bags</span>
+          <span class="access-chip">Mark Manufacturing Complete</span>
+          <span class="access-chip">Dashboard</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (Factory Manager)</strong><br/>
+        Email: <code>arjun.factory@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#0D9488">
+        <div class="step-num">1</div>
+        <h3>Manufacturing Dashboard — /manufacturing</h3>
+        <p>Production queue with KPI cards and all active manufacturing orders.</p>
+        <ul>
+          <li>4 KPI cards: Pending Start, VPO Issued, Job Bag Created, Ready to Ship</li>
+          <li>Each order shows current status with a colored left border</li>
+          <li>Actions appear based on each order's current stage</li>
+          <li>Click "Refresh" to reload the queue</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#0D9488">
+        <div class="step-num">2</div>
+        <h3>Issue VPO &amp; Start Production</h3>
+        <p>For orders in SKU_CREATION or CUSTOMER_APPROVED status.</p>
+        <ul>
+          <li>Enter VPO Number (e.g. VPO-2026-001)</li>
+          <li>Enter Job Bag Number (e.g. JB-0042)</li>
+          <li>Click "Issue VPO &amp; Start" — status → VPO_ISSUED</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#0D9488">
+        <div class="step-num">3</div>
+        <h3>Create Job Bag</h3>
+        <p>For orders in VPO_ISSUED status.</p>
+        <ul>
+          <li>Enter final Job Bag Number</li>
+          <li>Enter Vendor / Factory Name</li>
+          <li>Click "Create Job Bag" — status → ORDER_JOB_BAG_CREATED</li>
+          <li>Order is now in active production at the factory</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#0D9488">
+        <div class="step-num">4</div>
+        <h3>Complete Manufacturing</h3>
+        <p>When the factory delivers the finished piece.</p>
+        <ul>
+          <li>Find the order in ORDER_JOB_BAG_CREATED status</li>
+          <li>Click "Mark Manufacturing Complete — Move to Ready to Ship"</li>
+          <li>Status → READY_TO_INVOICE → READY_TO_SHIP</li>
+          <li>Order now appears in Shipping Manager's queue</li>
+        </ul>
+        <div class="mock-screen">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#EF4444"></div>
+            <div class="mock-dot" style="background:#F59E0B"></div>
+            <div class="mock-dot" style="background:#22C55E"></div>
+            <div class="mock-url">localhost:3000/manufacturing</div>
+          </div>
+          <div class="mock-body">
+            <div style="background:var(--bg);border:1px solid rgba(13,148,136,0.3);border-left:3px solid #0D9488;border-radius:8px;padding:12px;margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text)">PO-2026-0041</div>
+                  <div style="font-size:10px;color:var(--text3)">Ring · 18K White Gold · John Smith</div>
+                </div>
+                <span class="badge" style="background:rgba(13,148,136,0.12);color:#0D9488;font-size:10px">Job Bag Created</span>
+              </div>
+              <button class="mock-btn" style="width:100%;background:var(--navy);font-size:10px">Mark Manufacturing Complete — Move to Ready to Ship</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SHIPPING ===== -->
+  <div id="section-shipping" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(37,99,235,0.1)">📦</div>
+      <div class="role-header-text">
+        <h2 style="color:#1D4ED8">Shipping Manager</h2>
+        <p>The Shipping Manager handles the final mile of the order journey. They dispatch ready orders with tracking numbers, monitor shipped orders, and mark deliveries as complete.</p>
+        <div class="access-chips">
+          <span class="access-chip">Shipping Dashboard</span>
+          <span class="access-chip">Dispatch Orders</span>
+          <span class="access-chip">Track Shipments</span>
+          <span class="access-chip">Mark Delivered</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Test Login (Shipping Manager)</strong><br/>
+        Email: <code>kavita.shipping@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>test123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:#1D4ED8">
+        <div class="step-num">1</div>
+        <h3>Shipping Dashboard — /shipping</h3>
+        <p>Two-tab view: "Ready to Ship" and "Shipped / Delivered".</p>
+        <ul>
+          <li>3 KPI cards at top: Ready to Ship, Shipped, Delivered counts</li>
+          <li>"Ready to Ship" tab — orders waiting for dispatch</li>
+          <li>"Shipped / Delivered" tab — orders in transit or completed</li>
+          <li>Click "Refresh" to reload</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:#1D4ED8">
+        <div class="step-num">2</div>
+        <h3>Dispatch an Order</h3>
+        <p>From the "Ready to Ship" tab.</p>
+        <ul>
+          <li>Each order card shows a dispatch form</li>
+          <li>Enter Tracking Number (required)</li>
+          <li>Select Carrier from dropdown: FedEx, UPS, USPS, DHL, Hand Delivery, Other</li>
+          <li>Click "Dispatch" — order moves to SHIPPED status</li>
+          <li>Tracking number is saved and visible to the customer</li>
+        </ul>
+        <div class="mock-screen">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#EF4444"></div>
+            <div class="mock-dot" style="background:#F59E0B"></div>
+            <div class="mock-dot" style="background:#22C55E"></div>
+            <div class="mock-url">localhost:3000/shipping</div>
+          </div>
+          <div class="mock-body">
+            <div style="background:var(--bg);border:1px solid rgba(37,99,235,0.25);border-left:3px solid #2563EB;border-radius:8px;padding:12px">
+              <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">PO-2026-0039</div>
+              <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Pendant · 18K Rose Gold · Sarah Mitchell</div>
+              <div style="display:grid;grid-template-columns:1fr 120px auto;gap:6px">
+                <div class="mock-field" style="font-size:10px;color:var(--text3)">1Z999AA1234567890</div>
+                <div class="mock-field" style="font-size:10px;color:var(--text3)">FedEx</div>
+                <button class="mock-btn" style="font-size:10px;background:#2563EB">Dispatch</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-card" style="--step-color:#1D4ED8">
+        <div class="step-num">3</div>
+        <h3>Mark as Delivered</h3>
+        <p>From the "Shipped / Delivered" tab, for orders in SHIPPED status.</p>
+        <ul>
+          <li>Find the order in the "Shipped / Delivered" tab</li>
+          <li>Click "Mark Delivered" (green button)</li>
+          <li>Status changes to DELIVERED</li>
+          <li>Customer's order shows 100% progress</li>
+          <li>Order moves to Delivered section</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ADMIN ===== -->
+  <div id="section-admin" class="section">
+    <div class="role-header">
+      <div class="role-icon" style="background:rgba(192,155,88,0.1)">👑</div>
+      <div class="role-header-text">
+        <h2 style="color:var(--gold)">Admin</h2>
+        <p>The Admin has unrestricted access to every page and every action in the system. They can move orders to any stage, view all metrics, manage customers, access the kanban board, and perform every action available to any other role.</p>
+        <div class="access-chips">
+          <span class="access-chip">All Pages</span>
+          <span class="access-chip">All Order Stages</span>
+          <span class="access-chip">User Management</span>
+          <span class="access-chip">Full Metrics</span>
+          <span class="access-chip">Kanban Board</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="creds">
+      <div class="creds-icon">🔑</div>
+      <div class="creds-info">
+        <strong>Admin Login</strong><br/>
+        Email: <code>admin@kirajewels.one</code> &nbsp;·&nbsp; Password: <code>admin123</code>
+      </div>
+    </div>
+
+    <div class="steps-grid">
+      <div class="step-card" style="--step-color:var(--gold)">
+        <div class="step-num">1</div>
+        <h3>Full Order Control</h3>
+        <p>Admin can move any order to any stage from the order detail sidebar.</p>
+        <ul>
+          <li>"Move to Stage" sidebar shows ALL 13 statuses</li>
+          <li>Can move backwards or skip stages</li>
+          <li>Can cancel any order at any time</li>
+          <li>Can authorize orders (same as Authorizer role)</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:var(--gold)">
+        <div class="step-num">2</div>
+        <h3>Kanban Board — /orders/kanban</h3>
+        <p>Visual pipeline showing all orders in columns by status.</p>
+        <ul>
+          <li>Every status has its own column with order count</li>
+          <li>Each card shows order key details</li>
+          <li>Quick-advance button below each card (→ Next Stage)</li>
+          <li>Click any card to open full order detail</li>
+          <li>Switch back to list view with "☰ List view" button</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:var(--gold)">
+        <div class="step-num">3</div>
+        <h3>All Specialized Pages</h3>
+        <p>Admin has access to every module in the sidebar.</p>
+        <ul>
+          <li>/cad — CAD file management</li>
+          <li>/sku — SKU generation</li>
+          <li>/manufacturing — Production queue</li>
+          <li>/shipping — Dispatch &amp; delivery</li>
+          <li>/customers — Customer management</li>
+        </ul>
+      </div>
+      <div class="step-card" style="--step-color:var(--gold)">
+        <div class="step-num">4</div>
+        <h3>Notifications</h3>
+        <p>Bell icon in the top-right navigation shows real-time notifications.</p>
+        <ul>
+          <li>Click the bell icon to open the notification panel</li>
+          <li>Shows recent activity across all orders</li>
+          <li>Red badge shows unread count</li>
+          <li>Notifications include status changes and messages</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)">
+      <h3 style="font-size:20px;font-weight:600;margin-bottom:16px">All Pages — Quick Reference</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/dashboard</div>
+          <div style="font-size:11px;color:var(--text3)">KPIs, recent orders, pipeline</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/orders</div>
+          <div style="font-size:11px;color:var(--text3)">Full order list + search/filter</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/orders/[id]</div>
+          <div style="font-size:11px;color:var(--text3)">Order detail, move stage, messages</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/orders/kanban</div>
+          <div style="font-size:11px;color:var(--text3)">Visual kanban pipeline</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/customers</div>
+          <div style="font-size:11px;color:var(--text3)">Customer list, add, order for</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/cad</div>
+          <div style="font-size:11px;color:var(--text3)">CAD files, upload, approval</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/sku</div>
+          <div style="font-size:11px;color:var(--text3)">SKU generation &amp; management</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/manufacturing</div>
+          <div style="font-size:11px;color:var(--text3)">VPO, job bags, production</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/shipping</div>
+          <div style="font-size:11px;color:var(--text3)">Dispatch, tracking, deliver</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/customer/orders</div>
+          <div style="font-size:11px;color:var(--text3)">Customer portal — order list</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/customer/orders/new</div>
+          <div style="font-size:11px;color:var(--text3)">Customer — place new order</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">/login</div>
+          <div style="font-size:11px;color:var(--text3)">Login — all roles</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div style="background:var(--navy);padding:24px 48px;display:flex;justify-content:space-between;align-items:center;margin-top:16px">
+  <div style="font-family:'Cormorant Garamond',serif;color:rgba(255,255,255,0.5);font-size:16px">KIRA JEWELS <span style="color:var(--gold-light)">Custom</span></div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3)">Custom Order Management System · All Roles Guide</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3)">Backend: localhost:4000 · Frontend: localhost:3000</div>
+</div>
+
+<script>
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    const el = document.getElementById('section-' + id);
+    if (el) el.classList.add('active');
+    const tabs = document.querySelectorAll('.nav-tab');
+    tabs.forEach(t => { if (t.textContent.toLowerCase().replace(/\s+/g,'').includes(id.replace('-','').toLowerCase()) || (id === 'overview' && t.textContent === 'Overview') || (id === 'fullflow' && t.textContent === 'Full Workflow')) t.classList.add('active'); });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Collapsible page cards
+  document.querySelectorAll('.page-card-header').forEach(h => {
+    h.addEventListener('click', () => {
+      const body = h.nextElementSibling;
+      body.classList.toggle('open');
+      h.querySelector('.expand-icon').textContent = body.classList.contains('open') ? '▲' : '▼';
+    });
+  });
+</script>
+</body>
+</html>

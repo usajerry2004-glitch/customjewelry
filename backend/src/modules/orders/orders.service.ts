@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
@@ -70,7 +70,9 @@ export class OrdersService {
 
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string }): Promise<Order> {
     const data: Partial<Order> = { ...dto };
+
     if (user?.role === 'CUSTOMER') {
+      // Customers get auto-assigned identity and PO number
       data.customerId = user.id;
       data.customerEmail = user.email;
       if (!data.customerFullName) {
@@ -80,7 +82,13 @@ export class OrdersService {
         const count = await this.orderRepo.count();
         data.poNumber = `KJ-CUST-${String(count + 1).padStart(4, '0')}`;
       }
+    } else {
+      // Staff/admin must provide a PO number
+      if (!data.poNumber) {
+        throw new BadRequestException('poNumber is required when creating an order as staff. Provide a unique PO number.');
+      }
     }
+
     const order = this.orderRepo.create(data);
     return this.orderRepo.save(order);
   }

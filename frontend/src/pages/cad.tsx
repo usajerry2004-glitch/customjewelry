@@ -4,28 +4,23 @@ import { apiFetch, API } from '../utils/apiFetch';
 
 const STATUS_COLORS: Record<string, { color: string; label: string }> = {
   UPLOADED:            { color: '#6366F1', label: 'Uploaded' },
-  SENT_FOR_APPROVAL:   { color: '#F59E0B', label: 'Sent for Approval' },
-  APPROVED:            { color: '#10B981', label: 'Approved' },
-  REJECTED:            { color: '#EF4444', label: 'Rejected' },
-  REVISION_REQUESTED:  { color: '#8B5CF6', label: 'Revision Requested' },
+  SENT_FOR_APPROVAL:   { color: '#D97706', label: 'Sent for Approval' },
+  APPROVED:            { color: '#059669', label: 'Approved' },
+  REJECTED:            { color: '#DC2626', label: 'Rejected' },
+  REVISION_REQUESTED:  { color: '#7C3AED', label: 'Revision Requested' },
 };
 
 interface CadFile {
-  id: string;
-  orderId: string;
-  originalName: string;
-  fileName: string;
-  status: string;
-  revisionNumber: number;
-  designerNotes?: string;
-  customerFeedback?: string;
-  uploadedBy?: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  createdAt: string;
+  id: string; orderId: string; originalName: string; fileName: string;
+  status: string; revisionNumber: number; designerNotes?: string;
+  customerFeedback?: string; uploadedBy?: string; approvedBy?: string;
+  approvedAt?: string; createdAt: string;
 }
-
 interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; }
+
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px 22px', boxShadow: 'var(--shadow-sm)' };
+const lbl: React.CSSProperties = { display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '0.8px', textTransform: 'uppercase' };
+const inp: React.CSSProperties = { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' };
 
 export default function CADPage() {
   const [files, setFiles] = useState<CadFile[]>([]);
@@ -41,15 +36,10 @@ export default function CADPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [fRes, oRes] = await Promise.all([
-        apiFetch(`${API}/cad`),
-        apiFetch(`${API}/orders?limit=100`),
-      ]);
+      const [fRes, oRes] = await Promise.all([apiFetch(`${API}/cad`), apiFetch(`${API}/orders?limit=100`)]);
       if (fRes.ok) setFiles(await fRes.json());
       if (oRes.ok) { const d = await oRes.json(); setOrders(d.orders || []); }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { loadAll(); }, []);
@@ -70,10 +60,7 @@ export default function CADPage() {
   const action = async (id: string, endpoint: string, body?: object) => {
     setActionLoading(id + endpoint);
     try {
-      await apiFetch(`${API}/cad/${id}/${endpoint}`, {
-        method: 'PATCH',
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      await apiFetch(`${API}/cad/${id}/${endpoint}`, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined });
       await loadAll();
     } finally { setActionLoading(null); }
   };
@@ -81,16 +68,14 @@ export default function CADPage() {
   return (
     <AppLayout title="CAD Files" subtitle="Upload designs, send for approval, track revisions">
       {/* Upload Panel */}
-      <div style={{ background: '#111118', border: '1px solid #1E1E2E', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#CBD5E1', marginBottom: '16px' }}>Upload New CAD File</h3>
+      <div style={{ ...card, marginBottom: '24px' }}>
+        <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px' }}>
+          Upload New CAD File
+        </h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px' }}>ORDER *</label>
-            <select
-              value={selectedOrderId}
-              onChange={e => setSelectedOrderId(e.target.value)}
-              style={{ width: '100%', background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '8px', padding: '9px 12px', color: selectedOrderId ? '#E2E8F0' : '#4B5563', fontSize: '13px', outline: 'none' }}
-            >
+            <label style={lbl}>Order *</label>
+            <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={inp}>
               <option value="">Select order…</option>
               {orders.map(o => (
                 <option key={o.id} value={o.id}>{o.poNumber} — {o.storeName || o.customerFullName || 'Unknown'}</option>
@@ -98,91 +83,75 @@ export default function CADPage() {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px' }}>FILE *</label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".stl,.obj,.3dm,.pdf,.jpg,.png,.zip"
-              style={{ width: '100%', background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '8px', padding: '8px 12px', color: '#E2E8F0', fontSize: '12px' }}
-            />
+            <label style={lbl}>File *</label>
+            <input ref={fileRef} type="file" accept=".stl,.obj,.3dm,.pdf,.jpg,.png,.zip" style={inp} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '5px' }}>DESIGNER NOTES</label>
-            <input
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Notes for this revision…"
-              style={{ width: '100%', background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '8px', padding: '9px 12px', color: '#E2E8F0', fontSize: '13px', outline: 'none' }}
-            />
+            <label style={lbl}>Designer Notes</label>
+            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes for this revision…" style={inp} />
           </div>
           <button
             onClick={upload}
             disabled={uploading || !selectedOrderId}
-            style={{ background: 'linear-gradient(135deg, #F6D860, #E6A817)', color: '#000', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploading || !selectedOrderId ? 0.6 : 1 }}
+            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploading || !selectedOrderId ? 0.6 : 1 }}
           >
             {uploading ? 'Uploading…' : '↑ Upload'}
           </button>
         </div>
       </div>
 
-      {/* File list */}
       {loading ? (
-        <div style={{ color: '#4B5563', textAlign: 'center', padding: '40px 0' }}>Loading CAD files…</div>
+        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>Loading CAD files…</div>
       ) : files.length === 0 ? (
-        <div style={{ color: '#4B5563', textAlign: 'center', padding: '60px 0' }}>No CAD files yet. Upload one above.</div>
+        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px 0' }}>No CAD files yet. Upload one above.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {files.map(f => {
-            const sc = STATUS_COLORS[f.status] || { color: '#64748B', label: f.status };
+            const sc = STATUS_COLORS[f.status] || { color: '#6B7280', label: f.status };
             const order = orders.find(o => o.id === f.orderId);
             return (
-              <div key={f.id} style={{ background: '#111118', border: `1px solid ${sc.color}25`, borderRadius: '12px', padding: '16px 20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+              <div key={f.id} style={{ ...card, borderLeft: `3px solid ${sc.color}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#E2E8F0' }}>📎 {f.originalName}</span>
-                      <span style={{ fontSize: '10px', background: `${sc.color}20`, color: sc.color, padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>{sc.label}</span>
-                      <span style={{ fontSize: '10px', color: '#4B5563' }}>Rev #{f.revisionNumber}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>📎 {f.originalName}</span>
+                      <span style={{ fontSize: '10px', background: `${sc.color}15`, color: sc.color, padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>{sc.label}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 7px', borderRadius: '5px' }}>Rev #{f.revisionNumber}</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>
-                      Order: <span style={{ color: '#F6D860' }}>{order?.poNumber || f.orderId.slice(0, 8)}</span>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      Order: <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{order?.poNumber || f.orderId.slice(0, 8)}</span>
                       {order && <span style={{ marginLeft: '6px' }}>— {order.storeName || order.customerFullName}</span>}
                       {f.uploadedBy && <span style={{ marginLeft: '12px' }}>By: {f.uploadedBy}</span>}
                       <span style={{ marginLeft: '12px' }}>{new Date(f.createdAt).toLocaleDateString()}</span>
                     </div>
-                    {f.designerNotes && <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>Notes: {f.designerNotes}</div>}
-                    {f.customerFeedback && <div style={{ fontSize: '12px', color: '#F59E0B', marginTop: '4px' }}>Feedback: {f.customerFeedback}</div>}
+                    {f.designerNotes && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Notes: {f.designerNotes}</div>}
+                    {f.customerFeedback && <div style={{ fontSize: '12px', color: '#D97706', marginTop: '4px' }}>Feedback: {f.customerFeedback}</div>}
                   </div>
                 </div>
 
-                {/* Action buttons */}
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                   {f.status === 'UPLOADED' && (
-                    <button onClick={() => action(f.id, 'send')} disabled={actionLoading === f.id + 'send'} style={btnStyle('#F59E0B')}>
-                      📨 Send for Approval
+                    <button onClick={() => action(f.id, 'send')} disabled={actionLoading === f.id + 'send'} style={actionBtn('#D97706')}>
+                      Send for Approval
                     </button>
                   )}
-                  {(f.status === 'SENT_FOR_APPROVAL') && (
+                  {f.status === 'SENT_FOR_APPROVAL' && (
                     <>
-                      <button onClick={() => action(f.id, 'approve')} disabled={!!actionLoading} style={btnStyle('#10B981')}>
-                        ✅ Approve
-                      </button>
-                      <button onClick={() => action(f.id, 'reject', { feedback: feedback[f.id] || 'Rejected' })} disabled={!!actionLoading} style={btnStyle('#EF4444')}>
-                        ❌ Reject
-                      </button>
-                      <button onClick={() => action(f.id, 'revision', { feedback: feedback[f.id] || 'Please revise' })} disabled={!!actionLoading} style={btnStyle('#8B5CF6')}>
-                        🔄 Request Revision
-                      </button>
+                      <button onClick={() => action(f.id, 'approve')} disabled={!!actionLoading} style={actionBtn('#059669')}>Approve</button>
+                      <button onClick={() => action(f.id, 'reject', { feedback: feedback[f.id] || 'Rejected' })} disabled={!!actionLoading} style={actionBtn('#DC2626')}>Reject</button>
+                      <button onClick={() => action(f.id, 'revision', { feedback: feedback[f.id] || 'Please revise' })} disabled={!!actionLoading} style={actionBtn('#7C3AED')}>Request Revision</button>
                       <input
                         placeholder="Add feedback…"
                         value={feedback[f.id] || ''}
                         onChange={e => setFeedback(p => ({ ...p, [f.id]: e.target.value }))}
-                        style={{ flex: 1, minWidth: '200px', background: '#0F0F14', border: '1px solid #2D2D3D', borderRadius: '7px', padding: '6px 10px', color: '#E2E8F0', fontSize: '12px', outline: 'none' }}
+                        style={{ flex: 1, minWidth: '200px', ...inp }}
                       />
                     </>
                   )}
                   {f.status === 'APPROVED' && (
-                    <span style={{ fontSize: '12px', color: '#10B981' }}>✅ Approved{f.approvedBy ? ` by ${f.approvedBy}` : ''}{f.approvedAt ? ` on ${new Date(f.approvedAt).toLocaleDateString()}` : ''}</span>
+                    <span style={{ fontSize: '12px', color: '#059669', fontWeight: 600 }}>
+                      ✓ Approved{f.approvedBy ? ` by ${f.approvedBy}` : ''}{f.approvedAt ? ` · ${new Date(f.approvedAt).toLocaleDateString()}` : ''}
+                    </span>
                   )}
                 </div>
               </div>
@@ -194,13 +163,7 @@ export default function CADPage() {
   );
 }
 
-const btnStyle = (color: string): React.CSSProperties => ({
-  background: `${color}15`,
-  border: `1px solid ${color}40`,
-  borderRadius: '7px',
-  padding: '6px 14px',
-  color,
-  fontSize: '12px',
-  fontWeight: 600,
-  cursor: 'pointer',
+const actionBtn = (color: string): React.CSSProperties => ({
+  background: `${color}12`, border: `1px solid ${color}35`, borderRadius: '7px',
+  padding: '6px 14px', color, fontSize: '12px', fontWeight: 600, cursor: 'pointer',
 });

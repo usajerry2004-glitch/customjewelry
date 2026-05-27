@@ -44,19 +44,22 @@ export class AuthService {
   }
 
   async seedAdmin() {
+    // Passwords sourced from env vars; fall back to strong defaults.
+    // These are ONLY used when creating accounts for the first time (if they don't exist).
+    // Existing accounts are NOT modified on each restart.
     const seeds = [
-      { firstName: 'Admin', lastName: 'User', email: 'admin@kirajewels.one', password: 'admin123', role: UserRole.ADMIN },
-      { firstName: 'Sarah', lastName: 'Chen', email: 'sales@kirajewels.one', password: 'sales123', role: UserRole.SALES_REP },
-      { firstName: 'Raj', lastName: 'Sharma', email: 'authorizer@kirajewels.one', password: 'auth123', role: UserRole.AUTHORIZER },
-      { firstName: 'Maya', lastName: 'Patel', email: 'cad@kirajewels.one', password: 'cad123', role: UserRole.CAD_DESIGNER },
-      { firstName: 'Jake', lastName: 'Morris', email: 'sku@kirajewels.one', password: 'sku123', role: UserRole.SKU_MANAGER },
-      { firstName: 'Arjun', lastName: 'Singh', email: 'factory@kirajewels.one', password: 'factory123', role: UserRole.FACTORY_MANAGER },
-      { firstName: 'Lisa', lastName: 'Nguyen', email: 'shipping@kirajewels.one', password: 'shipping123', role: UserRole.SHIPPING_MANAGER },
-      { firstName: 'Emma', lastName: 'Thompson', email: 'customer@example.com', password: 'customer123', role: UserRole.CUSTOMER },
+      { firstName: 'Admin',    lastName: 'User',     email: 'admin@kirajewels.one',      password: process.env.SEED_ADMIN_PASSWORD    || 'KiRa@Admin#2025!',    role: UserRole.ADMIN },
+      { firstName: 'Sarah',    lastName: 'Chen',     email: 'sales@kirajewels.one',       password: process.env.SEED_SALES_PASSWORD    || 'KiRa@Sales#2025!',    role: UserRole.SALES_REP },
+      { firstName: 'Raj',      lastName: 'Sharma',   email: 'authorizer@kirajewels.one',  password: process.env.SEED_AUTH_PASSWORD     || 'KiRa@Auth#2025!',     role: UserRole.AUTHORIZER },
+      { firstName: 'Maya',     lastName: 'Patel',    email: 'cad@kirajewels.one',         password: process.env.SEED_CAD_PASSWORD      || 'KiRa@CadDesign#2025!', role: UserRole.CAD_DESIGNER },
+      { firstName: 'Jake',     lastName: 'Morris',   email: 'sku@kirajewels.one',         password: process.env.SEED_SKU_PASSWORD      || 'KiRa@SkuMgr#2025!',   role: UserRole.SKU_MANAGER },
+      { firstName: 'Arjun',   lastName: 'Singh',    email: 'factory@kirajewels.one',     password: process.env.SEED_FACTORY_PASSWORD  || 'KiRa@Factory#2025!',  role: UserRole.FACTORY_MANAGER },
+      { firstName: 'Lisa',     lastName: 'Nguyen',   email: 'shipping@kirajewels.one',    password: process.env.SEED_SHIPPING_PASSWORD || 'KiRa@Shipping#2025!', role: UserRole.SHIPPING_MANAGER },
+      { firstName: 'Emma',     lastName: 'Thompson', email: 'customer@example.com',       password: process.env.SEED_CUSTOMER_PASSWORD || 'KiRa@Customer#2025!', role: UserRole.CUSTOMER },
     ];
     for (const seed of seeds) {
       const exists = await this.userRepo.findOne({ where: { email: seed.email } });
-      if (exists) continue;
+      if (exists) continue; // Never overwrite existing accounts
       const passwordHash = await bcrypt.hash(seed.password, 10);
       await this.userRepo.save(this.userRepo.create({ ...seed, passwordHash }));
     }

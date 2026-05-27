@@ -1,4 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+// Use the proxy path so API calls work via tunnel (browser → Next.js → backend)
+const API = '/api/proxy';
 
 export { API };
 
