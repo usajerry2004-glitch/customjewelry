@@ -387,13 +387,19 @@ export default function OrderDetail() {
 
           {/* Field groups */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {FIELD_GROUPS.map(group => (
+            {FIELD_GROUPS.map(group => {
+              const FINANCIAL_KEYS = ['quotedCost', 'invoiceNumber'];
+              const visibleFields = userRole === UserRole.ADMIN
+                ? group.fields
+                : group.fields.filter(f => !FINANCIAL_KEYS.includes(f.key));
+              if (visibleFields.length === 0) return null;
+              return (
               <div key={group.title} style={cardStyle}>
                 <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '16px' }}>
                   {group.title}
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-                  {group.fields.map(({ key, label, format }) => {
+                  {visibleFields.map(({ key, label, format }) => {
                     const raw = (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');
                     return (
@@ -409,7 +415,8 @@ export default function OrderDetail() {
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {order.customerNotes && (
               <div style={cardStyle}>

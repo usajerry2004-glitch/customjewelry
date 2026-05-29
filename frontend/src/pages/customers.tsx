@@ -54,6 +54,14 @@ export default function CustomersPage() {
   const [showOrders, setShowOrders] = useState<{ customer: Customer; orders: Order[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+    } catch {}
+  }, []);
 
   const [newUser, setNewUser] = useState({ firstName: '', lastName: '', email: '', password: '', storeName: '' });
   const [newOrder, setNewOrder] = useState<Record<string, string>>({
@@ -280,7 +288,7 @@ export default function CustomersPage() {
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              {ORDER_FIELDS.map(f => (
+              {ORDER_FIELDS.filter(f => isAdmin || f.key !== 'quotedCost').map(f => (
                 <div key={f.key}>
                   <label style={LABEL}>{f.label}</label>
                   {f.type === 'select' ? (

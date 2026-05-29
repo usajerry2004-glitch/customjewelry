@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
-import { Order, OrderStatus, STATUS_CONFIG } from '../../utils/types';
+import { Order, OrderStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 const STATUS_FILTERS = [
@@ -37,6 +37,14 @@ export default function OrdersPage() {
   const [newOrder, setNewOrder] = useState({ poNumber: '', storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
   const [refImage, setRefImage] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+    } catch {}
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -121,7 +129,7 @@ export default function OrdersPage() {
               { label: 'Order Type',             key: 'orderType',  placeholder: 'e.g. Engagement Ring' },
               { label: 'Metal Type',             key: 'metalType',  placeholder: 'e.g. 18K' },
               { label: 'Metal Color',            key: 'metalColor', placeholder: 'e.g. White Gold' },
-              { label: 'Quoted Cost ($)',         key: 'quotedCost', placeholder: 'e.g. 3500' },
+              ...(isAdmin ? [{ label: 'Quoted Cost ($)', key: 'quotedCost', placeholder: 'e.g. 3500' }] : []),
             ].map(({ label, key, placeholder }) => (
               <div key={key} style={fieldStyle}>
                 <label style={labelStyle}>{label}</label>
@@ -227,7 +235,7 @@ export default function OrdersPage() {
       ) : (
         <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
           {orders.map(order => (
-            <OrderCard key={order.id} order={order} onClick={() => router.push(`/orders/${order.id}`)} />
+            <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} />
           ))}
         </div>
       )}

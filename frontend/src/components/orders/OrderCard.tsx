@@ -5,9 +5,10 @@ interface OrderCardProps {
   order: Partial<Order>;
   onClick?: (order: Partial<Order>) => void;
   compact?: boolean;
+  hideFinancials?: boolean;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false }) => {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
 
   return (
@@ -64,7 +65,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact })
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {order.orderType && <Tag text={order.orderType} />}
         {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
-        {order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
+        {!hideFinancials && order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
       </div>
     </div>
   );

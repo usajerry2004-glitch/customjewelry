@@ -39,6 +39,14 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Partial<Order>[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'demo'>('connecting');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -93,7 +101,7 @@ export default function Dashboard() {
     >
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
-        {KPI_CARDS(metrics).map((kpi) => (
+        {KPI_CARDS(metrics).filter(kpi => isAdmin || kpi.label !== 'Total Revenue').map((kpi) => (
           <div key={kpi.label} style={{
             background: 'var(--bg-card)', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-lg)', padding: '20px 22px',
@@ -131,7 +139,7 @@ export default function Dashboard() {
             <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '40px 0', textAlign: 'center' }}>No orders yet.</div>
           ) : (
             orders.map((order) => (
-              <OrderCard key={order.id} order={order} onClick={() => router.push(`/orders/${order.id}`)} />
+              <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} />
             ))
           )}
         </div>

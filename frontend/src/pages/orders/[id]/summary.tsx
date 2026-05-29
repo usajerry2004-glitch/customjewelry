@@ -77,6 +77,14 @@ export default function OrderSummaryPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [summary, setSummary]   = useState<string | null>(null);
   const [sumLoading, setSumLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+    } catch {}
+  }, []);
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
@@ -121,7 +129,6 @@ export default function OrderSummaryPage() {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
   const currentStep = PIPELINE.findIndex(p => p.status === order.status);
   const completedPct = currentStep >= 0 ? Math.round((currentStep / (PIPELINE.length - 1)) * 100) : 0;
-  const latestCad = cads[cads.length - 1];
   const recentMessages = messages.slice(-3).reverse();
 
   return (
@@ -176,7 +183,7 @@ export default function OrderSummaryPage() {
             </div>
             {/* Right */}
             <div style={{ textAlign: 'right' }}>
-              {order.quotedCost && (
+              {isAdmin && order.quotedCost && (
                 <div style={{ marginBottom: '8px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '2px' }}>Quoted Cost</div>
                   <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--accent-dark)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
@@ -206,7 +213,6 @@ export default function OrderSummaryPage() {
             {PIPELINE.map((step, i) => {
               const done    = i < currentStep;
               const active  = i === currentStep;
-              const pending = i > currentStep;
               return (
                 <React.Fragment key={step.status}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 0 auto', minWidth: '64px' }}>
@@ -265,7 +271,7 @@ export default function OrderSummaryPage() {
           {/* Pricing & Logistics */}
           <Card accent="#10B981">
             <CardTitle icon="💰" label="Pricing & Logistics" color="#10B981" />
-            <Row label="Quoted Cost"   value={order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : null} accent />
+            {isAdmin && <Row label="Quoted Cost" value={order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : null} accent />}
             <Row label="Vendor"        value={order.vendorName} />
             <Row label="Tracking #"    value={order.trackingNumber} />
           </Card>
