@@ -6,9 +6,10 @@ interface OrderCardProps {
   onClick?: (order: Partial<Order>) => void;
   compact?: boolean;
   hideFinancials?: boolean;
+  daysOverdue?: number;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, daysOverdue }) => {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
 
   return (
@@ -62,10 +63,15 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
         {order.storeName || order.customerFullName || 'Unknown Store'}
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
         {order.orderType && <Tag text={order.orderType} />}
         {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
         {!hideFinancials && order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
+        {daysOverdue !== undefined && daysOverdue > 0 && (
+          <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+            ⚠ +{daysOverdue}d overdue
+          </span>
+        )}
       </div>
     </div>
   );

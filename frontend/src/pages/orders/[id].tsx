@@ -373,6 +373,14 @@ export default function OrderDetail() {
           >
             📊 Summary
           </button>
+          {['SKU_CREATION','VPO_ISSUED','PENDING_CONTRACTOR','ORDER_JOB_BAG_CREATED','READY_TO_INVOICE','READY_TO_SHIP','SHIPPED','DELIVERED'].includes(order.status!) && (
+            <button
+              onClick={() => router.push(`/orders/${id}/jobbag`)}
+              style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#0369a1', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              🖨 Job Bag
+            </button>
+          )}
           <button
             onClick={() => router.push('/orders')}
             style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}

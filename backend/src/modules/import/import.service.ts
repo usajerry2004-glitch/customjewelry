@@ -38,10 +38,31 @@ export class ImportService {
     @InjectRepository(Order) private orderRepo: Repository<Order>,
   ) {}
 
-  async importFromExcel(filePath: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
+  async importFromFile(filePath: string, preview = false): Promise<{
+    imported: number; skipped: number; errors: string[]; preview?: any[]
+  }> {
+    return this.importFromExcel(filePath, preview);
+  }
+
+  async importFromExcel(filePath: string, preview = false): Promise<{ imported: number; skipped: number; errors: string[]; preview?: any[] }> {
     const wb = XLSX.readFile(filePath);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
+
+    // Preview mode: return first 10 rows parsed without saving
+    if (preview) {
+      const previewRows = rows.slice(0, 10).map(row => ({
+        poNumber:         str(row['PO #']),
+        storeName:        str(row['Store Name']),
+        customerFullName: str(row['Customer Full Name']) || str(row['Customer Name']),
+        orderType:        str(row['Type']),
+        metalType:        str(row['Metal Type']),
+        metalColor:       str(row['Metal Color']),
+        status:           str(row['Status']) || 'Waiting Confirmation',
+        quotedCost:       money(row['Kira Quoted Cost']),
+      }));
+      return { imported: 0, skipped: 0, errors: [], preview: previewRows };
+    }
 
     let imported = 0;
     let skipped = 0;
@@ -68,43 +89,43 @@ export class ImportService {
         const order = this.orderRepo.create({
           poNumber,
           status,
-          kiraSkuNumber:        str(row['Kira Sku #']),
-          trackingNumber:       str(row['Tracking']),
-          storeName:            str(row['Store Name']),
-          customerFullName:     str(row['Customer Full Name']) || str(row['Customer Name']),
-          customerEmail:        str(row['Email (final)']) || str(row['Email']),
-          salesRepEmail:        str(row['Sales Rep Email']),
-          orderType:            str(row['Type']),
-          size:                 str(row['Size']) || str(row['Ring Size']),
-          metalType:            str(row['Metal Type']),
-          metalColor:           str(row['Metal Color']),
-          diamondType:          str(row['Natural or Lab']),
-          diamondQuality:       str(row['Dia Quality']),
-          centerStoneShape:     str(row['Center Stone Shape']),
-          approximateCaratWeight: str(row['Approximate Carat Weight']),
-          centerStoneRatio:     str(row['Center Stone Ratio']),
-          referenceWeblink:     str(row['Reference Weblink']),
-          stockNumber:          str(row['Stock No# (If from Inventory)']),
-          customerNotes:        str(row['Customer Comments']),
-          quotedCost:           money(row['Kira Quoted Cost']),
-          goldLockPrice:        money(row['Gold Lock']),
-          invoiceNumber:        str(row['Invoice #']),
-          shipMethod:           str(row['Ship Method']),
-          vendorName:           str(row['Vendor Name']),
-          rcOrderNumber:        str(row['RC Order #']),
-          rcJobBagNumber:       str(row['RC Job Bag #']),
-          rcVpoNumber:          str(row['RC VPO #']),
-          vpoOrderDetails:      str(row['VPO order details']),
-          factoryStatus:        str(row['Factory Status']),
-          headStyle:            str(row['Head Style']) || str(row['Prong/Head Style']),
-          shankStyle:           str(row['Shank Style']),
-          timeFrame:            str(row['Time Frame']),
-          phoneNumber:          str(row['Phone Number']),
-          refCustomerPo:        str(row['Ref Customer PO#']) || str(row['Customer PO# / Reference No#']),
-          customerEmailApproval: String(row['Customer Email Contact approval'] ?? '').toLowerCase() === 'approved',
-          sentToRc:             String(row['Send to RC'] ?? '').toLowerCase() === 'yes',
-          isArchived:           String(row['Archive'] ?? '').toLowerCase() === 'yes',
-          sentToCustomer:       String(row['Send to Customer'] ?? '').toLowerCase() === 'yes',
+          kiraSkuNumber:           str(row['Kira Sku #']),
+          trackingNumber:          str(row['Tracking']),
+          storeName:               str(row['Store Name']),
+          customerFullName:        str(row['Customer Full Name']) || str(row['Customer Name']),
+          customerEmail:           str(row['Email (final)']) || str(row['Email']),
+          salesRepEmail:           str(row['Sales Rep Email']),
+          orderType:               str(row['Type']),
+          size:                    str(row['Size']) || str(row['Ring Size']),
+          metalType:               str(row['Metal Type']),
+          metalColor:              str(row['Metal Color']),
+          diamondType:             str(row['Natural or Lab']),
+          diamondQuality:          str(row['Dia Quality']),
+          centerStoneShape:        str(row['Center Stone Shape']),
+          approximateCaratWeight:  str(row['Approximate Carat Weight']),
+          centerStoneRatio:        str(row['Center Stone Ratio']),
+          referenceWeblink:        str(row['Reference Weblink']),
+          stockNumber:             str(row['Stock No# (If from Inventory)']),
+          customerNotes:           str(row['Customer Comments']),
+          quotedCost:              money(row['Kira Quoted Cost']),
+          goldLockPrice:           money(row['Gold Lock']),
+          invoiceNumber:           str(row['Invoice #']),
+          shipMethod:              str(row['Ship Method']),
+          vendorName:              str(row['Vendor Name']),
+          rcOrderNumber:           str(row['RC Order #']),
+          rcJobBagNumber:          str(row['RC Job Bag #']),
+          rcVpoNumber:             str(row['RC VPO #']),
+          vpoOrderDetails:         str(row['VPO order details']),
+          factoryStatus:           str(row['Factory Status']),
+          headStyle:               str(row['Head Style']) || str(row['Prong/Head Style']),
+          shankStyle:              str(row['Shank Style']),
+          timeFrame:               str(row['Time Frame']),
+          phoneNumber:             str(row['Phone Number']),
+          refCustomerPo:           str(row['Ref Customer PO#']) || str(row['Customer PO# / Reference No#']),
+          customerEmailApproval:   String(row['Customer Email Contact approval'] ?? '').toLowerCase() === 'approved',
+          sentToRc:                String(row['Send to RC'] ?? '').toLowerCase() === 'yes',
+          isArchived:              String(row['Archive'] ?? '').toLowerCase() === 'yes',
+          sentToCustomer:          String(row['Send to Customer'] ?? '').toLowerCase() === 'yes',
           processedDate,
         });
         await this.orderRepo.save(order);

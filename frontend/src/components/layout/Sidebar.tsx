@@ -11,13 +11,15 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { icon: '◈', label: 'Dashboard',      path: '/dashboard',       roles: Object.values(UserRole) as UserRole[] },
   { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[] },
-  { icon: '⊞', label: 'Kanban Board',   path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
+  { icon: '⊞', label: 'Pipeline Board', path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER] },
   { icon: '◈', label: 'SKU Management', path: '/sku',             roles: [UserRole.ADMIN, UserRole.SKU_MANAGER] },
   { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER] },
   { icon: '▷', label: 'Shipping',       path: '/shipping',        roles: [UserRole.ADMIN, UserRole.SHIPPING_MANAGER] },
   { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.US_SETTER] },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP] },
+  { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
+  { icon: '📊', label: 'Reports',       path: '/reports',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP] },
   { icon: '◇', label: 'Settings',       path: '/settings',        roles: [UserRole.ADMIN] },
 ];
 

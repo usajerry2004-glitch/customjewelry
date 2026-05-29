@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'demo'>('connecting');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [overdueOrders, setOverdueOrders] = useState<{ id: string; poNumber: string; status: string; daysOverdue: number; slaLabel: string }[]>([]);
 
   useEffect(() => {
     try {
@@ -51,9 +52,10 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [mRes, oRes] = await Promise.all([
+        const [mRes, oRes, slaRes] = await Promise.all([
           apiFetch(`${API}/orders/metrics`),
           apiFetch(`${API}/orders?limit=20`),
+          apiFetch(`${API}/sla/overdue`),
         ]);
         let gotRealData = false;
         if (mRes.ok) {
@@ -65,6 +67,7 @@ export default function Dashboard() {
           if (oData.orders?.length) setOrders(oData.orders);
           gotRealData = true;
         }
+        if (slaRes.ok) setOverdueOrders(await slaRes.json());
         setApiStatus(gotRealData ? 'live' : 'demo');
       } catch {
         setApiStatus('demo');
@@ -144,12 +147,38 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Pipeline */}
+        {/* Pipeline + Overdue */}
         <div>
           <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
             Pipeline
           </h2>
           <MetricsPanel metrics={metrics} />
+
+          {/* SLA / Overdue widget */}
+          {overdueOrders.length > 0 && (
+            <div style={{ marginTop: '20px', background: 'var(--bg-card)', border: '1px solid rgba(220,38,38,0.25)', borderTop: '3px solid #EF4444', borderRadius: 'var(--radius-lg)', padding: '16px', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  ⚠ SLA Breaches ({overdueOrders.length})
+                </div>
+                <a href="/reports" style={{ fontSize: '11px', color: 'var(--accent-dark)', fontWeight: 600, textDecoration: 'none' }}>View report →</a>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {overdueOrders.slice(0, 5).map(o => (
+                  <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: '7px', cursor: 'pointer' }}>
+                    <div>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy)' }}>{o.poNumber}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>{o.slaLabel}</span>
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', padding: '2px 7px', borderRadius: '5px' }}>+{o.daysOverdue}d</span>
+                  </div>
+                ))}
+                {overdueOrders.length > 5 && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>+{overdueOrders.length - 5} more overdue orders</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

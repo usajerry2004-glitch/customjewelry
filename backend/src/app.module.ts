@@ -26,6 +26,8 @@ import { UsersModule } from './modules/users/users.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { SummaryModule } from './modules/summary/summary.module';
 import { ImportModule } from './modules/import/import.module';
+import { SlaModule } from './modules/sla/sla.module';
+import { ReportingModule } from './modules/reporting/reporting.module';
 import { AuthService } from './modules/auth/auth.service';
 
 @Module({
@@ -67,6 +69,8 @@ import { AuthService } from './modules/auth/auth.service';
     MessagesModule,
     SummaryModule,
     ImportModule,
+    SlaModule,
+    ReportingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -14,6 +14,8 @@ export enum NotificationType {
   CUSTOMER_MESSAGE = 'CUSTOMER_MESSAGE',
   MENTION = 'MENTION',
   GENERAL = 'GENERAL',
+  SLA_OVERDUE = 'SLA_OVERDUE',
+  WEEKLY_REPORT = 'WEEKLY_REPORT',
 }
 
 @Entity('notifications')
