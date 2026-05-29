@@ -176,6 +176,9 @@ body{font-family:'DM Sans',sans-serif;background:#f5f3ef;color:#1a2740;line-heig
   <button class="nbtn" onclick="show('pipeline',this)">Pipeline Board</button>
   <button class="nbtn" onclick="show('messaging',this)">Messaging</button>
   <button class="nbtn" onclick="show('customerportal',this)">Customer Portal</button>
+  <button class="nbtn" onclick="show('cadguide',this)">✏️ CAD Designer</button>
+  <button class="nbtn" onclick="show('skuguide',this)">🏷️ SKU Manager</button>
+  <button class="nbtn" onclick="show('factoryguide',this)">🏭 Factory Manager</button>
   <button class="nbtn" onclick="show('quickref',this)">Quick Reference</button>
 </nav>
 
@@ -1113,6 +1116,532 @@ body{font-family:'DM Sans',sans-serif;background:#f5f3ef;color:#1a2740;line-heig
     <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#fff;margin-bottom:6px">Need More Help?</div>
     <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:4px">For account issues, password resets, or technical problems — contact the Kira Jewels admin team.</div>
     <div style="font-size:11px;color:#c09b58;margin-top:12px;font-weight:600;letter-spacing:.5px">KIRA JEWELS CUSTOM · JEWELFLOW OS</div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ CAD DESIGNER GUIDE ══════════════ -->
+<div id="cadguide" class="page">
+<div class="pg-hero" style="background:linear-gradient(135deg,#1e1b4b,#312e81)">
+  <h1>CAD Designer Guide</h1>
+  <p>Everything a CAD Designer needs to manage their design queue, upload files, and handle customer revisions.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Your Daily Workflow at a Glance</div>
+  <div class="ss">As a CAD Designer, you only see orders that are in design stages. Here is your end-to-end process every day.</div>
+
+  <div class="card" style="border-left:4px solid #6366F1;margin-bottom:28px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">1. Check queue</div>
+      <div style="color:#9ca3af;font-size:12px">→</div>
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">2. Open order</div>
+      <div style="color:#9ca3af;font-size:12px">→</div>
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">3. Create design</div>
+      <div style="color:#9ca3af;font-size:12px">→</div>
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">4. Upload file</div>
+      <div style="color:#9ca3af;font-size:12px">→</div>
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">5. Send for approval</div>
+      <div style="color:#9ca3af;font-size:12px">→</div>
+      <div style="background:#6366F115;color:#6366F1;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">6. Handle feedback</div>
+    </div>
+  </div>
+
+  <!-- Step 1: Finding your queue -->
+  <div class="st">Step 1 — Find Your Design Queue</div>
+  <div class="ss">Your orders are automatically filtered. Go to <strong>Orders</strong> in the sidebar — you only see orders in CAD stages (Pending CAD, CAD In Progress). No clutter from other stages.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders (CAD Designer view)</div></div>
+    <div class="mock-app" style="min-height:220px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>CAD Files</div>
+      </div>
+      <div class="mock-main">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#0d1b35">Orders <span style="color:#9ca3af;font-weight:400;font-size:10px">(showing design-stage only)</span></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div class="mock-search" style="flex:1;margin-bottom:0">🔍 Search…</div>
+          <div style="background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">Pending CAD ▾</div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-202</div><div class="mock-details">Engagement Ring · 18K Rose Gold · Oval · 2.00ct</div></div>
+          <div class="mock-badge" style="background:#ede9fe;color:#6d28d9">Pending CAD</div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-215</div><div class="mock-details">Pendant · 14K White Gold · Compass rose design</div></div>
+          <div class="mock-badge" style="background:#ede9fe;color:#6d28d9">Pending CAD</div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-204</div><div class="mock-details">Earrings · 18K White Gold · Natural Diamond</div></div>
+          <div class="mock-badge" style="background:#eef2ff;color:#4f46e5">CAD In Progress</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-blue">
+    <strong>Tip:</strong> Use the status filter dropdown to toggle between <strong>Pending CAD</strong> (new assignments) and <strong>CAD In Progress</strong> (revisions waiting). Check both every morning.
+  </div>
+
+  <!-- Step 2: Reading the order -->
+  <div class="st" style="margin-top:36px">Step 2 — Read the Order Carefully Before Designing</div>
+  <div class="ss">Click on an order to open it. Read everything before starting. Missing a detail causes wasted revisions.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders / KJ-TEST-202</div></div>
+    <div style="background:#f5f3ef;padding:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <!-- Specs card -->
+        <div class="mock-card" style="margin-bottom:0">
+          <div class="mock-card-title">Product Specs — READ FIRST</div>
+          <div class="mock-row"><span class="mock-row-label">Order Type</span><span class="mock-row-value" style="color:#6366F1">Engagement Ring</span></div>
+          <div class="mock-row"><span class="mock-row-label">Metal</span><span class="mock-row-value" style="color:#6366F1">18K · Rose Gold</span></div>
+          <div class="mock-row"><span class="mock-row-label">Ring Size</span><span class="mock-row-value" style="color:#6366F1">5.5</span></div>
+          <div class="mock-row"><span class="mock-row-label">Stone Type</span><span class="mock-row-value" style="color:#6366F1">Lab Grown Diamond</span></div>
+          <div class="mock-row"><span class="mock-row-label">Quality</span><span class="mock-row-value" style="color:#6366F1">VS1</span></div>
+          <div class="mock-row"><span class="mock-row-label">Shape</span><span class="mock-row-value" style="color:#6366F1">Oval</span></div>
+          <div class="mock-row"><span class="mock-row-label">Carat Weight</span><span class="mock-row-value" style="color:#6366F1">2.00 ct</span></div>
+        </div>
+        <!-- Notes card -->
+        <div class="mock-card" style="margin-bottom:0">
+          <div class="mock-card-title">Customer Notes — VERY IMPORTANT</div>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px;font-size:11px;color:#78350f;line-height:1.6">"Customer wants a hidden halo detail underneath the oval stone. Thin band, cathedral-style setting. She sent a reference of a Tiffany Soleste style. Please keep the profile very low."</div>
+          <div style="margin-top:8px" class="mock-card-title">Reference Image</div>
+          <div style="background:#f3f4f6;border-radius:6px;padding:12px;text-align:center;font-size:10px;color:#9ca3af">📎 reference-ring.jpg · Click to view</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>Product Specs</strong> — Every field matters: metal karat, color, stone shape, carat weight, ring size. These define the physical piece.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Customer Notes</strong> — The most important section. Read word for word. Design decisions are hidden in the details ("thin band", "low profile", "hidden halo").</span></li>
+    <li><div class="ann-num">3</div><span><strong>Reference Image</strong> — If one was uploaded, view it before opening your CAD software. It shows exactly what the customer has in mind.</span></li>
+  </div>
+
+  <!-- Step 3: Uploading -->
+  <div class="st" style="margin-top:36px">Step 3 — Upload Your Design File</div>
+  <div class="ss">Scroll down on the order detail page to the <strong>Design Files</strong> section. Click the upload area.</div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">1</div>
+      <div><h4>Scroll to "Design Files" on the order page</h4><p>It's below the field groups. You'll see an upload zone or an "Upload" button.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">2</div>
+      <div>
+        <h4>Choose your file</h4>
+        <p>Select your exported CAD file from your computer. Accepted formats: <strong>SVG, PNG, JPG, PDF</strong> — up to 10MB. Export your design at high resolution so the customer can zoom in.</p>
+        <div class="callout callout-blue" style="margin-top:8px"><strong>Best practice:</strong> Export a top view, front view, and side view as separate pages in a single PDF. This gives the customer the clearest picture of the design.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">3</div>
+      <div>
+        <h4>Write a designer note — always</h4>
+        <p>In the "Designer Notes" field, explain: key design decisions, dimensions, how you addressed the customer's brief, and anything notable. Example:</p>
+        <div style="background:#f5f3ef;border:1px solid #e5e1d8;border-radius:7px;padding:10px 12px;font-size:12px;color:#374151;font-style:italic;margin-top:8px;line-height:1.7">"Hidden halo set with 1.2mm round stones, cathedral bridge, 1.8mm band width. Stone set low to keep finger profile minimal. Prong tips rounded as per customer note. Side view included on page 2."</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">4</div>
+      <div><h4>The file is uploaded as Rev #1</h4><p>The system automatically numbers revisions. Your first upload is Rev #1, next revision is Rev #2, and so on. All revisions are kept — nothing is deleted.</p></div>
+    </div>
+  </div>
+
+  <!-- Step 4: Send for approval -->
+  <div class="st" style="margin-top:36px">Step 4 — Send for Customer Approval</div>
+  <div class="ss">After uploading, click the <strong>Send for Approval</strong> button on the file row. This notifies the customer and posts an automatic message to the conversation.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">Order Design Files section</div></div>
+    <div style="background:#f5f3ef;padding:14px">
+      <div class="mock-card">
+        <div class="mock-card-title">Design Files (1)</div>
+        <div style="background:#f9f8f5;border:1px solid #d1cdc7;border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+          <div style="font-size:20px">🖼</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;color:#0d1b35">KJ-TEST-202-cad-rev1.svg</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:2px">Rev #1 · just uploaded · Initial design for Engagement Ring — 18K Rose Gold, Oval stone</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <div class="mock-badge" style="background:#eef2ff;color:#4f46e5;font-size:9px">Uploaded</div>
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:5px 10px">👁 View</div>
+            <div class="mock-btn" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;padding:5px 10px;border-radius:7px">📤 Send for Approval</div>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-green" style="margin:10px 0 0">
+        After clicking "Send for Approval": status changes to <strong>Awaiting Your Approval</strong>, order status changes to <strong>CAD In Progress</strong>, and a 🔔 notification message posts to the conversation automatically.
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Handling revisions -->
+  <div class="st" style="margin-top:36px">Step 5 — Handling Customer Feedback & Revisions</div>
+  <div class="ss">The customer will respond via the conversation. Check the conversation on the order for their feedback.</div>
+
+  <div class="g2" style="gap:14px;margin-bottom:20px">
+    <div class="card" style="border-top:3px solid #10B981">
+      <div style="font-size:24px;margin-bottom:8px">✅</div>
+      <div style="font-size:14px;font-weight:700;color:#0d1b35;margin-bottom:6px">Customer Approves</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">Great news! The conversation will show a green ✅ approved event. Your job on this order is done. The order moves forward automatically to SKU Creation.</div>
+    </div>
+    <div class="card" style="border-top:3px solid #8B5CF6">
+      <div style="font-size:24px;margin-bottom:8px">↺</div>
+      <div style="font-size:14px;font-weight:700;color:#0d1b35;margin-bottom:6px">Customer Requests Changes</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">Read their feedback in the conversation carefully. Make the requested changes in your CAD software. Upload the revised file — it becomes <strong>Rev #2</strong> automatically. Send for approval again.</div>
+    </div>
+  </div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#8B5CF6">1</div>
+      <div><h4>Read the feedback in the conversation</h4><p>Scroll to the Conversation section at the bottom of the order. The customer's feedback is posted there (with a ↺ purple event card showing their exact words).</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#8B5CF6">2</div>
+      <div><h4>Make revisions in your software</h4><p>Address every point in the feedback. If something isn't clear, post a message in the conversation to ask before revising — saves going back and forth.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#8B5CF6">3</div>
+      <div><h4>Upload the revised file</h4><p>Upload the new version. It's automatically numbered Rev #2. Add a designer note explaining what changed: "Rounded prong tips, added side view on page 2, reduced band width to 1.6mm."</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#8B5CF6">4</div>
+      <div><h4>Send for approval again</h4><p>Click "Send for Approval" on Rev #2. The cycle repeats until the customer approves.</p></div>
+    </div>
+  </div>
+
+  <div class="hl">
+    <h4>💡 Pro tip: Reduce revisions by being thorough upfront</h4>
+    <p>Before uploading, double-check: Did you use the right metal color? Is the stone shape correct? Does the design match the reference image? Does the band width look proportional? A 5-minute self-review saves a week of back-and-forth.</p>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ SKU MANAGER GUIDE ══════════════ -->
+<div id="skuguide" class="page">
+<div class="pg-hero" style="background:linear-gradient(135deg,#431407,#7c2d12)">
+  <h1>SKU Manager Guide</h1>
+  <p>How to create SKU numbers, issue purchase orders to the factory, and manage the product catalog.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Your Role in the Workflow</div>
+  <div class="ss">You sit between Design and Manufacturing. Once a customer approves a design, it lands on your desk. You create the internal product code (SKU) and issue the formal instruction to the factory (VPO).</div>
+
+  <div class="card" style="border-left:4px solid #F97316;margin-bottom:28px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="background:#FFF7ED;color:#C2410C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Design Approved ✓</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#FFF7ED;color:#C2410C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Lands in your queue</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#FFF7ED;color:#C2410C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">You create SKU</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#FFF7ED;color:#C2410C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">You issue VPO</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#FFF7ED;color:#C2410C;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Factory begins</div>
+    </div>
+  </div>
+
+  <div class="st">Step 1 — Find Orders Awaiting SKU</div>
+  <div class="ss">Go to <strong>Orders</strong> in the sidebar and filter by <strong>Customer Approved</strong> or <strong>SKU Creation</strong> status. These are your orders to process.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders (SKU Manager view)</div></div>
+    <div class="mock-app" style="min-height:200px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>SKU Catalog</div>
+      </div>
+      <div class="mock-main">
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div class="mock-search" style="flex:1;margin-bottom:0">🔍 Search…</div>
+          <div style="background:#FFF7ED;color:#C2410C;border:1px solid #fed7aa;border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700">Customer Approved ▾</div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-205</div><div class="mock-details">Wedding Band · Platinum · Round · 2mm eternity</div></div>
+          <div style="text-align:right">
+            <div class="mock-badge" style="background:#d1fae5;color:#059669">Customer Approved</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">Approved 2 days ago</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-218</div><div class="mock-details">Engagement Ring · 18K White Gold · Radiant 2.5ct</div></div>
+          <div style="text-align:right">
+            <div class="mock-badge" style="background:#d1fae5;color:#059669">Customer Approved</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">Approved today</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-206</div><div class="mock-details">Bracelet · 18K Yellow Gold · Tennis</div></div>
+          <div style="text-align:right">
+            <div class="mock-badge" style="background:#ffedd5;color:#C2410C">SKU Creation</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">In progress</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="st" style="margin-top:36px">Step 2 — Open the Order and Review All Specs</div>
+  <div class="ss">Click the order. Read the approved CAD design and confirm all specifications before creating the SKU. This is the last checkpoint before the factory begins.</div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#F97316">1</div>
+      <div>
+        <h4>Review the approved CAD file</h4>
+        <p>Click the <strong>👁 View</strong> button on the approved design file (it will show a green "Approved" badge). Confirm the design matches the specifications in the order.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#F97316">2</div>
+      <div>
+        <h4>Check the order specs</h4>
+        <p>Verify: metal type and karat, metal color, stone type, stone quality, shape, carat weight, ring size (if applicable). These all go into the SKU code.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#F97316">3</div>
+      <div>
+        <h4>Create the SKU number</h4>
+        <p>On the order detail page, use the "Move To" sidebar to move the status to <strong>SKU Creation</strong>. Then enter the SKU number in the <strong>Kira SKU Number</strong> field. The SKU format is typically: <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:12px">CJ[XXXXX]-[KARAT][COLOR]</code></p>
+        <div class="callout callout-amber" style="margin-top:8px"><strong>Example:</strong> CJ01015-18W means Custom Jewelry piece #01015, 18K White Gold. Yellow = Y, Rose = R, White = W, Platinum = PT.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="st" style="margin-top:36px">Step 3 — Issue the VPO (Vendor Purchase Order)</div>
+  <div class="ss">Once the SKU is created, move the order to <strong>VPO Issued</strong> status. This is the formal signal to the factory to begin manufacturing.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">Order Detail — Move To sidebar</div></div>
+    <div style="background:#f5f3ef;padding:14px">
+      <div style="display:grid;grid-template-columns:1fr 120px;gap:10px;max-width:500px">
+        <div class="mock-card">
+          <div class="mock-card-title">Order Info</div>
+          <div class="mock-row"><span class="mock-row-label">PO Number</span><span class="mock-row-value">KJ-TEST-205</span></div>
+          <div class="mock-row"><span class="mock-row-label">Status</span><span class="mock-badge" style="background:#ffedd5;color:#C2410C;font-size:9px">SKU Creation</span></div>
+          <div class="mock-row"><span class="mock-row-label">Kira SKU</span><span class="mock-row-value" style="color:#F97316">CJ01205-PT</span></div>
+        </div>
+        <div>
+          <div class="mock-card" style="margin-bottom:8px">
+            <div class="mock-card-title">Status</div>
+            <div class="mock-badge" style="background:#ffedd5;color:#C2410C;font-size:9px;padding:4px 8px">SKU Creation</div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-title">Move To</div>
+            <div class="mock-btn" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-size:10px;padding:6px 8px;width:100%;justify-content:center;border-radius:6px;margin-bottom:5px">→ VPO Issued</div>
+          </div>
+        </div>
+      </div>
+      <div class="callout callout-green" style="margin-top:10px">
+        Moving to <strong>VPO Issued</strong> notifies the Factory Manager that manufacturing can begin. Make sure the SKU number is filled in before doing this.
+      </div>
+    </div>
+  </div>
+
+  <div class="hl" style="margin-top:20px">
+    <h4>📋 SKU Manager Checklist Before Issuing VPO</h4>
+    <p>
+      ☑ Approved CAD design reviewed<br>
+      ☑ SKU number entered in Kira SKU Number field<br>
+      ☑ Metal type, karat, and color confirmed<br>
+      ☑ Stone specifications confirmed<br>
+      ☑ Ring size confirmed (for rings)<br>
+      ☑ No open messages or questions in the conversation
+    </p>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ FACTORY MANAGER GUIDE ══════════════ -->
+<div id="factoryguide" class="page">
+<div class="pg-hero" style="background:linear-gradient(135deg,#052e16,#064e3b)">
+  <h1>Factory Manager Guide</h1>
+  <p>How to manage the manufacturing queue, track production stages, and move orders to ready for shipping.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Your Role in the Workflow</div>
+  <div class="ss">You take over when the VPO is issued. Your job is to oversee each piece through casting, stone setting, polishing, and quality inspection — then hand off to Shipping when done.</div>
+
+  <div class="card" style="border-left:4px solid #0D9488;margin-bottom:28px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">VPO Issued</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Assign contractor</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Create Job Bag</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Track production</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">QC Pass</div>
+      <div style="color:#9ca3af;font-size:14px">→</div>
+      <div style="background:#CCFBF1;color:#0f766e;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px">Ready to Invoice</div>
+    </div>
+  </div>
+
+  <div class="st">Step 1 — Your Manufacturing Dashboard</div>
+  <div class="ss">Click <strong>Manufacturing</strong> in the left sidebar. This is your dedicated view — only orders in production stages appear here.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ manufacturing</div></div>
+    <div class="mock-app" style="min-height:260px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Manufacturing</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+      </div>
+      <div class="mock-main">
+        <!-- KPIs -->
+        <div style="font-size:13px;font-weight:700;color:#0d1b35;margin-bottom:10px">Manufacturing</div>
+        <div class="mock-kpi-row" style="margin-bottom:12px">
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#0ea5e9">2</div><div class="mock-kpi-lbl">VPO Issued</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#F59E0B">4</div><div class="mock-kpi-lbl">Contractor</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#14b8a6">5</div><div class="mock-kpi-lbl">Job Bag</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#22c55e">7</div><div class="mock-kpi-lbl">Ready Invoice</div></div>
+        </div>
+        <!-- Production queue -->
+        <div style="font-size:10px;font-weight:700;color:#0d1b35;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px">Production Queue</div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-207</div><div class="mock-details" style="display:flex;gap:8px"><span>Engagement Ring</span><span>18K White Gold</span><span>CJ01207-18W</span></div></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="mock-badge" style="background:#e0f2fe;color:#0369a1">VPO Issued</div>
+            <div class="mock-btn" style="background:#ccfbf1;color:#0f766e;border:1px solid #99f6e4;font-size:9px;padding:4px 8px;border-radius:5px">→ Contractor</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-209</div><div class="mock-details" style="display:flex;gap:8px"><span>Wedding Band</span><span>14K Yellow Gold</span><span>CJ01209-14Y</span></div></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="mock-badge" style="background:#fef3c7;color:#b45309">Contractor</div>
+            <div class="mock-btn" style="background:#ccfbf1;color:#0f766e;border:1px solid #99f6e4;font-size:9px;padding:4px 8px;border-radius:5px">→ Job Bag</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-220</div><div class="mock-details" style="display:flex;gap:8px"><span>Wedding Band</span><span>Platinum</span><span>CJ01220-PT</span></div></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="mock-badge" style="background:#ccfbf1;color:#0f766e">Job Bag Created</div>
+            <div class="mock-btn" style="background:#ccfbf1;color:#0f766e;border:1px solid #99f6e4;font-size:9px;padding:4px 8px;border-radius:5px">→ Rdy Invoice</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>KPI numbers at the top</strong> — Quick count of how many orders are at each manufacturing stage right now. Use this to spot bottlenecks (e.g., too many stuck at "Contractor").</span></li>
+    <li><div class="ann-num">2</div><span><strong>SKU number visible</strong> — The Kira SKU is shown so you can match orders to physical pieces in the factory.</span></li>
+    <li><div class="ann-num">3</div><span><strong>→ Advance button</strong> — Click to move an order to the next stage. You do not need to open the full order to do this — one click right from the queue.</span></li>
+  </div>
+
+  <div class="st" style="margin-top:36px">Step 2 — The 4 Manufacturing Stages You Control</div>
+  <div class="ss">Each stage has a specific meaning. Move the order when the physical milestone is reached — not before.</div>
+
+  <div class="status-grid" style="margin-bottom:24px">
+    <div class="status-row">
+      <div class="status-dot" style="background:#0EA5E9"></div>
+      <div class="status-name">VPO Issued</div>
+      <div class="status-plain">VPO received from SKU Manager. You are ready to begin. Assign the piece to a production team or contractor and move it forward.</div>
+      <div class="status-who">Move when: work assigned</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#F59E0B"></div>
+      <div class="status-name">Pending Contractor</div>
+      <div class="status-plain">The piece requires specialist work — stone setting, engraving, or a specific technique — and has been assigned to a contractor or specialist team.</div>
+      <div class="status-who">Move when: contractor has the piece</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#14B8A6"></div>
+      <div class="status-name">Job Bag Created</div>
+      <div class="status-plain">A physical job bag has been created at the factory and is traveling with the piece. Casting, setting, and polishing are actively in progress.</div>
+      <div class="status-who">Move when: bag created, active production</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#22C55E"></div>
+      <div class="status-name">Ready to Invoice</div>
+      <div class="status-plain">The piece has completed all manufacturing steps and passed quality inspection. It is ready to be handed to the Shipping Manager.</div>
+      <div class="status-who">Move when: QC passed ✓</div>
+    </div>
+  </div>
+
+  <div class="st">Step 3 — Moving an Order Through Stages</div>
+  <div class="ss">Two ways to advance an order — directly from the queue, or from inside the order.</div>
+
+  <div class="g2" style="gap:14px;margin-bottom:20px">
+    <div class="card" style="border-top:3px solid #0D9488">
+      <div style="font-size:20px;margin-bottom:8px">⚡</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">Quick advance (from queue)</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">On the Manufacturing page, each order has a <strong>→ [Next Stage]</strong> button. Click it to advance without opening the order. Best for routine progression when no notes are needed.</div>
+    </div>
+    <div class="card" style="border-top:3px solid #0D9488">
+      <div style="font-size:20px;margin-bottom:8px">📝</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">Open & advance (with notes)</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">Open the order → use the <strong>"Move To"</strong> panel in the right sidebar → optionally post a note in the Conversation (e.g., "Stone setting completed. Polishing started.") → advance.</div>
+    </div>
+  </div>
+
+  <div class="st">Step 4 — Quality Check Before "Ready to Invoice"</div>
+  <div class="ss">This is your final step. Before clicking "Ready to Invoice," confirm everything is right.</div>
+
+  <div class="hl">
+    <h4>✅ QC Checklist — do this before marking Ready to Invoice</h4>
+    <p>
+      ☑ Metal type and color matches the order (e.g., 18K White Gold, not Yellow Gold)<br>
+      ☑ Stone is set correctly — no chips, correct position, secure<br>
+      ☑ Ring size matches the order specification<br>
+      ☑ Surface is polished, no scratches or pits<br>
+      ☑ Hallmark is stamped (karat marking)<br>
+      ☑ SKU matches the physical piece<br>
+      ☑ Dimensions match the approved CAD design<br><br>
+      <strong>If anything fails QC:</strong> Post a message in the order conversation explaining the issue. Do not advance the status. The Admin or Sales Rep will advise next steps.
+    </p>
+  </div>
+
+  <div class="callout callout-green" style="margin-top:20px">
+    <strong>When you click "Ready to Invoice"</strong> — the order appears in the Shipping Manager's queue. They will invoice it, pack it, and dispatch it. Your manufacturing role on this order is complete.
+  </div>
+
+  <div class="st" style="margin-top:36px">Communicating Issues</div>
+  <div class="ss">If something goes wrong in production — stone unavailable, sizing issue, quality problem — use the order conversation to communicate immediately.</div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#EF4444">!</div>
+      <div>
+        <h4>Open the order and scroll to Conversation</h4>
+        <p>Click the order from the Manufacturing queue → scroll to the bottom → type your message. Mention what the issue is, what stage it's at, and what you need.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#EF4444">!</div>
+      <div>
+        <h4>Tag the right person with @mention</h4>
+        <p>Click the <strong>@ Mention</strong> button before sending to notify the relevant team: <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:12px">@ADMIN</code> for critical issues, <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:12px">@SKU_MANAGER</code> for specification questions.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#EF4444">!</div>
+      <div>
+        <h4>Do NOT advance the status until the issue is resolved</h4>
+        <p>Leaving the order at its current stage is the correct action when there's a problem. Never move it forward to hide an issue. The status accurately reflects where the piece is.</p>
+      </div>
+    </div>
   </div>
 
 </div>
