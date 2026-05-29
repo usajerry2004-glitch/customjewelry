@@ -129,7 +129,7 @@ export default function NewOrderPage() {
               <label style={labelStyle}>Diamond / Stone Type</label>
               <select value={form.diamondType} onChange={e => set('diamondType', e.target.value)} style={selectStyle}>
                 <option value="">Select…</option>
-                {['Natural Diamond','Lab Grown Diamond','Sapphire','Ruby','Emerald','Moissanite','No Stone'].map(o => <option key={o}>{o}</option>)}
+                {['Certified Lab Grown Diamond','Non Certified (CVD)','Non Certified (HPHT)'].map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div style={fieldWrap}>

@@ -18,6 +18,17 @@ const MENTION_ROLES = [
   '@FACTORY_MANAGER', '@SHIPPING_MANAGER', '@SALES_REP',
 ];
 
+// CAD event messages start with one of these emojis
+const CAD_EVENT_PREFIX = /^(📎|🔔|✅|❌|↺)/;
+
+const CAD_EVENT_STYLE: Record<string, { border: string; bg: string; accent: string }> = {
+  '📎': { border: '#6366F1', bg: 'rgba(99,102,241,0.06)',  accent: '#6366F1' }, // uploaded
+  '🔔': { border: '#F59E0B', bg: 'rgba(245,158,11,0.06)', accent: '#F59E0B' }, // sent for approval
+  '✅': { border: '#10B981', bg: 'rgba(16,185,129,0.06)', accent: '#10B981' }, // approved
+  '❌': { border: '#EF4444', bg: 'rgba(239,68,68,0.06)',  accent: '#EF4444' }, // rejected
+  '↺':  { border: '#8B5CF6', bg: 'rgba(139,92,246,0.06)', accent: '#8B5CF6' }, // revision
+};
+
 interface Props {
   orderId: string;
   currentUserRole: string;
@@ -91,12 +102,41 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           <div key={date}>
             <div style={{ textAlign: 'center', margin: '10px 0', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{date}</div>
             {msgs.map(msg => {
-              const isMine = msg.authorId === currentUserId;
-              const roleColor = ROLE_COLORS[msg.authorRole] || 'var(--text-muted)';
-              const internal = msg.isInternal;
+              const isMine     = msg.authorId === currentUserId;
+              const roleColor  = ROLE_COLORS[msg.authorRole] || 'var(--text-muted)';
+              const internal   = msg.isInternal;
+              const cadPrefix  = CAD_EVENT_PREFIX.exec(msg.content)?.[0];
+              const isCadEvent = !!cadPrefix;
+              const cadStyle   = cadPrefix ? CAD_EVENT_STYLE[cadPrefix] : null;
+
+              // ── CAD event: full-width activity card ──────────────────
+              if (isCadEvent && cadStyle) {
+                return (
+                  <div key={msg.id} style={{ marginBottom: '10px' }}>
+                    <div style={{
+                      background: cadStyle.bg,
+                      border: `1px solid ${cadStyle.border}30`,
+                      borderLeft: `3px solid ${cadStyle.border}`,
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1 }}>
+                          {msg.content}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, textAlign: 'right' }}>
+                          <div>{msg.authorName}</div>
+                          <div>{new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // ── Regular chat bubble ───────────────────────────────────
               return (
                 <div key={msg.id} style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
-                  {/* Author + time */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                     {internal && !isCustomer && (
                       <span style={{ fontSize: '10px', background: 'rgba(99,102,241,0.1)', color: '#6366F1', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(99,102,241,0.2)' }}>Internal</span>
@@ -106,28 +146,12 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                       {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  {/* Bubble */}
                   <div style={{
                     maxWidth: '75%',
-                    background: internal && !isCustomer
-                      ? 'rgba(99,102,241,0.06)'
-                      : isMine
-                        ? 'rgba(26,39,64,0.06)'
-                        : 'var(--bg-input)',
-                    border: `1px solid ${
-                      internal && !isCustomer
-                        ? 'rgba(99,102,241,0.2)'
-                        : isMine
-                          ? 'rgba(26,39,64,0.15)'
-                          : 'var(--border)'
-                    }`,
-                    borderRadius: '10px',
-                    padding: '10px 14px',
-                    fontSize: '13px',
-                    color: 'var(--text-primary)',
-                    lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
+                    background: internal && !isCustomer ? 'rgba(99,102,241,0.06)' : isMine ? 'rgba(26,39,64,0.06)' : 'var(--bg-input)',
+                    border: `1px solid ${internal && !isCustomer ? 'rgba(99,102,241,0.2)' : isMine ? 'rgba(26,39,64,0.15)' : 'var(--border)'}`,
+                    borderRadius: '10px', padding: '10px 14px', fontSize: '13px',
+                    color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {msg.content}
                     {msg.mentions?.length > 0 && (

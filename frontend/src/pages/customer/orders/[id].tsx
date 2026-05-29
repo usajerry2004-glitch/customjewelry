@@ -11,12 +11,99 @@ export async function getServerSideProps() {
 
 interface CadFile {
   id: string;
+  fileName: string;
   originalName: string;
   status: string;
   revisionNumber: number;
   designerNotes?: string;
   customerFeedback?: string;
   createdAt: string;
+}
+
+// ── Inline viewer modal (customer-facing) ─────────────────────────────────
+function CadViewer({ cad, onClose }: { cad: CadFile; onClose: () => void }) {
+  const ext      = (cad.originalName.split('.').pop() || '').toLowerCase();
+  const isImage  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+  const isPdf    = ext === 'pdf';
+  const fileUrl  = `/uploads/cad/${cad.fileName}`;
+  const cs       = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+    >
+      <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', width: '100%', maxWidth: '860px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : '📎'}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cad.originalName}</div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
+                <span style={{ fontSize: '11px', background: `${cs.color}18`, color: cs.color, padding: '1px 8px', borderRadius: '99px', fontWeight: 700 }}>{cs.label}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+            <a href={fileUrl} download={cad.originalName}
+              style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
+              ↓ Download
+            </a>
+            <button onClick={onClose}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 12px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div style={{ flex: 1, overflow: 'auto', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
+          {isImage ? (
+            <img src={fileUrl} alt={cad.originalName}
+              style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', display: 'block' }} />
+          ) : isPdf ? (
+            <iframe src={`${fileUrl}#toolbar=1`} style={{ width: '100%', height: '65vh', border: 'none' }} title={cad.originalName} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '56px', marginBottom: '14px', opacity: 0.4 }}>📎</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '18px' }}>Preview not available for .{ext} files</div>
+              <a href={fileUrl} download={cad.originalName}
+                style={{ background: 'var(--accent)', color: '#fff', padding: '10px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
+                ↓ Download File
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Notes footer */}
+        {(cad.designerNotes || cad.customerFeedback) && (
+          <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px', display: 'flex', gap: '10px', flexWrap: 'wrap', background: 'var(--bg-card)', flexShrink: 0 }}>
+            {cad.designerNotes && (
+              <div style={{ flex: 1, minWidth: '180px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Designer Note</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.designerNotes}</div>
+              </div>
+            )}
+            {cad.customerFeedback && (
+              <div style={{ flex: 1, minWidth: '180px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Your Feedback</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.customerFeedback}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const CAD_STATUS: Record<string, { label: string; color: string }> = {
@@ -52,6 +139,7 @@ export default function CustomerOrderDetail() {
   const [cadFeedback, setCadFeedback] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
+  const [viewingCad, setViewingCad] = useState<CadFile | null>(null);
 
   useEffect(() => {
     try {
@@ -106,6 +194,7 @@ export default function CustomerOrderDetail() {
   const currentIdx = TIMELINE.findIndex(t => t.status === order.status);
 
   return (
+    <>
     <CustomerLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.orderType ? `${order.orderType} · ${order.metalType} ${order.metalColor}` : undefined}
@@ -231,8 +320,16 @@ export default function CustomerOrderDetail() {
                         <div style={{ fontSize: '12px', color: '#F59E0B', marginTop: '4px' }}>Your feedback: {cad.customerFeedback}</div>
                       )}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '12px' }}>
-                      {new Date(cad.createdAt).toLocaleDateString()}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                        {new Date(cad.createdAt).toLocaleDateString()}
+                      </span>
+                      <button
+                        onClick={() => setViewingCad(cad)}
+                        style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                      >
+                        👁 View
+                      </button>
                     </div>
                   </div>
 
@@ -291,5 +388,10 @@ export default function CustomerOrderDetail() {
         </div>
       )}
     </CustomerLayout>
+
+    {viewingCad && (
+      <CadViewer cad={viewingCad} onClose={() => setViewingCad(null)} />
+    )}
+    </>
   );
 }
