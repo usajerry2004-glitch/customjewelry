@@ -89,7 +89,7 @@ export default function JobBagPage() {
           </div>
 
           {/* Body */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0' }}>
+          <div className="jobbag-body" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0' }}>
             {/* Order specs */}
             <div style={{ padding: '20px 24px', borderRight: '1px solid #e5e1d8' }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '14px' }}>Order Specifications</div>

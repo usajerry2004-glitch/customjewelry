@@ -233,7 +233,7 @@ export default function KanbanPage() {
               </div>
             ) : (
               /* Order cards grid — auto-fills available width, no horizontal scroll */
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(272px, 1fr))', gap: '10px' }}>
+              <div className="kanban-orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(272px, 1fr))', gap: '10px' }}>
                 {selectedCol.orders.map(order => (
                   <div key={order.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} />

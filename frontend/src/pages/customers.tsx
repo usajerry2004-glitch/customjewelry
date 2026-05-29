@@ -243,7 +243,7 @@ export default function CustomersPage() {
           <div className="modal-box" style={modalBox} onClick={e => e.stopPropagation()}>
             <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px', margin: '0 0 20px' }}>Add New Customer</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {[['First Name *', 'firstName', 'text'], ['Last Name', 'lastName', 'text']].map(([label, key, type]) => (
                 <div key={key}>
                   <label style={LABEL}>{label}</label>
@@ -287,7 +287,7 @@ export default function CustomersPage() {
               For <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{showOrder.firstName} {showOrder.lastName}</span> ({showOrder.email})
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
               {ORDER_FIELDS.filter(f => isAdmin || f.key !== 'quotedCost').map(f => (
                 <div key={f.key}>
                   <label style={LABEL}>{f.label}</label>

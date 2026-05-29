@@ -214,7 +214,7 @@ export default function ImportPage() {
           <div style={card}>
             <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, marginBottom: '20px' }}>Import Complete</h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+            <div className="import-result-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
               <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '32px', fontWeight: 700, color: '#10B981', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{result.imported}</div>
                 <div style={{ fontSize: '12px', color: '#059669', fontWeight: 600, marginTop: '4px' }}>Orders Imported</div>

@@ -72,7 +72,7 @@ export default function CADPage() {
         <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px' }}>
           Upload New CAD File
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
+        <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
           <div>
             <label style={lbl}>Order *</label>
             <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={inp}>

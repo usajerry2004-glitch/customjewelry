@@ -406,7 +406,7 @@ export default function OrderDetail() {
                 <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '16px' }}>
                   {group.title}
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+                <div className="order-spec-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
                   {visibleFields.map(({ key, label, format }) => {
                     const raw = (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');

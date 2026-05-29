@@ -116,7 +116,7 @@ export default function ReportsPage() {
             </div>
 
             {/* ── 2-col: Status chart + Top Stores ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="reports-main-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
               {/* Orders by status */}
               <div style={card}>

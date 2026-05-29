@@ -100,7 +100,7 @@ export default function NewOrderPage() {
             </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Metal Type *</label>
               <select value={form.metalType} onChange={e => set('metalType', e.target.value)} style={selectStyle}>
@@ -124,7 +124,7 @@ export default function NewOrderPage() {
 
           <SectionTitle>Stone Details</SectionTitle>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Diamond / Stone Type</label>
               <select value={form.diamondType} onChange={e => set('diamondType', e.target.value)} style={selectStyle}>
@@ -141,7 +141,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Stone Shape</label>
               <select value={form.centerStoneShape} onChange={e => set('centerStoneShape', e.target.value)} style={selectStyle}>

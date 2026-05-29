@@ -203,3 +203,106 @@ input::placeholder, textarea::placeholder {
 @media (max-width: 540px) {
   .kanban-phase-grid { grid-template-columns: 1fr !important; }
 }
+
+/* ─── Full Responsive Pass ─── */
+
+/* SKU page: sidebar collapses below main */
+@media (max-width: 900px) {
+  .sku-layout { grid-template-columns: 1fr !important; }
+}
+
+/* Reports: 2-col main section stacks */
+@media (max-width: 860px) {
+  .reports-main-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Import: 3-col result cards stack to 1 on mobile */
+@media (max-width: 540px) {
+  .import-result-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Manufacturing / Shipping action rows: stack inputs vertically on mobile */
+@media (max-width: 640px) {
+  .mfg-action-row { grid-template-columns: 1fr !important; }
+  .mfg-action-row button { width: 100%; }
+  .ship-action-row { grid-template-columns: 1fr !important; }
+  .ship-action-row button { width: 100%; }
+}
+
+/* CAD upload row: stack on mobile */
+@media (max-width: 768px) {
+  .cad-upload-row { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 540px) {
+  .cad-upload-row { grid-template-columns: 1fr !important; }
+}
+
+/* Modal forms: stack 2-col grids on small screens */
+@media (max-width: 480px) {
+  .modal-form-grid { grid-template-columns: 1fr !important; }
+  .form-2col       { grid-template-columns: 1fr !important; }
+}
+
+/* Order detail spec grid: 2→1 column on mobile */
+@media (max-width: 540px) {
+  .order-spec-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Kanban orders panel: min card width smaller on mobile */
+@media (max-width: 480px) {
+  .kanban-orders-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Job bag body: QR code moves below specs on mobile */
+@media (max-width: 600px) {
+  .jobbag-body { grid-template-columns: 1fr !important; }
+  .jobbag-body > div:first-child { border-right: none !important; border-bottom: 1px solid #e5e1d8; }
+}
+
+/* Order summary: already handled in summary.tsx style block — ensure same via CSS */
+@media (max-width: 768px) {
+  .order-summary-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Tables — always scrollable horizontally on small screens */
+@media (max-width: 768px) {
+  table { font-size: 11px !important; }
+}
+
+/* Topbar action buttons — wrap and shrink on small screens */
+@media (max-width: 600px) {
+  .topbar-actions { flex-wrap: wrap; gap: 4px !important; }
+  .topbar-actions button,
+  .topbar-actions a { font-size: 11px !important; padding: 5px 10px !important; }
+}
+
+/* CAD viewer modal — full-screen on mobile */
+@media (max-width: 640px) {
+  .cad-viewer-modal {
+    border-radius: 12px 12px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+  }
+}
+
+/* Reports KPI: 4→2→1 (reuse kpi-grid rule, already handled) */
+
+/* Prevent any inline overflow issues on very small screens */
+@media (max-width: 380px) {
+  .main-content-pad { padding: 12px !important; }
+  .topbar-subtitle  { display: none !important; }
+}
+
+/* Customer portal — new order form stacks fully on mobile */
+@media (max-width: 480px) {
+  .form-2col { grid-template-columns: 1fr !important; }
+}
+
+/* Shipping queue list horizontal scroll safety */
+@media (max-width: 640px) {
+  .ship-action-row { gap: 6px !important; }
+}

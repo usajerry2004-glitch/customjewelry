@@ -86,7 +86,7 @@ export default function ShippingPage() {
         </div>
 
         {isReady && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px' }}>
+          <div className="ship-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px' }}>
             <input value={inputs.tracking} onChange={e => setTracking(order.id, 'tracking', e.target.value)} placeholder="Tracking number *" style={inp} />
             <select value={inputs.method} onChange={e => setTracking(order.id, 'method', e.target.value)} style={inp}>
               <option value="">Carrier…</option>

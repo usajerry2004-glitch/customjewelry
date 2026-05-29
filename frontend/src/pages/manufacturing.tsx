@@ -102,7 +102,7 @@ export default function ManufacturingPage() {
                   </div>
 
                   {(order.status === OrderStatus.SKU_CREATION || order.status === OrderStatus.CUSTOMER_APPROVED) && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
+                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
                       <input value={inputs.vpo} onChange={e => setVpo(order.id, 'vpo', e.target.value)} placeholder="VPO Number" style={inp} />
                       <input value={inputs.jobBag} onChange={e => setVpo(order.id, 'jobBag', e.target.value)} placeholder="Job Bag Number" style={inp} />
                       <button onClick={() => action(order.id, 'start', { vpoNumber: inputs.vpo, jobBagNumber: inputs.jobBag })} disabled={busy}
@@ -113,7 +113,7 @@ export default function ManufacturingPage() {
                   )}
 
                   {order.status === OrderStatus.VPO_ISSUED && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
+                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
                       <input value={inputs.jobBag} onChange={e => setVpo(order.id, 'jobBag', e.target.value)} placeholder="Job Bag Number" style={inp} />
                       <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
                       <button onClick={() => action(order.id, 'jobbag', { jobBagNumber: inputs.jobBag, vendorName: inputs.vendor })} disabled={busy}

@@ -44,7 +44,7 @@ export default function SKUPage() {
 
   return (
     <AppLayout title="SKU Management" subtitle="Generate and manage product SKUs">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
+      <div className="sku-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '24px', alignItems: 'start' }}>
 
         {/* SKU list */}
         <div>
