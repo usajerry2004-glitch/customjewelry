@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>JewelFlow OS — Website User Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#f5f3ef;color:#1a2740;line-height:1.6;font-size:14px}
+
+/* NAV */
+.topnav{position:sticky;top:0;z-index:200;background:#0d1b35;border-bottom:1px solid rgba(255,255,255,0.08);height:52px;display:flex;align-items:center;padding:0 20px;gap:6px;overflow-x:auto}
+.topnav::-webkit-scrollbar{display:none}
+.nav-brand{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:1px;white-space:nowrap;margin-right:10px;flex-shrink:0}
+.nbtn{flex-shrink:0;background:none;border:none;color:rgba(255,255,255,0.5);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.nbtn:hover{color:#fff;background:rgba(255,255,255,0.08)}
+.nbtn.active{color:#c09b58;background:rgba(192,155,88,0.12);font-weight:700}
+
+/* LAYOUT */
+.page{display:none;animation:fadeUp .2s ease}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.wrap{max-width:960px;margin:0 auto;padding:36px 20px}
+.pg-hero{background:linear-gradient(135deg,#0d1b35,#1e3a6e);padding:44px 24px 36px;text-align:center}
+.pg-hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,5vw,42px);font-weight:600;color:#fff;margin-bottom:8px}
+.pg-hero p{font-size:13px;color:rgba(255,255,255,0.55);max-width:500px;margin:0 auto}
+
+/* CARDS */
+.card{background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+
+/* SECTION TITLE */
+.st{font-family:'Cormorant Garamond',serif;font-size:clamp(22px,4vw,32px);font-weight:600;color:#0d1b35;margin-bottom:6px}
+.ss{font-size:13px;color:#6b7280;max-width:600px;margin-bottom:28px;line-height:1.7}
+
+/* MOCK UI */
+.mock{background:#f5f3ef;border:1px solid #d1cdc7;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.12);margin:20px 0}
+.mock-bar{background:#0d1b35;height:36px;display:flex;align-items:center;padding:0 14px;gap:8px}
+.mock-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.2)}
+.mock-url{background:rgba(255,255,255,0.08);border-radius:4px;padding:3px 12px;font-size:11px;color:rgba(255,255,255,0.4);margin-left:8px;flex:1;max-width:260px}
+.mock-body{padding:0}
+
+/* MOCK SIDEBAR */
+.mock-app{display:flex;min-height:200px}
+.mock-sidebar{width:160px;background:#0d1b35;flex-shrink:0;padding:14px 0}
+.mock-sidebar .brand{font-family:'Cormorant Garamond',serif;font-size:13px;color:#fff;padding:0 14px 14px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:8px;letter-spacing:.5px}
+.mock-nav-item{padding:7px 14px;font-size:11px;color:rgba(255,255,255,0.45);cursor:default;border-radius:0;display:flex;align-items:center;gap:7px}
+.mock-nav-item.active{background:rgba(192,155,88,0.12);color:#c09b58;font-weight:600}
+.mock-nav-item .dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.mock-main{flex:1;padding:16px;background:#f5f3ef;overflow:hidden}
+.mock-title{font-size:14px;font-weight:700;color:#0d1b35;margin-bottom:12px}
+.mock-subtitle{font-size:11px;color:#9ca3af;margin-bottom:12px;margin-top:-8px}
+
+/* MOCK COMPONENTS */
+.mock-kpi-row{display:flex;gap:8px;margin-bottom:12px}
+.mock-kpi{flex:1;background:#fff;border:1px solid #e5e1d8;border-radius:7px;padding:10px;text-align:center}
+.mock-kpi-num{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700}
+.mock-kpi-lbl{font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px}
+
+.mock-order-row{background:#fff;border:1px solid #e5e1d8;border-radius:7px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:default}
+.mock-order-row:hover{border-color:#c09b58}
+.mock-po{font-size:12px;font-weight:700;color:#0d1b35}
+.mock-details{font-size:10px;color:#9ca3af}
+.mock-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:99px;white-space:nowrap;flex-shrink:0}
+.mock-progress{height:3px;background:#f3f4f6;border-radius:99px;margin-top:5px}
+.mock-progress-bar{height:100%;border-radius:99px}
+
+.mock-search{background:#fff;border:1px solid #d1cdc7;border-radius:6px;padding:6px 10px;font-size:11px;color:#9ca3af;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.mock-input{background:#f9f8f5;border:1px solid #d1cdc7;border-radius:6px;padding:7px 10px;font-size:11px;color:#374151;width:100%;margin-bottom:8px}
+.mock-label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#9ca3af;font-weight:600;margin-bottom:3px}
+.mock-select{background:#f9f8f5;border:1px solid #d1cdc7;border-radius:6px;padding:6px 10px;font-size:11px;color:#374151;width:100%;margin-bottom:8px}
+.mock-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:600;cursor:default;border:none}
+.mock-btn-primary{background:#0d1b35;color:#fff}
+.mock-btn-secondary{background:#f3f4f6;color:#374151;border:1px solid #d1cdc7}
+.mock-btn-gold{background:rgba(192,155,88,0.1);color:#92400e;border:1px solid rgba(192,155,88,0.3)}
+.mock-btn-green{background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.3)}
+.mock-btn-purple{background:rgba(139,92,246,0.1);color:#7c3aed;border:1px solid rgba(139,92,246,0.3)}
+.mock-btn-red{background:rgba(239,68,68,0.1);color:#dc2626;border:1px solid rgba(239,68,68,0.3)}
+
+.mock-timeline{display:flex;align-items:center;gap:0;margin-bottom:14px;overflow:hidden}
+.mock-tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.mock-tl-line{flex:1;height:2px;background:#e5e1d8}
+.mock-tl-line.done{background:#10b981}
+
+.mock-card{background:#fff;border:1px solid #e5e1d8;border-radius:7px;padding:10px 12px;margin-bottom:8px}
+.mock-card-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#9ca3af;margin-bottom:8px}
+.mock-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.mock-row-label{font-size:10px;color:#9ca3af}
+.mock-row-value{font-size:10px;font-weight:600;color:#0d1b35}
+
+.mock-chat-bubble{padding:8px 11px;border-radius:8px;font-size:10px;max-width:85%;margin-bottom:7px;line-height:1.5}
+.bubble-right{background:#0d1b3508;border:1px solid rgba(26,39,64,0.12);align-self:flex-end;margin-left:auto}
+.bubble-left{background:#f9f8f5;border:1px solid #e5e1d8}
+.bubble-event{background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-left:3px solid #10b981;width:100%}
+.mock-chat-wrap{display:flex;flex-direction:column;gap:0}
+.chat-author{font-size:9px;color:#9ca3af;margin-bottom:2px}
+
+.mock-cad-file{background:#f9f8f5;border:1px solid #d1cdc7;border-radius:7px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mock-cad-icon{font-size:18px;flex-shrink:0}
+.mock-cad-info{flex:1;min-width:0}
+.mock-cad-name{font-size:11px;font-weight:600;color:#0d1b35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mock-cad-meta{font-size:9px;color:#9ca3af;margin-top:1px}
+
+.mock-pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.mock-phase{background:#fff;border:1px solid #e5e1d8;border-radius:7px;padding:10px;border-top:3px solid}
+.mock-phase-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.mock-phase-status{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:5px;margin-bottom:4px;cursor:default}
+.mock-phase-status:hover{background:#f3f4f6}
+.mock-phase-status-name{font-size:9px;color:#374151}
+.mock-phase-count{font-size:10px;font-weight:700}
+
+/* CALLOUT */
+.callout{border-radius:8px;padding:12px 14px;margin:14px 0;font-size:12px;line-height:1.7}
+.callout-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.callout-green{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.callout-amber{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.callout-red{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.callout strong{font-weight:700}
+
+/* STEPS */
+.step-list{display:flex;flex-direction:column;gap:0}
+.step{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid #f3f4f6}
+.step:last-child{border-bottom:none}
+.step-n{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;margin-top:2px}
+.step h4{font-size:14px;font-weight:700;color:#0d1b35;margin-bottom:4px}
+.step p{font-size:13px;color:#4b5563;line-height:1.7}
+
+/* HIGHLIGHT */
+.hl{background:rgba(192,155,88,0.08);border:1px solid rgba(192,155,88,0.25);border-radius:8px;padding:14px 16px;margin:16px 0}
+.hl h4{font-size:13px;font-weight:700;color:#92400e;margin-bottom:4px}
+.hl p{font-size:12px;color:#78350f;line-height:1.7}
+
+/* ANNOTATED */
+.annotated{position:relative}
+.ann{position:absolute;background:#EF4444;color:#fff;font-size:10px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);z-index:10}
+.ann-list{list-style:none;margin-top:10px}
+.ann-list li{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#374151;padding:5px 0;border-bottom:1px solid #f3f4f6}
+.ann-list li:last-child{border-bottom:none}
+.ann-num{background:#EF4444;color:#fff;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+/* ROLE QUICK CARDS */
+.role-quick{background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:16px;border-left:4px solid}
+.role-quick h4{font-size:14px;font-weight:700;margin-bottom:6px}
+.role-quick p{font-size:12px;color:#4b5563;margin-bottom:10px;line-height:1.6}
+.role-quick ul{list-style:none;padding:0}
+.role-quick ul li{font-size:12px;color:#374151;padding:3px 0;display:flex;gap:6px}
+.role-quick ul li::before{content:'→';color:#c09b58;font-weight:700;flex-shrink:0}
+
+/* PRINT */
+@media print{.topnav{position:static}.page{display:block!important}.page:not(:first-child){page-break-before:always}}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .g2,.g3{grid-template-columns:1fr}
+  .mock-app{flex-direction:column}
+  .mock-sidebar{width:100%;padding:10px;display:flex;gap:6px;overflow-x:auto}
+  .mock-sidebar .brand{display:none}
+  .mock-kpi-row{flex-wrap:wrap}
+  .mock-pipeline{grid-template-columns:repeat(2,1fr)}
+  .topnav{flex-wrap:wrap;height:auto;padding:8px 12px;justify-content:center;gap:4px}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="nav-brand">💎 JewelFlow Guide</div>
+  <button class="nbtn active" onclick="show('start',this)">Getting Started</button>
+  <button class="nbtn" onclick="show('dashboard',this)">Dashboard</button>
+  <button class="nbtn" onclick="show('orders',this)">Orders</button>
+  <button class="nbtn" onclick="show('orderdetail',this)">Order Detail</button>
+  <button class="nbtn" onclick="show('cad',this)">CAD Files</button>
+  <button class="nbtn" onclick="show('pipeline',this)">Pipeline Board</button>
+  <button class="nbtn" onclick="show('messaging',this)">Messaging</button>
+  <button class="nbtn" onclick="show('customerportal',this)">Customer Portal</button>
+  <button class="nbtn" onclick="show('quickref',this)">Quick Reference</button>
+</nav>
+
+<!-- ══════════════ GETTING STARTED ══════════════ -->
+<div id="start" class="page active">
+<div class="pg-hero">
+  <h1>How to Use JewelFlow OS</h1>
+  <p>A step-by-step visual guide for every team member and customer. No technical knowledge needed.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Step 1 — Logging In</div>
+  <div class="ss">Open the platform in any browser. You'll see the login screen.</div>
+
+  <!-- LOGIN MOCK -->
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div>
+      <div class="mock-url">kirajewels.com / login</div>
+    </div>
+    <div style="display:flex;background:#f5f3ef;min-height:220px">
+      <!-- left panel -->
+      <div style="width:220px;background:#0d1b35;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;flex-shrink:0">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#fff;letter-spacing:1.5px;margin-bottom:4px">KIRA JEWELS</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:3px;text-transform:uppercase;margin-bottom:20px">Custom</div>
+        <div style="width:30px;height:1px;background:rgba(192,155,88,0.4);margin-bottom:20px"></div>
+        <p style="font-size:10px;color:rgba(255,255,255,0.35);text-align:center;line-height:1.7">Custom jewelry workflow — order to delivery</p>
+      </div>
+      <!-- right panel -->
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:28px">
+        <div style="width:100%;max-width:260px">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#0d1b35;margin-bottom:4px">Sign in</div>
+          <div style="font-size:10px;color:#9ca3af;margin-bottom:16px">Enter your credentials to continue</div>
+          <div class="mock-label">Email</div>
+          <div class="mock-input" style="color:#0d1b35">your@email.com</div>
+          <div class="mock-label">Password</div>
+          <div class="mock-input" style="color:#0d1b35;letter-spacing:3px">••••••••</div>
+          <div class="mock-btn mock-btn-primary" style="width:100%;justify-content:center;margin-top:4px">Sign In</div>
+          <p style="font-size:9px;color:#9ca3af;text-align:center;margin-top:12px;line-height:1.6">Contact your administrator if you need access or have forgotten your password.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list" style="margin-top:0">
+    <li><div class="ann-num">1</div><span><strong>Email</strong> — Enter the email address your administrator set up for you.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Password</strong> — Enter your password. Contact admin if you've forgotten it.</span></li>
+    <li><div class="ann-num">3</div><span><strong>Sign In</strong> — Click to log in. You'll be taken directly to the right part of the platform for your role.</span></li>
+  </div>
+
+  <div class="callout callout-blue" style="margin-top:20px">
+    <strong>Where you go after login depends on your role:</strong><br>
+    Staff (Admin, Sales, CAD, etc.) → <strong>Dashboard</strong> &nbsp;|&nbsp; Customer → <strong>My Orders</strong>
+  </div>
+
+  <div class="st" style="margin-top:36px">Step 2 — Understanding the Layout</div>
+  <div class="ss">Once logged in, the screen is divided into three areas.</div>
+
+  <!-- APP LAYOUT MOCK -->
+  <div class="mock">
+    <div class="mock-bar">
+      <div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div>
+      <div class="mock-url">kirajewels.com / dashboard</div>
+    </div>
+    <div class="mock-app" style="min-height:260px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>Customers</div>
+        <div class="mock-nav-item"><div class="dot"></div>Manufacturing</div>
+        <div class="mock-nav-item"><div class="dot"></div>Shipping</div>
+        <div class="mock-nav-item"><div class="dot"></div>CAD Files</div>
+      </div>
+      <div class="mock-main">
+        <!-- Topbar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e5e1d8">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#0d1b35">Dashboard</div>
+            <div style="font-size:10px;color:#9ca3af">Kira Jewels Custom — Order Management</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;background:rgba(5,150,105,0.1);color:#059669;padding:3px 8px;border-radius:99px;font-weight:600">● Live</span>
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:5px 10px">+ New Order</div>
+          </div>
+        </div>
+        <!-- KPIs -->
+        <div class="mock-kpi-row">
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#0d1b35">406</div><div class="mock-kpi-lbl">Active Orders</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#7c3aed">3</div><div class="mock-kpi-lbl">CAD Design</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#c09b58">4</div><div class="mock-kpi-lbl">Ready to Ship</div></div>
+        </div>
+        <!-- Recent orders -->
+        <div style="font-size:10px;font-weight:600;color:#0d1b35;margin-bottom:7px">Recent Orders</div>
+        <div class="mock-order-row">
+          <div><div class="mock-po">KJ-TEST-211</div><div class="mock-details">Engagement Ring · 18K White Gold</div></div>
+          <div class="mock-badge" style="background:#dbeafe;color:#1d4ed8">Ready to Ship</div>
+        </div>
+        <div class="mock-order-row">
+          <div><div class="mock-po">KJ-TEST-204</div><div class="mock-details">Earrings · 18K White Gold</div></div>
+          <div class="mock-badge" style="background:#ede9fe;color:#6d28d9">CAD In Progress</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num" style="background:#6366F1">1</div><span><strong>Left sidebar</strong> — Navigation menu. Click any item to go to that section. Your current page is highlighted in gold.</span></li>
+    <li><div class="ann-num" style="background:#F59E0B">2</div><span><strong>Top bar</strong> — Shows the current page name, your connection status (Live/Demo), and quick action buttons.</span></li>
+    <li><div class="ann-num" style="background:#10B981">3</div><span><strong>Main area</strong> — The content for whatever page you're on. This changes as you navigate.</span></li>
+  </div>
+
+  <div class="hl" style="margin-top:24px">
+    <h4>📱 On mobile?</h4>
+    <p>The sidebar collapses on mobile. Tap the ☰ hamburger menu button (top left) to open it. Tap any menu item and the sidebar closes automatically.</p>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div id="dashboard" class="page">
+<div class="pg-hero">
+  <h1>The Dashboard</h1>
+  <p>Your home base — see the health of all orders at a glance the moment you log in.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">What You See on the Dashboard</div>
+  <div class="ss">The dashboard gives you a live snapshot of everything happening right now — order counts, pipeline status, and recent activity.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ dashboard</div></div>
+    <div class="mock-app">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>Customers</div>
+        <div class="mock-nav-item"><div class="dot"></div>Manufacturing</div>
+        <div class="mock-nav-item"><div class="dot"></div>Shipping</div>
+      </div>
+      <div class="mock-main">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:14px;font-weight:700;color:#0d1b35">Dashboard</div>
+          <div style="display:flex;gap:6px">
+            <span style="font-size:9px;background:rgba(5,150,105,0.1);color:#059669;padding:2px 7px;border-radius:99px;font-weight:600">● Live</span>
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:4px 10px">+ New Order</div>
+          </div>
+        </div>
+        <!-- KPI row — admin sees revenue too -->
+        <div class="mock-kpi-row" style="margin-bottom:10px">
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#0d1b35">406</div><div class="mock-kpi-lbl">Active Orders</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#059669">$187k</div><div class="mock-kpi-lbl">Revenue (Admin)</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#7c3aed">3</div><div class="mock-kpi-lbl">In CAD Design</div></div>
+          <div class="mock-kpi"><div class="mock-kpi-num" style="color:#c09b58">4</div><div class="mock-kpi-lbl">Ready to Ship</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px;gap:10px">
+          <div>
+            <div style="font-size:10px;font-weight:600;color:#0d1b35;margin-bottom:7px">Recent Orders</div>
+            <div class="mock-order-row"><div><div class="mock-po">KJ-TEST-211</div><div class="mock-details">Engagement Ring · 18K White Gold</div></div><div class="mock-badge" style="background:#dbeafe;color:#1d4ed8">Ready to Ship</div></div>
+            <div class="mock-order-row"><div><div class="mock-po">KJ-TEST-204</div><div class="mock-details">Earrings · Natural Diamond</div></div><div class="mock-badge" style="background:#ede9fe;color:#6d28d9">CAD In Progress</div></div>
+            <div class="mock-order-row"><div><div class="mock-po">KJ-TEST-203</div><div class="mock-details">Necklace · 14K Yellow Gold</div></div><div class="mock-badge" style="background:#fef3c7;color:#b45309">Sent for Approval</div></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:600;color:#0d1b35;margin-bottom:7px">Pipeline</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between;font-size:9px;padding:3px 6px;border-radius:4px;background:#fef3c720"><span style="color:#b45309">Waiting</span><span style="font-weight:700;color:#b45309">45</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;padding:3px 6px;border-radius:4px;background:#ede9fe20"><span style="color:#6d28d9">CAD</span><span style="font-weight:700;color:#6d28d9">12</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;padding:3px 6px;border-radius:4px;background:#d1fae520"><span style="color:#059669">Approved</span><span style="font-weight:700;color:#059669">9</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;padding:3px 6px;border-radius:4px;background:#dbeafe20"><span style="color:#1d4ed8">Mfg</span><span style="font-weight:700;color:#1d4ed8">18</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>KPI Cards</strong> — The big numbers at the top. Active Orders (total), Revenue (Admin only), orders In CAD Design, and orders Ready to Ship.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Recent Orders</strong> — The last 20 orders, newest first. Click any row to open that order's detail page.</span></li>
+    <li><div class="ann-num">3</div><span><strong>Pipeline Summary</strong> — How many orders are in each major stage. A quick health check for the business.</span></li>
+    <li><div class="ann-num">4</div><span><strong>+ New Order button</strong> — Staff can quickly create a new order from the dashboard without going to the Orders page.</span></li>
+  </div>
+
+  <div class="callout callout-amber" style="margin-top:20px">
+    <strong>Note:</strong> The "Revenue" KPI card is only visible to the Admin role. All other roles see 3 KPI cards instead of 4.
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ ORDERS ══════════════ -->
+<div id="orders" class="page">
+<div class="pg-hero">
+  <h1>Orders List</h1>
+  <p>Search, filter, and manage all orders from a single page. Create new orders here too.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Navigating the Orders Page</div>
+  <div class="ss">Click <strong>Orders</strong> in the left sidebar. You'll see all orders you have access to, with powerful search and filter tools.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders</div></div>
+    <div class="mock-app">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>Customers</div>
+        <div class="mock-nav-item"><div class="dot"></div>Manufacturing</div>
+        <div class="mock-nav-item"><div class="dot"></div>Shipping</div>
+      </div>
+      <div class="mock-main">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#0d1b35">Orders <span style="font-weight:400;color:#9ca3af;font-size:10px">(406 total)</span></div>
+          <div style="display:flex;gap:6px">
+            <div class="mock-btn mock-btn-secondary" style="font-size:10px;padding:4px 8px">📥 Import</div>
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:4px 10px">+ New Order</div>
+          </div>
+        </div>
+        <!-- Search + filter row -->
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div class="mock-search" style="flex:1;margin-bottom:0">🔍 Search by PO number, store, SKU…</div>
+          <div class="mock-select" style="width:110px;margin-bottom:0">All Statuses ▾</div>
+          <div class="mock-btn mock-btn-secondary" style="font-size:10px;padding:4px 8px">⊞ Kanban</div>
+        </div>
+        <!-- Order rows -->
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-220</div><div class="mock-details">Wedding Band · Platinum · Round</div></div>
+          <div style="text-align:right;flex-shrink:0">
+            <div class="mock-badge" style="background:#ccfbf1;color:#0f766e">Job Bag Created</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">May 29, 2026</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-219</div><div class="mock-details">Necklace · 14K Yellow Gold</div></div>
+          <div style="text-align:right;flex-shrink:0">
+            <div class="mock-badge" style="background:#e0f2fe;color:#0369a1">VPO Issued</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">May 29, 2026</div>
+          </div>
+        </div>
+        <div class="mock-order-row">
+          <div style="flex:1"><div class="mock-po">KJ-TEST-204</div><div class="mock-details">Earrings · 18K White Gold · Natural Diamond</div></div>
+          <div style="text-align:right;flex-shrink:0">
+            <div class="mock-badge" style="background:#ede9fe;color:#6d28d9">CAD In Progress</div>
+            <div style="font-size:9px;color:#9ca3af;margin-top:2px">May 29, 2026</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:8px;font-size:10px;color:#9ca3af">← Load more orders →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>Search bar</strong> — Type any PO number, store name, or SKU to instantly filter the list.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Status filter</strong> — Click the dropdown to show only orders in a specific stage (e.g., show only "CAD In Progress" orders).</span></li>
+    <li><div class="ann-num">3</div><span><strong>Order row</strong> — Click anywhere on a row to open the full order detail page.</span></li>
+    <li><div class="ann-num">4</div><span><strong>⊞ Kanban button</strong> — Switch to the visual Pipeline Board view of the same orders.</span></li>
+  </div>
+
+  <div class="st" style="margin-top:36px">Creating a New Order (Staff)</div>
+  <div class="ss">Click the blue "+ New Order" button. A form appears — fill in the details and click Create.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders — New Order modal</div></div>
+    <div style="padding:20px;background:#f5f3ef">
+      <div style="background:#fff;border:1px solid #d1cdc7;border-radius:10px;padding:20px;max-width:400px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,0.12)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:14px;font-weight:700;color:#0d1b35">New Order</div>
+          <span style="color:#9ca3af;cursor:pointer;font-size:16px">✕</span>
+        </div>
+        <div class="mock-label">PO Number *</div><div class="mock-input">KJ-2026-015</div>
+        <div class="mock-label">Store / Customer Name</div><div class="mock-input">Diamond Collection NYC</div>
+        <div class="mock-label">Order Type</div><div class="mock-input">Engagement Ring</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div class="mock-label">Metal Type</div><div class="mock-input">18K</div></div>
+          <div><div class="mock-label">Metal Color</div><div class="mock-input">White Gold</div></div>
+        </div>
+        <div style="margin-top:4px;display:flex;gap:8px;justify-content:flex-end">
+          <div class="mock-btn mock-btn-secondary">Cancel</div>
+          <div class="mock-btn mock-btn-primary">Create Order</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-green">
+    <strong>Tip:</strong> The PO Number must be unique — the system will tell you if it's already taken. Use your company's standard format (e.g., KJ-2026-001).
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ ORDER DETAIL ══════════════ -->
+<div id="orderdetail" class="page">
+<div class="pg-hero">
+  <h1>Order Detail Page</h1>
+  <p>Everything about a single order — specs, files, status, messages — all on one page.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">Opening an Order</div>
+  <div class="ss">Click on any order row from the Orders list, Dashboard, or Pipeline Board. The order detail page opens.</div>
+
+  <!-- Full order detail mock -->
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders / KJ-TEST-204</div></div>
+    <div class="mock-app" style="min-height:380px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>Customers</div>
+        <div class="mock-nav-item"><div class="dot"></div>Manufacturing</div>
+        <div class="mock-nav-item"><div class="dot"></div>Shipping</div>
+      </div>
+      <div class="mock-main" style="overflow-y:auto">
+        <!-- Topbar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#0d1b35">KJ-TEST-204</div>
+            <div style="font-size:10px;color:#9ca3af">Emma Thompson</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <div class="mock-btn mock-btn-gold" style="font-size:9px;padding:4px 8px">📊 Summary</div>
+            <div class="mock-btn mock-btn-secondary" style="font-size:9px;padding:4px 8px">← Back</div>
+          </div>
+        </div>
+        <!-- Two-col layout -->
+        <div style="display:grid;grid-template-columns:1fr 100px;gap:10px">
+          <div>
+            <!-- Order Details card -->
+            <div class="mock-card">
+              <div class="mock-card-title">Order Details</div>
+              <div class="mock-row"><span class="mock-row-label">PO Number</span><span class="mock-row-value">KJ-TEST-204</span></div>
+              <div class="mock-row"><span class="mock-row-label">Order Type</span><span class="mock-row-value">Earrings</span></div>
+              <div class="mock-row"><span class="mock-row-label">Metal</span><span class="mock-row-value">18K White Gold</span></div>
+              <div class="mock-row"><span class="mock-row-label">Stone</span><span class="mock-row-value">Natural Diamond VS2</span></div>
+            </div>
+            <!-- CAD Files card -->
+            <div class="mock-card" style="margin-top:8px">
+              <div class="mock-card-title">Design Files (2)</div>
+              <div class="mock-cad-file">
+                <div class="mock-cad-icon">🖼</div>
+                <div class="mock-cad-info"><div class="mock-cad-name">KJ-TEST-204-cad-rev2.svg</div><div class="mock-cad-meta">Rev #2 · Awaiting Approval</div></div>
+                <div class="mock-badge" style="background:#fef3c7;color:#b45309;font-size:8px">Awaiting</div>
+                <div class="mock-btn mock-btn-primary" style="font-size:9px;padding:4px 8px">👁 View</div>
+              </div>
+              <div class="mock-cad-file">
+                <div class="mock-cad-icon">🖼</div>
+                <div class="mock-cad-info"><div class="mock-cad-name">KJ-TEST-204-cad-rev1.svg</div><div class="mock-cad-meta">Rev #1 · Revision Requested</div></div>
+                <div class="mock-badge" style="background:#ede9fe;color:#6d28d9;font-size:8px">Revised</div>
+                <div class="mock-btn mock-btn-primary" style="font-size:9px;padding:4px 8px">👁 View</div>
+              </div>
+            </div>
+          </div>
+          <!-- Sidebar -->
+          <div>
+            <div class="mock-card">
+              <div class="mock-card-title">Status</div>
+              <div class="mock-badge" style="background:#ede9fe;color:#6d28d9;font-size:9px;padding:4px 8px;display:inline-block">CAD In Progress</div>
+            </div>
+            <div class="mock-card" style="margin-top:7px">
+              <div class="mock-card-title">Move To</div>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div class="mock-btn" style="background:#d1fae5;color:#059669;border:1px solid #a7f3d0;font-size:9px;padding:4px;justify-content:center;border-radius:6px">→ Approved</div>
+                <div class="mock-btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-size:9px;padding:4px;justify-content:center;border-radius:6px">→ Rejected</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Conversation preview -->
+        <div class="mock-card" style="margin-top:8px">
+          <div class="mock-card-title">Conversation</div>
+          <div class="mock-chat-wrap">
+            <div><div class="chat-author">admin@kirajewels.one</div><div class="mock-chat-bubble bubble-event">📎 CAD file uploaded — KJ-TEST-204-cad-rev2.svg (Rev #2)</div></div>
+            <div style="margin-left:auto"><div class="chat-author" style="text-align:right">Emma Thompson</div><div class="mock-chat-bubble bubble-right">Can you make the stones slightly smaller?</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>📊 Summary button</strong> — Opens a beautiful one-page summary of the order, great for printing or sharing with management.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Order fields</strong> — All specs entered when the order was created. Admin/Sales can edit these by clicking the field.</span></li>
+    <li><div class="ann-num">3</div><span><strong>Design Files</strong> — Every CAD file uploaded for this order. Click <strong>👁 View</strong> to open and review the design in the browser.</span></li>
+    <li><div class="ann-num">4</div><span><strong>Move To</strong> (sidebar) — The buttons in the sidebar let you advance the order to the next stage. Only statuses your role is allowed to use are shown.</span></li>
+    <li><div class="ann-num">5</div><span><strong>Conversation</strong> — Chat thread at the bottom. Type a message and press Ctrl+Enter (or click Send) to post.</span></li>
+  </div>
+
+  <div class="st" style="margin-top:36px">The Order Summary Page</div>
+  <div class="ss">Click the gold <strong>📊 Summary</strong> button on any order to see an elegant single-page overview — great for management reviews or printing.</div>
+
+  <div class="callout callout-blue">
+    The Summary page shows: status badge, pipeline progress bar, customer details, product specs, CAD files, AI brief, recent messages — all in visual cards. It also has a 🖨 Print button.
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ CAD FILES ══════════════ -->
+<div id="cad" class="page">
+<div class="pg-hero">
+  <h1>CAD Files — Upload & Review</h1>
+  <p>How to upload design files, view them, and handle customer approvals.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">For CAD Designers — Uploading a File</div>
+  <div class="ss">Go to the order, scroll to the <strong>Design Files</strong> section and click the upload area.</div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">1</div>
+      <div>
+        <h4>Open the order you're working on</h4>
+        <p>Navigate to Orders → find your order (it will be in "Pending CAD" or "CAD In Progress" status) → click to open it.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">2</div>
+      <div>
+        <h4>Scroll to Design Files</h4>
+        <p>On the order detail page, scroll past the order specs. You'll see a "Design Files" card. Click the upload area or the Upload button.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">3</div>
+      <div>
+        <h4>Choose your file and add a note</h4>
+        <p>Select the CAD file from your computer (SVG, PNG, JPG, or PDF). Add a designer note — explain key design decisions, dimensions, or anything the customer should know.</p>
+        <div class="callout callout-blue" style="margin-top:8px"><strong>Accepted formats:</strong> SVG, PNG, JPG, PDF — up to 10MB per file</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#6366F1">4</div>
+      <div>
+        <h4>Send for Customer Approval</h4>
+        <p>After uploading, click the <strong>"Send for Approval"</strong> button on the file. This notifies the customer and marks the file as "Awaiting Your Approval." A message is automatically posted to the conversation.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="st" style="margin-top:36px">The CAD Viewer</div>
+  <div class="ss">Click the <strong>👁 View</strong> button on any design file to open the full-screen viewer.</div>
+
+  <!-- CAD VIEWER MOCK -->
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">Order Detail — CAD Viewer</div></div>
+    <div style="background:rgba(0,0,0,0.85);padding:20px;display:flex;align-items:center;justify-content:center;min-height:320px">
+      <div style="background:#fff;border-radius:10px;width:100%;max-width:580px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+        <!-- Viewer header -->
+        <div style="background:#f9f8f5;border-bottom:1px solid #e5e1d8;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span style="font-size:18px">🖼</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#0d1b35">KJ-TEST-204-cad-rev2.svg</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+                <span style="font-size:9px;color:#9ca3af">Rev #2</span>
+                <span style="font-size:9px;background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:99px;font-weight:700">Awaiting Approval</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:5px 10px">↓ Download</div>
+            <div class="mock-btn mock-btn-secondary" style="font-size:10px;padding:5px 10px">✕</div>
+          </div>
+        </div>
+        <!-- Preview area -->
+        <div style="background:#111827;padding:20px;display:flex;align-items:center;justify-content:center;min-height:140px">
+          <!-- Mini SVG ring design -->
+          <svg viewBox="0 0 200 200" width="130" height="130" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="72" fill="none" stroke="#d0d8e8" stroke-width="18" opacity=".9"/>
+            <circle cx="100" cy="38" r="20" fill="#d0d8e8" opacity=".9"/>
+            <polygon points="100,22 114,38 100,52 86,38" fill="#e8f4ff" opacity=".95"/>
+            <circle cx="80" cy="38" r="5" fill="#d0d8e8"/><circle cx="120" cy="38" r="5" fill="#d0d8e8"/>
+            <circle cx="100" cy="18" r="5" fill="#d0d8e8"/>
+            <text x="100" y="185" text-anchor="middle" fill="#c09b58" font-size="9" font-family="monospace">KIRA JEWELS · CAD DESIGN</text>
+          </svg>
+        </div>
+        <!-- Notes & actions -->
+        <div style="border-top:1px solid #e5e1d8;padding:12px 14px">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div style="flex:1;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:7px;padding:8px 10px">
+              <div style="font-size:9px;font-weight:700;color:#6366F1;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Designer Note</div>
+              <div style="font-size:11px;color:#374151">Revised prong settings as requested. Stone spacing adjusted.</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#9ca3af;margin-bottom:7px">Add feedback (optional):</div>
+          <div class="mock-input" style="margin-bottom:8px;font-size:10px;color:#9ca3af">Type your feedback or revision notes here…</div>
+          <div style="display:flex;gap:7px">
+            <div class="mock-btn mock-btn-green" style="flex:1;justify-content:center;font-size:11px">✓ Approve</div>
+            <div class="mock-btn mock-btn-purple" style="flex:1;justify-content:center;font-size:11px">↺ Request Changes</div>
+            <div class="mock-btn mock-btn-red" style="flex:1;justify-content:center;font-size:11px">✕ Reject</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>File preview</strong> — Images and PDFs open directly in the browser. No software needed. Use scroll/pinch to zoom.</span></li>
+    <li><div class="ann-num">2</div><span><strong>↓ Download</strong> — Save the file to your computer to view in higher quality or share with someone else.</span></li>
+    <li><div class="ann-num">3</div><span><strong>Designer Note</strong> — The designer's explanation of key decisions in this revision.</span></li>
+    <li><div class="ann-num">4</div><span><strong>Feedback box</strong> — If requesting changes, type specific feedback here (e.g., "Make the band thinner"). This feedback saves to the file record.</span></li>
+    <li><div class="ann-num">5</div><span><strong>✓ Approve</strong> — Design accepted. Order moves forward to manufacturing.</span></li>
+    <li><div class="ann-num">6</div><span><strong>↺ Request Changes</strong> — Designer will revise and upload a new version (Rev #2, #3…).</span></li>
+    <li><div class="ann-num">7</div><span><strong>✕ Reject</strong> — Full rejection. A fresh design approach is needed.</span></li>
+  </div>
+
+  <div class="callout callout-amber">
+    <strong>Important:</strong> Every action (approve, reject, revision request) is automatically recorded as a message in the order's conversation thread, so there's always a complete paper trail.
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ PIPELINE BOARD ══════════════ -->
+<div id="pipeline" class="page">
+<div class="pg-hero">
+  <h1>Pipeline Board</h1>
+  <p>A visual overview of every order grouped by stage. No horizontal scrolling — everything fits on screen.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">How to Use the Pipeline Board</div>
+  <div class="ss">Click <strong>Pipeline Board</strong> in the sidebar (or click ⊞ Kanban from the Orders page). The board shows all 12 stages grouped into 4 phases.</div>
+
+  <!-- PIPELINE BOARD MOCK -->
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ orders / kanban</div></div>
+    <div class="mock-app" style="min-height:380px">
+      <div class="mock-sidebar">
+        <div class="brand">KIRA JEWELS</div>
+        <div class="mock-nav-item"><div class="dot"></div>Dashboard</div>
+        <div class="mock-nav-item active"><div class="dot"></div>Pipeline Board</div>
+        <div class="mock-nav-item"><div class="dot"></div>Orders</div>
+        <div class="mock-nav-item"><div class="dot"></div>Manufacturing</div>
+      </div>
+      <div class="mock-main">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#0d1b35">Pipeline Board</div>
+          <div class="mock-btn mock-btn-secondary" style="font-size:10px;padding:4px 8px">☰ List view</div>
+        </div>
+        <!-- 4 Phase cards -->
+        <div class="mock-pipeline">
+          <div class="mock-phase" style="border-top-color:#6366F1">
+            <div class="mock-phase-title" style="color:#6366F1">📥 Intake <span style="float:right;background:#6366F115;padding:1px 5px;border-radius:99px">53</span></div>
+            <div class="mock-phase-status" style="background:#6366F110"><span class="mock-phase-status-name">Waiting Conf.</span><span class="mock-phase-count" style="color:#6366F1">45</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Pending CAD</span><span class="mock-phase-count" style="color:#8b5cf6">8</span></div>
+          </div>
+          <div class="mock-phase" style="border-top-color:#F59E0B">
+            <div class="mock-phase-title" style="color:#F59E0B">✏️ Design <span style="float:right;background:#F59E0B15;padding:1px 5px;border-radius:99px">24</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">CAD In Progress</span><span class="mock-phase-count" style="color:#6366F1">3</span></div>
+            <div class="mock-phase-status" style="background:#10b98110"><span class="mock-phase-status-name">Cust. Approved</span><span class="mock-phase-count" style="color:#10b981">9</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">SKU Creation</span><span class="mock-phase-count" style="color:#F97316">2</span></div>
+          </div>
+          <div class="mock-phase" style="border-top-color:#EF4444">
+            <div class="mock-phase-title" style="color:#EF4444">🏭 Mfg <span style="float:right;background:#EF444415;padding:1px 5px;border-radius:99px">18</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">VPO Issued</span><span class="mock-phase-count" style="color:#0ea5e9">2</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Contractor</span><span class="mock-phase-count" style="color:#F59E0B">4</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Job Bag</span><span class="mock-phase-count" style="color:#14b8a6">5</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Rdy Invoice</span><span class="mock-phase-count" style="color:#22c55e">7</span></div>
+          </div>
+          <div class="mock-phase" style="border-top-color:#10B981">
+            <div class="mock-phase-title" style="color:#10B981">🚚 Delivery <span style="float:right;background:#10B98115;padding:1px 5px;border-radius:99px">19</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Ready to Ship</span><span class="mock-phase-count" style="color:#3b82f6">4</span></div>
+            <div class="mock-phase-status"><span class="mock-phase-status-name">Shipped</span><span class="mock-phase-count" style="color:#6366F1">12</span></div>
+            <div class="mock-phase-status" style="background:#10b98110"><span class="mock-phase-status-name">Delivered</span><span class="mock-phase-count" style="color:#10b981">3</span></div>
+          </div>
+        </div>
+        <!-- Selected panel -->
+        <div style="background:#fff;border:1px solid rgba(192,155,88,0.3);border-radius:7px;padding:10px;margin-top:8px">
+          <div style="font-size:10px;font-weight:700;color:#b45309;margin-bottom:8px">WAITING CONFIRMATION (45 orders)</div>
+          <div class="mock-order-row" style="margin-bottom:5px"><div><div class="mock-po" style="font-size:11px">KJ-TEST-216</div><div class="mock-details">Wedding Band · Rose Gold</div></div><div class="mock-btn" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;font-size:9px;padding:3px 7px;border-radius:5px">→ Move to Pending CAD</div></div>
+          <div class="mock-order-row"><div><div class="mock-po" style="font-size:11px">KJ-TEST-201</div><div class="mock-details">Engagement Ring · 18K White Gold</div></div><div class="mock-btn" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;font-size:9px;padding:3px 7px;border-radius:5px">→ Move to Pending CAD</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>4 Phase cards</strong> — Intake, Design, Manufacturing, Delivery. Each shows how many orders are in that phase and breaks them down by status. Click any status to see its orders.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Selected orders panel</strong> — When you click a status, its orders appear below. Each card shows the PO number, order type, and a quick "→ Move to [next stage]" button.</span></li>
+    <li><div class="ann-num">3</div><span><strong>→ Move to [next stage]</strong> — Advance an order to the next status with a single click — right from the board, without opening the order.</span></li>
+    <li><div class="ann-num">4</div><span><strong>☰ List view</strong> — Switch back to the regular order list from the top right.</span></li>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ MESSAGING ══════════════ -->
+<div id="messaging" class="page">
+<div class="pg-hero">
+  <h1>Messaging & Conversation</h1>
+  <p>Every order has its own chat. Keep all communication about an order in one place.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">How the Conversation Works</div>
+  <div class="ss">Scroll to the bottom of any order detail page to find the Conversation section. Messages are grouped by date.</div>
+
+  <!-- CONVERSATION MOCK -->
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">Order Detail — Conversation</div></div>
+    <div style="background:#f5f3ef;padding:14px">
+      <div style="background:#fff;border:1px solid #e5e1d8;border-radius:10px;overflow:hidden;max-width:520px;margin:0 auto">
+        <div style="padding:12px 16px;border-bottom:1px solid #e5e1d8;display:flex;align-items:center;justify-content:space-between">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:#0d1b35">Conversation <span style="font-size:11px;color:#9ca3af;font-weight:400">(4)</span></div>
+          <span style="font-size:10px;color:#9ca3af">Internal = visible to staff only</span>
+        </div>
+        <div style="padding:12px 16px;max-height:220px;overflow-y:auto">
+          <div style="text-align:center;font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;margin:4px 0 10px">May 29, 2026</div>
+          <!-- CAD event message -->
+          <div style="margin-bottom:10px">
+            <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-left:3px solid #6366F1;border-radius:8px;padding:9px 12px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="font-size:11px;color:#1a2740;line-height:1.6">📎 CAD file uploaded — <strong>KJ-TEST-204-cad-rev2.svg</strong> (Rev #2)<br><span style="color:#4b5563">📝 Designer note: "Revised prong settings as requested"</span></div>
+                <div style="font-size:9px;color:#9ca3af;text-align:right;flex-shrink:0;margin-left:8px"><div>admin</div><div>10:32 AM</div></div>
+              </div>
+            </div>
+          </div>
+          <!-- Customer message -->
+          <div style="margin-bottom:10px;display:flex;flex-direction:column;align-items:flex-start">
+            <div style="font-size:9px;color:#9ca3af;margin-bottom:3px">Emma Thompson · <span style="color:#059669">CUSTOMER</span></div>
+            <div style="max-width:75%;background:#f9f8f5;border:1px solid #e5e1d8;border-radius:8px;padding:8px 12px;font-size:11px;color:#1a2740;line-height:1.5">Can the prongs be a little more rounded? And can you show a side view?</div>
+          </div>
+          <!-- Staff reply (right) -->
+          <div style="margin-bottom:10px;display:flex;flex-direction:column;align-items:flex-end">
+            <div style="font-size:9px;color:#9ca3af;margin-bottom:3px;text-align:right">cad@kirajewels.one · <span style="color:#6366F1">CAD</span></div>
+            <div style="max-width:75%;background:rgba(26,39,64,0.06);border:1px solid rgba(26,39,64,0.12);border-radius:8px;padding:8px 12px;font-size:11px;color:#1a2740;line-height:1.5">Of course! I'll round the prongs and add a side view in Rev #3. Should be ready within 24 hours.</div>
+          </div>
+          <!-- Internal message -->
+          <div style="margin-bottom:4px;display:flex;flex-direction:column;align-items:flex-start">
+            <div style="font-size:9px;color:#9ca3af;margin-bottom:3px"><span style="background:#ede9fe;color:#6d28d9;padding:1px 5px;border-radius:3px;font-weight:700">Internal</span> admin · 11:05 AM</div>
+            <div style="max-width:75%;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:8px 12px;font-size:11px;color:#1a2740;line-height:1.5">@CAD_DESIGNER please prioritise this — customer wants it for a proposal next week</div>
+          </div>
+        </div>
+        <!-- Input area -->
+        <div style="border-top:1px solid #e5e1d8;padding:12px 16px;background:#f9f8f5">
+          <div style="display:flex;gap:7px;margin-bottom:8px;flex-wrap:wrap">
+            <div class="mock-btn" style="background:#fff;border:1px solid #d1cdc7;color:#374151;font-size:10px;padding:3px 8px;border-radius:6px">Public</div>
+            <div class="mock-btn" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#6366F1;font-size:10px;padding:3px 8px;border-radius:6px">@ Mention</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end">
+            <div class="mock-input" style="flex:1;margin-bottom:0;resize:none;min-height:36px;font-size:11px;color:#9ca3af">Send a message to the team…</div>
+            <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:7px 12px;flex-shrink:0">Send</div>
+          </div>
+          <div style="font-size:9px;color:#9ca3af;margin-top:4px">Ctrl+Enter to send</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>CAD events (colored bars)</strong> — Purple/green/amber/red bars are automatic messages posted when CAD files are uploaded, approved, or revised. You can't delete them — they're a permanent record.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Customer messages</strong> — Appear on the left in a light grey bubble. Show the customer's name.</span></li>
+    <li><div class="ann-num">3</div><span><strong>Your messages</strong> — Appear on the right in a slightly darker bubble.</span></li>
+    <li><div class="ann-num">4</div><span><strong>Internal badge</strong> — Messages marked "Internal" are only visible to staff, not the customer. Use this for team notes.</span></li>
+    <li><div class="ann-num">5</div><span><strong>@ Mention</strong> — Click to tag a role (e.g., @CAD_DESIGNER). That team gets a notification.</span></li>
+    <li><div class="ann-num">6</div><span><strong>Public / Internal toggle</strong> — Before sending, switch between Public (customer can see) and Internal (staff only).</span></li>
+  </div>
+
+  <div class="callout callout-green">
+    <strong>Tip:</strong> Press <strong>Ctrl+Enter</strong> (Windows) or <strong>Cmd+Enter</strong> (Mac) to send a message without reaching for the mouse.
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ CUSTOMER PORTAL ══════════════ -->
+<div id="customerportal" class="page">
+<div class="pg-hero">
+  <h1>Customer Portal Guide</h1>
+  <p>Everything a customer needs to know — from placing an order to approving a design.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">My Orders — Your Home Screen</div>
+  <div class="ss">After logging in, customers land on the My Orders page — a list of all their custom jewelry orders with progress bars.</div>
+
+  <div class="mock">
+    <div class="mock-bar"><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-dot"></div><div class="mock-url">/ customer / orders</div></div>
+    <div style="background:#f5f3ef;padding:16px">
+      <!-- Customer layout header -->
+      <div style="background:#0d1b35;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:16px;color:#fff;font-weight:600">KIRA JEWELS</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase">Custom</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4)">Emma Thompson</div>
+          <div class="mock-btn" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-size:9px;padding:3px 8px;border-radius:5px">Sign out</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:#0d1b35">My Orders</div>
+          <div style="font-size:11px;color:#9ca3af">23 orders</div>
+        </div>
+        <div class="mock-btn mock-btn-primary" style="font-size:10px;padding:7px 14px">+ Place New Order</div>
+      </div>
+      <!-- Order cards -->
+      <div style="background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-size:14px;font-weight:700;color:#0d1b35">KJ-TEST-204</div><div style="font-size:11px;color:#6b7280;display:flex;gap:10px"><span>Earrings</span><span>18K White Gold</span></div></div>
+          <div style="text-align:right"><div class="mock-badge" style="background:#ede9fe;color:#6d28d9">CAD In Progress</div><div style="font-size:9px;color:#9ca3af;margin-top:3px">May 29, 2026</div></div>
+        </div>
+        <div style="height:4px;background:#f3f4f6;border-radius:99px;overflow:hidden"><div style="height:100%;width:30%;background:#6d28d9;border-radius:99px"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="font-size:9px;color:#9ca3af">Order placed</span><span style="font-size:9px;color:#6d28d9;font-weight:600">30% complete</span><span style="font-size:9px;color:#9ca3af">Delivered</span></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:14px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-size:14px;font-weight:700;color:#0d1b35">KJ-TEST-211</div><div style="font-size:11px;color:#6b7280">Engagement Ring · 18K White Gold</div></div>
+          <div style="text-align:right"><div class="mock-badge" style="background:#dbeafe;color:#1d4ed8">Ready to Ship</div><div style="font-size:9px;color:#9ca3af;margin-top:3px">May 29, 2026</div></div>
+        </div>
+        <div style="height:4px;background:#f3f4f6;border-radius:99px;overflow:hidden"><div style="height:100%;width:82%;background:#1d4ed8;border-radius:99px"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="font-size:9px;color:#9ca3af">Order placed</span><span style="font-size:9px;color:#1d4ed8;font-weight:600">82% complete</span><span style="font-size:9px;color:#9ca3af">Delivered</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ann-list">
+    <li><div class="ann-num">1</div><span><strong>Order card</strong> — Each order shows the PO number, type, metal, and current status. Click anywhere on a card to open the order details.</span></li>
+    <li><div class="ann-num">2</div><span><strong>Progress bar</strong> — Shows visually how far through the process your order is. 100% = Delivered.</span></li>
+    <li><div class="ann-num">3</div><span><strong>% complete</strong> — The percentage below the bar. CAD In Progress = ~30%, Ready to Ship = ~82%, Delivered = 100%.</span></li>
+    <li><div class="ann-num">4</div><span><strong>+ Place New Order</strong> — Start a new custom jewelry order.</span></li>
+  </div>
+
+  <div class="st" style="margin-top:36px">Placing a New Order (as Customer)</div>
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">1</div>
+      <div><h4>Click "+ Place New Order"</h4><p>The new order form opens. Fill in all the fields about your jewelry piece.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">2</div>
+      <div><h4>Fill in Jewelry Details</h4><p>Choose the type (Engagement Ring, Necklace, etc.), metal type (14K, 18K, Platinum…), metal color (Yellow Gold, White Gold, Rose Gold…), and ring size if applicable.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">3</div>
+      <div><h4>Fill in Stone Details</h4><p>Choose the diamond type (Certified Lab Grown Diamond, Non Certified CVD, Non Certified HPHT), quality grade, stone shape, and approximate carat weight.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">4</div>
+      <div>
+        <h4>Upload a Reference Image (recommended)</h4>
+        <p>Click the upload area to add an inspiration photo. This helps the designer understand your vision immediately. JPG, PNG, and PDF are all accepted.</p>
+        <div class="callout callout-blue" style="margin-top:8px">A reference image dramatically reduces the number of design revisions needed.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">5</div>
+      <div><h4>Add Special Instructions</h4><p>Any details the designer needs: engraving text, band width preference, specific setting style, design inspiration, or anything else. The more detail, the better.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">✓</div>
+      <div><h4>Click "Place Order"</h4><p>Your order is submitted and appears in My Orders with status "Waiting Confirmation." The Kira Jewels team will review it and begin design work shortly.</p></div>
+    </div>
+  </div>
+
+  <div class="st" style="margin-top:36px">Reviewing Your CAD Design</div>
+  <div class="ss">When your design is ready, open the order and scroll to "Design Files." You'll see files marked "Awaiting Your Approval."</div>
+
+  <div class="step-list">
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">1</div>
+      <div><h4>Click the 👁 View button</h4><p>The design opens in full screen. Take your time — zoom in, look at all the details.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">2</div>
+      <div><h4>Read the Designer Note</h4><p>The designer explains their decisions below the preview. Read this before giving feedback.</p></div>
+    </div>
+    <div class="step">
+      <div class="step-n" style="background:#9D4EDD">3</div>
+      <div>
+        <h4>Make your decision</h4>
+        <p><strong style="color:#059669">✓ Approve Design</strong> — You're happy! Manufacturing begins.<br><strong style="color:#7c3aed">↺ Request Changes</strong> — Type specific feedback in the box first, then click this. The designer will revise.<br><strong style="color:#dc2626">✕ Reject</strong> — The design doesn't work at all. A fresh approach will be started.</p>
+        <div class="callout callout-amber" style="margin-top:8px">If requesting changes: be <strong>specific</strong>. "Thinner band" and "more rounded prongs" gets faster results than "doesn't look right."</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════ QUICK REFERENCE ══════════════ -->
+<div id="quickref" class="page">
+<div class="pg-hero">
+  <h1>Quick Reference</h1>
+  <p>What to do first day on the job — by role. Bookmark this page.</p>
+</div>
+<div class="wrap">
+
+  <div class="st">First-Day Checklist by Role</div>
+  <div class="ss">Find your role below for a quick-start guide to using the platform.</div>
+
+  <div class="g2" style="gap:16px;margin-bottom:24px">
+
+    <div class="role-quick" style="border-left-color:#1a2740">
+      <h4>👑 Admin</h4>
+      <p>You have full access to everything. Start here.</p>
+      <ul>
+        <li>Go to Dashboard for an overview</li>
+        <li>Use Pipeline Board to see all active orders by stage</li>
+        <li>To create a user: Customers page → Create User</li>
+        <li>Revenue data is visible only to you on the Dashboard and Order Summary</li>
+        <li>You can move any order to any status using the "Move To" panel</li>
+        <li>Generate AI briefs on any order via the Order Detail page</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#059669">
+      <h4>🤝 Sales Rep</h4>
+      <p>You create orders on behalf of clients and track them.</p>
+      <ul>
+        <li>Create orders: Orders → + New Order (or Customers page)</li>
+        <li>Always fill in PO Number, Store Name, Metal, and Order Type at minimum</li>
+        <li>Upload reference images when you have them — saves revisions</li>
+        <li>Use the conversation to communicate with customers</li>
+        <li>You can move orders to Waiting Confirmation or Cancelled only</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#7C3AED">
+      <h4>⚖️ Authorizer</h4>
+      <p>You're the quality gate between intake and design.</p>
+      <ul>
+        <li>Filter orders by "Waiting Confirmation" to see your queue</li>
+        <li>Open each order → generate AI brief → review specs</li>
+        <li>Click "Authorize Order" to release to CAD team</li>
+        <li>Post a message if you need more info before authorizing</li>
+        <li>You can also approve/reject CAD designs</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#6366F1">
+      <h4>✏️ CAD Designer</h4>
+      <p>You see only design-stage orders. Here's your flow.</p>
+      <ul>
+        <li>Your orders are filtered automatically to CAD stages</li>
+        <li>Open order → read all specs and customer notes carefully</li>
+        <li>Scroll to Design Files → upload your file + add a designer note</li>
+        <li>Click "Send for Approval" when ready for customer review</li>
+        <li>Wait for customer response — check the conversation for feedback</li>
+        <li>If revision requested: upload new file (it becomes Rev #2 automatically)</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#F97316">
+      <h4>🏷️ SKU Manager</h4>
+      <p>You handle product codes and factory orders.</p>
+      <ul>
+        <li>Filter by "Customer Approved" to see your queue</li>
+        <li>Create SKU number for approved designs</li>
+        <li>Issue VPO to move to manufacturing</li>
+        <li>Filter by "SKU Creation" to see pending items</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#0D9488">
+      <h4>🏭 Factory Manager</h4>
+      <p>You track production. Use the Manufacturing page.</p>
+      <ul>
+        <li>Go to Manufacturing in the sidebar</li>
+        <li>You see all orders in VPO Issued → Job Bag stages</li>
+        <li>Click an order → use "Move To" to advance through stages</li>
+        <li>When piece passes QC: move to "Ready to Invoice"</li>
+        <li>Post messages to flag any production issues</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#2563EB">
+      <h4>🚚 Shipping Manager</h4>
+      <p>You handle the final mile. Use the Shipping page.</p>
+      <ul>
+        <li>Go to Shipping in the sidebar</li>
+        <li>You see all orders in Ready to Invoice → Shipped stages</li>
+        <li>Invoice generated → move to "Ready to Ship"</li>
+        <li>When dispatched: enter tracking number → move to "Shipped"</li>
+        <li>On delivery confirmed: move to "Delivered"</li>
+      </ul>
+    </div>
+
+    <div class="role-quick" style="border-left-color:#9D4EDD">
+      <h4>💍 Customer</h4>
+      <p>Your portal is simple — here's everything you can do.</p>
+      <ul>
+        <li>My Orders shows all your orders with progress bars</li>
+        <li>Click any order to see full details and timeline</li>
+        <li>Design Files section: click 👁 View to see your design</li>
+        <li>Use Approve / Request Changes / Reject on designs</li>
+        <li>Send messages to the team in the Conversation section</li>
+        <li>Tracking number appears in Order Info when shipped</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="st" style="margin-top:8px">Keyboard Shortcuts</div>
+  <div class="card" style="margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid #f3f4f6">
+          <th style="text-align:left;padding:8px 10px;color:#6b7280;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Shortcut</th>
+          <th style="text-align:left;padding:8px 10px;color:#6b7280;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px">What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 10px"><kbd style="background:#f3f4f6;border:1px solid #d1cdc7;border-radius:4px;padding:2px 6px;font-size:11px">Ctrl+Enter</kbd></td><td style="padding:8px 10px;color:#374151">Send a message in the conversation</td></tr>
+        <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 10px"><kbd style="background:#f3f4f6;border:1px solid #d1cdc7;border-radius:4px;padding:2px 6px;font-size:11px">Escape</kbd></td><td style="padding:8px 10px;color:#374151">Close the CAD viewer modal</td></tr>
+        <tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 10px"><kbd style="background:#f3f4f6;border:1px solid #d1cdc7;border-radius:4px;padding:2px 6px;font-size:11px">Click outside</kbd></td><td style="padding:8px 10px;color:#374151">Close any modal or popup</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="st">Common Mistakes to Avoid</div>
+  <div class="g2" style="gap:12px;margin-bottom:32px">
+    <div class="callout callout-red" style="margin:0"><strong>❌ Don't authorize without checking specs</strong><br>Always read the customer notes and verify specs are complete before authorizing. Missing information causes delays later.</div>
+    <div class="callout callout-red" style="margin:0"><strong>❌ Don't approve a design too quickly</strong><br>Customers: look carefully at the design before approving. Once manufacturing begins, changes are costly and time-consuming.</div>
+    <div class="callout callout-red" style="margin:0"><strong>❌ Don't skip the designer note</strong><br>CAD Designers: always add a note explaining your design decisions. It reduces revision requests significantly.</div>
+    <div class="callout callout-red" style="margin:0"><strong>❌ Don't use vague revision feedback</strong><br>Customers: "I don't like it" wastes a revision. Be specific: "Make the band 1mm thinner and add milgrain edges."</div>
+    <div class="callout callout-green" style="margin:0"><strong>✅ Do use the conversation for everything</strong><br>Every discussion about an order should happen in that order's conversation thread — not email, not WhatsApp. Keep it all in one place.</div>
+    <div class="callout callout-green" style="margin:0"><strong>✅ Do use the 📊 Summary page for reviews</strong><br>Management and authorizers: the Summary page gives a one-page overview perfect for quick reviews and printed records.</div>
+  </div>
+
+  <div style="background:#0d1b35;border-radius:12px;padding:24px;text-align:center">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#fff;margin-bottom:6px">Need More Help?</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:4px">For account issues, password resets, or technical problems — contact the Kira Jewels admin team.</div>
+    <div style="font-size:11px;color:#c09b58;margin-top:12px;font-weight:600;letter-spacing:.5px">KIRA JEWELS CUSTOM · JEWELFLOW OS</div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.page').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
