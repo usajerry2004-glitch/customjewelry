@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>JewelFlow OS — Complete System Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#f5f3ef;color:#1a2740;line-height:1.6}
+
+/* ── NAV ── */
+.sticky-nav{position:sticky;top:0;z-index:100;background:#0d1b35;border-bottom:1px solid rgba(255,255,255,0.08)}
+.nav-inner{display:flex;align-items:center;overflow-x:auto;padding:0 20px;height:54px;gap:4px;scrollbar-width:none}
+.nav-inner::-webkit-scrollbar{display:none}
+.nav-btn{flex-shrink:0;background:none;border:none;color:rgba(255,255,255,0.55);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;letter-spacing:.3px;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,0.08)}
+.nav-btn.active{color:#c09b58;background:rgba(192,155,88,0.12);font-weight:700}
+.nav-brand{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:700;color:#fff;letter-spacing:1px;margin-right:16px;flex-shrink:0}
+
+/* ── HERO ── */
+.hero{background:linear-gradient(135deg,#0d1b35 0%,#1a2f5e 60%,#0d1b35 100%);padding:64px 24px 56px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(192,155,88,0.15);border:1px solid rgba(192,155,88,0.3);color:#c09b58;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:5px 16px;border-radius:99px;margin-bottom:20px;font-weight:600}
+.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(32px,6vw,56px);font-weight:600;color:#fff;letter-spacing:1px;margin-bottom:12px}
+.hero p{font-size:15px;color:rgba(255,255,255,0.6);max-width:560px;margin:0 auto 32px;line-height:1.8}
+.hero-stats{display:flex;gap:32px;justify-content:center;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;color:#c09b58}
+.stat-lbl{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+
+/* ── SECTIONS ── */
+.section{display:none;animation:fadeIn .25s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 24px}
+
+/* ── CARDS ── */
+.card{background:#fff;border:1px solid #e5e1d8;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.card-grid{display:grid;gap:16px;margin-bottom:24px}
+.card-grid-2{grid-template-columns:repeat(2,1fr)}
+.card-grid-3{grid-template-columns:repeat(3,1fr)}
+.card-grid-4{grid-template-columns:repeat(4,1fr)}
+
+/* ── SECTION HEADER ── */
+.sec-title{font-family:'Cormorant Garamond',serif;font-size:clamp(24px,4vw,36px);font-weight:600;color:#0d1b35;margin-bottom:8px}
+.sec-sub{font-size:14px;color:#6b7280;max-width:640px;margin-bottom:32px;line-height:1.7}
+
+/* ── ROLE CARDS ── */
+.role-card{background:#fff;border:1px solid #e5e1d8;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);transition:transform .15s,box-shadow .15s}
+.role-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.1)}
+.role-header{padding:20px 20px 14px;display:flex;align-items:center;gap:12px}
+.role-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.role-name{font-size:15px;font-weight:700;color:#0d1b35}
+.role-tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;letter-spacing:.5px;text-transform:uppercase;margin-top:2px;display:inline-block}
+.role-body{padding:0 20px 20px}
+.role-desc{font-size:13px;color:#4b5563;line-height:1.7;margin-bottom:12px}
+.role-tasks{list-style:none;padding:0}
+.role-tasks li{font-size:12px;color:#374151;padding:5px 0;border-bottom:1px solid #f3f4f6;display:flex;align-items:flex-start;gap:7px;line-height:1.5}
+.role-tasks li:last-child{border-bottom:none}
+.role-tasks li::before{content:'✓';color:#10b981;font-weight:700;font-size:11px;flex-shrink:0;margin-top:1px}
+
+/* ── PIPELINE / FLOW ── */
+.flow-wrap{display:flex;flex-direction:column;gap:0;margin-bottom:32px}
+.flow-phase{margin-bottom:24px}
+.phase-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.phase-line{flex:1;height:1px;background:#e5e1d8}
+.flow-steps{display:flex;flex-wrap:wrap;gap:8px}
+.flow-step{background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;width:calc(50% - 4px);box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+.step-info{flex:1}
+.step-title{font-size:13px;font-weight:700;color:#0d1b35;margin-bottom:2px}
+.step-desc{font-size:12px;color:#6b7280;line-height:1.6}
+.step-who{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;display:inline-block;margin-top:5px;letter-spacing:.3px}
+.flow-arrow{text-align:center;font-size:18px;color:#c09b58;padding:4px 0;width:100%}
+
+/* ── STATUS PILLS ── */
+.status-grid{display:flex;flex-direction:column;gap:10px}
+.status-row{background:#fff;border:1px solid #e5e1d8;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.status-name{font-size:13px;font-weight:700;color:#0d1b35;min-width:180px;flex-shrink:0}
+.status-plain{font-size:12px;color:#374151;flex:1;line-height:1.6}
+.status-who{font-size:11px;color:#9ca3af;min-width:120px;text-align:right}
+
+/* ── FEATURES ── */
+.feature-card{background:#fff;border:1px solid #e5e1d8;border-radius:12px;padding:22px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.feature-icon{font-size:28px;margin-bottom:12px}
+.feature-title{font-size:15px;font-weight:700;color:#0d1b35;margin-bottom:6px}
+.feature-desc{font-size:13px;color:#4b5563;line-height:1.7}
+.feature-list{list-style:none;margin-top:10px}
+.feature-list li{font-size:12px;color:#374151;padding:4px 0;display:flex;align-items:flex-start;gap:6px}
+.feature-list li::before{content:'→';color:#c09b58;font-weight:700;flex-shrink:0}
+
+/* ── STEP BY STEP ── */
+.steps-list{display:flex;flex-direction:column;gap:0;counter-reset:step}
+.step-item{display:flex;gap:16px;padding:20px 0;border-bottom:1px solid #f3f4f6;position:relative}
+.step-item:last-child{border-bottom:none}
+.step-badge{width:36px;height:36px;border-radius:50%;background:#0d1b35;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;margin-top:2px}
+.step-content h4{font-size:14px;font-weight:700;color:#0d1b35;margin-bottom:4px}
+.step-content p{font-size:13px;color:#4b5563;line-height:1.7}
+.step-content .tip{background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 12px;font-size:12px;color:#92400e;margin-top:8px;line-height:1.6}
+.step-connector{position:absolute;left:18px;top:56px;bottom:-20px;width:1px;background:#e5e1d8}
+
+/* ── JOURNEY TIMELINE (big) ── */
+.journey{display:flex;flex-direction:column;gap:0}
+.journey-item{display:flex;gap:0;position:relative}
+.journey-left{width:200px;flex-shrink:0;text-align:right;padding:16px 24px 16px 0;display:flex;flex-direction:column;align-items:flex-end;justify-content:center}
+.journey-center{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.journey-circle{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;border:3px solid;flex-shrink:0;background:#fff}
+.journey-line{flex:1;width:2px;background:#e5e1d8;min-height:20px}
+.journey-right{flex:1;padding:12px 0 12px 24px}
+.journey-stage{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.journey-title{font-size:15px;font-weight:700;color:#0d1b35;margin-bottom:4px}
+.journey-desc{font-size:13px;color:#4b5563;line-height:1.7}
+.journey-who{font-size:11px;margin-top:6px;font-weight:600}
+
+/* ── FAQ ── */
+.faq-item{background:#fff;border:1px solid #e5e1d8;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.faq-q{padding:16px 20px;font-size:14px;font-weight:600;color:#0d1b35;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.faq-q:hover{background:#f9f8f5}
+.faq-q .arrow{font-size:12px;color:#9ca3af;transition:transform .2s}
+.faq-a{padding:0 20px 16px;font-size:13px;color:#4b5563;line-height:1.8;display:none}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .arrow{transform:rotate(180deg)}
+
+/* ── GLOSSARY ── */
+.gloss-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.gloss-item{background:#fff;border:1px solid #e5e1d8;border-radius:8px;padding:12px 14px}
+.gloss-term{font-size:13px;font-weight:700;color:#0d1b35;margin-bottom:3px}
+.gloss-def{font-size:12px;color:#4b5563;line-height:1.6}
+
+/* ── HIGHLIGHT BOX ── */
+.highlight{background:linear-gradient(135deg,rgba(192,155,88,0.08),rgba(192,155,88,0.04));border:1px solid rgba(192,155,88,0.25);border-radius:10px;padding:18px 20px;margin:24px 0}
+.highlight h4{font-size:14px;font-weight:700;color:#92400e;margin-bottom:6px}
+.highlight p{font-size:13px;color:#78350f;line-height:1.7}
+
+/* ── PRINT ── */
+@media print{
+  .sticky-nav{position:static}
+  .section{display:block!important}
+  .section:not(:first-child){page-break-before:always}
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .card-grid-4{grid-template-columns:repeat(2,1fr)}
+  .card-grid-3{grid-template-columns:repeat(2,1fr)}
+  .flow-step{width:100%}
+  .journey-left{display:none}
+}
+@media(max-width:600px){
+  .card-grid-2,.card-grid-3,.card-grid-4,.gloss-grid{grid-template-columns:1fr}
+  .status-who{display:none}
+  .status-name{min-width:130px}
+  .nav-inner{flex-wrap:wrap;height:auto;padding:8px 12px;gap:4px;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="sticky-nav">
+  <div class="nav-inner">
+    <div class="nav-brand">💎 JewelFlow OS</div>
+    <button class="nav-btn active" onclick="show('overview',this)">Overview</button>
+    <button class="nav-btn" onclick="show('journey',this)">Order Journey</button>
+    <button class="nav-btn" onclick="show('roles',this)">Team Roles</button>
+    <button class="nav-btn" onclick="show('stages',this)">Order Stages</button>
+    <button class="nav-btn" onclick="show('features',this)">Features</button>
+    <button class="nav-btn" onclick="show('placing',this)">Placing an Order</button>
+    <button class="nav-btn" onclick="show('processing',this)">Processing an Order</button>
+    <button class="nav-btn" onclick="show('customer',this)">Customer Portal</button>
+    <button class="nav-btn" onclick="show('faq',this)">FAQ</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Stakeholder Reference Guide</div>
+  <h1>JewelFlow OS</h1>
+  <p>The complete custom jewelry workflow platform — from the moment a customer places an order to the moment it arrives at their door. Everything your team needs in one place.</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">8</div><div class="stat-lbl">Team Roles</div></div>
+    <div class="stat"><div class="stat-num">13</div><div class="stat-lbl">Order Stages</div></div>
+    <div class="stat"><div class="stat-num">1</div><div class="stat-lbl">Platform</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-lbl">Orders Handled</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════ OVERVIEW ════════════════════ -->
+<div id="overview" class="section active">
+<div class="wrap">
+  <div class="sec-title">What is JewelFlow OS?</div>
+  <div class="sec-sub">JewelFlow OS is a custom jewelry management system built for Kira Jewels. It tracks every custom jewelry order from the moment it's placed through design, manufacturing, and delivery — keeping everyone on the team aligned and every customer informed.</div>
+
+  <div class="highlight">
+    <h4>The core problem it solves</h4>
+    <p>Custom jewelry involves many people — sales reps, designers, factory managers, shipping teams, and customers — all working together over weeks or months. Without a system, things get lost, communication breaks down, and customers are left in the dark. JewelFlow OS puts every order, every file, every message, and every status update in one place that everyone can access.</p>
+  </div>
+
+  <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:16px;margin-top:32px">The Big Picture</h3>
+  <div class="card-grid card-grid-3" style="margin-bottom:32px">
+    <div class="card" style="border-top:3px solid #6366F1">
+      <div style="font-size:28px;margin-bottom:10px">📥</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Order Comes In</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">A customer or sales rep places a custom jewelry order with all the details — metal type, stone preferences, size, design inspiration. The order enters the system and waits for review.</div>
+    </div>
+    <div class="card" style="border-top:3px solid #F59E0B">
+      <div style="font-size:28px;margin-bottom:10px">✏️</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Design & Approval</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">CAD designers create a 3D digital design of the piece. The customer reviews it, suggests changes, and approves. Nothing goes to manufacturing until the customer says yes.</div>
+    </div>
+    <div class="card" style="border-top:3px solid #10B981">
+      <div style="font-size:28px;margin-bottom:10px">🚚</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Made & Delivered</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7">Once approved, the piece goes to the factory in India. After quality checks, it's shipped with a tracking number. The customer is updated every step of the way.</div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:16px">Who Uses It?</h3>
+  <div class="card-grid card-grid-4">
+    <div class="card" style="text-align:center;padding:20px 14px">
+      <div style="font-size:24px;margin-bottom:8px">👔</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px">Internal Team</div>
+      <div style="font-size:12px;color:#6b7280">Admin, Sales, Authorizers, CAD Designers, SKU, Factory, Shipping</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px 14px">
+      <div style="font-size:24px;margin-bottom:8px">💍</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px">Customers</div>
+      <div style="font-size:12px;color:#6b7280">End customers who can place and track their own custom jewelry orders</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px 14px">
+      <div style="font-size:24px;margin-bottom:8px">🏪</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px">Jewelry Stores</div>
+      <div style="font-size:12px;color:#6b7280">Partner stores that place orders on behalf of their clients</div>
+    </div>
+    <div class="card" style="text-align:center;padding:20px 14px">
+      <div style="font-size:24px;margin-bottom:8px">📊</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px">Management</div>
+      <div style="font-size:12px;color:#6b7280">Stakeholders who need visibility into order volume, pipeline, and status</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ ORDER JOURNEY ════════════════════ -->
+<div id="journey" class="section">
+<div class="wrap">
+  <div class="sec-title">The Complete Order Journey</div>
+  <div class="sec-sub">From the first conversation to the moment the jewelry arrives at the customer's door — here is every step an order goes through, explained in plain language.</div>
+
+  <div class="journey">
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 1</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#F59E0B;color:#F59E0B">1</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#F59E0B">📥 Order Intake</div>
+        <div class="journey-title">Order is Placed</div>
+        <div class="journey-desc">A customer or sales rep creates a new order with all the details: what type of jewelry, which metal, stone preferences, size, and any special design notes. A unique PO number is assigned automatically.</div>
+        <div class="journey-who" style="color:#F59E0B">👤 Who: Customer (self-service) or Sales Rep</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 2</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#7C3AED;color:#7C3AED">2</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#7C3AED">✅ Authorization</div>
+        <div class="journey-title">Order is Reviewed & Authorized</div>
+        <div class="journey-desc">An Authorizer (senior team member) reviews the order for completeness and feasibility. They can generate an AI summary to quickly understand the order. Once satisfied, they authorize it — which releases it to the design team.</div>
+        <div class="journey-who" style="color:#7C3AED">👤 Who: Authorizer or Admin</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 3</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#6366F1;color:#6366F1">3</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#6366F1">✏️ CAD Design</div>
+        <div class="journey-title">3D Design is Created</div>
+        <div class="journey-desc">The CAD Designer creates a detailed 3D digital model (called a CAD file) of the jewelry piece using professional software. The file shows every dimension, prong position, stone placement, and surface detail. They upload this to the order along with their design notes.</div>
+        <div class="journey-who" style="color:#6366F1">👤 Who: CAD Designer</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 4</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#0EA5E9;color:#0EA5E9">4</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#0EA5E9">👁️ Design Review</div>
+        <div class="journey-title">Customer Reviews the Design</div>
+        <div class="journey-desc">The CAD file is sent to the customer for approval. The customer can view the design right in their browser (no special software needed). They can: <strong>Approve</strong> it, <strong>Request Changes</strong> with feedback, or <strong>Reject</strong> it. Every action they take is automatically recorded in the conversation thread.</div>
+        <div class="journey-who" style="color:#0EA5E9">👤 Who: Customer (via Customer Portal)</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 4b</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#8B5CF6;color:#8B5CF6">↺</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#8B5CF6">🔄 Revision Loop (if needed)</div>
+        <div class="journey-title">Revisions Until Perfect</div>
+        <div class="journey-desc">If the customer requests changes, the CAD Designer makes revisions and uploads a new version (Rev #2, Rev #3, etc.). Each revision is kept in the system so the full design history is visible. This loop continues until the customer approves.</div>
+        <div class="journey-who" style="color:#8B5CF6">👤 Who: CAD Designer → Customer</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 5</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#F97316;color:#F97316">5</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#F97316">🏷️ SKU & Pricing</div>
+        <div class="journey-title">SKU Number is Assigned</div>
+        <div class="journey-desc">Once the design is approved, the SKU Manager creates an internal product code (SKU) for the piece. This code identifies the exact specifications of the item and is used throughout manufacturing and inventory. A price quote is also finalized at this stage.</div>
+        <div class="journey-who" style="color:#F97316">👤 Who: SKU Manager</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 6</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#0D9488;color:#0D9488">6</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#0D9488">🏭 Manufacturing</div>
+        <div class="journey-title">Order Goes to Factory</div>
+        <div class="journey-desc">A Vendor Purchase Order (VPO) is issued to the factory in India. The Factory Manager tracks the piece as it goes through casting, stone setting, polishing, and quality inspection. A physical "Job Bag" accompanies the piece through every step of manufacturing.</div>
+        <div class="journey-who" style="color:#0D9488">👤 Who: Factory Manager</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 7</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#2563EB;color:#2563EB">7</div>
+        <div class="journey-line"></div>
+      </div>
+      <div class="journey-right">
+        <div class="journey-stage" style="color:#2563EB">📦 Shipping</div>
+        <div class="journey-title">Invoiced, Packed & Shipped</div>
+        <div class="journey-desc">Once the piece passes quality inspection, it's marked Ready to Invoice. The Shipping Manager generates the invoice, packs the order, and dispatches it with a tracking number. The tracking number is entered into the system so the customer can follow their package.</div>
+        <div class="journey-who" style="color:#2563EB">👤 Who: Shipping Manager</div>
+      </div>
+    </div>
+
+    <div class="journey-item">
+      <div class="journey-left"><span style="font-size:11px;color:#9ca3af;font-weight:600">STEP 8</span></div>
+      <div class="journey-center">
+        <div class="journey-circle" style="border-color:#10B981;color:#10B981">✓</div>
+        <div class="journey-line" style="background:transparent"></div>
+      </div>
+      <div class="journey-right" style="padding-bottom:0">
+        <div class="journey-stage" style="color:#10B981">🎁 Complete</div>
+        <div class="journey-title">Delivered — Order Complete</div>
+        <div class="journey-desc">The order is marked Delivered. The customer has their piece. The full record — every design revision, every message, every status change — remains in the system permanently for reference.</div>
+        <div class="journey-who" style="color:#10B981">👤 Who: Shipping Manager confirms delivery</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ ROLES ════════════════════ -->
+<div id="roles" class="section">
+<div class="wrap">
+  <div class="sec-title">Team Roles</div>
+  <div class="sec-sub">JewelFlow OS has 8 different roles. Each person only sees and can do what's relevant to their job. Here's what each role does and what they're responsible for.</div>
+
+  <div class="card-grid card-grid-2">
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#1a2740">👑</div>
+        <div>
+          <div class="role-name">Admin</div>
+          <div class="role-tag" style="background:#1a274015;color:#1a2740">Full Access</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">The administrator has access to everything in the system. They can see all orders, all financial data (including quoted costs and revenue), manage users, and perform any action any other role can do.</div>
+        <ul class="role-tasks">
+          <li>View all orders across every stage</li>
+          <li>See revenue and quoted cost data (hidden from other roles)</li>
+          <li>Create and manage staff accounts</li>
+          <li>Move orders through any status</li>
+          <li>Access the full order pipeline and analytics dashboard</li>
+          <li>Generate AI summaries of any order</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#05966915">🤝</div>
+        <div>
+          <div class="role-name">Sales Rep</div>
+          <div class="role-tag" style="background:#05966915;color:#059669">Order Entry</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">Sales reps are the first point of contact. They take orders from stores or clients and enter all the details into the system. They're the bridge between the customer and the internal team.</div>
+        <ul class="role-tasks">
+          <li>Create new orders on behalf of customers or stores</li>
+          <li>Enter all jewelry specifications (metal, stone, size, etc.)</li>
+          <li>Upload reference images and customer notes</li>
+          <li>Communicate with customers through the order conversation</li>
+          <li>Track the status of their orders</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#7c3aed15">⚖️</div>
+        <div>
+          <div class="role-name">Authorizer</div>
+          <div class="role-tag" style="background:#7c3aed15;color:#7c3aed">Quality Gate</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">The Authorizer is a senior team member who reviews new orders before they're released to the design team. They make sure the order is complete, feasible, and correctly priced before work begins.</div>
+        <ul class="role-tasks">
+          <li>Review new orders waiting for authorization</li>
+          <li>Generate and read AI order briefs for quick understanding</li>
+          <li>Approve orders to release them to the CAD team</li>
+          <li>Flag or reject orders that need more information</li>
+          <li>Approve or reject completed CAD designs</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#6366F115">✏️</div>
+        <div>
+          <div class="role-name">CAD Designer</div>
+          <div class="role-tag" style="background:#6366F115;color:#6366F1">Design</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">CAD Designers create the 3D digital models of each jewelry piece. They use specialized software to design every detail — then upload the files to the order so the customer can review them.</div>
+        <ul class="role-tasks">
+          <li>See only orders in the design stages (their queue)</li>
+          <li>Upload CAD design files (images, PDFs, 3D files)</li>
+          <li>Add designer notes explaining the design decisions</li>
+          <li>Send designs to customers for approval</li>
+          <li>Make revisions based on customer feedback</li>
+          <li>Mark orders ready to move to SKU/manufacturing</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#F9731615">🏷️</div>
+        <div>
+          <div class="role-name">SKU Manager</div>
+          <div class="role-tag" style="background:#F9731615;color:#F97316">Catalog</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">The SKU Manager handles the internal product catalog. After a design is approved, they create a unique product code (SKU) that identifies the exact piece and its specifications throughout manufacturing.</div>
+        <ul class="role-tasks">
+          <li>Create SKU numbers for approved designs</li>
+          <li>Manage the product catalog and specifications</li>
+          <li>Issue Vendor Purchase Orders (VPOs) to the factory</li>
+          <li>Maintain inventory records</li>
+          <li>Move orders from design to manufacturing</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#0D948815">🏭</div>
+        <div>
+          <div class="role-name">Factory Manager</div>
+          <div class="role-tag" style="background:#0D948815;color:#0D9488">Manufacturing</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">The Factory Manager oversees production at the manufacturing facility in India. They track each piece as it moves through casting, stone setting, polishing, and quality inspection.</div>
+        <ul class="role-tasks">
+          <li>View all orders in the manufacturing queue</li>
+          <li>Create physical Job Bags that travel with each piece</li>
+          <li>Track orders through each manufacturing stage</li>
+          <li>Mark orders complete when quality inspection passes</li>
+          <li>Coordinate with contractors and setters</li>
+          <li>Move orders to Ready to Invoice when finished</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#2563EB15">🚚</div>
+        <div>
+          <div class="role-name">Shipping Manager</div>
+          <div class="role-tag" style="background:#2563EB15;color:#2563EB">Fulfillment</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">The Shipping Manager handles the final stage — getting the finished piece to the customer. They generate invoices, arrange packaging, dispatch shipments, and update tracking information.</div>
+        <ul class="role-tasks">
+          <li>View orders that are ready to ship</li>
+          <li>Generate invoices and packing slips</li>
+          <li>Enter tracking numbers when shipments are dispatched</li>
+          <li>Mark orders as Shipped and Delivered</li>
+          <li>Handle any shipping issues or returns</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-header">
+        <div class="role-icon" style="background:#9D4EDD15">💍</div>
+        <div>
+          <div class="role-name">Customer</div>
+          <div class="role-tag" style="background:#9D4EDD15;color:#9D4EDD">Self-Service</div>
+        </div>
+      </div>
+      <div class="role-body">
+        <div class="role-desc">Customers have their own private portal where they can place orders, track progress, review CAD designs, and communicate with the Kira Jewels team — all without needing to email or call.</div>
+        <ul class="role-tasks">
+          <li>Place new custom jewelry orders anytime</li>
+          <li>Upload reference images and inspiration photos</li>
+          <li>View their orders and track progress with a timeline</li>
+          <li>View CAD design files directly in the browser</li>
+          <li>Approve or request changes to designs</li>
+          <li>Chat with the team through the order conversation</li>
+          <li>See only their own orders — complete privacy</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ STAGES ════════════════════ -->
+<div id="stages" class="section">
+<div class="wrap">
+  <div class="sec-title">Order Stages Explained</div>
+  <div class="sec-sub">Every order in the system has a status that tells you exactly where it is in the process. Here's what each status means in plain language, and who is responsible at that stage.</div>
+
+  <div class="status-grid">
+    <div class="status-row">
+      <div class="status-dot" style="background:#F59E0B"></div>
+      <div class="status-name">Waiting Confirmation</div>
+      <div class="status-plain">A new order has just come in. It's sitting in the inbox, waiting for an Authorizer to review it and give the green light to proceed.</div>
+      <div class="status-who">→ Authorizer</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#8B5CF6"></div>
+      <div class="status-name">Pending CAD</div>
+      <div class="status-plain">The order has been authorized. The CAD design team has been notified and the order is in their queue, waiting to be picked up for design work.</div>
+      <div class="status-who">→ CAD Designer</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#6366F1"></div>
+      <div class="status-name">CAD In Progress</div>
+      <div class="status-plain">A designer is actively working on the 3D model. They have uploaded at least one design file and it may be going through internal review or revisions before being sent to the customer.</div>
+      <div class="status-who">→ CAD Designer</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#10B981"></div>
+      <div class="status-name">Customer Approved</div>
+      <div class="status-plain">🎉 The customer has seen the design and approved it. The piece is exactly what they want. Now it moves forward to SKU creation and manufacturing.</div>
+      <div class="status-who">→ SKU Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#EF4444"></div>
+      <div class="status-name">Customer Rejected</div>
+      <div class="status-plain">The customer has rejected the design — not just requesting changes, but a full rejection. The team needs to go back to the drawing board and restart the design process.</div>
+      <div class="status-who">→ CAD Designer</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#F97316"></div>
+      <div class="status-name">SKU Creation</div>
+      <div class="status-plain">The SKU Manager is creating the internal product code for this piece. This code will follow the item through manufacturing and inventory forever.</div>
+      <div class="status-who">→ SKU Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#0EA5E9"></div>
+      <div class="status-name">VPO Issued</div>
+      <div class="status-plain">A Vendor Purchase Order has been sent to the factory in India. The factory has received the instruction to begin making this piece. Manufacturing is starting.</div>
+      <div class="status-who">→ Factory Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#F59E0B"></div>
+      <div class="status-name">Pending Contractor</div>
+      <div class="status-plain">This piece requires specialist work — such as a stone setter, engraver, or specific technique — and is waiting for a contractor to be assigned and begin work.</div>
+      <div class="status-who">→ Factory Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#14B8A6"></div>
+      <div class="status-name">Job Bag Created</div>
+      <div class="status-plain">A physical job bag (a document envelope with all specifications) has been created at the factory and is traveling with the piece through production. The item is actively being made.</div>
+      <div class="status-who">→ Factory Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#22C55E"></div>
+      <div class="status-name">Ready to Invoice</div>
+      <div class="status-plain">The piece has passed quality inspection at the factory and is ready to be invoiced and shipped. The Shipping Manager is next in line to process it.</div>
+      <div class="status-who">→ Shipping Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#3B82F6"></div>
+      <div class="status-name">Ready to Ship</div>
+      <div class="status-plain">The invoice has been generated and the piece is packed, labelled, and sitting ready to be dispatched. Just waiting for collection by the courier.</div>
+      <div class="status-who">→ Shipping Manager</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#6366F1"></div>
+      <div class="status-name">Shipped</div>
+      <div class="status-plain">The package is on its way! A tracking number has been entered into the system. The customer can see the tracking number in their portal and follow the delivery.</div>
+      <div class="status-who">→ In Transit</div>
+    </div>
+    <div class="status-row">
+      <div class="status-dot" style="background:#10B981"></div>
+      <div class="status-name">Delivered</div>
+      <div class="status-plain">✅ The customer has received their piece. The order is complete. All records are preserved permanently.</div>
+      <div class="status-who">→ Complete</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ FEATURES ════════════════════ -->
+<div id="features" class="section">
+<div class="wrap">
+  <div class="sec-title">Platform Features</div>
+  <div class="sec-sub">Every tool your team needs to manage custom jewelry orders from start to finish — all in one platform.</div>
+
+  <div class="card-grid card-grid-3" style="margin-bottom:32px">
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <div class="feature-title">Order Management</div>
+      <div class="feature-desc">The central hub for all orders. Search, filter by status, and manage everything from a clean list view.</div>
+      <ul class="feature-list">
+        <li>Search by PO number, store name, or SKU</li>
+        <li>Filter by any order status</li>
+        <li>Create new orders with full jewelry specs</li>
+        <li>Upload reference images at order creation</li>
+        <li>Move orders between stages with one click</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🖥️</div>
+      <div class="feature-title">CAD File Viewer</div>
+      <div class="feature-desc">Design files can be viewed right in the browser — no special software needed. Works for images and PDFs.</div>
+      <ul class="feature-list">
+        <li>View design images and PDFs inline</li>
+        <li>See designer notes alongside the file</li>
+        <li>Full revision history (Rev #1, #2, #3…)</li>
+        <li>Approve, request changes, or reject from the viewer</li>
+        <li>Download files for offline review</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">Order Conversation</div>
+      <div class="feature-desc">Every order has its own chat thread. Team members and customers can communicate directly on the order.</div>
+      <ul class="feature-list">
+        <li>Real-time messaging per order</li>
+        <li>CAD actions auto-post (upload, approve, revision, etc.)</li>
+        <li>Tag team members with @mentions</li>
+        <li>Internal notes (visible to staff only)</li>
+        <li>Full message history preserved forever</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Pipeline Board</div>
+      <div class="feature-desc">A visual overview of all orders across every stage — like a kanban board but designed specifically for the jewelry workflow.</div>
+      <ul class="feature-list">
+        <li>4 phase view: Intake / Design / Manufacturing / Delivery</li>
+        <li>Click any stage to see its orders</li>
+        <li>Advance orders to the next stage with one click</li>
+        <li>Full pipeline progress bar</li>
+        <li>Order counts per stage at a glance</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📄</div>
+      <div class="feature-title">Order Summary Page</div>
+      <div class="feature-desc">A beautiful one-page summary of any order — all the key information laid out in easy-to-read cards.</div>
+      <ul class="feature-list">
+        <li>Status, PO number, and dates at a glance</li>
+        <li>Customer and product specs side by side</li>
+        <li>All CAD files with revision history</li>
+        <li>Recent messages snapshot</li>
+        <li>Print-ready layout for physical records</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-title">AI Order Brief</div>
+      <div class="feature-desc">One click to generate a plain-language summary of any order — useful for authorizers and management reviewing orders quickly.</div>
+      <ul class="feature-list">
+        <li>Summarizes the piece, specs, and customer notes</li>
+        <li>Highlights anything needing attention</li>
+        <li>Saves time reading through long order details</li>
+        <li>Cached so it only generates once per order</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💍</div>
+      <div class="feature-title">Customer Portal</div>
+      <div class="feature-desc">A separate, private portal for customers. They see only their own orders and can interact without any staff involvement.</div>
+      <ul class="feature-list">
+        <li>Place new custom orders anytime</li>
+        <li>Track order progress with a visual timeline</li>
+        <li>View and approve CAD design files</li>
+        <li>Message the team directly</li>
+        <li>See tracking information when shipped</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏭</div>
+      <div class="feature-title">Manufacturing Dashboard</div>
+      <div class="feature-desc">A dedicated view for the factory team showing all orders currently in production with their stage and priority.</div>
+      <ul class="feature-list">
+        <li>Queue of all orders in manufacturing</li>
+        <li>Key metrics: in progress, job bags, ready to ship</li>
+        <li>One-click stage advancement</li>
+        <li>Filter by manufacturing stage</li>
+      </ul>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">Role-Based Security</div>
+      <div class="feature-desc">Every person only sees what they need to. Financial data, internal notes, and sensitive information are shown only to the right people.</div>
+      <ul class="feature-list">
+        <li>Revenue and cost data: Admin only</li>
+        <li>Internal messages: Staff only (not customers)</li>
+        <li>Customer orders: Customers see only their own</li>
+        <li>Stage controls limited to relevant roles</li>
+        <li>Rate-limited login to prevent unauthorized access</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ PLACING AN ORDER ════════════════════ -->
+<div id="placing" class="section">
+<div class="wrap">
+  <div class="sec-title">How to Place an Order</div>
+  <div class="sec-sub">Orders can be placed two ways: by the customer themselves through the Customer Portal, or by a Sales Rep on behalf of a client. Here's how both work.</div>
+
+  <div class="card-grid card-grid-2" style="margin-bottom:32px">
+    <div class="card" style="border-top:3px solid #9D4EDD">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:6px;color:#9D4EDD">💍 Customer Self-Service</h3>
+      <p style="font-size:13px;color:#4b5563;line-height:1.7;margin-bottom:8px">The customer logs into their portal at any time and places the order themselves. No phone call needed.</p>
+      <p style="font-size:12px;color:#9ca3af">Best for: regular customers who know what they want</p>
+    </div>
+    <div class="card" style="border-top:3px solid #059669">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:6px;color:#059669">🤝 Sales Rep Assisted</h3>
+      <p style="font-size:13px;color:#4b5563;line-height:1.7;margin-bottom:8px">A Sales Rep speaks with the client, gathers all the details, and enters the order on their behalf through the staff portal.</p>
+      <p style="font-size:12px;color:#9ca3af">Best for: first-time customers, complex orders, trade clients</p>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:20px">Step-by-Step: What Information is Collected</h3>
+
+  <div class="steps-list">
+    <div class="step-item">
+      <div class="step-badge" style="background:#6366F1">1</div>
+      <div class="step-content">
+        <h4>Order Type</h4>
+        <p>What type of jewelry? Engagement Ring, Wedding Band, Necklace, Earrings, Bracelet, Pendant, Brooch, or Other. This sets the context for everything that follows.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#F59E0B">2</div>
+      <div class="step-content">
+        <h4>Metal Selection</h4>
+        <p>Choose the metal type (10K, 14K, 18K, Platinum, Sterling Silver) and color (Yellow Gold, White Gold, Rose Gold, Platinum, Two-Tone). This determines the material cost and appearance of the piece.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#10B981">3</div>
+      <div class="step-content">
+        <h4>Ring Size (if applicable)</h4>
+        <p>For rings and bracelets, a size is required. For rings, this is typically a US size (e.g., 6, 6.5, 7). The CAD designer will build the piece to this exact size.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#8B5CF6">4</div>
+      <div class="step-content">
+        <h4>Stone Details</h4>
+        <p>The center stone type (Certified Lab Grown Diamond, Non Certified CVD, Non Certified HPHT), quality grade (VVS1–SI2), shape (Round, Oval, Cushion, Princess, etc.), and approximate carat weight.</p>
+        <div class="tip">💡 Not sure about stone grades? VVS1 = near perfect (most expensive). VS1/VS2 = very slight inclusions (excellent value). SI1/SI2 = small inclusions (great price point, usually not visible to the naked eye).</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#F97316">5</div>
+      <div class="step-content">
+        <h4>Reference Image (optional but recommended)</h4>
+        <p>Upload any inspiration photos — magazine cuts, screenshots, other jewelry photos. This gives the CAD designer a clear visual direction for the design. JPG, PNG, and PDF files are all accepted.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#0EA5E9">6</div>
+      <div class="step-content">
+        <h4>Special Instructions</h4>
+        <p>Any additional notes: engraving text, specific design requests, allergies, preferred finishing, delivery deadline, or anything else the team should know.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#10B981">✓</div>
+      <div class="step-content">
+        <h4>Order Submitted</h4>
+        <p>The order is submitted and immediately appears in the system with status "Waiting Confirmation." The order is assigned a unique PO number (e.g., KJ-CUST-0042 for customer orders). The Authorizer will review it next.</p>
+        <div class="tip">✅ After placing an order, customers will see it appear immediately in their "My Orders" list with a progress timeline.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ PROCESSING AN ORDER ════════════════════ -->
+<div id="processing" class="section">
+<div class="wrap">
+  <div class="sec-title">How the Team Processes an Order</div>
+  <div class="sec-sub">Once an order is in the system, the internal team takes it through multiple stages. Here's exactly who does what and when, from the staff perspective.</div>
+
+  <div class="flow-wrap">
+
+    <div class="flow-phase">
+      <div class="phase-label" style="color:#7C3AED">⚖️ PHASE 1: AUTHORIZATION <div class="phase-line"></div></div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num" style="background:#7C3AED15;color:#7C3AED">1</div>
+          <div class="step-info">
+            <div class="step-title">Review new order</div>
+            <div class="step-desc">Authorizer opens the order, reads the customer notes, checks specs are complete and realistic.</div>
+            <div class="step-who" style="background:#7C3AED15;color:#7C3AED">Authorizer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#7C3AED15;color:#7C3AED">2</div>
+          <div class="step-info">
+            <div class="step-title">Generate AI brief (optional)</div>
+            <div class="step-desc">Click "Generate AI Brief" for a one-paragraph summary of the order to quickly understand it without reading every field.</div>
+            <div class="step-who" style="background:#7C3AED15;color:#7C3AED">Authorizer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#7C3AED15;color:#7C3AED">3</div>
+          <div class="step-info">
+            <div class="step-title">Authorize the order</div>
+            <div class="step-desc">Click "Authorize Order" to release it to the CAD team. Status changes to "Pending CAD" automatically.</div>
+            <div class="step-who" style="background:#7C3AED15;color:#7C3AED">Authorizer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#EF444415;color:#EF4444">!</div>
+          <div class="step-info">
+            <div class="step-title">If something's wrong</div>
+            <div class="step-desc">Post a message in the order conversation to ask the Sales Rep or customer for clarification. Don't authorize until the order is complete.</div>
+            <div class="step-who" style="background:#EF444415;color:#EF4444">Authorizer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <div class="flow-phase">
+      <div class="phase-label" style="color:#6366F1">✏️ PHASE 2: CAD DESIGN <div class="phase-line"></div></div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num" style="background:#6366F115;color:#6366F1">1</div>
+          <div class="step-info">
+            <div class="step-title">Pick up the order</div>
+            <div class="step-desc">CAD Designer sees the order in their queue (Pending CAD). They open it, read all specs and customer notes, review any reference images.</div>
+            <div class="step-who" style="background:#6366F115;color:#6366F1">CAD Designer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#6366F115;color:#6366F1">2</div>
+          <div class="step-info">
+            <div class="step-title">Create the CAD design</div>
+            <div class="step-desc">Design the piece in CAD software (Rhino, Matrix, etc.). Export as a high-quality image or PDF showing top, front, and side views.</div>
+            <div class="step-who" style="background:#6366F115;color:#6366F1">CAD Designer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#6366F115;color:#6366F1">3</div>
+          <div class="step-info">
+            <div class="step-title">Upload the file</div>
+            <div class="step-desc">Go to the order's Design Files section. Upload the file and add designer notes explaining key decisions. The file is now visible on the order.</div>
+            <div class="step-who" style="background:#6366F115;color:#6366F1">CAD Designer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#6366F115;color:#6366F1">4</div>
+          <div class="step-info">
+            <div class="step-title">Send for customer approval</div>
+            <div class="step-desc">Click "Send for Approval" on the CAD file. Status changes to "Sent for Approval" and a notification message is posted to the conversation.</div>
+            <div class="step-who" style="background:#6366F115;color:#6366F1">CAD Designer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#F59E0B15;color:#F59E0B">5</div>
+          <div class="step-info">
+            <div class="step-title">Wait for customer response</div>
+            <div class="step-desc">The customer reviews the design in their portal. They will Approve it, Request Changes (with feedback), or Reject it. Their action posts automatically to the conversation.</div>
+            <div class="step-who" style="background:#F59E0B15;color:#F59E0B">Customer</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#8B5CF615;color:#8B5CF6">↺</div>
+          <div class="step-info">
+            <div class="step-title">Handle revisions if needed</div>
+            <div class="step-desc">If the customer requests changes, read their feedback in the conversation, make revisions, and upload Rev #2. Repeat until approved.</div>
+            <div class="step-who" style="background:#8B5CF615;color:#8B5CF6">CAD Designer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <div class="flow-phase">
+      <div class="phase-label" style="color:#F97316">🏷️ PHASE 3: SKU & VPO <div class="phase-line"></div></div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num" style="background:#F9731615;color:#F97316">1</div>
+          <div class="step-info">
+            <div class="step-title">Create SKU number</div>
+            <div class="step-desc">Assign a unique SKU code to the approved design based on metal type, stone specs, and style. This code is the piece's identity in the catalog.</div>
+            <div class="step-who" style="background:#F9731615;color:#F97316">SKU Manager</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#F9731615;color:#F97316">2</div>
+          <div class="step-info">
+            <div class="step-title">Issue Vendor Purchase Order</div>
+            <div class="step-desc">Issue a VPO to the factory with all manufacturing specifications. The factory receives this as their instruction to begin production.</div>
+            <div class="step-who" style="background:#F9731615;color:#F97316">SKU Manager</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <div class="flow-phase">
+      <div class="phase-label" style="color:#0D9488">🏭 PHASE 4: MANUFACTURING <div class="phase-line"></div></div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num" style="background:#0D948815;color:#0D9488">1</div>
+          <div class="step-info">
+            <div class="step-title">Create Job Bag</div>
+            <div class="step-desc">A physical job bag is created at the factory containing all specs, the approved CAD design, and the VPO. It travels with the piece through every manufacturing step.</div>
+            <div class="step-who" style="background:#0D948815;color:#0D9488">Factory Manager</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#0D948815;color:#0D9488">2</div>
+          <div class="step-info">
+            <div class="step-title">Monitor production</div>
+            <div class="step-desc">Track the piece through casting, stone setting (if applicable), polishing, and quality inspection. Update the status at each milestone.</div>
+            <div class="step-who" style="background:#0D948815;color:#0D9488">Factory Manager</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#0D948815;color:#0D9488">3</div>
+          <div class="step-info">
+            <div class="step-title">Quality check & mark complete</div>
+            <div class="step-desc">Once the piece passes quality inspection, mark it "Ready to Invoice" in the system. The Shipping Manager is notified to proceed.</div>
+            <div class="step-who" style="background:#0D948815;color:#0D9488">Factory Manager</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">↓</div>
+
+    <div class="flow-phase">
+      <div class="phase-label" style="color:#2563EB">🚚 PHASE 5: SHIPPING <div class="phase-line"></div></div>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="step-num" style="background:#2563EB15;color:#2563EB">1</div>
+          <div class="step-info">
+            <div class="step-title">Generate invoice & pack</div>
+            <div class="step-desc">Create the invoice for the piece, pack it securely, and prepare the shipping label. Mark as "Ready to Ship" in the system.</div>
+            <div class="step-who" style="background:#2563EB15;color:#2563EB">Shipping Manager</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#2563EB15;color:#2563EB">2</div>
+          <div class="step-info">
+            <div class="step-title">Dispatch & enter tracking</div>
+            <div class="step-desc">Hand to the courier and enter the tracking number into the order. Status changes to "Shipped." The customer can now see their tracking number.</div>
+            <div class="step-who" style="background:#2563EB15;color:#2563EB">Shipping Manager</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num" style="background:#10B98115;color:#10B981">✓</div>
+          <div class="step-info">
+            <div class="step-title">Mark delivered</div>
+            <div class="step-desc">Once confirmed delivered, mark the order "Delivered." The order is complete. All records are preserved in the system permanently.</div>
+            <div class="step-who" style="background:#10B98115;color:#10B981">Shipping Manager</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ CUSTOMER PORTAL ════════════════════ -->
+<div id="customer" class="section">
+<div class="wrap">
+  <div class="sec-title">The Customer Portal</div>
+  <div class="sec-sub">Customers have their own private, separate portal where they can manage their orders without needing to call or email. Everything they need is right there.</div>
+
+  <div class="highlight">
+    <h4>How customers access it</h4>
+    <p>Customers log in at the same website URL using their email and password. The system automatically shows them the customer portal — they never see internal staff tools. Each customer can only see their own orders.</p>
+  </div>
+
+  <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin:28px 0 16px">What Customers Can Do</h3>
+
+  <div class="card-grid card-grid-2" style="margin-bottom:28px">
+    <div class="feature-card" style="border-left:3px solid #9D4EDD">
+      <div class="feature-icon">📝</div>
+      <div class="feature-title">Place New Orders</div>
+      <div class="feature-desc">Customers can place custom jewelry orders themselves at any time — day or night. They fill in the jewelry type, metal, stone preferences, and can upload reference photos.</div>
+    </div>
+    <div class="feature-card" style="border-left:3px solid #9D4EDD">
+      <div class="feature-icon">📍</div>
+      <div class="feature-title">Track Order Progress</div>
+      <div class="feature-desc">Each order shows a visual timeline so the customer always knows exactly where their piece is — from "Order Received" through "CAD Design," "Approved," "Manufacturing," "Shipped," to "Delivered."</div>
+    </div>
+    <div class="feature-card" style="border-left:3px solid #9D4EDD">
+      <div class="feature-icon">👁️</div>
+      <div class="feature-title">View & Approve CAD Designs</div>
+      <div class="feature-desc">When the designer is ready, the customer gets a notification (via the conversation). They can view the design file directly in the browser and choose to Approve it, Request Changes, or Reject it.</div>
+    </div>
+    <div class="feature-card" style="border-left:3px solid #9D4EDD">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">Message the Team</div>
+      <div class="feature-desc">Each order has a built-in conversation. Customers can message the Kira Jewels team with questions, clarifications, or special requests — and all communication is kept on the order for reference.</div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:20px">Customer Step-by-Step Guide</h3>
+
+  <div class="steps-list">
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">1</div>
+      <div class="step-content">
+        <h4>Log In</h4>
+        <p>Go to the Kira Jewels platform URL. Enter your email address and password. You'll be taken directly to "My Orders."</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">2</div>
+      <div class="step-content">
+        <h4>Place an Order (if new)</h4>
+        <p>Click the blue "+ Place New Order" button. Fill in the form — choose your jewelry type, metal, stone preferences, size. Optionally upload a reference photo. Click "Place Order."</p>
+        <div class="tip">💡 The more detail you provide in the Special Instructions field, the closer the first design will be to what you have in mind. Mention any specifics like thin bands, hidden halos, milgrain edges, specific stone ratios, etc.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">3</div>
+      <div class="step-content">
+        <h4>Follow the Timeline</h4>
+        <p>Click on any order to open its details. The timeline at the top shows each stage and highlights where your order currently is. Completed stages are shown in the order's accent color; future stages are grey.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">4</div>
+      <div class="step-content">
+        <h4>Review Your Design</h4>
+        <p>When your design is ready, you'll see it in the "Design Files" section of your order with an "Awaiting Your Approval" status. Click the "👁 View" button to open the design in full screen. You can:</p>
+        <p style="margin-top:8px"><strong>→ Approve Design</strong> — if you love it, approve it and manufacturing begins<br><strong>→ Request Changes</strong> — type your feedback and the designer will revise<br><strong>→ Reject</strong> — if the design isn't close, a fresh start will be made</p>
+        <div class="tip">💡 Be as specific as possible when requesting changes: "Please make the band thinner" or "The prongs should be more rounded" will get you a faster revision than "not quite right."</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">5</div>
+      <div class="step-content">
+        <h4>Wait for Your Piece to Be Made</h4>
+        <p>Once you approve the design, your piece goes into manufacturing. Your order status will update as it progresses — you can check at any time to see where it is.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-badge" style="background:#9D4EDD">6</div>
+      <div class="step-content">
+        <h4>Get Your Tracking Number</h4>
+        <p>When your piece is shipped, a tracking number will appear in your order details (under "Order Info"). Use this to track your delivery with the courier.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════ FAQ ════════════════════ -->
+<div id="faq" class="section">
+<div class="wrap">
+  <div class="sec-title">Frequently Asked Questions</div>
+  <div class="sec-sub">Common questions from customers, staff, and stakeholders — answered in plain language.</div>
+
+  <h3 style="font-size:14px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">For Customers</h3>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">How long does a custom jewelry order take? <span class="arrow">▼</span></div>
+    <div class="faq-a">Typical timelines: CAD design takes 3–7 business days for the first draft. Customer review and revisions take as long as needed (usually 1–5 days per round). Manufacturing takes 3–5 weeks. Shipping takes 3–7 days. Total: approximately 6–8 weeks from order to delivery, depending on the complexity and number of design revisions.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">Can I see the design before manufacturing begins? <span class="arrow">▼</span></div>
+    <div class="faq-a">Yes — absolutely. Nothing goes to manufacturing until you have reviewed and approved the CAD design. You'll see a detailed digital rendering of your piece before any metal is cast or stones are set. If you're not happy, we revise until you are.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">What if I change my mind about the design after approving? <span class="arrow">▼</span></div>
+    <div class="faq-a">Once you've approved the design and manufacturing has begun, changes are difficult and may incur additional costs. It's important to be thorough during the CAD review stage. If you need to discuss changes after approval, contact your sales rep immediately through the order conversation.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">How do I know what "Certified Lab Grown Diamond" means vs Non Certified CVD/HPHT? <span class="arrow">▼</span></div>
+    <div class="faq-a">All three are real lab-grown diamonds with the same physical properties as natural diamonds. <strong>Certified</strong> means the stone comes with a grading certificate from a recognized lab (like GIA or IGI) confirming its exact specifications. <strong>Non Certified CVD</strong> is grown using Chemical Vapour Deposition — typically higher quality. <strong>Non Certified HPHT</strong> is grown using High Pressure High Temperature — a different process. Non-certified stones are more affordable but don't come with a certificate. Your sales rep can guide you on which is right for your budget and needs.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">I can't log in — what should I do? <span class="arrow">▼</span></div>
+    <div class="faq-a">Contact your Kira Jewels sales representative or the admin team. They can reset your password through the system. Note: for security reasons, there is no self-service password reset — a team member must assist you.</div>
+  </div>
+
+  <h3 style="font-size:14px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:24px 0 12px">For the Internal Team</h3>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">What's the difference between "Reject" and "Request Changes" on a CAD file? <span class="arrow">▼</span></div>
+    <div class="faq-a">"Request Changes" means the design is on the right track but needs adjustments — the designer refines the same concept. "Reject" means the design doesn't meet requirements at all and a fresh approach is needed. Use "Request Changes" whenever possible as it's faster. Reserve "Reject" for when the design fundamentally misses the brief.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">Who can see the quoted price / revenue data? <span class="arrow">▼</span></div>
+    <div class="faq-a">Only the Admin role can see quoted costs and revenue figures. All other staff roles (Sales Rep, CAD Designer, Factory Manager, etc.) and customers cannot see any financial data. This is enforced at both the front-end display level and the back-end API level.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">What happens if I move an order to the wrong status by mistake? <span class="arrow">▼</span></div>
+    <div class="faq-a">Ask the Admin to move it back. Admins can set an order to any status. If you don't have admin access, message the admin team through the order conversation or directly. All status changes are logged in the conversation thread so there's a full audit trail.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">Can internal messages be seen by customers? <span class="arrow">▼</span></div>
+    <div class="faq-a">No. When posting a message, staff can toggle it to "Internal" — these messages are only visible to other staff members, not to the customer. Use this for notes about pricing, internal concerns, or team coordination that the customer shouldn't see.</div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q" onclick="toggleFaq(this)">How does the AI Order Brief work? <span class="arrow">▼</span></div>
+    <div class="faq-a">Click "Generate AI Brief" (or "✨ Generate Summary") on any order detail page. The system sends the order's key information to an AI model, which writes a concise 3–5 sentence summary covering the piece type, key specs, customer details, and any special notes. This is useful for Authorizers who need to quickly review many orders. The brief is generated once and then cached so it appears instantly on future visits.</div>
+  </div>
+
+  <h3 style="font-size:14px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:24px 0 12px">Glossary of Key Terms</h3>
+
+  <div class="gloss-grid">
+    <div class="gloss-item"><div class="gloss-term">PO Number</div><div class="gloss-def">Purchase Order Number. A unique identifier for each order (e.g., KJ-CUST-0042). Used to track the order throughout the system.</div></div>
+    <div class="gloss-item"><div class="gloss-term">CAD File</div><div class="gloss-def">Computer-Aided Design file. A digital 3D model of the jewelry piece created by the designer showing exact dimensions and details.</div></div>
+    <div class="gloss-item"><div class="gloss-term">SKU</div><div class="gloss-def">Stock Keeping Unit. A unique product code assigned to each design once approved. Identifies the exact specification of the piece.</div></div>
+    <div class="gloss-item"><div class="gloss-term">VPO</div><div class="gloss-def">Vendor Purchase Order. A formal instruction sent to the factory to begin manufacturing a specific piece with exact specifications.</div></div>
+    <div class="gloss-item"><div class="gloss-term">Job Bag</div><div class="gloss-def">A physical document envelope that travels with the jewelry piece through the factory, containing all specs, the design, and tracking information.</div></div>
+    <div class="gloss-item"><div class="gloss-term">Authorization</div><div class="gloss-def">The act of a senior team member approving a new order to be released for design work. A quality gate before resources are committed.</div></div>
+    <div class="gloss-item"><div class="gloss-term">Revision</div><div class="gloss-def">A new version of a CAD design file after changes are made based on customer feedback. Labeled Rev #1, Rev #2, etc.</div></div>
+    <div class="gloss-item"><div class="gloss-term">Pipeline Board</div><div class="gloss-def">A visual overview showing all orders grouped by stage — like a kanban board. Lets management see the entire workload at a glance.</div></div>
+    <div class="gloss-item"><div class="gloss-term">CVD Diamond</div><div class="gloss-def">Chemical Vapour Deposition — a method of growing lab diamonds using carbon-rich gas. Produces very high quality stones.</div></div>
+    <div class="gloss-item"><div class="gloss-term">HPHT Diamond</div><div class="gloss-def">High Pressure High Temperature — the original method of growing lab diamonds, mimicking natural formation conditions underground.</div></div>
+    <div class="gloss-item"><div class="gloss-term">VVS / VS / SI</div><div class="gloss-def">Diamond clarity grades. VVS (Very Very Slightly Included) = near flawless. VS = Very Slight inclusions. SI = Slight Inclusions. The scale goes VVS1 → VVS2 → VS1 → VS2 → SI1 → SI2.</div></div>
+    <div class="gloss-item"><div class="gloss-term">Internal Message</div><div class="gloss-def">A message in the order conversation that is visible only to staff, not to the customer. Used for team coordination and internal notes.</div></div>
+  </div>
+
+  <div style="margin-top:40px;padding:24px;background:#0d1b35;border-radius:12px;text-align:center">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#fff;margin-bottom:8px">Need Help?</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px">Contact the Kira Jewels admin team for account access, password resets, or any questions about using the platform.</div>
+    <div style="font-size:12px;color:#c09b58;font-weight:600;letter-spacing:.5px">KIRA JEWELS CUSTOM · JEWELFLOW OS</div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  var nav = document.querySelector('.sticky-nav');
+  window.scrollTo({ top: nav ? nav.offsetTop : 0, behavior: 'smooth' });
+}
+function toggleFaq(el) {
+  var item = el.closest('.faq-item');
+  item.classList.toggle('open');
+}
+</script>
+</body>
+</html>
