@@ -306,3 +306,50 @@ input::placeholder, textarea::placeholder {
 @media (max-width: 640px) {
   .ship-action-row { gap: 6px !important; }
 }
+
+/* ── Print / PDF styles ───────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the report content */
+  .app-sidebar,
+  .app-sidebar + div > div:first-child,  /* topbar */
+  .report-actions,
+  .report-period-selector,
+  .sidebar-overlay {
+    display: none !important;
+  }
+
+  /* Remove page chrome */
+  body { background: #fff !important; }
+  .app-main { display: block !important; }
+  .main-content-pad { padding: 0 !important; overflow: visible !important; }
+
+  /* Reset card styles for clean print */
+  #printable-report {
+    display: block !important;
+    padding: 0 !important;
+  }
+  #printable-report > * {
+    box-shadow: none !important;
+    border-color: #ddd !important;
+    break-inside: avoid;
+  }
+
+  /* KPI grid — 4 across on print */
+  .kpi-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; }
+
+  /* Reports 2-col stays 2-col */
+  .reports-main-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Overdue table */
+  table { width: 100% !important; font-size: 11px !important; }
+
+  /* Page setup */
+  @page {
+    size: A4 landscape;
+    margin: 15mm 12mm;
+  }
+
+  /* Print header — company name + report title */
+  #print-header { display: block !important; }
+}
+

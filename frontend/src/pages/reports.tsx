@@ -42,6 +42,10 @@ export default function ReportsPage() {
 
   useEffect(() => { load(period); }, [period]);
 
+  const exportPDF = () => {
+    window.print();
+  };
+
   const exportCSV = () => {
     if (!report) return;
     const rows = [
@@ -76,9 +80,12 @@ export default function ReportsPage() {
   return (
     <AppLayout title="Reports" subtitle="Order pipeline analytics and SLA status"
       actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="report-actions" style={{ display: 'flex', gap: '8px' }}>
           <button onClick={exportCSV} disabled={!report} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            ↓ Export CSV
+            ↓ CSV
+          </button>
+          <button onClick={exportPDF} disabled={!report} style={{ background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', cursor: 'pointer', color: '#fff', fontWeight: 600, opacity: !report ? 0.5 : 1 }}>
+            ↓ Download PDF
           </button>
         </div>
       }
@@ -86,7 +93,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
         {/* Period selector */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="report-period-selector" style={{ display: 'flex', gap: '8px' }}>
           {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)} style={{ padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: period === p ? 700 : 500, cursor: 'pointer', border: period === p ? '2px solid var(--navy)' : '1px solid var(--border)', background: period === p ? 'var(--navy)' : 'var(--bg-card)', color: period === p ? '#fff' : 'var(--text-secondary)', transition: 'all .15s' }}>
               {PERIOD_LABELS[p]}
@@ -97,6 +104,21 @@ export default function ReportsPage() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>Loading report…</div>
         ) : !report ? null : (
+          <div id="printable-report">
+            {/* Hidden header shown only in print */}
+            <div id="print-header" style={{ display: 'none', marginBottom: '24px', borderBottom: '2px solid #0D1B35', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 700, color: '#0D1B35', letterSpacing: '1px' }}>KIRA JEWELS</div>
+                  <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>Custom Jewelry Workflow — Order Analytics Report</div>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '11px', color: '#6B7280' }}>
+                  <div style={{ fontWeight: 700, color: '#0D1B35' }}>{report.period}</div>
+                  <div>{new Date(report.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} → {new Date(report.to).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                  <div style={{ marginTop: '2px' }}>Generated: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                </div>
+              </div>
+            </div>
           <>
             {/* ── KPI ROW ── */}
             <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
@@ -212,6 +234,7 @@ export default function ReportsPage() {
               )}
             </div>
           </>
+          </div>
         )}
       </div>
     </AppLayout>
