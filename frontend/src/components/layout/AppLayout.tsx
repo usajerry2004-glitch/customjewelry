@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Sidebar } from './Sidebar';
+import { TourGuide } from '../TourGuide';
 import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
@@ -21,6 +22,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const [unread, setUnread] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -107,9 +109,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
             {actions}
 
+            {/* Tour help button */}
+            <button
+              onClick={() => setShowTour(true)}
+              title="Website tour"
+              style={{
+                background: 'var(--bg-input)', border: '1px solid var(--border)',
+                borderRadius: '50%', width: '32px', height: '32px',
+                cursor: 'pointer', fontSize: '13px', fontWeight: 700,
+                color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', flexShrink: 0,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--navy)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-input)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
+            >
+              ?
+            </button>
+
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
               <button
+                id="tour-notif-bell"
                 onClick={openNotifs}
                 style={{
                   background: 'var(--bg-input)', border: '1px solid var(--border)',
@@ -204,6 +225,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
       </div>
 
       {showNotifs && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNotifs(false)} />}
+
+      {showTour && <TourGuide onClose={() => setShowTour(false)} />}
     </div>
   );
 };
