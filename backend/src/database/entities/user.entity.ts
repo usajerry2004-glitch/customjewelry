@@ -43,6 +43,9 @@ export class User {
   @Column({ nullable: true })
   avatarUrl: string;
 
+  @Column({ nullable: true })
+  salesRepId: string;
+
   @Column({ default: true })
   isActive: boolean;
 

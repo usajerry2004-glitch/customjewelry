@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 
@@ -23,6 +24,7 @@ const lbl: React.CSSProperties = { display: 'block', fontSize: '11px', color: 'v
 const inp: React.CSSProperties = { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' };
 
 export default function CADPage() {
+  const router = useRouter();
   const [files, setFiles] = useState<CadFile[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,18 @@ export default function CADPage() {
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isCadDesigner, setIsCadDesigner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) {
+        const role = JSON.parse(u).role;
+        setIsCadDesigner(role === 'CAD_DESIGNER' || role === 'ADMIN');
+      }
+    } catch {}
+  }, []);
 
   const loadAll = async () => {
     setLoading(true);
@@ -67,38 +80,40 @@ export default function CADPage() {
 
   return (
     <AppLayout title="CAD Files" subtitle="Upload designs, send for approval, track revisions">
-      {/* Upload Panel */}
-      <div style={{ ...card, marginBottom: '24px' }}>
-        <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px' }}>
-          Upload New CAD File
-        </h3>
-        <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
-          <div>
-            <label style={lbl}>Order *</label>
-            <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={inp}>
-              <option value="">Select order…</option>
-              {orders.map(o => (
-                <option key={o.id} value={o.id}>{o.poNumber} — {o.storeName || o.customerFullName || 'Unknown'}</option>
-              ))}
-            </select>
+      {/* Upload Panel — CAD Designer / Admin only */}
+      {isCadDesigner && (
+        <div style={{ ...card, marginBottom: '24px' }}>
+          <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '18px' }}>
+            Upload New CAD File
+          </h3>
+          <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
+            <div>
+              <label style={lbl}>Order *</label>
+              <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={inp}>
+                <option value="">Select order…</option>
+                {orders.map(o => (
+                  <option key={o.id} value={o.id}>{o.poNumber} — {o.storeName || o.customerFullName || 'Unknown'}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>File *</label>
+              <input ref={fileRef} type="file" accept=".stl,.obj,.3dm,.pdf,.jpg,.png,.zip" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Designer Notes</label>
+              <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes for this revision…" style={inp} />
+            </div>
+            <button
+              onClick={upload}
+              disabled={uploading || !selectedOrderId}
+              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploading || !selectedOrderId ? 0.6 : 1 }}
+            >
+              {uploading ? 'Uploading…' : '↑ Upload'}
+            </button>
           </div>
-          <div>
-            <label style={lbl}>File *</label>
-            <input ref={fileRef} type="file" accept=".stl,.obj,.3dm,.pdf,.jpg,.png,.zip" style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Designer Notes</label>
-            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes for this revision…" style={inp} />
-          </div>
-          <button
-            onClick={upload}
-            disabled={uploading || !selectedOrderId}
-            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploading || !selectedOrderId ? 0.6 : 1 }}
-          >
-            {uploading ? 'Uploading…' : '↑ Upload'}
-          </button>
         </div>
-      </div>
+      )}
 
       {loading ? (
         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>Loading CAD files…</div>
@@ -119,8 +134,22 @@ export default function CADPage() {
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 7px', borderRadius: '5px' }}>Rev #{f.revisionNumber}</span>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Order: <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{order?.poNumber || f.orderId.slice(0, 8)}</span>
-                      {order && <span style={{ marginLeft: '6px' }}>— {order.storeName || order.customerFullName}</span>}
+                      Order:{' '}
+                      <span
+                        onClick={() => router.push(`/orders/${f.orderId}`)}
+                        style={{ color: 'var(--accent-dark)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                        title="Open order details"
+                      >
+                        {order?.poNumber || f.orderId.slice(0, 8)}
+                      </span>
+                      {order && (
+                        <span
+                          onClick={() => router.push(`/orders/${f.orderId}`)}
+                          style={{ marginLeft: '6px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                        >
+                          — {order.storeName || order.customerFullName}
+                        </span>
+                      )}
                       {f.uploadedBy && <span style={{ marginLeft: '12px' }}>By: {f.uploadedBy}</span>}
                       <span style={{ marginLeft: '12px' }}>{new Date(f.createdAt).toLocaleDateString()}</span>
                     </div>

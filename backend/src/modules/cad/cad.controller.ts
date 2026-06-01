@@ -58,10 +58,22 @@ export class CadController {
     return this.cadService.getByOrder(orderId);
   }
 
+  @Post('reference/:orderId')
+  @ApiOperation({ summary: 'Upload a reference image for an order (all staff)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage }))
+  async uploadReference(
+    @Param('orderId') orderId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    return this.cadService.uploadReference(orderId, file, req.user?.email || 'staff');
+  }
+
   @Post('upload/:orderId')
-  @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
+  @Roles(UserRole.CAD_DESIGNER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Upload a CAD file' })
+  @ApiOperation({ summary: 'Upload a CAD file (CAD Designer only)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { storage }))
   async upload(

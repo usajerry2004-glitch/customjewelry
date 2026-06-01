@@ -31,9 +31,12 @@ export class UsersService {
     @InjectRepository(Order) private orderRepo: Repository<Order>,
   ) {}
 
-  async findAll(role?: string): Promise<User[]> {
+  async findAll(role?: string, caller?: { id: string; role: string }): Promise<User[]> {
     const qb = this.userRepo.createQueryBuilder('u').orderBy('u.createdAt', 'DESC');
     if (role) qb.where('u.role = :role', { role });
+    if (caller?.role === UserRole.SALES_REP) {
+      qb.andWhere('u.salesRepId = :salesRepId', { salesRepId: caller.id });
+    }
     return qb.getMany();
   }
 
@@ -43,7 +46,7 @@ export class UsersService {
     return user;
   }
 
-  async create(dto: CreateUserDto): Promise<User> {
+  async create(dto: CreateUserDto, caller?: { id: string; role: string }): Promise<User> {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -53,6 +56,7 @@ export class UsersService {
       email: dto.email,
       passwordHash,
       role: dto.role || UserRole.CUSTOMER,
+      salesRepId: caller?.role === UserRole.SALES_REP ? caller.id : undefined,
     });
     return this.userRepo.save(user);
   }

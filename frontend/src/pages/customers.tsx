@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
@@ -55,6 +55,8 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [refImage, setRefImage] = useState<File | null>(null);
+  const refImageRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -125,7 +127,20 @@ export default function CustomersPage() {
     });
     if (res.ok) {
       const created = await res.json();
+      if (refImage && created.id) {
+        try {
+          const token = localStorage.getItem('jf_token');
+          const fd = new FormData();
+          fd.append('file', refImage);
+          await fetch(`${API}/cad/reference/${created.id}`, {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: fd,
+          });
+        } catch {}
+      }
       setShowOrder(null);
+      setRefImage(null);
       setNewOrder({ orderType: '', metalType: '', metalColor: '', size: '', diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '' });
       router.push(`/orders/${created.id}`);
     } else {
@@ -304,6 +319,33 @@ export default function CustomersPage() {
               ))}
             </div>
 
+            {/* Reference Image */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={LABEL}>Reference Image (optional)</label>
+              <div
+                onClick={() => refImageRef.current?.click()}
+                style={{
+                  border: `2px dashed ${refImage ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center',
+                  cursor: 'pointer', background: refImage ? 'rgba(192,155,88,0.04)' : 'var(--bg-input)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input ref={refImageRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                  onChange={e => setRefImage(e.target.files?.[0] || null)} />
+                {refImage
+                  ? <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 600 }}>📎 {refImage.name}</div>
+                  : <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🖼 Upload inspiration photo · JPG, PNG, PDF</div>
+                }
+              </div>
+              {refImage && (
+                <button onClick={() => setRefImage(null)}
+                  style={{ marginTop: '4px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer' }}>
+                  ✕ Remove
+                </button>
+              )}
+            </div>
+
             <div style={{ marginBottom: '20px' }}>
               <label style={LABEL}>Customer Notes</label>
               <textarea value={newOrder.customerNotes} onChange={e => setNewOrder(p => ({ ...p, customerNotes: e.target.value }))}
@@ -318,7 +360,7 @@ export default function CustomersPage() {
               <button onClick={placeOrder} disabled={saving} style={{ flex: 1, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Creating…' : 'Place Order'}
               </button>
-              <button onClick={() => setShowOrder(null)} style={{ padding: '11px 20px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
+              <button onClick={() => { setShowOrder(null); setRefImage(null); }} style={{ padding: '11px 20px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
                 Cancel
               </button>
             </div>

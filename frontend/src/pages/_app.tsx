@@ -18,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.includes(router.pathname);
-    const isCustomerRoute = router.pathname.startsWith('/customer');
+    const isCustomerRoute = router.pathname.startsWith('/customer/');
     const stored = typeof window !== 'undefined' ? localStorage.getItem('jf_token') : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('jf_user') : null;
     const role = storedUser ? JSON.parse(storedUser).role : null;

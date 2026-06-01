@@ -37,6 +37,8 @@ export class OrdersService {
         '(order.customerEmail = :email OR order.customerId = :uid)',
         { email: user.email, uid: user.id },
       );
+    } else if (user?.role === 'SALES_REP') {
+      qb.andWhere('order.salesRepId = :salesRepId', { salesRepId: user.id });
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
     } else if (user?.role === 'SKU_MANAGER') {
@@ -52,6 +54,14 @@ export class OrdersService {
         { s: `%${filters.search}%` },
       );
     }
+    if (filters.dateFrom) {
+      qb.andWhere('order.createdAt >= :dateFrom', { dateFrom: new Date(filters.dateFrom) });
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      qb.andWhere('order.createdAt <= :dateTo', { dateTo: to });
+    }
     qb.orderBy('order.createdAt', 'DESC')
       .skip(filters.offset || 0)
       .take(filters.limit || 50);
@@ -59,12 +69,18 @@ export class OrdersService {
     return { orders, total };
   }
 
-  async findOne(id: string, user?: { email: string; role: string }): Promise<Order> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
+
     if (user?.role === 'CUSTOMER' && order.customerEmail !== user.email) {
       throw new NotFoundException(`Order ${id} not found`);
     }
+
+    if (user?.role === 'SALES_REP' && user.id && order.salesRepId !== user.id) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
     return order;
   }
 
@@ -82,8 +98,15 @@ export class OrdersService {
         const count = await this.orderRepo.count();
         data.poNumber = `KJ-CUST-${String(count + 1).padStart(4, '0')}`;
       }
+    } else if (user?.role === 'SALES_REP') {
+      // Sales reps get assigned as the order creator
+      data.salesRepId = user.id;
+      data.salesRepEmail = user.email;
+      if (!data.poNumber) {
+        throw new BadRequestException('poNumber is required when creating an order as staff. Provide a unique PO number.');
+      }
     } else {
-      // Staff/admin must provide a PO number
+      // Admin/other staff must provide a PO number
       if (!data.poNumber) {
         throw new BadRequestException('poNumber is required when creating an order as staff. Provide a unique PO number.');
       }
@@ -93,13 +116,13 @@ export class OrdersService {
     return this.orderRepo.save(order);
   }
 
-  async update(id: string, dto: Partial<Order>, user?: { email: string; role: string }): Promise<Order> {
+  async update(id: string, dto: Partial<Order>, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.findOne(id, user);
     Object.assign(order, dto);
     return this.orderRepo.save(order);
   }
 
-  async updateStatus(id: string, status: OrderStatus, user?: { email: string; role: string }): Promise<Order> {
+  async updateStatus(id: string, status: OrderStatus, user?: { id?: string; email: string; role: string }): Promise<Order> {
     if (user?.role === 'CUSTOMER' || user?.role === 'CAD_DESIGNER') {
       throw new ForbiddenException('Not authorized to change order status directly');
     }
@@ -132,18 +155,22 @@ export class OrdersService {
     });
   }
 
-  async getKanbanBoard(user?: { role: string }) {
+  async getKanbanBoard(user?: { id: string; role: string }) {
     const statuses = Object.values(OrderStatus);
     return Promise.all(
       statuses.map(async (status) => {
         const qb = this.orderRepo.createQueryBuilder('o')
           .where('o.status = :status', { status })
           .andWhere('o.isArchived = false');
-        if (user?.role === 'CAD_DESIGNER') {
+
+        if (user?.role === 'SALES_REP') {
+          qb.andWhere('o.salesRepId = :salesRepId', { salesRepId: user.id });
+        } else if (user?.role === 'CAD_DESIGNER') {
           if (!CAD_STATUSES.includes(status as OrderStatus)) {
             return { status, orders: [], count: 0 };
           }
         }
+
         const [orders, count] = await qb.orderBy('o.updatedAt', 'DESC').take(15).getManyAndCount();
         return { status, orders, count };
       }),

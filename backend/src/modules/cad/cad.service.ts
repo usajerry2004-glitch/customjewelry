@@ -34,6 +34,23 @@ export class CadService {
     return saved;
   }
 
+  async uploadReference(orderId: string, file: Express.Multer.File, uploadedBy: string): Promise<CadFile> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+    const existing = await this.cadRepo.find({ where: { orderId } });
+    const cad = this.cadRepo.create({
+      orderId,
+      originalName: file.originalname,
+      fileName: file.filename,
+      filePath: file.path,
+      uploadedBy,
+      revisionNumber: existing.length + 1,
+      designerNotes: 'Reference image',
+      status: CadFileStatus.UPLOADED,
+    });
+    return this.cadRepo.save(cad);
+  }
+
   async getByOrder(orderId: string): Promise<CadFile[]> {
     return this.cadRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
   }

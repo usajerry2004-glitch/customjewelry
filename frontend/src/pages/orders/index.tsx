@@ -33,6 +33,9 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [activeMonth, setActiveMonth] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [newOrder, setNewOrder] = useState({ poNumber: '', storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
   const [refImage, setRefImage] = useState<File | null>(null);
@@ -52,6 +55,8 @@ export default function OrdersPage() {
       const params = new URLSearchParams({ limit: '50' });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -61,7 +66,19 @@ export default function OrdersPage() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [search, statusFilter]);
+  const applyMonth = (year: number, month: number) => {
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`;
+    setActiveMonth(key);
+    setDateFrom(from);
+    setDateTo(to);
+  };
+
+  const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
+
+  useEffect(() => { load(); }, [search, statusFilter, dateFrom, dateTo]);
 
   const createOrder = async () => {
     if (!newOrder.poNumber.trim()) return;
@@ -81,7 +98,7 @@ export default function OrdersPage() {
             const fd = new FormData();
             fd.append('file', refImage);
             fd.append('designerNotes', 'Customer reference image');
-            await fetch(`${API}/cad/upload/${order.id}`, {
+            await fetch(`${API}/cad/reference/${order.id}`, {
               method: 'POST',
               headers: token ? { Authorization: `Bearer ${token}` } : {},
               body: fd,
@@ -188,7 +205,7 @@ export default function OrdersPage() {
       )}
 
       {/* Search + Filters */}
-      <div className="filter-row" style={{ display: 'flex', gap: '12px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="filter-row" style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -213,6 +230,68 @@ export default function OrdersPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Date Filters */}
+      <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Quick month chips */}
+        {(() => {
+          const now = new Date();
+          const months = [
+            { label: 'This Month', y: now.getFullYear(), m: now.getMonth() + 1 },
+            { label: 'Last Month', y: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), m: now.getMonth() === 0 ? 12 : now.getMonth() },
+            { label: '3 Months Ago', y: now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear(), m: ((now.getMonth() - 2 + 12) % 12) + 1 },
+          ];
+          return months.map(({ label, y, m }) => {
+            const key = `${y}-${String(m).padStart(2, '0')}`;
+            const isActive = activeMonth === key;
+            return (
+              <button key={key} onClick={() => isActive ? clearDates() : applyMonth(y, m)}
+                style={{
+                  padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                  fontWeight: isActive ? 600 : 400,
+                  background: isActive ? 'var(--accent-dark)' : 'var(--bg-card)',
+                  color: isActive ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${isActive ? 'var(--accent-dark)' : 'var(--border)'}`,
+                  transition: 'all 0.15s',
+                }}
+              >{label}</button>
+            );
+          });
+        })()}
+
+        {/* Month picker */}
+        <input
+          type="month"
+          value={activeMonth}
+          onChange={e => {
+            if (!e.target.value) { clearDates(); return; }
+            const [y, m] = e.target.value.split('-').map(Number);
+            applyMonth(y, m);
+          }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px', color: activeMonth ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          title="Pick a specific month"
+        />
+
+        <span style={{ color: 'var(--border)', fontSize: '14px' }}>|</span>
+
+        {/* Custom date range */}
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>From</label>
+        <input type="date" value={dateFrom}
+          onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+        />
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
+        <input type="date" value={dateTo}
+          onChange={e => { setDateTo(e.target.value); setActiveMonth(''); }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+        />
+
+        {(dateFrom || dateTo) && (
+          <button onClick={clearDates}
+            style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500 }}
+          >✕ Clear</button>
+        )}
       </div>
 
       {/* Kanban link */}
