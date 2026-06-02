@@ -64,6 +64,12 @@ export class Order {
   salesRepEmail: string;
 
   @Column({ nullable: true })
+  salesRepId: string;
+
+  @Column({ nullable: true })
+  salesRepName: string;
+
+  @Column({ nullable: true })
   salesRepCode: string;
 
   @Column({ nullable: true })

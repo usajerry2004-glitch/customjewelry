@@ -41,6 +41,9 @@ export class User {
   department: string;
 
   @Column({ nullable: true })
+  storeName: string;
+
+  @Column({ nullable: true })
   avatarUrl: string;
 
   @Column({ nullable: true })

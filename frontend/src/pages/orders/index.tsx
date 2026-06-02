@@ -5,7 +5,7 @@ import { OrderCard } from '../../components/orders/OrderCard';
 import { Order, OrderStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
-const STATUS_FILTERS = [
+const ALL_STATUS_FILTERS = [
   { label: 'All',           value: '' },
   { label: 'Waiting',       value: OrderStatus.WAITING_CONFIRMATION },
   { label: 'CAD',           value: OrderStatus.CAD_IN_PROGRESS },
@@ -16,6 +16,34 @@ const STATUS_FILTERS = [
   { label: 'Delivered',     value: OrderStatus.DELIVERED },
 ];
 
+const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
+  SHIPPING_MANAGER: [
+    { label: 'All',           value: '' },
+    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
+    { label: 'Shipped',       value: OrderStatus.SHIPPED },
+    { label: 'Delivered',     value: OrderStatus.DELIVERED },
+  ],
+  FACTORY_MANAGER: [
+    { label: 'All',           value: '' },
+    { label: 'SKU Created',   value: OrderStatus.SKU_CREATION },
+    { label: 'VPO Issued',    value: OrderStatus.VPO_ISSUED },
+    { label: 'Job Bag',       value: OrderStatus.ORDER_JOB_BAG_CREATED },
+    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
+  ],
+  CAD_DESIGNER: [
+    { label: 'All',           value: '' },
+    { label: 'Pending CAD',   value: OrderStatus.PENDING_CAD },
+    { label: 'CAD',           value: OrderStatus.CAD_IN_PROGRESS },
+    { label: 'Approved',      value: OrderStatus.CUSTOMER_APPROVED },
+    { label: 'Rejected',      value: OrderStatus.CUSTOMER_REJECTED },
+  ],
+  SKU_MANAGER: [
+    { label: 'All',           value: '' },
+    { label: 'Approved',      value: OrderStatus.CUSTOMER_APPROVED },
+    { label: 'SKU Creation',  value: OrderStatus.SKU_CREATION },
+  ],
+};
+
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)',
@@ -24,6 +52,10 @@ const inputStyle: React.CSSProperties = {
 
 const fieldStyle: React.CSSProperties = { marginBottom: '14px' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '0.8px', textTransform: 'uppercase' };
+
+interface Customer { id: string; firstName: string; lastName: string; email: string; storeName?: string; }
+
+const ROLES_NEED_CUSTOMER = ['SALES_REP', 'AUTHORIZER', 'ADMIN'];
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -37,15 +69,24 @@ export default function OrdersPage() {
   const [dateTo, setDateTo] = useState('');
   const [activeMonth, setActiveMonth] = useState('');
   const [showNew, setShowNew] = useState(false);
-  const [newOrder, setNewOrder] = useState({ poNumber: '', storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+  const [newOrder, setNewOrder] = useState({ storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDrop, setShowCustomerDrop] = useState(false);
   const [refImage, setRefImage] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
     try {
       const u = localStorage.getItem('jf_user');
-      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+      if (u) {
+        const parsed = JSON.parse(u);
+        setIsAdmin(parsed.role === 'ADMIN');
+        setUserRole(parsed.role || '');
+      }
     } catch {}
   }, []);
 
@@ -80,13 +121,33 @@ export default function OrdersPage() {
 
   useEffect(() => { load(); }, [search, statusFilter, dateFrom, dateTo]);
 
+  const openNewOrderModal = async () => {
+    setShowNew(true);
+    try {
+      const res = await apiFetch(`${API}/users?role=CUSTOMER`);
+      if (res.ok) setCustomers(await res.json());
+    } catch {}
+  };
+
+  const selectCustomer = (c: Customer) => {
+    setSelectedCustomer(c);
+    setCustomerSearch(c.storeName || `${c.firstName} ${c.lastName}`);
+    setShowCustomerDrop(false);
+    setNewOrder(p => ({ ...p, storeName: c.storeName || `${c.firstName} ${c.lastName}` }));
+  };
+
   const createOrder = async () => {
-    if (!newOrder.poNumber.trim()) return;
+    if (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer) return;
     setSaving(true);
     try {
+      const customerFields = selectedCustomer ? {
+        customerId: selectedCustomer.id,
+        customerEmail: selectedCustomer.email,
+        customerFullName: `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
+      } : {};
       const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        body: JSON.stringify({ ...newOrder, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD' }),
+        body: JSON.stringify({ ...newOrder, ...customerFields, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD' }),
       });
       if (res.ok) {
         const order = await res.json();
@@ -107,14 +168,16 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ poNumber: '', storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+        setNewOrder({ storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+        setSelectedCustomer(null);
+        setCustomerSearch('');
         setRefImage(null);
         load();
       }
     } finally { setSaving(false); }
   };
 
-  const closeModal = () => { setShowNew(false); setRefImage(null); };
+  const closeModal = () => { setShowNew(false); setRefImage(null); setSelectedCustomer(null); setCustomerSearch(''); };
 
   return (
     <AppLayout
@@ -122,7 +185,7 @@ export default function OrdersPage() {
       subtitle={`${total} total orders`}
       actions={
         <button
-          onClick={() => setShowNew(true)}
+          onClick={openNewOrderModal}
           style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
         >
           + New Order
@@ -140,22 +203,85 @@ export default function OrdersPage() {
               <button onClick={closeModal} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>✕</button>
             </div>
 
+            {/* PO Number — auto-generated */}
+            <div style={{ ...fieldStyle, background: 'var(--bg-input)', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🔖</span>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>PO Number</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Auto-generated on save — format: <strong>KJ-{new Date().getFullYear()}-XXXX</strong></div>
+              </div>
+            </div>
+
+            {/* Customer picker — dropdown of existing customers */}
+            {ROLES_NEED_CUSTOMER.includes(userRole) && (
+              <div style={{ ...fieldStyle, position: 'relative' }}>
+                <label style={labelStyle}>Customer *</label>
+                <input
+                  value={customerSearch}
+                  onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); setSelectedCustomer(null); }}
+                  onFocus={() => setShowCustomerDrop(true)}
+                  placeholder="Search by name or email…"
+                  style={{ ...inputStyle, width: '100%', borderColor: selectedCustomer ? 'var(--accent)' : undefined }}
+                  autoComplete="off"
+                />
+                {showCustomerDrop && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', zIndex: 100, maxHeight: '200px', overflowY: 'auto', boxShadow: 'var(--shadow-lg)', marginTop: '4px' }}>
+                    {customers
+                      .filter(c => {
+                        const q = customerSearch.toLowerCase();
+                        const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
+                        return !q || name.includes(q) || c.email.toLowerCase().includes(q);
+                      })
+                      .map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => selectCustomer(c)}
+                          style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '13px' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-input)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {c.storeName || `${c.firstName} ${c.lastName}`}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
+                        </div>
+                      ))}
+                    {customers.filter(c => {
+                      const q = customerSearch.toLowerCase();
+                      const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
+                      return !q || name.includes(q) || c.email.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div style={{ padding: '14px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        No customer found. Add them first via the Customers page.
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedCustomer && (
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: '#10B981', fontWeight: 600 }}>
+                    ✓ {selectedCustomer.storeName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`} · {selectedCustomer.email}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Store Name */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Store / Company Name</label>
+              <input value={newOrder.storeName} onChange={e => setNewOrder(p => ({ ...p, storeName: e.target.value }))}
+                placeholder="e.g. Diamond Collection NYC" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+
+            {/* Order details */}
             {[
-              { label: 'PO Number *',            key: 'poNumber',   placeholder: 'e.g. PO-2025-010' },
-              { label: 'Store / Customer Name',  key: 'storeName',  placeholder: 'e.g. Diamond Collection NYC' },
-              { label: 'Order Type',             key: 'orderType',  placeholder: 'e.g. Engagement Ring' },
-              { label: 'Metal Type',             key: 'metalType',  placeholder: 'e.g. 18K' },
-              { label: 'Metal Color',            key: 'metalColor', placeholder: 'e.g. White Gold' },
+              { label: 'Order Type',  key: 'orderType',  placeholder: 'e.g. Engagement Ring' },
+              { label: 'Metal Type',  key: 'metalType',  placeholder: 'e.g. 18K' },
+              { label: 'Metal Color', key: 'metalColor', placeholder: 'e.g. White Gold' },
               ...(isAdmin ? [{ label: 'Quoted Cost ($)', key: 'quotedCost', placeholder: 'e.g. 3500' }] : []),
             ].map(({ label, key, placeholder }) => (
               <div key={key} style={fieldStyle}>
                 <label style={labelStyle}>{label}</label>
-                <input
-                  value={(newOrder as any)[key]}
-                  onChange={e => setNewOrder(p => ({ ...p, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  style={{ ...inputStyle, width: '100%' }}
-                />
+                <input value={(newOrder as any)[key]} onChange={e => setNewOrder(p => ({ ...p, [key]: e.target.value }))}
+                  placeholder={placeholder} style={{ ...inputStyle, width: '100%' }} />
               </div>
             ))}
 
@@ -194,8 +320,8 @@ export default function OrdersPage() {
               </button>
               <button
                 onClick={createOrder}
-                disabled={saving || !newOrder.poNumber.trim()}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (saving || !newOrder.poNumber.trim()) ? 0.6 : 1, letterSpacing: '0.3px' }}
+                disabled={saving || (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer)}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (saving || (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer)) ? 0.6 : 1, letterSpacing: '0.3px' }}
               >
                 {saving ? 'Creating…' : 'Create Order'}
               </button>
@@ -213,7 +339,7 @@ export default function OrdersPage() {
           style={{ ...inputStyle, width: '260px' }}
         />
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-          {STATUS_FILTERS.map(f => (
+          {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
               onClick={() => setStatusFilter(f.value)}

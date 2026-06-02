@@ -45,6 +45,12 @@ export class OrdersService {
       qb.andWhere('order.status IN (:...skuStatuses)', {
         skuStatuses: [OrderStatus.CUSTOMER_APPROVED, OrderStatus.SKU_CREATION],
       });
+    } else if (user?.role === 'FACTORY_MANAGER') {
+      qb.andWhere('order.kiraSkuNumber IS NOT NULL');
+    } else if (user?.role === 'SHIPPING_MANAGER') {
+      qb.andWhere('order.status IN (:...shippingStatuses)', {
+        shippingStatuses: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+      });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
@@ -81,34 +87,63 @@ export class OrdersService {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
+    if (user?.role === 'FACTORY_MANAGER' && !order.kiraSkuNumber) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
+    const SHIPPING_STATUSES = [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
+    if (user?.role === 'SHIPPING_MANAGER' && !SHIPPING_STATUSES.includes(order.status)) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
     return order;
   }
 
-  async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string }): Promise<Order> {
+  private async generatePoNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `KJ-${year}-`;
+    // Find highest existing sequence for this year
+    const latest = await this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.poNumber LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('o.poNumber', 'DESC')
+      .getOne();
+    let seq = 1;
+    if (latest) {
+      const parts = latest.poNumber.split('-');
+      const last = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(last)) seq = last + 1;
+    }
+    return `${prefix}${String(seq).padStart(4, '0')}`;
+  }
+
+  async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
     const data: Partial<Order> = { ...dto };
 
+    // Always auto-generate PO number — ignore any client-supplied value
+    data.poNumber = await this.generatePoNumber();
+
+    // Store creator's full name from the JWT
+    if (user) {
+      const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+      if (fullName) data.salesRepName = fullName;
+    }
+
     if (user?.role === 'CUSTOMER') {
-      // Customers get auto-assigned identity and PO number
       data.customerId = user.id;
       data.customerEmail = user.email;
       if (!data.customerFullName) {
         data.customerFullName = `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || user.email;
       }
-      if (!data.poNumber) {
-        const count = await this.orderRepo.count();
-        data.poNumber = `KJ-CUST-${String(count + 1).padStart(4, '0')}`;
-      }
     } else if (user?.role === 'SALES_REP') {
-      // Sales reps get assigned as the order creator
       data.salesRepId = user.id;
       data.salesRepEmail = user.email;
-      if (!data.poNumber) {
-        throw new BadRequestException('poNumber is required when creating an order as staff. Provide a unique PO number.');
+      if (!data.customerId) {
+        throw new BadRequestException('customerId is required. Orders must be placed for an existing customer.');
       }
-    } else {
-      // Admin/other staff must provide a PO number
-      if (!data.poNumber) {
-        throw new BadRequestException('poNumber is required when creating an order as staff. Provide a unique PO number.');
+    } else if (user?.role === 'AUTHORIZER') {
+      if (!data.customerId) {
+        throw new BadRequestException('customerId is required. Orders must be placed for an existing customer.');
       }
     }
 
@@ -123,8 +158,14 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, status: OrderStatus, user?: { id?: string; email: string; role: string }): Promise<Order> {
-    if (user?.role === 'CUSTOMER' || user?.role === 'CAD_DESIGNER') {
+    if (user?.role === 'CUSTOMER') {
       throw new ForbiddenException('Not authorized to change order status directly');
+    }
+    if (user?.role === 'CAD_DESIGNER') {
+      const order = await this.findOne(id);
+      if (order.status !== OrderStatus.PENDING_CAD || status !== OrderStatus.CAD_IN_PROGRESS) {
+        throw new ForbiddenException('CAD Designer can only move orders from Pending CAD to CAD In Progress');
+      }
     }
     return this.update(id, { status }, user);
   }
@@ -167,6 +208,12 @@ export class OrdersService {
           qb.andWhere('o.salesRepId = :salesRepId', { salesRepId: user.id });
         } else if (user?.role === 'CAD_DESIGNER') {
           if (!CAD_STATUSES.includes(status as OrderStatus)) {
+            return { status, orders: [], count: 0 };
+          }
+        } else if (user?.role === 'FACTORY_MANAGER') {
+          qb.andWhere('o.kiraSkuNumber IS NOT NULL');
+        } else if (user?.role === 'SHIPPING_MANAGER') {
+          if (![OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED].includes(status as OrderStatus)) {
             return { status, orders: [], count: 0 };
           }
         }

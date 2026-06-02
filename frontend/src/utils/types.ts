@@ -50,6 +50,8 @@ export interface Order {
   customerNotes?: string;
   quotedCost?: number;
   vendorName?: string;
+  salesRepName?: string;
+  salesRepEmail?: string;
   createdAt: string;
   updatedAt: string;
 }

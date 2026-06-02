@@ -37,7 +37,7 @@ function CadViewerModal({ cad, userRole, onClose, onAction }: ViewerProps) {
   const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
   const isPdf   = ext === 'pdf';
-  const fileUrl = `/uploads/cad/${cad.fileName}`;
+  const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
   const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
   const canAct  = CAD_ACTION_ROLES.includes(userRole as UserRole) && cad.status !== 'APPROVED';
 
@@ -449,6 +449,26 @@ export default function OrderDetail() {
               </div>
             </div>
 
+            {/* Created by */}
+            {(order.salesRepName || order.salesRepEmail) && (
+              <div style={cardStyle}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  Created By
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {(order as any).salesRepName || order.salesRepEmail}
+                </div>
+                {(order as any).salesRepName && order.salesRepEmail && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                    {order.salesRepEmail}
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {new Date(order.createdAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
+            )}
+
             {/* Authorize panel — only for WAITING_CONFIRMATION and authorizers/admin */}
             {order.status === OrderStatus.WAITING_CONFIRMATION &&
               (userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) && (
@@ -544,28 +564,74 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* ── CAD Files ── */}
+        {/* ── Reference Images (visible to all roles) ── */}
+        {(() => {
+          const refs = cads.filter(c => c.designerNotes === 'Reference image');
+          if (refs.length === 0) return null;
+          return (
+            <div style={cardStyle}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 14px' }}>
+                📌 Reference Images ({refs.length})
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {refs.map(cad => {
+                  const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
+                  const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+                  const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
+                  return (
+                    <div key={cad.id}
+                      onClick={() => setViewingCad(cad)}
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', width: '160px', flexShrink: 0, cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
+                    >
+                      {isImage ? (
+                        <img src={fileUrl} alt={cad.originalName}
+                          style={{ width: '160px', height: '120px', objectFit: 'cover', display: 'block' }}
+                          onError={e => {
+                            const img = e.target as HTMLImageElement;
+                            img.style.display = 'none';
+                            const fallback = img.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div style={{ width: '160px', height: '120px', display: isImage ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', background: 'var(--bg-input)' }}>
+                        🖼
+                      </div>
+                      <div style={{ padding: '6px 8px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cad.originalName}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>by {cad.uploadedBy}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── CAD Design Files ── */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
-              Design Files {cads.length > 0 && `(${cads.length})`}
+              Design Files {cads.filter(c => c.designerNotes !== 'Reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image').length})`}
             </h3>
           </div>
 
-          {cads.length === 0 ? (
+          {cads.filter(c => c.designerNotes !== 'Reference image').length === 0 ? (
             <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>
               No CAD files uploaded yet for this order.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {cads.map(cad => {
+              {cads.filter(c => c.designerNotes !== 'Reference image').map(cad => {
                 const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
                 const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                 const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
                 const isPdf = ext === 'pdf';
                 return (
                   <div key={cad.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius)', border: `1px solid ${cs.color}25`, flexWrap: 'wrap' }}>
-                    {/* File info */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: '22px', flexShrink: 0 }}>{isImage ? '🖼' : isPdf ? '📄' : '📎'}</span>
                       <div style={{ minWidth: 0 }}>
@@ -580,8 +646,6 @@ export default function OrderDetail() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Status + actions */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                       <span style={{ fontSize: '11px', background: cs.bg, color: cs.color, padding: '3px 10px', borderRadius: '99px', fontWeight: 700 }}>
                         {cs.label}

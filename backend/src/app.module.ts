@@ -35,8 +35,8 @@ import { AuthService } from './modules/auth/auth.service';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     ThrottlerModule.forRoot([{
       name: 'default',
-      ttl: 60000,   // 1-minute window
-      limit: 30,    // 30 requests per minute per IP (general)
+      ttl: 60000,
+      limit: 300,
     }]),
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({

@@ -14,6 +14,8 @@ interface Customer {
   role: string;
   isActive: boolean;
   createdAt: string;
+  salesRepId?: string;
+  storeName?: string;
 }
 
 interface Stats { totalCustomers: number; activeCustomers: number; totalStaff: number }
@@ -46,6 +48,7 @@ const ORDER_FIELDS = [
 export default function CustomersPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [salesRepMap, setSalesRepMap] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -73,19 +76,26 @@ export default function CustomersPage() {
   });
 
   const load = async () => {
-    const [uRes, sRes] = await Promise.all([
+    const [uRes, sRes, rRes] = await Promise.all([
       apiFetch(`${API}/users?role=CUSTOMER`),
       apiFetch(`${API}/users/stats`),
+      apiFetch(`${API}/users?role=SALES_REP`),
     ]);
     if (uRes.ok) setCustomers(await uRes.json());
     if (sRes.ok) setStats(await sRes.json());
+    if (rRes.ok) {
+      const reps: any[] = await rRes.json();
+      const map: Record<string, string> = {};
+      reps.forEach(r => { map[r.id] = `${r.firstName} ${r.lastName}`; });
+      setSalesRepMap(map);
+    }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
   const filtered = customers.filter(c =>
-    `${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())
+    `${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const createCustomer = async () => {
@@ -201,17 +211,17 @@ export default function CustomersPage() {
         <table className="customers-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-              {['Customer', 'Email', 'Status', 'Joined', 'Actions'].map(h => (
+              {['Customer', 'Email', 'Sales Rep', 'Status', 'Joined', 'Actions'].map(h => (
                 <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
+              <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: '48px', textAlign: 'center' }}>
+                <td colSpan={6} style={{ padding: '48px', textAlign: 'center' }}>
                   <div style={{ fontSize: '32px', marginBottom: '10px', opacity: 0.3 }}>👥</div>
                   <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No customers yet</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Click "+ Add Customer" to create the first account.</div>
@@ -220,9 +230,25 @@ export default function CustomersPage() {
             ) : filtered.map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {c.storeName || `${c.firstName} ${c.lastName}`}
+                  </div>
+                  {c.storeName && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {c.firstName} {c.lastName}
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>{c.email}</td>
+                <td style={{ padding: '14px 16px' }}>
+                  {c.salesRepId && salesRepMap[c.salesRepId] ? (
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {salesRepMap[c.salesRepId]}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>—</span>
+                  )}
+                </td>
                 <td style={{ padding: '14px 16px' }}>
                   <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: c.isActive ? 'rgba(5,150,105,0.12)' : 'rgba(220,38,38,0.1)', color: c.isActive ? '#059669' : '#DC2626', fontWeight: 600 }}>
                     {c.isActive ? 'Active' : 'Inactive'}
@@ -239,7 +265,7 @@ export default function CustomersPage() {
                     <button onClick={() => viewOrders(c)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                       View Orders
                     </button>
-                    {c.isActive && (
+                    {isAdmin && c.isActive && (
                       <button onClick={() => deactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(220,38,38,0.3)', background: 'transparent', color: '#DC2626', fontSize: '11px', cursor: 'pointer' }}>
                         Deactivate
                       </button>

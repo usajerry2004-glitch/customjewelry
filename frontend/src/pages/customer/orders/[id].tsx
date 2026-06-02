@@ -25,7 +25,7 @@ function CadViewer({ cad, onClose }: { cad: CadFile; onClose: () => void }) {
   const ext      = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
   const isPdf    = ext === 'pdf';
-  const fileUrl  = `/uploads/cad/${cad.fileName}`;
+  const fileUrl  = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
   const cs       = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
 
   useEffect(() => {
@@ -287,19 +287,92 @@ export default function CustomerOrderDetail() {
         </div>
       )}
 
-      {/* CAD files */}
+      {/* Reference Images — always visible, customers can upload */}
+      {(() => {
+        const refs = cads.filter(c => c.designerNotes === 'Reference image');
+        return (
+        <div style={card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', margin: 0 }}>
+              📌 Reference Images {refs.length > 0 && `(${refs.length})`}
+            </h3>
+            <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 10px', background: 'transparent' }}>
+              + Add Image
+              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+                onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (!file || !order?.id) return;
+                  const token = localStorage.getItem('jf_token');
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cad/reference/${order.id}`, {
+                    method: 'POST',
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    body: fd,
+                  });
+                  if (res.ok) reload();
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+          {refs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No reference images yet. Upload an inspiration photo to share with our design team.
+            </div>
+          ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {refs.map(cad => {
+              const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
+              const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+              const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
+              return (
+                <div key={cad.id}
+                  onClick={() => setViewingCad(cad)}
+                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', width: '150px', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
+                >
+                  {isImage ? (
+                    <img src={fileUrl} alt={cad.originalName}
+                      style={{ width: '150px', height: '110px', objectFit: 'cover', display: 'block' }}
+                      onError={e => {
+                        const img = e.target as HTMLImageElement;
+                        img.style.display = 'none';
+                        const fallback = img.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ width: '150px', height: '110px', display: isImage ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', background: 'var(--bg-input)' }}>
+                    🖼
+                  </div>
+                  <div style={{ padding: '5px 8px', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {cad.originalName}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
+        </div>
+        );
+      })()}
+
+      {/* CAD Design Files */}
       <div style={card}>
         <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>
-          Design Files {cads.length > 0 && `(${cads.length})`}
+          Design Files {cads.filter(c => c.designerNotes !== 'Reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image').length})`}
         </h3>
 
-        {cads.length === 0 ? (
+        {cads.filter(c => c.designerNotes !== 'Reference image').length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
             No design files yet. Our CAD team will upload designs once your order is confirmed.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {cads.map(cad => {
+            {cads.filter(c => c.designerNotes !== 'Reference image').map(cad => {
               const cs = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
               const needsApproval = cad.status === 'SENT_FOR_APPROVAL';
               return (

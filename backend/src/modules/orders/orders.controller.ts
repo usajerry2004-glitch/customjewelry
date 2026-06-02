@@ -58,8 +58,8 @@ export class OrdersController {
   @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update order status' })
-  updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus) {
-    return this.ordersService.updateStatus(id, status);
+  updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus, @Request() req: any) {
+    return this.ordersService.updateStatus(id, status, req.user);
   }
 
   @Patch(':id/authorize')

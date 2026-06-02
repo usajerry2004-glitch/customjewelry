@@ -22,6 +22,7 @@ export class UpdateUserDto {
   @IsString() @IsOptional() @MinLength(6) password?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
   @IsString() @IsOptional() department?: string;
+  @IsString() @IsOptional() storeName?: string;
 }
 
 @Injectable()
@@ -57,6 +58,7 @@ export class UsersService {
       passwordHash,
       role: dto.role || UserRole.CUSTOMER,
       salesRepId: caller?.role === UserRole.SALES_REP ? caller.id : undefined,
+      storeName: dto.storeName,
     });
     return this.userRepo.save(user);
   }
@@ -70,6 +72,7 @@ export class UsersService {
     if (dto.lastName !== undefined) user.lastName = dto.lastName;
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;
+    if (dto.storeName !== undefined) user.storeName = dto.storeName;
     return this.userRepo.save(user);
   }
 
