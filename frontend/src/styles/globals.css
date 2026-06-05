@@ -318,6 +318,95 @@ input::placeholder, textarea::placeholder {
   .ship-action-row { gap: 6px !important; }
 }
 
+/* ── Additional responsive rules ─────────────────────────────────────── */
+
+/* Order detail: content (left) + sticky sidebar (right) */
+@media (max-width: 900px) {
+  .order-detail-outer { grid-template-columns: 1fr !important; }
+  .order-detail-outer .order-sticky-sidebar { position: static !important; }
+}
+
+/* Status filter tabs — horizontal scroll on mobile instead of wrapping */
+@media (max-width: 640px) {
+  .status-tabs-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .status-tabs-row::-webkit-scrollbar { display: none; }
+  .status-tabs-row button { flex-shrink: 0; }
+}
+
+/* Tables — always wrap in horizontal scroll container on mobile */
+@media (max-width: 768px) {
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll table { min-width: 600px; }
+}
+
+/* Topbar actions on mobile — only show icon buttons, hide text if too small */
+@media (max-width: 480px) {
+  .topbar-actions { gap: 4px !important; }
+  .topbar-actions .btn-text-hide { display: none !important; }
+}
+
+/* Order cards in list — single column on phone */
+@media (max-width: 540px) {
+  .orders-card-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Manufacturing queue card — stack inputs on phone */
+@media (max-width: 480px) {
+  .mfg-action-row { grid-template-columns: 1fr !important; }
+  .mfg-action-row input,
+  .mfg-action-row button { width: 100% !important; }
+}
+
+/* Repairs table */
+@media (max-width: 768px) {
+  .repairs-table th:nth-child(4),
+  .repairs-table td:nth-child(4) { display: none; }
+}
+@media (max-width: 540px) {
+  .repairs-table th:nth-child(3),
+  .repairs-table td:nth-child(3) { display: none; }
+}
+
+/* Priority tasks — compact on mobile */
+@media (max-width: 640px) {
+  .priority-order-card { padding: 10px 12px !important; }
+}
+
+/* Stone sub-filter row — horizontal scroll */
+@media (max-width: 640px) {
+  .stone-sub-filter { overflow-x: auto; flex-wrap: nowrap !important; }
+  .stone-sub-filter::-webkit-scrollbar { display: none; }
+  .stone-sub-filter button { flex-shrink: 0; }
+}
+
+/* Sidebar signed-in footer — hide on very small */
+@media (max-width: 360px) {
+  .sidebar-footer { display: none !important; }
+}
+
+/* CAD page grid */
+@media (max-width: 768px) {
+  .cad-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Shipping page cards */
+@media (max-width: 640px) {
+  .shipping-card-row { flex-direction: column !important; }
+}
+
+/* Form inputs full-width on mobile */
+@media (max-width: 480px) {
+  .input-group { flex-direction: column !important; }
+  .input-group input,
+  .input-group button { width: 100% !important; }
+}
+
 /* ── Print / PDF styles ───────────────────────────────────────────────── */
 @media print {
   /* Hide everything except the report content */

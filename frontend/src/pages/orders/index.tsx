@@ -412,7 +412,7 @@ export default function OrdersPage() {
           placeholder="Search PO number, store, SKU…"
           style={{ ...inputStyle, width: '260px' }}
         />
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+        <div className="status-tabs-row" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
@@ -434,7 +434,7 @@ export default function OrdersPage() {
 
       {/* CAD Sub-filters — shown for Admin/Authorizer when CAD In Progress is selected */}
       {showCadSubRow && (
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid var(--accent)' }}>
+        <div className="status-tabs-row" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid var(--accent)' }}>
           {[
             { label: 'All CAD', value: '' },
             { label: '⏳ Pending CAD', value: 'cad_pending' },
@@ -457,7 +457,7 @@ export default function OrdersPage() {
 
       {/* Stone Sub-filters — shown for Admin/Authorizer/Factory when VPO Created is selected */}
       {showStoneSubRow && (
-        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid #7C3AED' }}>
+        <div className="stone-sub-filter" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid #7C3AED' }}>
           {[
             { label: 'All VPO',         value: '' },
             { label: '💎 Pending Stone', value: 'stone_pending' },

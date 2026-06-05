@@ -85,8 +85,8 @@ export default function RepairsPage() {
                 </div>
 
                 {/* Orders under this contractor */}
-                <div style={{ ...card, overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <div className="table-scroll" style={{ ...card, overflow: 'hidden' }}>
+                  <table className="repairs-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border)' }}>
                         {['PO Number', 'Store / Customer', 'Product', 'Sent for Repair', 'Days', 'Actions'].map(h => (

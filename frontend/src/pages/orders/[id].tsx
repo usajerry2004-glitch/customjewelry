@@ -489,7 +489,7 @@ export default function OrderDetail() {
       }
     >
       {/* ── Outer: content (left) + sidebar (right, sticky) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '20px', alignItems: 'start' }}>
+      <div className="order-detail-outer" style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '20px', alignItems: 'start' }}>
 
         {/* ── Main content column ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -744,7 +744,7 @@ export default function OrderDetail() {
         </div>{/* ── end main content column ── */}
 
         {/* ── Sidebar: sticky beside all content ── */}
-        <div style={{ position: 'sticky', top: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="order-sticky-sidebar" style={{ position: 'sticky', top: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
           {/* Current status */}
           <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
