@@ -318,6 +318,15 @@ input::placeholder, textarea::placeholder {
   .ship-action-row { gap: 6px !important; }
 }
 
+/* ── Status filter tabs: pills on desktop, dropdown on mobile ─────────── */
+.status-tabs-mobile { display: none !important; }
+.status-tabs-desktop { display: flex !important; }
+
+@media (max-width: 640px) {
+  .status-tabs-mobile  { display: block !important; }
+  .status-tabs-desktop { display: none !important; }
+}
+
 /* ── Additional responsive rules ─────────────────────────────────────── */
 
 /* Order detail: content (left) + sticky sidebar (right) */

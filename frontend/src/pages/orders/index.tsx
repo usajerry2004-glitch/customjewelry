@@ -405,14 +405,16 @@ export default function OrdersPage() {
       )}
 
       {/* Search + Filters */}
-      <div className="filter-row" style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search PO number, store, SKU…"
-          style={{ ...inputStyle, width: '260px' }}
+          style={{ ...inputStyle, flex: '1 1 200px', minWidth: '140px', maxWidth: '300px' }}
         />
-        <div className="status-tabs-row" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+
+        {/* Desktop: pill buttons */}
+        <div className="status-tabs-desktop" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
@@ -430,6 +432,18 @@ export default function OrdersPage() {
             </button>
           ))}
         </div>
+
+        {/* Mobile: dropdown select */}
+        <select
+          className="status-tabs-mobile"
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setCadSubFilter(''); setStoneSubFilter(''); }}
+          style={{ ...inputStyle, flex: '1 1 160px', maxWidth: '220px', fontSize: '13px', padding: '8px 12px', fontWeight: 500 }}
+        >
+          {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* CAD Sub-filters — shown for Admin/Authorizer when CAD In Progress is selected */}
@@ -479,12 +493,11 @@ export default function OrdersPage() {
 
       {/* Date Filters */}
       <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Quick month chips */}
         {(() => {
           const now = new Date();
           const months = [
-            { label: 'This Month', y: now.getFullYear(), m: now.getMonth() + 1 },
-            { label: 'Last Month', y: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), m: now.getMonth() === 0 ? 12 : now.getMonth() },
+            { label: 'This Month',   y: now.getFullYear(), m: now.getMonth() + 1 },
+            { label: 'Last Month',   y: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), m: now.getMonth() === 0 ? 12 : now.getMonth() },
             { label: '3 Months Ago', y: now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear(), m: ((now.getMonth() - 2 + 12) % 12) + 1 },
           ];
           return months.map(({ label, y, m }) => {
@@ -504,38 +517,17 @@ export default function OrdersPage() {
             );
           });
         })()}
-
-        {/* Month picker */}
-        <input
-          type="month"
-          value={activeMonth}
-          onChange={e => {
-            if (!e.target.value) { clearDates(); return; }
-            const [y, m] = e.target.value.split('-').map(Number);
-            applyMonth(y, m);
-          }}
-          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px', color: activeMonth ? 'var(--text-primary)' : 'var(--text-muted)' }}
-          title="Pick a specific month"
+        <input type="month" value={activeMonth}
+          onChange={e => { if (!e.target.value) { clearDates(); return; } const [y, m] = e.target.value.split('-').map(Number); applyMonth(y, m); }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} title="Pick a specific month"
         />
-
         <span style={{ color: 'var(--border)', fontSize: '14px' }}>|</span>
-
-        {/* Custom date range */}
         <label style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>From</label>
-        <input type="date" value={dateFrom}
-          onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }}
-          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-        />
+        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }} style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} />
         <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
-        <input type="date" value={dateTo}
-          onChange={e => { setDateTo(e.target.value); setActiveMonth(''); }}
-          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-        />
-
+        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setActiveMonth(''); }} style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} />
         {(dateFrom || dateTo) && (
-          <button onClick={clearDates}
-            style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500 }}
-          >✕ Clear</button>
+          <button onClick={clearDates} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500 }}>✕ Clear</button>
         )}
       </div>
 
