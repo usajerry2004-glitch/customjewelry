@@ -137,6 +137,28 @@ export class ReportingService {
     };
   }
 
+  // Returns order counts per day for last N days — used by dashboard chart
+  async getDailyTrend(days = 7): Promise<{ date: string; created: number; completed: number }[]> {
+    const results: { date: string; created: number; completed: number }[] = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+      const to   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+      const [created, completed] = await Promise.all([
+        this.orderRepo.count({ where: { createdAt: Between(from, to) } }),
+        this.orderRepo.count({ where: { status: OrderStatus.COMPLETED, updatedAt: Between(from, to) } }),
+      ]);
+      results.push({
+        date: `${d.getMonth() + 1}/${d.getDate()}`,
+        created,
+        completed,
+      });
+    }
+    return results;
+  }
+
   // Runs every Monday at 8:00 AM — creates a notification for all admins
   @Cron('0 8 * * 1')
   async generateWeeklyReport() {
