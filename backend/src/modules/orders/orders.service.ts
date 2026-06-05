@@ -451,15 +451,15 @@ export class OrdersService {
     });
 
     if ([UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)) {
-      // CAD: in CAD_IN_PROGRESS > 3 days with no file uploaded
+      // CAD: in CAD_IN_PROGRESS > 1 day with no file uploaded
       const cadOverdue = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
         .andWhere('(o."cadSubStatus" IS NULL OR o."cadSubStatus" = :u)', { u: 'PENDING' })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(3) })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
         .getMany();
       cadOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'CAD file not uploaded — over 3 days', priorityLevel: 'MEDIUM' });
+          results.push({ ...o, priorityReason: 'CAD file not uploaded — over 1 day', priorityLevel: 'HIGH' });
       });
     }
 
@@ -500,11 +500,11 @@ export class OrdersService {
       });
       const contractorOverdue = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.PENDING_CONTRACTOR })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(21) })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(2) })
         .getMany();
       contractorOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'With contractor — over 21 days', priorityLevel: 'HIGH' });
+          results.push({ ...o, priorityReason: 'With contractor — over 2 days', priorityLevel: 'HIGH' });
       });
     }
 

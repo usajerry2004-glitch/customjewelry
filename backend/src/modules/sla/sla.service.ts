@@ -8,11 +8,11 @@ import { Notification, NotificationType } from '../../database/entities/notifica
 
 // Days a status can stay unchanged before it's considered overdue
 const SLA_RULES: { status: OrderStatus; maxDays: number; role: UserRole; label: string }[] = [
-  { status: OrderStatus.CAD_IN_PROGRESS,   maxDays: 7,  role: UserRole.CAD_DESIGNER,     label: 'CAD In Progress' },
+  { status: OrderStatus.CAD_IN_PROGRESS,   maxDays: 1,  role: UserRole.CAD_DESIGNER,     label: 'CAD In Progress' },
   { status: OrderStatus.SKU_CREATION,      maxDays: 1,  role: UserRole.SKU_MANAGER,      label: 'SKU Creation' },
   { status: OrderStatus.VPO_ISSUED,        maxDays: 4,  role: UserRole.FACTORY_MANAGER,  label: 'VPO Issued' },
   { status: OrderStatus.VPO_ISSUED,        maxDays: 1,  role: UserRole.STONE_MANAGER,    label: 'Stone Pending' },
-  { status: OrderStatus.PENDING_CONTRACTOR,maxDays: 21, role: UserRole.FACTORY_MANAGER,  label: 'Pending Contractor' },
+  { status: OrderStatus.PENDING_CONTRACTOR,maxDays: 2,  role: UserRole.FACTORY_MANAGER,  label: 'Pending Contractor' },
   { status: OrderStatus.READY_TO_SHIP,     maxDays: 2,  role: UserRole.SHIPPING_MANAGER, label: 'Ready to Ship' },
 ];
 
