@@ -137,7 +137,7 @@ export default function Dashboard() {
           ? <img className="order-row-img" src={img} alt="" style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           : <div className="order-row-img" style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
         }
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="order-row-text" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
           <div className="order-row-name" style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 3, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
           <div className="order-row-sub" style={{ fontSize: 12, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}

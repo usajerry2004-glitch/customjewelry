@@ -367,14 +367,15 @@ input::placeholder, textarea::placeholder {
   .dash-kpi  { grid-template-columns: 1fr; }
 }
 
-/* Action Queue / New This Week — compact on mobile */
+/* Action Queue / New This Week — fully visible on mobile */
 @media (max-width: 640px) {
-  .order-row-right { display: none !important; }
-  .order-row-img   { width: 34px !important; height: 34px !important; min-width: 34px !important; }
-  .order-row-name  { font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .order-row-sub   { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .order-row-right  { display: none !important; }
+  .order-row-img    { width: 34px !important; height: 34px !important; min-width: 34px !important; flex-shrink: 0; }
+  .order-row-name   { font-size: 13px !important; white-space: normal !important; word-break: break-word; }
+  .order-row-sub    { font-size: 11px !important; white-space: normal !important; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .dash-action-card { padding: 14px 14px !important; }
-  .order-row-card  { padding: 8px 10px !important; gap: 8px !important; overflow: hidden !important; max-width: 100% !important; }
+  .order-row-card   { padding: 8px 10px !important; gap: 8px !important; width: 100% !important; box-sizing: border-box !important; }
+  .order-row-text   { min-width: 0; flex: 1; overflow: hidden; }
 }
 
 /* Pipeline funnel — ensure horizontal scroll on mobile */
