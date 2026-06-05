@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -29,7 +29,6 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
   const [topStores, setTopStores]   = useState<TopStore[]>([]);
-  const [chartTab, setChartTab]     = useState<'trend'|'stages'|'stores'>('trend');
   const [showMoreA, setShowMoreA]   = useState(false);
   const [showMoreR, setShowMoreR]   = useState(false);
 
@@ -164,90 +163,54 @@ export default function Dashboard() {
     </div>
   );
 
-  const CHART_TABS = [
-    { key: 'trend',  label: '📈 Daily Activity',      desc: 'Created vs Completed — last 7 days' },
-    { key: 'stages', label: '📊 Stage Distribution',  desc: 'Live orders at each stage right now' },
-    { key: 'stores', label: '🏪 Top Stores',          desc: 'Most active stores this month' },
-  ] as const;
+  // Pie chart colours for each day
+  const PIE_COLORS = ['#1A2740','#0891B2','#7C3AED','#F59E0B','#10B981','#EF4444','#C09B58'];
 
-  // Stage distribution data from metrics
-  const stageData = (metrics?.byStatus || [])
-    .filter(b => !['COMPLETED','CANCELLED'].includes(b.status) && parseInt(b.count) > 0)
-    .map(b => ({ name: STATUS_CONFIG[b.status]?.label || b.status, count: parseInt(b.count), color: STATUS_CONFIG[b.status]?.color || '#6B7280' }))
-    .sort((a, b) => b.count - a.count);
+  // Pie data: orders created per day (non-zero only)
+  const pieData = trend.filter(t => t.created > 0).map((t, i) => ({ name: t.date, value: t.created, fill: PIE_COLORS[i % PIE_COLORS.length] }));
 
-  const TrendChart = () => (
-    <div style={{ ...card, padding: '18px 22px' }}>
-      {/* Header + tab switcher */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-            {CHART_TABS.find(t => t.key === chartTab)?.label}
-          </h2>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-            {CHART_TABS.find(t => t.key === chartTab)?.desc}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {CHART_TABS.map(t => (
-            <button key={t.key} onClick={() => setChartTab(t.key)}
-              style={{ padding: '5px 11px', borderRadius: 20, fontSize: 11, cursor: 'pointer', fontWeight: chartTab === t.key ? 700 : 400, background: chartTab === t.key ? 'var(--navy)' : 'var(--bg-input)', color: chartTab === t.key ? '#fff' : 'var(--text-secondary)', border: `1px solid ${chartTab === t.key ? 'var(--navy)' : 'var(--border)'}`, transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+  const ActivityPie = () => (
+    <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 0 }}>
+      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Daily Activity</h2>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Orders created — last 7 days</div>
       {loading ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
-      ) : chartTab === 'trend' ? (
-        trend.length > 0 ? <>
-          <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
-              <Bar dataKey="created" fill="#1A2740" radius={[4,4,0,0]} name="Created" />
-              <Bar dataKey="completed" fill="#059669" radius={[4,4,0,0]} name="Completed" />
-            </BarChart>
-          </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 16, marginTop: 10, justifyContent: 'center' }}>
-            {[{ c: '#1A2740', l: 'Created' }, { c: '#059669', l: 'Completed' }].map(i => (
-              <div key={i.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: i.c }} />{i.l}
-              </div>
-            ))}
-          </div>
-        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data</div>
-
-      ) : chartTab === 'stages' ? (
-        stageData.length > 0 ? <>
-          <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={stageData} layout="vertical" margin={{ top: 4, right: 40, bottom: 0, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={110} />
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
-              <Bar dataKey="count" radius={[0,4,4,0]} name="Orders">
-                {stageData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No active orders</div>
-
+        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+      ) : pieData.length === 0 ? (
+        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No orders this week</div>
       ) : (
-        topStores.length > 0 ? <>
-          <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={topStores.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 40, bottom: 0, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <YAxis type="category" dataKey="store" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={130} />
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
-              <Bar dataKey="count" fill="#C09B58" radius={[0,4,4,0]} name="Orders" />
-            </BarChart>
-          </ResponsiveContainer>
-        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No store data this month</div>
+        <ResponsiveContainer width="100%" height={210}>
+          <PieChart>
+            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="48%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
+              {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+            </Pie>
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} orders`, 'Created']} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+
+  const TopCustomers = () => (
+    <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 0 }}>
+      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Top Customers</h2>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Most active this month</div>
+      {loading ? (
+        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+      ) : topStores.length === 0 ? (
+        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data this month</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={210}>
+          <BarChart data={topStores.slice(0, 6)} layout="vertical" margin={{ top: 4, right: 36, bottom: 0, left: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis type="category" dataKey="store" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={120} />
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} orders`, 'Orders']} />
+            <Bar dataKey="count" radius={[0,4,4,0]} name="Orders">
+              {topStores.slice(0, 6).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       )}
     </div>
   );
@@ -286,8 +249,13 @@ export default function Dashboard() {
         <KpiCard label="My Actions"     value={actions.length}  color="#7C3AED" sub="priority tasks"             link="/todos" />
       </div>
       <PipelineFunnel />
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, marginBottom: 24 }}>
-        <TrendChart />
+      {/* Charts row */}
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+        <ActivityPie />
+        <TopCustomers />
+      </div>
+      {/* SLA row */}
+      <div style={{ marginBottom: 24 }}>
         <SLAPanel />
       </div>
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
