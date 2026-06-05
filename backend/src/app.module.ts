@@ -18,6 +18,7 @@ import { OrderMessage } from './database/entities/order-message.entity';
 
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { PublicModule } from './modules/public/public.module';
 import { CadModule } from './modules/cad/cad.module';
 import { SkuModule } from './modules/sku/sku.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -72,6 +73,7 @@ import { AuthService } from './modules/auth/auth.service';
       inject: [ConfigService],
     }),
     AuthModule,
+    PublicModule,
     OrdersModule,
     CadModule,
     SkuModule,
