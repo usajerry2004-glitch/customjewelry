@@ -19,6 +19,11 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum StoneStatus {
+  PENDING_STONE = 'PENDING_STONE',
+  STONE_RECEIVED = 'STONE_RECEIVED',
+}
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   SALES_REP = 'SALES_REP',
@@ -53,6 +58,7 @@ export interface Order {
   customerNotes?: string;
   quotedCost?: number;
   vendorName?: string;
+  stoneStatus?: StoneStatus | null;
   salesRepName?: string;
   salesRepEmail?: string;
   createdAt: string;

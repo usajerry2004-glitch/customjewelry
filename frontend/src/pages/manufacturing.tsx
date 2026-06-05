@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, OrderStatus, STATUS_CONFIG } from '../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG } from '../utils/types';
 
 export async function getServerSideProps() { return { props: {} }; }
 
-interface Metrics { pendingStart: number; inProgress: number; jobBagCreated: number; readyToShip: number }
+interface Metrics { pendingStart: number; inProgress: number; jobBagCreated: number; readyToShip: number; pendingStone: number }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
 const inp: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', width: '100%' };
@@ -47,6 +47,7 @@ export default function ManufacturingPage() {
   const kpi = [
     { label: 'Pending Start',  value: metrics?.pendingStart ?? 0,  color: '#EA6C28' },
     { label: 'VPO Issued',     value: metrics?.inProgress ?? 0,    color: '#0891B2' },
+    { label: 'Pending Stone',  value: metrics?.pendingStone ?? 0,  color: '#7C3AED' },
     { label: 'Job Bag Created',value: metrics?.jobBagCreated ?? 0, color: '#0D9488' },
     { label: 'Ready to Ship',  value: metrics?.readyToShip ?? 0,   color: '#2563EB' },
   ];
@@ -54,7 +55,7 @@ export default function ManufacturingPage() {
   return (
     <AppLayout title="Manufacturing" subtitle="Factory queue & production tracking">
       {/* KPIs */}
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '28px' }}>
         {kpi.map(k => (
           <div key={k.label} style={{ ...card, padding: '18px 20px' }}>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>{k.label}</div>
@@ -97,6 +98,11 @@ export default function ManufacturingPage() {
                         {order.kiraSkuNumber && (
                           <span style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', border: '1px solid var(--border)' }}>{order.kiraSkuNumber}</span>
                         )}
+                        {order.status === OrderStatus.VPO_ISSUED && (
+                          order.stoneStatus === StoneStatus.STONE_RECEIVED
+                            ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
+                            : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
+                        )}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                         {order.orderType} · {order.metalType} {order.metalColor}
@@ -120,17 +126,23 @@ export default function ManufacturingPage() {
                   )}
 
                   {order.status === OrderStatus.VPO_ISSUED && (
-                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
-                      <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                      <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        Pending Contractor
-                      </button>
-                      <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
-                        style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        Ready to Ship
-                      </button>
-                    </div>
+                    order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
+                      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500 }}>
+                        ⏳ Waiting for Stone Manager to confirm stone receipt before production can proceed.
+                      </div>
+                    ) : (
+                      <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
+                        <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
+                        <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
+                          style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                          Pending Contractor
+                        </button>
+                        <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                          style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                          Ready to Ship
+                        </button>
+                      </div>
+                    )
                   )}
 
                   {order.status === OrderStatus.PENDING_CONTRACTOR && (

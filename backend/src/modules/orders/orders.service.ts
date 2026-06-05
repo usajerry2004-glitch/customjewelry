@@ -93,6 +93,8 @@ export class OrdersService {
       qb.andWhere('order.status IN (:...shippingStatuses)', {
         shippingStatuses: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
       });
+    } else if (user?.role === 'STONE_MANAGER') {
+      qb.andWhere('order.status = :stoneStatus', { stoneStatus: OrderStatus.VPO_ISSUED });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });

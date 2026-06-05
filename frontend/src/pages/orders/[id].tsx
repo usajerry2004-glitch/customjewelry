@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, STATUS_CONFIG, UserRole } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
@@ -717,6 +717,43 @@ export default function OrderDetail() {
             </div>
           )}
         </div>
+
+          {/* ── Stone Status (VPO_ISSUED stage) ── */}
+          {order.status === OrderStatus.VPO_ISSUED && (
+            <div style={{ ...cardStyle, borderTop: `3px solid ${order.stoneStatus === StoneStatus.STONE_RECEIVED ? '#10B981' : '#7C3AED'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
+                  💎 Stone Status
+                </h3>
+                {order.stoneStatus === StoneStatus.STONE_RECEIVED
+                  ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '4px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>Stone Received ✓</span>
+                  : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '4px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>Pending Stone</span>
+                }
+              </div>
+              {order.stoneStatus !== StoneStatus.STONE_RECEIVED && (
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: userRole === UserRole.STONE_MANAGER ? '12px' : '0' }}>
+                  This order is waiting for the stone to be received before manufacturing can proceed.
+                </p>
+              )}
+              {order.stoneStatus === StoneStatus.STONE_RECEIVED && (
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  Stone has been confirmed received. Factory Manager has been notified to proceed.
+                </p>
+              )}
+              {userRole === UserRole.STONE_MANAGER && order.stoneStatus !== StoneStatus.STONE_RECEIVED && (
+                <button
+                  onClick={async () => {
+                    if (!order?.id) return;
+                    const res = await apiFetch(`${API}/manufacturing/${order.id}/stone-received`, { method: 'PATCH' });
+                    if (res.ok) setOrder(await res.json());
+                  }}
+                  style={{ width: '100%', background: '#7C3AED', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.3px' }}
+                >
+                  ✓ Mark Stone as Received
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Conversation */}
           {order.id && currentUser && (

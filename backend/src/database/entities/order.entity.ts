@@ -29,6 +29,11 @@ export enum ManufacturingPath {
   CASTING_ONLY = 'CASTING_ONLY',
 }
 
+export enum StoneStatus {
+  PENDING_STONE = 'PENDING_STONE',
+  STONE_RECEIVED = 'STONE_RECEIVED',
+}
+
 @Entity('orders')
 @Index(['poNumber'], { unique: true })
 @Index(['status'])
@@ -155,6 +160,9 @@ export class Order {
 
   @Column({ nullable: true, type: 'varchar' })
   cadSubStatus: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  stoneStatus: StoneStatus | null;
 
   @Column({ default: false })
   isArchived: boolean;
