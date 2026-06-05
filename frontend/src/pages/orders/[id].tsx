@@ -718,40 +718,6 @@ export default function OrderDetail() {
           )}
         </div>
 
-          {/* ── Stone Status (VPO_ISSUED stage) ── */}
-          {order.status === OrderStatus.VPO_ISSUED && (
-            <div style={{ ...cardStyle, borderTop: `3px solid ${order.stoneStatus === StoneStatus.STONE_RECEIVED ? '#10B981' : '#7C3AED'}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
-                  💎 Stone Status
-                </h3>
-                {order.stoneStatus === StoneStatus.STONE_RECEIVED
-                  ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '4px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>Stone Received ✓</span>
-                  : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '4px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 700 }}>Pending Stone</span>
-                }
-              </div>
-
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: order.stoneStatus !== StoneStatus.STONE_RECEIVED && (userRole === UserRole.STONE_MANAGER || userRole === UserRole.ADMIN) ? '12px' : '0' }}>
-                {order.stoneStatus === StoneStatus.STONE_RECEIVED
-                  ? 'Stone has been sent and marked as received. Production can proceed.'
-                  : 'Waiting for Stone Manager to dispatch the stone.'}
-              </p>
-
-              {/* Stone Manager only: Mark Stone Sent → auto sets received on factory side */}
-              {(userRole === UserRole.STONE_MANAGER || userRole === UserRole.ADMIN) && order.stoneStatus !== StoneStatus.STONE_RECEIVED && (
-                <button
-                  onClick={async () => {
-                    if (!order?.id) return;
-                    const res = await apiFetch(`${API}/manufacturing/${order.id}/stone-sent`, { method: 'PATCH' });
-                    if (res.ok) setOrder(await res.json());
-                  }}
-                  style={{ width: '100%', background: '#7C3AED', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  📦 Mark Stone Sent
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Conversation */}
           {order.id && currentUser && (
@@ -773,6 +739,31 @@ export default function OrderDetail() {
               {cfg.label}
             </div>
           </div>
+
+          {/* Stone status — sidebar card */}
+          {order.status === OrderStatus.VPO_ISSUED && (
+            <div style={{ ...cardStyle, borderTop: `3px solid ${order.stoneStatus === StoneStatus.STONE_RECEIVED ? '#10B981' : '#7C3AED'}` }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>💎 Stone Status</div>
+              <div style={{ marginBottom: (userRole === UserRole.STONE_MANAGER || userRole === UserRole.ADMIN) && order.stoneStatus !== StoneStatus.STONE_RECEIVED ? '12px' : '0' }}>
+                {order.stoneStatus === StoneStatus.STONE_RECEIVED
+                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#D1FAE5', color: '#065F46', padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>Stone Received ✓</span>
+                  : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#EDE9FE', color: '#5B21B6', padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>Pending Stone</span>
+                }
+              </div>
+              {(userRole === UserRole.STONE_MANAGER || userRole === UserRole.ADMIN) && order.stoneStatus !== StoneStatus.STONE_RECEIVED && (
+                <button
+                  onClick={async () => {
+                    if (!order?.id) return;
+                    const res = await apiFetch(`${API}/manufacturing/${order.id}/stone-sent`, { method: 'PATCH' });
+                    if (res.ok) setOrder(await res.json());
+                  }}
+                  style={{ width: '100%', background: '#7C3AED', border: 'none', borderRadius: '8px', padding: '9px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  📦 Mark Stone Sent
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Quoted Price — editable for Authorizer/Admin, read-only for others */}
           {userRole !== UserRole.CUSTOMER && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, STATUS_CONFIG } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus } from '../../utils/types';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -103,6 +103,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           {daysOverdue !== undefined && daysOverdue > 0 && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               ⚠ +{daysOverdue}d overdue
+            </span>
+          )}
+          {(order as any).stoneStatus === StoneStatus.PENDING_STONE && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#5B21B6', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              💎 Pending Stone
+            </span>
+          )}
+          {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#065F46', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              💎 Stone Received
             </span>
           )}
         </div>
