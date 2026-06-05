@@ -491,8 +491,8 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Date Filters */}
-      <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Date filter chips */}
+      <div className="date-filter-chips" style={{ marginBottom: '8px' }}>
         {(() => {
           const now = new Date();
           const months = [
@@ -505,30 +505,36 @@ export default function OrdersPage() {
             const isActive = activeMonth === key;
             return (
               <button key={key} onClick={() => isActive ? clearDates() : applyMonth(y, m)}
-                style={{
-                  padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap',
                   fontWeight: isActive ? 600 : 400,
                   background: isActive ? 'var(--accent-dark)' : 'var(--bg-card)',
                   color: isActive ? '#fff' : 'var(--text-secondary)',
-                  border: `1px solid ${isActive ? 'var(--accent-dark)' : 'var(--border)'}`,
-                  transition: 'all 0.15s',
+                  border: `1px solid ${isActive ? 'var(--accent-dark)' : 'var(--border)'}`, transition: 'all 0.15s',
                 }}
               >{label}</button>
             );
           });
         })()}
+        {(dateFrom || dateTo || activeMonth) && (
+          <button onClick={clearDates} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500, whiteSpace: 'nowrap' }}>✕ Clear</button>
+        )}
+      </div>
+
+      {/* Date pickers — 2-column grid */}
+      <div className="date-pickers-grid" style={{ marginBottom: '16px' }}>
         <input type="month" value={activeMonth}
           onChange={e => { if (!e.target.value) { clearDates(); return; } const [y, m] = e.target.value.split('-').map(Number); applyMonth(y, m); }}
-          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} title="Pick a specific month"
+          style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }} title="Pick a month"
         />
-        <span style={{ color: 'var(--border)', fontSize: '14px' }}>|</span>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>From</label>
-        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }} style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} />
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
-        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setActiveMonth(''); }} style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }} />
-        {(dateFrom || dateTo) && (
-          <button onClick={clearDates} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500 }}>✕ Clear</button>
-        )}
+        <div />
+        <input type="date" value={dateFrom}
+          onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }}
+        />
+        <input type="date" value={dateTo}
+          onChange={e => { setDateTo(e.target.value); setActiveMonth(''); }}
+          style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }}
+        />
       </div>
 
       {/* Kanban link */}

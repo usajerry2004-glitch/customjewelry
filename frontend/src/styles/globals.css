@@ -165,10 +165,31 @@ input::placeholder, textarea::placeholder {
   .orders-grid { grid-template-columns: 1fr !important; }
 }
 
-/* Filter pills wrap nicely */
+/* Filter row — wrap on mobile but don't stretch */
 @media (max-width: 640px) {
-  .filter-row { flex-direction: column !important; align-items: stretch !important; }
-  .filter-row input { width: 100% !important; }
+  .filter-row { flex-wrap: wrap !important; gap: 8px !important; }
+  .filter-row > input[type="text"],
+  .filter-row > input[type="search"] { width: 100% !important; }
+}
+
+/* Date filter chips row — always horizontal, scrollable */
+.date-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Date pickers — 2-column grid on all screens */
+.date-pickers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+@media (max-width: 400px) {
+  .date-pickers-grid { grid-template-columns: 1fr; }
 }
 
 /* Login page */
