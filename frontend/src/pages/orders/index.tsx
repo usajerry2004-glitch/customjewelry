@@ -19,16 +19,6 @@ const ALL_STATUS_FILTERS = [
 ];
 
 const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
-  SHIPPING_MANAGER: [
-    { label: 'All',           value: '' },
-    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
-    { label: 'Shipped',       value: OrderStatus.SHIPPED },
-  ],
-  FACTORY_MANAGER: [
-    { label: 'All',                value: '' },
-    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
-    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
-  ],
   CAD_DESIGNER: [
     { label: 'All',            value: '' },
     { label: 'Pending',        value: 'cad_pending' },
@@ -38,6 +28,44 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
   SKU_MANAGER: [
     { label: 'All',          value: '' },
     { label: 'SKU Creation', value: OrderStatus.SKU_CREATION },
+  ],
+  STONE_MANAGER: [
+    { label: 'All',        value: '' },
+    { label: 'VPO Created', value: OrderStatus.VPO_ISSUED },
+  ],
+  FACTORY_MANAGER: [
+    { label: 'All',                value: '' },
+    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
+    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
+  ],
+  SHIPPING_MANAGER: [
+    { label: 'All',           value: '' },
+    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
+    { label: 'Shipped',       value: OrderStatus.SHIPPED },
+  ],
+  US_SETTER: [
+    { label: 'All',       value: '' },
+    { label: 'Repair',    value: OrderStatus.REPAIR },
+    { label: 'Completed', value: OrderStatus.COMPLETED },
+  ],
+  CUSTOMER: [
+    { label: 'All',             value: '' },
+    { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
+    { label: 'VPO Created',     value: OrderStatus.VPO_ISSUED },
+    { label: 'Ready to Ship',   value: OrderStatus.READY_TO_SHIP },
+    { label: 'Shipped',         value: OrderStatus.SHIPPED },
+    { label: 'Completed',       value: OrderStatus.COMPLETED },
+  ],
+  SALES_REP: [
+    { label: 'All',                value: '' },
+    { label: 'CAD In Progress',    value: OrderStatus.CAD_IN_PROGRESS },
+    { label: 'SKU Creation',       value: OrderStatus.SKU_CREATION },
+    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
+    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
+    { label: 'Ready to Ship',      value: OrderStatus.READY_TO_SHIP },
+    { label: 'Shipped',            value: OrderStatus.SHIPPED },
+    { label: 'Completed',          value: OrderStatus.COMPLETED },
+    { label: 'Cancelled',          value: OrderStatus.CANCELLED },
   ],
 };
 
