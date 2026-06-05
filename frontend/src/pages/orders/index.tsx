@@ -84,7 +84,14 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('status') || '';
+    }
+    return '';
+  });
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [activeMonth, setActiveMonth] = useState('');
@@ -101,6 +108,14 @@ export default function OrdersPage() {
   const [userRole, setUserRole] = useState('');
   const [cadSubFilter, setCadSubFilter] = useState('');
   const [stoneSubFilter, setStoneSubFilter] = useState('');
+
+  // Sync statusFilter when URL query changes (Next.js router)
+  useEffect(() => {
+    const s = (router.query.status as string) || '';
+    setStatusFilter(s);
+    setCadSubFilter('');
+    setStoneSubFilter('');
+  }, [router.query.status]);
 
   useEffect(() => {
     try {
