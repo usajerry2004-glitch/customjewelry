@@ -163,51 +163,64 @@ export default function Dashboard() {
     </div>
   );
 
-  // Pie chart colours for each day
-  const PIE_COLORS = ['#1A2740','#0891B2','#7C3AED','#F59E0B','#10B981','#EF4444','#C09B58'];
+  const BAR_COLORS = ['#1A2740','#0891B2','#7C3AED','#F59E0B','#10B981','#C09B58'];
 
-  // Pie data: orders created per day (non-zero only)
-  const pieData = trend.filter(t => t.created > 0).map((t, i) => ({ name: t.date, value: t.created, fill: PIE_COLORS[i % PIE_COLORS.length] }));
+  // Pie: total received vs completed over last 7 days
+  const totalReceived  = trend.reduce((s, t) => s + t.created, 0);
+  const totalCompleted = trend.reduce((s, t) => s + t.completed, 0);
+  const pieData = [
+    { name: `Received (${totalReceived})`,  value: totalReceived,  fill: '#1A2740' },
+    { name: `Completed (${totalCompleted})`, value: totalCompleted, fill: '#059669' },
+  ].filter(d => d.value > 0);
 
   const ActivityPie = () => (
-    <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 0 }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Daily Activity</h2>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Orders created — last 7 days</div>
+    <div style={{ ...card, padding: '18px 20px', flex: 1, minWidth: 0 }}>
+      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Weekly Activity</h2>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Received vs Completed — last 7 days</div>
       {loading ? (
-        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
       ) : pieData.length === 0 ? (
-        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No orders this week</div>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No orders this week</div>
       ) : (
-        <ResponsiveContainer width="100%" height={210}>
-          <PieChart>
-            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="48%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ name, value }) => `${name}: ${value}`} labelLine={false}>
-              {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-            </Pie>
-            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} orders`, 'Created']} />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-          </PieChart>
-        </ResponsiveContainer>
+        <>
+          <ResponsiveContainer width="100%" height={165}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={72} innerRadius={38} paddingAngle={4}>
+                {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Pie>
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 8 }}>
+            {pieData.map(d => (
+              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: d.fill, flexShrink: 0 }} />
+                {d.name}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
 
   const TopCustomers = () => (
-    <div style={{ ...card, padding: '18px 22px', flex: 1, minWidth: 0 }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Top Customers</h2>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Most active this month</div>
+    <div style={{ ...card, padding: '18px 20px', flex: 1, minWidth: 0 }}>
+      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Top Customers</h2>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Most active this month</div>
       {loading ? (
-        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
       ) : topStores.length === 0 ? (
-        <div style={{ height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data this month</div>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data this month</div>
       ) : (
-        <ResponsiveContainer width="100%" height={210}>
-          <BarChart data={topStores.slice(0, 6)} layout="vertical" margin={{ top: 4, right: 36, bottom: 0, left: 4 }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={topStores.slice(0, 5)} layout="vertical" margin={{ top: 4, right: 32, bottom: 0, left: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <YAxis type="category" dataKey="store" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={120} />
+            <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis type="category" dataKey="store" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={110} />
             <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} orders`, 'Orders']} />
-            <Bar dataKey="count" radius={[0,4,4,0]} name="Orders">
-              {topStores.slice(0, 6).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+            <Bar dataKey="count" radius={[0,4,4,0]}>
+              {topStores.slice(0, 5).map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -249,13 +262,10 @@ export default function Dashboard() {
         <KpiCard label="My Actions"     value={actions.length}  color="#7C3AED" sub="priority tasks"             link="/todos" />
       </div>
       <PipelineFunnel />
-      {/* Charts row */}
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      {/* 3-panel analytics row */}
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
         <ActivityPie />
         <TopCustomers />
-      </div>
-      {/* SLA row */}
-      <div style={{ marginBottom: 24 }}>
         <SLAPanel />
       </div>
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
