@@ -30,7 +30,7 @@ export default function RepairsPage() {
     });
   }, []);
 
-  // Group by repairContractor (fallback to 'Unassigned')
+  // Group by repairContractor
   const grouped: Record<string, Partial<Order>[]> = {};
   orders.forEach(o => {
     const key = (o as any).repairContractor || 'Unassigned';
@@ -38,7 +38,6 @@ export default function RepairsPage() {
     grouped[key].push(o);
   });
 
-  // Sort contractors alphabetically, Unassigned last
   const contractors = Object.keys(grouped).sort((a, b) => {
     if (a === 'Unassigned') return 1;
     if (b === 'Unassigned') return -1;
@@ -56,13 +55,13 @@ export default function RepairsPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading…</div>
       ) : orders.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '80px', ...card }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔧</div>
+        <div style={{ textAlign: 'center', padding: '60px 20px', ...card }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔧</div>
           <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No orders in repair</div>
           <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Orders sent for repair will appear here, grouped by contractor.</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {contractors.map(contractor => {
             const contractorOrders = grouped[contractor];
             const overdueCount = contractorOrders.filter(o => daysSince(o.updatedAt!) > 1).length;
@@ -70,7 +69,7 @@ export default function RepairsPage() {
             return (
               <div key={contractor}>
                 {/* Contractor header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
                   <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
                     🔧 {contractor}
                   </div>
@@ -84,59 +83,64 @@ export default function RepairsPage() {
                   )}
                 </div>
 
-                {/* Orders under this contractor */}
-                <div className="table-scroll" style={{ ...card, overflow: 'hidden' }}>
-                  <table className="repairs-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border)' }}>
-                        {['PO Number', 'Store / Customer', 'Product', 'Sent for Repair', 'Days', 'Actions'].map(h => (
-                          <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contractorOrders
-                        .sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime())
-                        .map((order, i) => {
-                          const days = daysSince(order.updatedAt!);
-                          const isOverdue = days > 1;
-                          return (
-                            <tr key={order.id}
-                              style={{ borderBottom: i < contractorOrders.length - 1 ? '1px solid var(--border-light)' : 'none', cursor: 'pointer', borderLeft: isOverdue ? '3px solid #DC2626' : '3px solid transparent' }}
-                              onClick={() => router.push(`/orders/${order.id}`)}
-                              onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(0,0,0,0.02)'}
-                              onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
-                            >
-                              <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--navy)', whiteSpace: 'nowrap' }}>
-                                {order.poNumber}
-                              </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                {/* Cards — works on all screen sizes */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {contractorOrders
+                    .sort((a, b) => new Date(a.updatedAt!).getTime() - new Date(b.updatedAt!).getTime())
+                    .map(order => {
+                      const days = daysSince(order.updatedAt!);
+                      const isOverdue = days > 1;
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={() => router.push(`/orders/${order.id}`)}
+                          style={{
+                            ...card,
+                            borderLeft: `4px solid ${isOverdue ? '#DC2626' : 'var(--border)'}`,
+                            padding: '14px 16px',
+                            cursor: 'pointer',
+                            transition: 'box-shadow 0.15s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-sm)'}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              {/* PO + overdue badge */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>{order.poNumber}</span>
+                                {isOverdue && (
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px', padding: '1px 7px' }}>
+                                    ⚠ {days} day{days !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Store */}
+                              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
                                 {order.storeName || order.customerFullName || '—'}
-                              </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                              </div>
+                              {/* Product specs */}
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 {[order.orderType, order.metalType, order.metalColor].filter(Boolean).join(' · ') || '—'}
-                              </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                                {new Date(order.updatedAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </td>
-                              <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                                <span style={{ fontWeight: 700, color: isOverdue ? '#DC2626' : 'var(--text-secondary)', background: isOverdue ? 'rgba(220,38,38,0.08)' : 'transparent', padding: isOverdue ? '2px 8px' : '0', borderRadius: '5px', fontSize: '12px' }}>
-                                  {days} day{days !== 1 ? 's' : ''}{isOverdue ? ' ⚠' : ''}
-                                </span>
-                              </td>
-                              <td style={{ padding: '12px 16px' }}>
-                                <button
-                                  onClick={e => { e.stopPropagation(); router.push(`/orders/${order.id}`); }}
-                                  style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent-dark)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
-                                >
-                                  View →
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              {!isOverdue && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '4px' }}>
+                                  {days} day{days !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                {new Date(order.updatedAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginTop: '4px' }}>
+                                View →
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             );
