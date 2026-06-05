@@ -14,6 +14,7 @@ const SLA_RULES: { status: OrderStatus; maxDays: number; role: UserRole; label: 
   { status: OrderStatus.VPO_ISSUED,        maxDays: 1,  role: UserRole.STONE_MANAGER,    label: 'Stone Pending' },
   { status: OrderStatus.PENDING_CONTRACTOR,maxDays: 2,  role: UserRole.FACTORY_MANAGER,  label: 'Pending Contractor' },
   { status: OrderStatus.READY_TO_SHIP,     maxDays: 2,  role: UserRole.SHIPPING_MANAGER, label: 'Ready to Ship' },
+  { status: OrderStatus.REPAIR,            maxDays: 1,  role: UserRole.AUTHORIZER,       label: 'With Repair Contractor' },
 ];
 
 // Separate rule for CAD files awaiting customer approval (checked on CadFile updatedAt)

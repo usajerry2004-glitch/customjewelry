@@ -278,6 +278,7 @@ export class OrdersService {
     status: OrderStatus,
     user?: { id?: string; email: string; role: string },
     quotedCost?: number,
+    repairContractor?: string,
   ): Promise<Order> {
     if (user?.role === 'CUSTOMER') {
       throw new ForbiddenException('Not authorized to change order status directly');
@@ -308,6 +309,14 @@ export class OrdersService {
         });
       }
       return skuOrder;
+    }
+
+    // Require contractor name when moving to REPAIR
+    if (status === OrderStatus.REPAIR) {
+      if (!repairContractor || !repairContractor.trim()) {
+        throw new BadRequestException('Contractor name is required when sending an order for repair');
+      }
+      return this.update(id, { status: OrderStatus.REPAIR, repairContractor: repairContractor.trim() }, user);
     }
 
     // Factory Manager cannot move VPO_ISSUED orders until stone is received
@@ -540,6 +549,19 @@ export class OrdersService {
       shipOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
           results.push({ ...o, priorityReason: 'Ready to ship — over 1 day', priorityLevel: 'MEDIUM' });
+      });
+    }
+
+    if ([UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)) {
+      // Repair: in REPAIR > 1 day — needs follow-up
+      const repairOverdue = await this.orderRepo.createQueryBuilder('o')
+        .where('o.isArchived = false')
+        .andWhere('o.status = :s', { s: OrderStatus.REPAIR })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+        .getMany();
+      repairOverdue.forEach(o => {
+        if (!results.find(r => r.id === o.id))
+          results.push({ ...o, priorityReason: `With repair contractor${o.repairContractor ? ` (${o.repairContractor})` : ''} — over 1 day`, priorityLevel: 'HIGH' });
       });
     }
 

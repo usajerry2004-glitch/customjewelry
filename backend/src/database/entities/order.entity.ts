@@ -152,6 +152,9 @@ export class Order {
   @Column({ nullable: true, type: 'varchar' })
   cadSubStatus: string | null;
 
+  @Column({ nullable: true })
+  repairContractor: string;
+
   @Column({ type: 'varchar', nullable: true })
   stoneStatus: StoneStatus | null;
 

@@ -49,6 +49,7 @@ export interface Order {
   quotedCost?: number;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
+  repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
   createdAt: string;

@@ -66,10 +66,10 @@ export class OrdersController {
   @ApiOperation({ summary: 'Update order status (quotedCost required when moving to SKU_CREATION)' })
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: OrderStatus; quotedCost?: number },
+    @Body() body: { status: OrderStatus; quotedCost?: number; repairContractor?: string },
     @Request() req: any,
   ) {
-    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost);
+    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor);
   }
 
   @Patch(':id/authorize')

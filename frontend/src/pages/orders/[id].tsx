@@ -308,6 +308,8 @@ export default function OrderDetail() {
   const [pendingPrice, setPendingPrice] = useState('');
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+  const [repairModal, setRepairModal] = useState(false);
+  const [repairContractorInput, setRepairContractorInput] = useState('');
 
   useEffect(() => {
     try {
@@ -372,7 +374,7 @@ export default function OrderDetail() {
     setSummaryLoading(false);
   };
 
-  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number) => {
+  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
     if (!order?.id) return;
     // SKU_CREATION requires a price — show modal if not provided
     if (newStatus === 'SKU_CREATION' as OrderStatus && !quotedCost) {
@@ -380,9 +382,16 @@ export default function OrderDetail() {
       setPriceModal(true);
       return;
     }
+    // REPAIR requires a contractor name — show modal
+    if (newStatus === OrderStatus.REPAIR && !repairContractor) {
+      setRepairContractorInput('');
+      setRepairModal(true);
+      return;
+    }
     setUpdatingStatus(true);
     const body: any = { status: newStatus };
     if (quotedCost) body.quotedCost = quotedCost;
+    if (repairContractor) body.repairContractor = repairContractor;
     const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -415,6 +424,12 @@ export default function OrderDetail() {
     if (!price || price <= 0) return;
     setPriceModal(false);
     await moveStatus('SKU_CREATION' as OrderStatus, price);
+  };
+
+  const confirmRepair = async () => {
+    if (!repairContractorInput.trim()) return;
+    setRepairModal(false);
+    await moveStatus(OrderStatus.REPAIR, undefined, repairContractorInput.trim());
   };
 
   if (loading) {
@@ -956,6 +971,44 @@ export default function OrderDetail() {
                 disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
                 style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
                 Confirm & Move to SKU Creation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Repair Contractor Modal */}
+      {repairModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '400px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Send for Repair
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Enter the <strong>contractor name</strong> who will handle this repair. This is required for tracking.
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Repair Contractor Name *
+            </label>
+            <input
+              type="text"
+              value={repairContractorInput}
+              onChange={e => setRepairContractorInput(e.target.value)}
+              placeholder="e.g. Diamond Setters NY"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') confirmRepair(); }}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setRepairModal(false)}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={confirmRepair}
+                disabled={!repairContractorInput.trim()}
+                style={{ flex: 2, background: '#EF4444', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: !repairContractorInput.trim() ? 0.5 : 1 }}>
+                🔧 Confirm — Send for Repair
               </button>
             </div>
           </div>
