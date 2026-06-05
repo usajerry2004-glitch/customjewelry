@@ -163,14 +163,15 @@ export default function Dashboard() {
     </div>
   );
 
-  const BAR_COLORS = ['#1A2740','#0891B2','#7C3AED','#F59E0B','#10B981','#C09B58'];
+  // Elegant navy-to-gold palette matching the project theme
+  const BAR_COLORS = ['#1A2740', '#243858', '#2E4870', '#C09B58', '#A07C3A', '#8A6B2E'];
 
   // Pie: total received vs completed over last 7 days
   const totalReceived  = trend.reduce((s, t) => s + t.created, 0);
   const totalCompleted = trend.reduce((s, t) => s + t.completed, 0);
   const pieData = [
-    { name: `Received (${totalReceived})`,  value: totalReceived,  fill: '#1A2740' },
-    { name: `Completed (${totalCompleted})`, value: totalCompleted, fill: '#059669' },
+    { name: `Received (${totalReceived})`,   value: totalReceived,  fill: '#1A2740' },
+    { name: `Completed (${totalCompleted})`, value: totalCompleted, fill: '#C09B58' },
   ].filter(d => d.value > 0);
 
   const ActivityPie = () => (
