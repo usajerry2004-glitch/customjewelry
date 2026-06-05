@@ -8,35 +8,36 @@ import { apiFetch, API } from '../../utils/apiFetch';
 interface KanbanColumn { status: string; orders: Partial<Order>[]; count: number; }
 
 const COLUMN_ORDER = [
-  'WAITING_CONFIRMATION', 'PENDING_CAD', 'CAD_IN_PROGRESS', 'CUSTOMER_APPROVED',
-  'SKU_CREATION', 'VPO_ISSUED', 'PENDING_CONTRACTOR', 'ORDER_JOB_BAG_CREATED',
-  'READY_TO_INVOICE', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED',
+  'CAD_IN_PROGRESS', 'SKU_CREATION',
+  'VPO_ISSUED', 'PENDING_CONTRACTOR',
+  'READY_TO_SHIP', 'SHIPPED',
+  'REPAIR', 'COMPLETED', 'CANCELLED',
 ];
 
 const PHASES = [
   {
-    label: 'Intake',
-    icon: '📥',
-    statuses: ['WAITING_CONFIRMATION', 'PENDING_CAD'],
+    label: 'Design',
+    icon: '✏️',
+    statuses: ['CAD_IN_PROGRESS', 'SKU_CREATION'],
     color: '#6366F1',
   },
   {
-    label: 'Design',
-    icon: '✏️',
-    statuses: ['CAD_IN_PROGRESS', 'CUSTOMER_APPROVED', 'SKU_CREATION'],
+    label: 'Production',
+    icon: '🏭',
+    statuses: ['VPO_ISSUED', 'PENDING_CONTRACTOR'],
     color: '#F59E0B',
   },
   {
-    label: 'Manufacturing',
-    icon: '🏭',
-    statuses: ['VPO_ISSUED', 'PENDING_CONTRACTOR', 'ORDER_JOB_BAG_CREATED', 'READY_TO_INVOICE'],
-    color: '#EF4444',
+    label: 'Fulfilment',
+    icon: '🚚',
+    statuses: ['READY_TO_SHIP', 'SHIPPED'],
+    color: '#10B981',
   },
   {
-    label: 'Delivery',
-    icon: '🚚',
-    statuses: ['READY_TO_SHIP', 'SHIPPED', 'DELIVERED'],
-    color: '#10B981',
+    label: 'Aftercare',
+    icon: '🔧',
+    statuses: ['REPAIR', 'COMPLETED', 'CANCELLED'],
+    color: '#EF4444',
   },
 ];
 
@@ -44,7 +45,7 @@ export default function KanbanPage() {
   const router = useRouter();
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string>('WAITING_CONFIRMATION');
+  const [selected, setSelected] = useState<string>('CAD_IN_PROGRESS');
 
   useEffect(() => {
     apiFetch(`${API}/orders/kanban`).then(async res => {
