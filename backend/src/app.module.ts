@@ -2,6 +2,7 @@ import { Module, OnModuleInit } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -49,25 +50,23 @@ import { AuthService } from './modules/auth/auth.service';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => {
+      useFactory: (config: ConfigService): TypeOrmModuleOptions => {
         const databaseUrl = config.get<string>('DATABASE_URL');
-        const isProduction = config.get('NODE_ENV') === 'production';
-        const base = {
-          entities: [Order, User, CadFile, Sku, Notification, OrderMessage, Todo],
-          synchronize: true,
-          logging: false,
-        };
+        const isProduction = config.get<string>('NODE_ENV') === 'production';
+        const entities = [Order, User, CadFile, Sku, Notification, OrderMessage, Todo];
         if (databaseUrl) {
-          return { ...base, type: 'postgres' as const, url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false };
+          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: true, logging: false };
         }
         return {
-          ...base,
-          type: 'postgres' as const,
-          host: config.get('DB_HOST', 'localhost'),
-          port: config.get<number>('DB_PORT', 5432),
-          username: config.get('DB_USERNAME', 'jewelflow'),
-          password: config.get('DB_PASSWORD', 'jewelflow123'),
-          database: config.get('DB_NAME', 'jewelflow'),
+          type: 'postgres',
+          host: config.get<string>('DB_HOST') || 'localhost',
+          port: config.get<number>('DB_PORT') || 5432,
+          username: config.get<string>('DB_USERNAME') || 'jewelflow',
+          password: config.get<string>('DB_PASSWORD') || 'jewelflow123',
+          database: config.get<string>('DB_NAME') || 'jewelflow',
+          entities,
+          synchronize: true,
+          logging: false,
         };
       },
       inject: [ConfigService],
