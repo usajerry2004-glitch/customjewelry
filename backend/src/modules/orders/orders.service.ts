@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Order, OrderStatus } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
@@ -439,6 +439,7 @@ export class OrdersService {
       [UserRole.SKU_MANAGER]:     [OrderStatus.SKU_CREATION],
       [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.ORDER_JOB_BAG_CREATED, OrderStatus.READY_TO_INVOICE],
       [UserRole.SHIPPING_MANAGER]:[OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+      [UserRole.STONE_MANAGER]:   [OrderStatus.VPO_ISSUED],
     };
 
     const qb = () => {
@@ -534,6 +535,20 @@ export class OrdersService {
       shipOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
           results.push({ ...o, priorityReason: 'Ready to ship — over 1 day', priorityLevel: 'MEDIUM' });
+      });
+    }
+
+    if ([UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
+      // Stone Manager: VPO_ISSUED with stone still pending > 1 day
+      const stoneOverdue = await this.orderRepo.createQueryBuilder('o')
+        .where('o.isArchived = false')
+        .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+        .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+        .getMany();
+      stoneOverdue.forEach(o => {
+        if (!results.find(r => r.id === o.id))
+          results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
       });
     }
 

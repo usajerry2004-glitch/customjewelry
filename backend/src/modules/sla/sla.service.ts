@@ -13,6 +13,7 @@ const SLA_RULES: { status: OrderStatus; maxDays: number; role: UserRole; label: 
   { status: OrderStatus.CAD_IN_PROGRESS,      maxDays: 7,  role: UserRole.CAD_DESIGNER,     label: 'CAD In Progress' },
   { status: OrderStatus.SKU_CREATION,         maxDays: 2,  role: UserRole.SKU_MANAGER,      label: 'SKU Creation' },
   { status: OrderStatus.VPO_ISSUED,           maxDays: 3,  role: UserRole.FACTORY_MANAGER,  label: 'VPO Issued' },
+  { status: OrderStatus.VPO_ISSUED,           maxDays: 1,  role: UserRole.STONE_MANAGER,    label: 'Stone Pending' },
   { status: OrderStatus.PENDING_CONTRACTOR,   maxDays: 5,  role: UserRole.FACTORY_MANAGER,  label: 'Pending Contractor' },
   { status: OrderStatus.ORDER_JOB_BAG_CREATED,maxDays: 21, role: UserRole.FACTORY_MANAGER,  label: 'Job Bag Created' },
   { status: OrderStatus.READY_TO_INVOICE,     maxDays: 2,  role: UserRole.SHIPPING_MANAGER, label: 'Ready to Invoice' },
