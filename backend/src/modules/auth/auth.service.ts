@@ -54,6 +54,7 @@ export class AuthService {
       { firstName: 'Maya',     lastName: 'Patel',    email: 'cad@kirajewels.one',         password: process.env.SEED_CAD_PASSWORD      || 'KiRa@CadDesign#2025!', role: UserRole.CAD_DESIGNER },
       { firstName: 'Jake',     lastName: 'Morris',   email: 'sku@kirajewels.one',         password: process.env.SEED_SKU_PASSWORD      || 'KiRa@SkuMgr#2025!',   role: UserRole.SKU_MANAGER },
       { firstName: 'Arjun',   lastName: 'Singh',    email: 'factory@kirajewels.one',     password: process.env.SEED_FACTORY_PASSWORD  || 'KiRa@Factory#2025!',  role: UserRole.FACTORY_MANAGER },
+      { firstName: 'Priya',    lastName: 'Mehta',    email: 'stone@kirajewels.one',       password: process.env.SEED_STONE_PASSWORD    || 'KiRa@Stone#2025!',    role: UserRole.STONE_MANAGER },
       { firstName: 'Lisa',     lastName: 'Nguyen',   email: 'shipping@kirajewels.one',    password: process.env.SEED_SHIPPING_PASSWORD || 'KiRa@Shipping#2025!', role: UserRole.SHIPPING_MANAGER },
       { firstName: 'Emma',     lastName: 'Thompson', email: 'customer@example.com',       password: process.env.SEED_CUSTOMER_PASSWORD || 'KiRa@Customer#2025!', role: UserRole.CUSTOMER },
 
