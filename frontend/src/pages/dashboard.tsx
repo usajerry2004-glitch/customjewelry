@@ -182,7 +182,7 @@ export default function Dashboard() {
       actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}>+ New Order</button>}
     >
       {/* ── KPIs ── */}
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 8 }}>
+      <div className="dash-kpi">
         <KpiCard label="Active Orders"  value={activeOrders}   color={NAVY}                                         sub="not completed or cancelled" link="/orders" />
         <KpiCard label="New This Week"  value={recent.length}  color="#0891B2"                                      sub="last 7 days"                link="/orders" />
         <KpiCard label="SLA Breaches"   value={overdue.length} color={overdue.length > 0 ? '#DC2626' : '#059669'}  sub="orders older than 10 days"  link="/todos" accent />
@@ -211,7 +211,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Analytics ── */}
-      <div className="dashboard-grid dash-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 8 }}>
+      <div className="dash-3col">
 
         {/* Weekly Activity — Pie */}
         <div style={{ ...card, padding: '20px 22px' }}>
@@ -299,7 +299,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Queues ── */}
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="dash-2col">
         <ActionSection title="My Action Queue" subtitle="Orders requiring your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
         <ActionSection title="New This Week"    subtitle="Last 7 days"                      items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
       </div>
@@ -308,7 +308,7 @@ export default function Dashboard() {
 
   // ── Other roles (compact) ────────────────────────────────────────────────────
   const RoleKpi = ({ items }: { items: { label: string; value: any; color: string; sub: string; link?: string }[] }) => (
-    <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length},1fr)`, gap: 16, marginBottom: 8 }}>
+    <div className="dash-kpi" style={{ marginBottom: 8 }}>
       {items.map(k => <KpiCard key={k.label} {...k} />)}
     </div>
   );
@@ -327,7 +327,7 @@ export default function Dashboard() {
   if (cfg) return (
     <AppLayout title="Dashboard" subtitle={cfg.subtitle} actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
       <RoleKpi items={cfg.kpis} />
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="dash-2col">
         <ActionSection title="My Priority Queue" subtitle="Needs your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
         <ActionSection title="Recent Activity"   subtitle="Last 7 days"          items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
       </div>
