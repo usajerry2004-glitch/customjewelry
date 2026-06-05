@@ -165,7 +165,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All clear</div>
             </div>
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {items.map((o: any) => <OrderRow key={o.id} o={o} />)}
+              {items.slice(0, 5).map((o: any) => <OrderRow key={o.id} o={o} />)}
             </div>
       }
     </div>
