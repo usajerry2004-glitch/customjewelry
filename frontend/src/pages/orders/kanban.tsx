@@ -263,68 +263,82 @@ export default function KanbanPage() {
             )}
           </div>
 
-          {/* ── Full pipeline progress bar ── */}
-          <div style={{
-            background: 'var(--bg-card)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)', padding: '16px 20px',
-            boxShadow: 'var(--shadow-sm)',
-          }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '12px' }}>
-              Full pipeline overview
+          {/* ── Full pipeline overview — grouped by phase ── */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '14px' }}>
+              Full Pipeline Overview
             </div>
-            <div style={{ display: 'flex', gap: '3px', alignItems: 'stretch', height: '36px' }}>
-              {columns.map(col => {
-                const cfg = STATUS_CONFIG[col.status] || { label: col.status, color: '#6B7280' };
-                const pct = totalOrders > 0 ? (col.count / totalOrders) * 100 : 0;
-                if (pct < 0.5) return null;
-                const isSelected = selected === col.status;
+
+            {/* Phase groups */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+              {PHASES.map(phase => {
+                const phaseStatuses = phase.statuses
+                  .map(s => columns.find(c => c.status === s))
+                  .filter(Boolean) as { status: string; orders: any[]; count: number }[];
+                const phaseTotal = phaseStatuses.reduce((s, c) => s + c.count, 0);
+                if (phaseTotal === 0) return null;
+
                 return (
-                  <button
-                    key={col.status}
-                    onClick={() => setSelected(col.status)}
-                    title={`${cfg.label}: ${col.count}`}
-                    style={{
-                      flex: col.count,
-                      background: isSelected ? cfg.color : `${cfg.color}50`,
-                      borderRadius: '5px',
-                      border: isSelected ? `2px solid ${cfg.color}` : '2px solid transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      minWidth: col.count > 0 ? '28px' : '0',
-                      overflow: 'hidden',
-                    }}
-                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = cfg.color; }}
-                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = `${cfg.color}50`; }}
-                  >
-                    {col.count > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: isSelected ? '#fff' : cfg.color, pointerEvents: 'none' }}>
-                        {col.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Labels */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-              {columns.filter(c => c.count > 0).map(col => {
-                const cfg = STATUS_CONFIG[col.status] || { label: col.status, color: '#6B7280' };
-                const isSelected = selected === col.status;
-                return (
-                  <button
-                    key={col.status}
-                    onClick={() => setSelected(col.status)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '5px', background: 'none',
-                      border: 'none', cursor: 'pointer', padding: '2px 0',
-                    }}
-                  >
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', color: isSelected ? cfg.color : 'var(--text-muted)', fontWeight: isSelected ? 700 : 400 }}>
-                      {cfg.label} ({col.count})
-                    </span>
-                  </button>
+                  <div key={phase.label} style={{ flex: phaseTotal, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {/* Phase label */}
+                    <div style={{ fontSize: '9px', fontWeight: 700, color: phase.color, textTransform: 'uppercase', letterSpacing: '0.7px', textAlign: 'center', marginBottom: '2px' }}>
+                      {phase.label}
+                    </div>
+                    {/* Status segments within phase */}
+                    <div style={{ display: 'flex', gap: '2px', height: '36px' }}>
+                      {phaseStatuses.filter(c => c.count > 0).map(col => {
+                        const cfg = STATUS_CONFIG[col.status] || { label: col.status, color: '#6B7280' };
+                        const isSelected = selected === col.status;
+                        return (
+                          <button
+                            key={col.status}
+                            onClick={() => setSelected(col.status)}
+                            title={`${cfg.label}: ${col.count}`}
+                            style={{
+                              flex: col.count,
+                              background: isSelected ? cfg.color : `${cfg.color}45`,
+                              borderRadius: '5px',
+                              border: isSelected ? `2px solid ${cfg.color}` : '2px solid transparent',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              minWidth: '28px', overflow: 'hidden',
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.background = cfg.color;
+                              const span = (e.currentTarget as HTMLElement).querySelector('span');
+                              if (span) span.style.color = '#fff';
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLElement).style.background = isSelected ? cfg.color : `${cfg.color}45`;
+                              const span = (e.currentTarget as HTMLElement).querySelector('span');
+                              if (span) span.style.color = isSelected ? '#fff' : cfg.color;
+                            }}
+                          >
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: isSelected ? '#fff' : cfg.color, pointerEvents: 'none', transition: 'color 0.15s' }}>
+                              {col.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Sub-status labels */}
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {phaseStatuses.filter(c => c.count > 0).map(col => {
+                        const cfg = STATUS_CONFIG[col.status] || { label: col.status, color: '#6B7280' };
+                        const isSelected = selected === col.status;
+                        return (
+                          <button key={col.status} onClick={() => setSelected(col.status)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 0' }}>
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: '10px', color: isSelected ? cfg.color : 'var(--text-muted)', fontWeight: isSelected ? 700 : 400, whiteSpace: 'nowrap' }}>
+                              {cfg.label} ({col.count})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>
