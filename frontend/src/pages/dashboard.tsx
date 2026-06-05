@@ -8,7 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 export async function getServerSideProps() { return { props: {} }; }
 
 interface Metrics   { total: number; byStatus: { status: string; count: string }[] }
-interface Overdue   { id: string; poNumber: string; status: string; daysOverdue: number; slaLabel: string }
+interface Overdue   { id: string; poNumber: string; storeName: string; status: string; daysOld: number; slaLabel: string }
 interface Priority  { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
 interface Trend     { date: string; created: number; completed: number }
 interface RecentOrder { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; orderType?: string; createdAt: string }
@@ -136,7 +136,7 @@ export default function Dashboard() {
         <a href="/todos" style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>View all →</a>
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
-        Orders sitting in a stage longer than allowed. Each stage has a time limit — breaches need immediate attention.
+        Orders created more than <strong>10 days ago</strong> that are not yet completed. Days counted from order creation date.
       </div>
       {loading ? <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
       : overdue.length === 0
@@ -150,9 +150,9 @@ export default function Dashboard() {
               >
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)' }}>{o.poNumber}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.slaLabel}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.storeName || o.slaLabel}</div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.1)', padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>+{o.daysOverdue}d</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.1)', padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
               </div>
             ))}
           </div>}

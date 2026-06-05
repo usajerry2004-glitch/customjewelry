@@ -8,7 +8,7 @@ import { SlaService } from './sla.service';
 @ApiTags('SLA')
 @ApiBearerAuth()
 @Controller('sla')
-@Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.SALES_REP)
+@Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
 @UseGuards(RolesGuard)
 export class SlaController {
   constructor(private readonly slaService: SlaService) {}

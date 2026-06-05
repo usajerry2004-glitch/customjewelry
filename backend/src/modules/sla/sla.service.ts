@@ -30,57 +30,50 @@ export class SlaService {
     @InjectRepository(Notification)private notifRepo: Repository<Notification>,
   ) {}
 
-  // Run every day at 9:00 AM
+  // Run every day at 9:00 AM — notifies Admin and Authorizer about orders > 10 days old
   @Cron('0 9 * * *')
   async checkSla() {
     this.logger.log('Running SLA check…');
     let alertCount = 0;
 
-    for (const rule of SLA_RULES) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - rule.maxDays);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 10);
+    const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
 
-      const overdue = await this.orderRepo.find({
-        where: { status: rule.status, updatedAt: LessThan(cutoff) },
-        select: ['id', 'poNumber', 'status', 'updatedAt'],
-      });
+    const overdueOrders = await this.orderRepo.find({
+      where: { isArchived: false, createdAt: LessThan(cutoff) },
+      select: ['id', 'poNumber', 'status', 'createdAt'],
+    });
 
-      if (overdue.length === 0) continue;
+    const activeOverdue = overdueOrders.filter(o => !FINAL.includes(o.status));
+    if (activeOverdue.length === 0) return 0;
 
-      const targets = await this.userRepo.find({
-        where: { role: rule.role, isActive: true },
-        select: ['id'],
-      });
-      // Also always notify admins
-      const admins = await this.userRepo.find({
-        where: { role: UserRole.ADMIN, isActive: true },
-        select: ['id'],
-      });
-      const allTargets = [...new Map([...targets, ...admins].map(u => [u.id, u])).values()];
+    // Only notify Admin and Authorizer
+    const targets = await this.userRepo.find({
+      where: [{ role: UserRole.ADMIN, isActive: true }, { role: UserRole.AUTHORIZER, isActive: true }],
+      select: ['id'],
+    });
 
-      for (const order of overdue) {
-        const daysStuck = Math.floor((Date.now() - new Date(order.updatedAt).getTime()) / 86400000);
-        for (const user of allTargets) {
-          // Avoid duplicate notifications: check if we already sent one today for this order+status
-          const today = new Date(); today.setHours(0, 0, 0, 0);
-          const existing = await this.notifRepo
-            .createQueryBuilder('n')
-            .where('n.orderId = :oid', { oid: order.id })
-            .andWhere('n.targetUserId = :uid', { uid: user.id })
-            .andWhere('n.type = :t', { t: NotificationType.SLA_OVERDUE })
-            .andWhere('n.createdAt >= :today', { today })
-            .getOne();
-          if (existing) continue;
-
-          await this.notifRepo.save(this.notifRepo.create({
-            type: NotificationType.SLA_OVERDUE,
-            title: `⚠️ SLA Breach — ${order.poNumber}`,
-            message: `Order ${order.poNumber} has been in "${rule.label}" for ${daysStuck} day${daysStuck !== 1 ? 's' : ''} (limit: ${rule.maxDays}d). Action required.`,
-            orderId: order.id,
-            targetUserId: user.id,
-          }));
-          alertCount++;
-        }
+    for (const order of activeOverdue) {
+      const daysOld = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86400000);
+      for (const user of targets) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const existing = await this.notifRepo
+          .createQueryBuilder('n')
+          .where('n.orderId = :oid', { oid: order.id })
+          .andWhere('n.targetUserId = :uid', { uid: user.id })
+          .andWhere('n.type = :t', { t: NotificationType.SLA_OVERDUE })
+          .andWhere('n.createdAt >= :today', { today })
+          .getOne();
+        if (existing) continue;
+        await this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.SLA_OVERDUE,
+          title: `⚠️ SLA Overdue — ${order.poNumber}`,
+          message: `Order ${order.poNumber} is ${daysOld} days old and still not completed. Please review.`,
+          orderId: order.id,
+          targetUserId: user.id,
+        }));
+        alertCount++;
       }
     }
 
@@ -89,23 +82,30 @@ export class SlaService {
   }
 
   // Return orders currently overdue (for dashboard widget + badges)
-  async getOverdueOrders(): Promise<{ id: string; poNumber: string; status: string; daysOverdue: number; slaLabel: string }[]> {
-    const results: { id: string; poNumber: string; status: string; daysOverdue: number; slaLabel: string }[] = [];
+  // Orders older than 10 days (from creation) that are not yet completed or cancelled.
+  // Days counted from order createdAt — visible to Admin and Authorizer only.
+  async getOverdueOrders(): Promise<{ id: string; poNumber: string; storeName: string; status: string; daysOld: number; slaLabel: string }[]> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 10);
 
-    for (const rule of SLA_RULES) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - rule.maxDays);
-      const overdue = await this.orderRepo.find({
-        where: { status: rule.status, updatedAt: LessThan(cutoff) },
-        select: ['id', 'poNumber', 'status', 'updatedAt'],
-      });
-      for (const o of overdue) {
-        const daysOverdue = Math.floor((Date.now() - new Date(o.updatedAt).getTime()) / 86400000) - rule.maxDays;
-        results.push({ id: o.id, poNumber: o.poNumber, status: o.status, daysOverdue, slaLabel: rule.label });
-      }
-    }
+    const orders = await this.orderRepo.find({
+      where: { isArchived: false, createdAt: LessThan(cutoff) },
+      select: ['id', 'poNumber', 'storeName', 'customerFullName', 'status', 'createdAt'],
+    });
 
-    return results.sort((a, b) => b.daysOverdue - a.daysOverdue);
+    const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
+
+    return orders
+      .filter(o => !FINAL.includes(o.status))
+      .map(o => ({
+        id:       o.id,
+        poNumber: o.poNumber,
+        storeName: o.storeName || (o as any).customerFullName || '—',
+        status:   o.status,
+        daysOld:  Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 86400000),
+        slaLabel: (o.storeName || (o as any).customerFullName || o.poNumber),
+      }))
+      .sort((a, b) => b.daysOld - a.daysOld);
   }
 
   // Trigger manually (admin can run from dashboard)
