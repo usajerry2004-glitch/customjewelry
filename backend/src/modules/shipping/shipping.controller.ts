@@ -46,11 +46,4 @@ export class ShippingController {
     return this.shippingService.dispatch(id, body);
   }
 
-  @Patch(':id/deliver')
-  @Roles(UserRole.ADMIN, UserRole.SHIPPING_MANAGER)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Mark order as delivered' })
-  markDelivered(@Param('id') id: string) {
-    return this.shippingService.markDelivered(id);
-  }
 }
