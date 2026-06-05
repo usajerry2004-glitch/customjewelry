@@ -15,12 +15,24 @@ export class ManufacturingService {
   ) {}
 
   async getQueue() {
-    return this.orderRepo.find({
+    const orders = await this.orderRepo.find({
       where: [
         { status: OrderStatus.VPO_ISSUED },
         { status: OrderStatus.PENDING_CONTRACTOR },
       ],
-      order: { updatedAt: 'ASC' },
+    });
+
+    // Sort priority: Pending Contractor → Stone Received → Pending Stone
+    const priority = (o: Order): number => {
+      if (o.status === OrderStatus.PENDING_CONTRACTOR) return 0;
+      if (o.status === OrderStatus.VPO_ISSUED && o.stoneStatus === StoneStatus.STONE_RECEIVED) return 1;
+      return 2; // VPO + pending/null stone — waiting
+    };
+
+    return orders.sort((a, b) => {
+      const diff = priority(a) - priority(b);
+      if (diff !== 0) return diff;
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
     });
   }
 
