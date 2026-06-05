@@ -39,8 +39,9 @@ export default function Dashboard() {
   const [actions, setActions]     = useState<Priority[]>([]);
   const [trend, setTrend]         = useState<Trend[]>([]);
   const [recent, setRecent]       = useState<RecentOrder[]>([]);
-  const [topStores, setTopStores] = useState<TopStore[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [topStores, setTopStores]     = useState<TopStore[]>([]);
+  const [myOrderTotal, setMyOrderTotal] = useState<number>(0);
+  const [loading, setLoading]         = useState(true);
   const [userRole, setUserRole]   = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
   const [showMoreA, setShowMoreA] = useState(false);
@@ -65,6 +66,9 @@ export default function Dashboard() {
       if (slaRes.ok)   setOverdue(await slaRes.json());
       if (trendRes.ok) setTrend(await trendRes.json());
       if (storeRes.ok) { const d = await storeRes.json(); setTopStores(d.topStores || []); }
+      // Fetch role-filtered total (used by Sales Rep and other roles)
+      const myRes = await apiFetch(`${API}/orders?limit=1`);
+      if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
       let ids: string[] = [];
       if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
       if (rRes.ok)   { const d = await rRes.json(); const l = d.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
@@ -310,7 +314,7 @@ export default function Dashboard() {
   );
 
   const roleConfigs: Record<string, any> = {
-    SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: activeOrders, color: NAVY, sub: 'all open orders', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
+    SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: myOrderTotal, color: NAVY, sub: 'my customers only', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     CAD_DESIGNER:    { subtitle: 'CAD Queue',         kpis: [{ label: 'In CAD Queue', value: sc('CAD_IN_PROGRESS'), color: '#6366F1', sub: 'awaiting design', link: '/orders?status=CAD_IN_PROGRESS' }, { label: 'Revision Needed', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('revision')).length, color: '#DC2626', sub: 'customer requested', link: '/todos' }, { label: 'Awaiting Quote', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('quote')).length, color: GOLD_DARK, sub: 'approved, needs price', link: '/todos' }] },
     SKU_MANAGER:     { subtitle: 'SKU Queue',         kpis: [{ label: 'Pending SKU', value: sc('SKU_CREATION'), color: '#F97316', sub: 'ready for generation', link: '/orders?status=SKU_CREATION' }, { label: 'Priority Tasks', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'With Contractor', value: sc('PENDING_CONTRACTOR'), color: GOLD_DARK, sub: 'sent out', link: '/orders?status=PENDING_CONTRACTOR' }, { label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'awaiting shipping', link: '/orders?status=READY_TO_SHIP' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
