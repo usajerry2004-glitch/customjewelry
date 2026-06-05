@@ -16,7 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◈', label: 'SKU Management', path: '/sku',             roles: [UserRole.ADMIN, UserRole.SKU_MANAGER] },
   { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER] },
   { icon: '▷', label: 'Shipping',       path: '/shipping',        roles: [UserRole.ADMIN, UserRole.SHIPPING_MANAGER] },
-  { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.US_SETTER] },
+  { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER] },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
   { icon: '📊', label: 'Reports',       path: '/reports',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP] },

@@ -235,7 +235,6 @@ const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
   [UserRole.FACTORY_MANAGER]:  [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP],
   [UserRole.SHIPPING_MANAGER]: [OrderStatus.SHIPPED, OrderStatus.COMPLETED],
   [UserRole.STONE_MANAGER]:    [],
-  [UserRole.US_SETTER]:        [OrderStatus.COMPLETED],
   [UserRole.CUSTOMER]:         [],
 };
 

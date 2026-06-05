@@ -33,8 +33,14 @@ export class UsersService {
   ) {}
 
   async findAll(role?: string, caller?: { id: string; role: string }): Promise<User[]> {
-    const qb = this.userRepo.createQueryBuilder('u').orderBy('u.createdAt', 'DESC');
+    const qb = this.userRepo.createQueryBuilder('u');
     if (role) qb.where('u.role = :role', { role });
+    // Sort customers alphabetically; sort staff by creation date
+    if (role === UserRole.CUSTOMER) {
+      qb.orderBy('u.firstName', 'ASC').addOrderBy('u.lastName', 'ASC');
+    } else {
+      qb.orderBy('u.createdAt', 'DESC');
+    }
     if (caller?.role === UserRole.SALES_REP) {
       qb.andWhere('u.salesRepId = :salesRepId', { salesRepId: caller.id });
     }

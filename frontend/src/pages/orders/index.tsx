@@ -43,11 +43,6 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
     { label: 'Shipped',       value: OrderStatus.SHIPPED },
   ],
-  US_SETTER: [
-    { label: 'All',       value: '' },
-    { label: 'Repair',    value: OrderStatus.REPAIR },
-    { label: 'Completed', value: OrderStatus.COMPLETED },
-  ],
   CUSTOMER: [
     { label: 'All',             value: '' },
     { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },

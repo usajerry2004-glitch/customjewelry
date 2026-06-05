@@ -100,9 +100,15 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, []);
 
-  const filtered = customers.filter(c =>
-    `${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = customers
+    .filter(c =>
+      `${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const nameA = (a.storeName || `${a.firstName} ${a.lastName}`).toLowerCase();
+      const nameB = (b.storeName || `${b.firstName} ${b.lastName}`).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
   const createCustomer = async () => {
     if (!newUser.firstName || !newUser.email || !newUser.password) {
