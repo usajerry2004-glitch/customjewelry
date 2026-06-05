@@ -134,17 +134,17 @@ export default function Dashboard() {
         onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}06` : '#FAFAF8'}
       >
         {img
-          ? <img src={img} alt="" style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          : <div style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
+          ? <img className="order-row-img" src={img} alt="" style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : <div className="order-row-img" style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
         }
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 3, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
-          <div style={{ fontSize: 12, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="order-row-name" style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 3, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+          <div className="order-row-sub" style={{ fontSize: 12, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}
             {o.priorityReason ? ` · ${o.priorityReason}` : ''}
           </div>
         </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div className="order-row-right" style={{ textAlign: 'right', flexShrink: 0 }}>
           <span style={{ fontSize: 11, background: cfg.bg, color: cfg.color, padding: '3px 9px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 4 }}>{cfg.label}</span>
           <span style={{ fontSize: 11, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
@@ -196,12 +196,12 @@ export default function Dashboard() {
             const cfg = STATUS_CONFIG[status]; const count = sc(status); const isLast = i === PIPELINE_ORDER.length - 1;
             return (
               <React.Fragment key={status}>
-                <div onClick={() => router.push(`/orders?status=${status}`)} style={{ flex: '1 1 0', minWidth: 72, background: count > 0 ? `${cfg.color}10` : '#F9F8F5', border: `1px solid ${count > 0 ? cfg.color + '35' : '#EDE9E2'}`, borderRadius: 10, padding: '14px 8px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                <div className="pipeline-tile" onClick={() => router.push(`/orders?status=${status}`)} style={{ flex: '1 1 0', minWidth: 60, background: count > 0 ? `${cfg.color}10` : '#F9F8F5', border: `1px solid ${count > 0 ? cfg.color + '35' : '#EDE9E2'}`, borderRadius: 10, padding: '14px 8px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
                   onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}1E`; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}10` : '#F9F8F5'; }}
                 >
-                  <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 30, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 6 }}>{loading ? '—' : count}</div>
-                  <div style={{ fontSize: 11, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3 }}>{cfg.label}</div>
+                  <div className="pipeline-count" style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 30, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 6 }}>{loading ? '—' : count}</div>
+                  <div className="pipeline-label" style={{ fontSize: 11, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3 }}>{cfg.label}</div>
                 </div>
                 {!isLast && <div style={{ display: 'flex', alignItems: 'center', color: '#D4CEC6', fontSize: 14, flexShrink: 0 }}>›</div>}
               </React.Fragment>
@@ -211,7 +211,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Analytics ── */}
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 8 }}>
+      <div className="dashboard-grid dash-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 8 }}>
 
         {/* Weekly Activity — Pie */}
         <div style={{ ...card, padding: '20px 22px' }}>

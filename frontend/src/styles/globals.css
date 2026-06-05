@@ -344,6 +344,29 @@ input::placeholder, textarea::placeholder {
   .status-tabs-desktop { display: none !important; }
 }
 
+/* ── Dashboard responsive ────────────────────────────────────────────── */
+
+/* Analytics 3-col → 1-col */
+@media (max-width: 900px) {
+  .dash-3col { grid-template-columns: 1fr !important; }
+}
+
+/* Action Queue / New This Week — hide date + badge on very small, shrink image */
+@media (max-width: 480px) {
+  .order-row-right { display: none !important; }
+  .order-row-img   { width: 32px !important; height: 32px !important; }
+  .order-row-name  { font-size: 13px !important; }
+  .order-row-sub   { font-size: 11px !important; }
+}
+
+/* Pipeline funnel — ensure horizontal scroll on mobile */
+@media (max-width: 640px) {
+  .pipeline-row { gap: 2px !important; }
+  .pipeline-tile { min-width: 60px !important; padding: 10px 4px !important; }
+  .pipeline-count { font-size: 20px !important; }
+  .pipeline-label { font-size: 9px !important; }
+}
+
 /* ── Additional responsive rules ─────────────────────────────────────── */
 
 /* Order detail: content (left) + sticky sidebar (right) */
