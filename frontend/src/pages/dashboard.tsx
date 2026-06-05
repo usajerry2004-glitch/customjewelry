@@ -3,34 +3,48 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from 'recharts';
 
 export async function getServerSideProps() { return { props: {} }; }
 
-interface Metrics   { total: number; byStatus: { status: string; count: string }[] }
-interface Overdue   { id: string; poNumber: string; storeName: string; status: string; daysOld: number; slaLabel: string }
-interface Priority  { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
-interface Trend     { date: string; created: number; completed: number }
-interface RecentOrder { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; orderType?: string; createdAt: string }
+interface Metrics    { total: number; byStatus: { status: string; count: string }[] }
+interface Overdue    { id: string; poNumber: string; storeName: string; status: string; daysOld: number; slaLabel: string }
+interface Priority   { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
+interface Trend      { date: string; created: number; completed: number }
+interface RecentOrder{ id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; orderType?: string; createdAt: string }
 interface TopStore   { store: string; count: number }
 
-const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
-const PIPELINE_ORDER: OrderStatus[] = [OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.REPAIR, OrderStatus.COMPLETED];
-const PRIORITY_COLORS = { CRITICAL: '#7C3AED', HIGH: '#DC2626', MEDIUM: '#F59E0B' };
+const NAVY = '#1A2740';
+const GOLD = '#C09B58';
+const GOLD_DARK = '#A07C3A';
+
+const card: React.CSSProperties = {
+  background: '#fff', border: '1px solid #E8E0D4',
+  borderRadius: 16, boxShadow: '0 2px 12px rgba(26,39,64,0.06)',
+};
+
+const PIPELINE_ORDER: OrderStatus[] = [
+  OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED,
+  OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED,
+  OrderStatus.REPAIR, OrderStatus.COMPLETED,
+];
+
+const BAR_COLORS = [NAVY, '#243858', '#2E4870', GOLD, GOLD_DARK, '#8A6B2E'];
+const PRIORITY_COLORS = { CRITICAL: '#7C3AED', HIGH: '#DC2626', MEDIUM: GOLD_DARK };
 
 export default function Dashboard() {
   const router = useRouter();
-  const [metrics, setMetrics]   = useState<Metrics | null>(null);
-  const [overdue, setOverdue]   = useState<Overdue[]>([]);
-  const [actions, setActions]   = useState<Priority[]>([]);
-  const [trend, setTrend]       = useState<Trend[]>([]);
-  const [recent, setRecent]     = useState<RecentOrder[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [userRole, setUserRole] = useState('');
+  const [metrics, setMetrics]     = useState<Metrics | null>(null);
+  const [overdue, setOverdue]     = useState<Overdue[]>([]);
+  const [actions, setActions]     = useState<Priority[]>([]);
+  const [trend, setTrend]         = useState<Trend[]>([]);
+  const [recent, setRecent]       = useState<RecentOrder[]>([]);
+  const [topStores, setTopStores] = useState<TopStore[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [userRole, setUserRole]   = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
-  const [topStores, setTopStores]   = useState<TopStore[]>([]);
-  const [showMoreA, setShowMoreA]   = useState(false);
-  const [showMoreR, setShowMoreR]   = useState(false);
+  const [showMoreA, setShowMoreA] = useState(false);
+  const [showMoreR, setShowMoreR] = useState(false);
 
   useEffect(() => {
     try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
@@ -51,22 +65,20 @@ export default function Dashboard() {
       if (slaRes.ok)   setOverdue(await slaRes.json());
       if (trendRes.ok) setTrend(await trendRes.json());
       if (storeRes.ok) { const d = await storeRes.json(); setTopStores(d.topStores || []); }
-      let allIds: string[] = [];
-      if (priRes.ok)  { const p = await priRes.json(); setActions(p); allIds.push(...p.map((o: any) => o.id)); }
-      if (rRes.ok)    { const d = await rRes.json(); const list = d.orders || []; setRecent(list); allIds.push(...list.map((o: any) => o.id)); }
-      if (allIds.length) {
-        const unique = [...new Set(allIds)];
-        const entries = await Promise.all(unique.map(async id => {
+      let ids: string[] = [];
+      if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
+      if (rRes.ok)   { const d = await rRes.json(); const l = d.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
+      if (ids.length) {
+        const map: Record<string, string> = {};
+        await Promise.all([...new Set(ids)].map(async id => {
           try {
             const r = await apiFetch(`${API}/cad/order/${id}`);
-            if (!r.ok) return null;
+            if (!r.ok) return;
             const cads = await r.json();
             const ref = cads.find((c: any) => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
-            return ref ? [id, `/uploads/cad/${ref.fileName}`] : null;
-          } catch { return null; }
+            if (ref) map[id] = `/uploads/cad/${ref.fileName}`;
+          } catch {}
         }));
-        const map: Record<string, string> = {};
-        entries.forEach(e => { if (e) map[e[0]] = e[1]; });
         setRefImages(map);
       }
       setLoading(false);
@@ -75,310 +87,259 @@ export default function Dashboard() {
   }, []);
 
   const sc = (s: string) => parseInt(metrics?.byStatus.find(b => b.status === s)?.count || '0');
-  const activeOrders = metrics?.byStatus.reduce((t, b) => ['COMPLETED','CANCELLED'].includes(b.status) ? t : t + parseInt(b.count), 0) ?? 0;
+  const activeOrders  = metrics?.byStatus.reduce((t, b) => ['COMPLETED','CANCELLED'].includes(b.status) ? t : t + parseInt(b.count), 0) ?? 0;
+  const totalReceived  = trend.reduce((s, t) => s + t.created, 0);
+  const totalCompleted = trend.reduce((s, t) => s + t.completed, 0);
+  const pieData = [
+    { name: `Received  ${totalReceived}`,   value: totalReceived,  fill: NAVY },
+    { name: `Completed  ${totalCompleted}`, value: totalCompleted, fill: GOLD },
+  ].filter(d => d.value > 0);
 
-  // ─── Shared helpers ──────────────────────────────────────────────────────────
-  const OrderRow = ({ o, showImg = true }: { o: any; showImg?: boolean }) => {
+  // ── Shared components ────────────────────────────────────────────────────────
+
+  const Divider = ({ label }: { label: string }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '28px 0 18px' }}>
+      <div style={{ width: 3, height: 16, background: GOLD, borderRadius: 2, flexShrink: 0 }} />
+      <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 13, fontWeight: 700, color: NAVY, letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: '#E8E0D4' }} />
+    </div>
+  );
+
+  const KpiCard = ({ label, value, color, sub, link, accent = false }: { label: string; value: any; color: string; sub: string; link?: string; accent?: boolean }) => (
+    <div onClick={() => link && router.push(link)}
+      style={{ ...card, padding: '20px 22px', cursor: link ? 'pointer' : 'default', borderTop: `3px solid ${accent ? GOLD : color}`, transition: 'all 0.2s', position: 'relative', overflow: 'hidden' }}
+      onMouseEnter={e => { if (link) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(26,39,64,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(26,39,64,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+    >
+      <div style={{ fontSize: 10, color: '#9BA8B5', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 }}>{sub}</div>
+      <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 40, fontWeight: 600, color, lineHeight: 1, marginBottom: 6 }}>
+        {loading ? '—' : value}
+      </div>
+      <div style={{ fontSize: 12, color: '#5C6B7A', fontWeight: 500 }}>{label}</div>
+    </div>
+  );
+
+  const OrderRow = ({ o }: { o: any }) => {
     const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: '#6B7280', bg: '#F3F4F6' };
     const pc  = o.priorityLevel ? PRIORITY_COLORS[o.priorityLevel as keyof typeof PRIORITY_COLORS] : null;
     const img = refImages[o.id];
     return (
       <div onClick={() => router.push(`/orders/${o.id}`)}
-        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: pc ? `${pc}08` : 'var(--bg-input)', border: `1px solid ${pc ? pc + '30' : 'var(--border)'}`, borderLeft: pc ? `3px solid ${pc}` : '3px solid transparent', borderRadius: '8px', cursor: 'pointer' }}
-        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}14` : 'var(--bg-hover)'}
-        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}08` : 'var(--bg-input)'}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: pc ? `${pc}06` : '#FAFAF8', border: `1px solid ${pc ? pc + '25' : '#EDE9E2'}`, borderLeft: `3px solid ${pc || GOLD}20`, borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}
+        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}10` : '#F5F3EF'}
+        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}06` : '#FAFAF8'}
       >
-        {showImg && (img
-          ? <img src={img} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: '1px solid var(--border)' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          : <div style={{ width: 40, height: 40, borderRadius: 6, flexShrink: 0, background: 'var(--bg-card)', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--text-muted)' }}>🖼</div>
-        )}
+        {img
+          ? <img src={img} alt="" style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : <div style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
+        }
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', marginBottom: 2 }}>{o.poNumber}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 2, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+          <div style={{ fontSize: 11, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}
             {o.priorityReason ? ` · ${o.priorityReason}` : ''}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <span style={{ fontSize: 10, background: cfg.bg, color: cfg.color, padding: '2px 7px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 2 }}>{cfg.label}</span>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span style={{ fontSize: 10, background: cfg.bg, color: cfg.color, padding: '2px 8px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 3 }}>{cfg.label}</span>
+          <span style={{ fontSize: 10, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
       </div>
     );
   };
 
-  const KpiCard = ({ label, value, color, sub, link }: { label: string; value: any; color: string; sub: string; link?: string }) => (
-    <div onClick={() => link && router.push(link)} style={{ ...card, padding: '18px 20px', cursor: link ? 'pointer' : 'default', transition: 'box-shadow 0.15s' }}
-      onMouseEnter={e => { if (link) (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'; }}
-      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-sm)'}
-    >
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 7px', borderRadius: 5, display: 'inline-block', marginBottom: 10 }}>{sub}</div>
-      <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 34, fontWeight: 600, color, lineHeight: 1, marginBottom: 4 }}>{loading ? '—' : value}</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</div>
-    </div>
-  );
-
-  const ActionSection = ({ title, items, link, showMore, setShowMore }: { title: string; items: any[]; link: string; showMore: boolean; setShowMore: (v: boolean) => void }) => (
-    <div style={{ ...card, padding: '18px 22px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h2>
-        <a href={link} style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>View all →</a>
+  const ActionSection = ({ title, subtitle, items, link, showMore, setShowMore }: any) => (
+    <div style={{ ...card, padding: '20px 22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: '0 0 3px' }}>{title}</h2>
+          {subtitle && <div style={{ fontSize: 11, color: '#9BA8B5' }}>{subtitle}</div>}
+        </div>
+        <a href={link} style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
       </div>
-      {loading ? <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
-      : items.length === 0 ? <div style={{ textAlign: 'center', padding: '24px 0' }}><div style={{ fontSize: 28, marginBottom: 8 }}>✅</div><div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All clear</div></div>
-      : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {items.slice(0, showMore ? items.length : 5).map(o => <OrderRow key={o.id} o={o} />)}
-          {items.length > 5 && <button onClick={() => setShowMore(!showMore)} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, paddingTop: 4, textAlign: 'center' }}>{showMore ? '▲ Show less' : `▼ Show ${items.length - 5} more`}</button>}
-        </div>}
-    </div>
-  );
-
-  const SLAPanel = () => (
-    <div style={{ ...card, padding: '18px 22px', borderTop: `3px solid ${overdue.length > 0 ? '#EF4444' : '#059669'}` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>SLA Alerts</h2>
-        <a href="/todos" style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>View all →</a>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
-        Orders created more than <strong>10 days ago</strong> that are not yet completed. Days counted from order creation date.
-      </div>
-      {loading ? <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Loading…</div>
-      : overdue.length === 0
-        ? <div style={{ textAlign: 'center', padding: '24px 0' }}><div style={{ fontSize: 28, marginBottom: 8 }}>✅</div><div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All orders on time</div></div>
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
-            {overdue.map(o => (
-              <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: 8, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.08)'}
-                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.04)'}
-              >
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)' }}>{o.poNumber}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.storeName || o.slaLabel}</div>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.1)', padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
+      {loading
+        ? <div style={{ color: '#9BA8B5', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Loading…</div>
+        : items.length === 0
+          ? <div style={{ textAlign: 'center', padding: '28px 0' }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>✅</div>
+              <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All clear</div>
+            </div>
+          : <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {items.slice(0, showMore ? items.length : 5).map((o: any) => <OrderRow key={o.id} o={o} />)}
               </div>
-            ))}
-          </div>}
+              {items.length > 5 && (
+                <button onClick={() => setShowMore(!showMore)} style={{ width: '100%', marginTop: 10, padding: '7px 0', background: 'none', border: `1px solid #E8E0D4`, borderRadius: 8, fontSize: 11, color: GOLD, cursor: 'pointer', fontWeight: 600, letterSpacing: '0.3px' }}>
+                  {showMore ? '▲ Show less' : `▼ Show ${items.length - 5} more`}
+                </button>
+              )}
+            </>
+      }
     </div>
   );
 
-  // Elegant navy-to-gold palette matching the project theme
-  const BAR_COLORS = ['#1A2740', '#243858', '#2E4870', '#C09B58', '#A07C3A', '#8A6B2E'];
+  // ── Role-based views ─────────────────────────────────────────────────────────
 
-  // Pie: total received vs completed over last 7 days
-  const totalReceived  = trend.reduce((s, t) => s + t.created, 0);
-  const totalCompleted = trend.reduce((s, t) => s + t.completed, 0);
-  const pieData = [
-    { name: `Received (${totalReceived})`,   value: totalReceived,  fill: '#1A2740' },
-    { name: `Completed (${totalCompleted})`, value: totalCompleted, fill: '#C09B58' },
-  ].filter(d => d.value > 0);
-
-  const ActivityPie = () => (
-    <div style={{ ...card, padding: '18px 20px', flex: 1, minWidth: 0 }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Weekly Activity</h2>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Received vs Completed — last 7 days</div>
-      {loading ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
-      ) : pieData.length === 0 ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No orders this week</div>
-      ) : (
-        <>
-          <ResponsiveContainer width="100%" height={165}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={72} innerRadius={38} paddingAngle={4}>
-                {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 8 }}>
-            {pieData.map(d => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)' }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: d.fill, flexShrink: 0 }} />
-                {d.name}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const TopCustomers = () => (
-    <div style={{ ...card, padding: '18px 20px', flex: 1, minWidth: 0 }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 17, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>Top Customers</h2>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Most active this month</div>
-      {loading ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
-      ) : topStores.length === 0 ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data this month</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={topStores.slice(0, 5)} layout="vertical" margin={{ top: 4, right: 32, bottom: 0, left: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <YAxis type="category" dataKey="store" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={110} />
-            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} orders`, 'Orders']} />
-            <Bar dataKey="count" radius={[0,4,4,0]}>
-              {topStores.slice(0, 5).map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  );
-
-  const PipelineFunnel = () => (
-    <div style={{ ...card, padding: '18px 22px', marginBottom: 24 }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Order Pipeline</h2>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
-        {PIPELINE_ORDER.map((status, i) => {
-          const cfg = STATUS_CONFIG[status]; const count = sc(status); const isLast = i === PIPELINE_ORDER.length - 1;
-          return (
-            <React.Fragment key={status}>
-              <div onClick={() => router.push(`/orders?status=${status}`)} style={{ flex: '1 1 0', minWidth: 80, background: count > 0 ? `${cfg.color}12` : 'var(--bg-input)', border: `1px solid ${count > 0 ? cfg.color + '40' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '12px 10px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}22`; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}12` : 'var(--bg-input)'; }}>
-                <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 26, fontWeight: 600, color: count > 0 ? cfg.color : 'var(--text-muted)', lineHeight: 1, marginBottom: 4 }}>{loading ? '—' : count}</div>
-                <div style={{ fontSize: 10, color: count > 0 ? cfg.color : 'var(--text-muted)', fontWeight: 600, lineHeight: 1.3 }}>{cfg.label}</div>
-              </div>
-              {!isLast && <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', fontSize: 12, flexShrink: 0, padding: '0 2px' }}>›</div>}
-            </React.Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  // ─── ROLE-BASED DASHBOARD RENDER ─────────────────────────────────────────────
-
-  // ADMIN / AUTHORIZER — full view
   if (!userRole || userRole === 'ADMIN' || userRole === 'AUTHORIZER') return (
-    <AppLayout title="Dashboard" subtitle="Overview" actions={<button onClick={() => router.push('/orders')} style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Active Orders"  value={activeOrders}    color="#1A2740" sub="not completed or cancelled" link="/orders" />
-        <KpiCard label="New This Week"  value={recent.length}   color="#0891B2" sub="last 7 days"                link="/orders" />
-        <KpiCard label="SLA Breaches"   value={overdue.length}  color={overdue.length > 0 ? '#DC2626' : '#059669'} sub={overdue.length > 0 ? 'need attention' : 'all on time'} link="/todos" />
-        <KpiCard label="My Actions"     value={actions.length}  color="#7C3AED" sub="priority tasks"             link="/todos" />
+    <AppLayout title="Dashboard" subtitle="Overview"
+      actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}>+ New Order</button>}
+    >
+      {/* ── KPIs ── */}
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 8 }}>
+        <KpiCard label="Active Orders"  value={activeOrders}   color={NAVY}                                         sub="not completed or cancelled" link="/orders" />
+        <KpiCard label="New This Week"  value={recent.length}  color="#0891B2"                                      sub="last 7 days"                link="/orders" />
+        <KpiCard label="SLA Breaches"   value={overdue.length} color={overdue.length > 0 ? '#DC2626' : '#059669'}  sub="orders older than 10 days"  link="/todos" accent />
+        <KpiCard label="My Actions"     value={actions.length} color="#7C3AED"                                      sub="priority tasks"              link="/todos" accent />
       </div>
-      <PipelineFunnel />
-      {/* 3-panel analytics row */}
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <ActivityPie />
-        <TopCustomers />
-        <SLAPanel />
+
+      {/* ── Pipeline ── */}
+      <Divider label="Order Pipeline" />
+      <div style={{ ...card, padding: '20px 22px', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
+          {PIPELINE_ORDER.map((status, i) => {
+            const cfg = STATUS_CONFIG[status]; const count = sc(status); const isLast = i === PIPELINE_ORDER.length - 1;
+            return (
+              <React.Fragment key={status}>
+                <div onClick={() => router.push(`/orders?status=${status}`)} style={{ flex: '1 1 0', minWidth: 72, background: count > 0 ? `${cfg.color}10` : '#F9F8F5', border: `1px solid ${count > 0 ? cfg.color + '35' : '#EDE9E2'}`, borderRadius: 10, padding: '14px 8px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}1E`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}10` : '#F9F8F5'; }}
+                >
+                  <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 28, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 5 }}>{loading ? '—' : count}</div>
+                  <div style={{ fontSize: 10, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3, letterSpacing: '0.2px' }}>{cfg.label}</div>
+                </div>
+                {!isLast && <div style={{ display: 'flex', alignItems: 'center', color: '#D4CEC6', fontSize: 14, flexShrink: 0 }}>›</div>}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="My Action Queue" items={actions} link="/todos"   showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="New This Week"   items={recent}  link="/orders"  showMore={showMoreR} setShowMore={setShowMoreR} />
+
+      {/* ── Analytics ── */}
+      <Divider label="Analytics" />
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 8 }}>
+
+        {/* Weekly Activity — Pie */}
+        <div style={{ ...card, padding: '20px 22px' }}>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Weekly Activity</h2>
+          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — last 7 days</div>
+          {loading ? (
+            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
+          ) : pieData.length === 0 ? (
+            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No orders this week</div>
+          ) : <>
+            <ResponsiveContainer width="100%" height={155}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={68} innerRadius={34} paddingAngle={4}>
+                  {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Pie>
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8 }}>
+              {pieData.map(d => (
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#5C6B7A' }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: d.fill }} />
+                  {d.name}
+                </div>
+              ))}
+            </div>
+          </>}
+        </div>
+
+        {/* Top Customers */}
+        <div style={{ ...card, padding: '20px 22px' }}>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Top Customers</h2>
+          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Most active this month</div>
+          {loading ? (
+            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
+          ) : topStores.length === 0 ? (
+            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No data this month</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={topStores.slice(0, 5)} layout="vertical" margin={{ top: 2, right: 32, bottom: 0, left: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0EBE3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#9BA8B5' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="store" tick={{ fontSize: 10, fill: '#5C6B7A' }} axisLine={false} tickLine={false} width={108} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} formatter={(v) => [`${v} orders`, 'Orders']} />
+                <Bar dataKey="count" radius={[0,5,5,0]}>
+                  {topStores.slice(0, 5).map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* SLA Alerts */}
+        <div style={{ ...card, padding: '20px 22px', borderTop: `3px solid ${overdue.length > 0 ? '#DC2626' : '#059669'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: 0 }}>SLA Alerts</h2>
+            <a href="/todos" style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
+          </div>
+          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Orders older than 10 days not yet completed</div>
+          {loading ? (
+            <div style={{ color: '#9BA8B5', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Loading…</div>
+          ) : overdue.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>✅</div>
+              <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All orders on time</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 210, overflowY: 'auto' }}>
+              {overdue.map(o => (
+                <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'rgba(220,38,38,0.03)', border: '1px solid rgba(220,38,38,0.12)', borderRadius: 10, cursor: 'pointer', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.07)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.03)'}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+                    <div style={{ fontSize: 10, color: '#9BA8B5', marginTop: 1 }}>{o.storeName}</div>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Queues ── */}
+      <Divider label="Workload" />
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ActionSection title="My Action Queue" subtitle="Orders requiring your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
+        <ActionSection title="New This Week"    subtitle="Last 7 days"                      items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
       </div>
     </AppLayout>
   );
 
-  // SALES REP — their customers/orders only
-  if (userRole === 'SALES_REP') return (
-    <AppLayout title="Dashboard" subtitle="My Orders" actions={<button onClick={() => router.push('/orders')} style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="My Active Orders" value={activeOrders}   color="#1A2740" sub="all open orders"   link="/orders" />
-        <KpiCard label="New This Week"    value={recent.length}  color="#0891B2" sub="last 7 days"       link="/orders" />
-        <KpiCard label="Priority Actions" value={actions.length} color="#7C3AED" sub="needs attention"   link="/todos" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="Priority Actions" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="New This Week"    items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
+  // ── Other roles (compact) ────────────────────────────────────────────────────
+  const RoleKpi = ({ items }: { items: { label: string; value: any; color: string; sub: string; link?: string }[] }) => (
+    <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length},1fr)`, gap: 16, marginBottom: 8 }}>
+      {items.map(k => <KpiCard key={k.label} {...k} />)}
+    </div>
+  );
+
+  const roleConfigs: Record<string, any> = {
+    SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: activeOrders, color: NAVY, sub: 'all open orders', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
+    CAD_DESIGNER:    { subtitle: 'CAD Queue',         kpis: [{ label: 'In CAD Queue', value: sc('CAD_IN_PROGRESS'), color: '#6366F1', sub: 'awaiting design', link: '/orders?status=CAD_IN_PROGRESS' }, { label: 'Revision Needed', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('revision')).length, color: '#DC2626', sub: 'customer requested', link: '/todos' }, { label: 'Awaiting Quote', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('quote')).length, color: GOLD_DARK, sub: 'approved, needs price', link: '/todos' }] },
+    SKU_MANAGER:     { subtitle: 'SKU Queue',         kpis: [{ label: 'Pending SKU', value: sc('SKU_CREATION'), color: '#F97316', sub: 'ready for generation', link: '/orders?status=SKU_CREATION' }, { label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'SKU generated', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
+    FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'With Contractor', value: sc('PENDING_CONTRACTOR'), color: GOLD_DARK, sub: 'sent out', link: '/orders?status=PENDING_CONTRACTOR' }, { label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'awaiting shipping', link: '/orders?status=READY_TO_SHIP' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
+    STONE_MANAGER:   { subtitle: 'Stone Queue',       kpis: [{ label: 'Pending Stone', value: sc('VPO_ISSUED'), color: '#7C3AED', sub: 'awaiting dispatch', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#DC2626', sub: '> 1 day overdue', link: '/todos' }] },
+    SHIPPING_MANAGER:{ subtitle: 'Shipping Queue',    kpis: [{ label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'awaiting dispatch', link: '/orders?status=READY_TO_SHIP' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#8B5CF6', sub: 'in transit', link: '/orders?status=SHIPPED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'overdue items', link: '/todos' }] },
+    CUSTOMER:        { subtitle: 'My Orders',         kpis: [{ label: 'Active Orders', value: activeOrders, color: NAVY, sub: 'in progress', link: '/orders' }, { label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'being prepared', link: '/orders?status=READY_TO_SHIP' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#8B5CF6', sub: 'on the way', link: '/orders?status=SHIPPED' }] },
+  };
+
+  const cfg = roleConfigs[userRole];
+  if (cfg) return (
+    <AppLayout title="Dashboard" subtitle={cfg.subtitle} actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
+      <RoleKpi items={cfg.kpis} />
+      <Divider label="Workload" />
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ActionSection title="My Priority Queue" subtitle="Needs your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
+        <ActionSection title="Recent Activity"   subtitle="Last 7 days"          items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
       </div>
     </AppLayout>
   );
 
-  // CAD DESIGNER — CAD queue
-  if (userRole === 'CAD_DESIGNER') return (
-    <AppLayout title="Dashboard" subtitle="CAD Queue">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="In CAD Queue"     value={sc('CAD_IN_PROGRESS')} color="#6366F1" sub="awaiting design"  link="/orders?status=CAD_IN_PROGRESS" />
-        <KpiCard label="Revision Needed"  value={actions.filter(a => a.priorityReason.toLowerCase().includes('revision')).length} color="#DC2626" sub="customer requested" link="/todos" />
-        <KpiCard label="Awaiting Quote"   value={actions.filter(a => a.priorityReason.toLowerCase().includes('quote')).length} color="#F59E0B" sub="approved, price needed" link="/todos" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="My Priority Queue" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="Recent Activity"   items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
-      </div>
-    </AppLayout>
-  );
-
-  // SKU MANAGER — SKU queue
-  if (userRole === 'SKU_MANAGER') return (
-    <AppLayout title="Dashboard" subtitle="SKU Queue">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Pending SKU"    value={sc('SKU_CREATION')}    color="#F97316" sub="ready for SKU generation" link="/orders?status=SKU_CREATION" />
-        <KpiCard label="VPO Active"     value={sc('VPO_ISSUED')}      color="#0891B2" sub="SKU generated"            link="/orders?status=VPO_ISSUED" />
-        <KpiCard label="Priority Tasks" value={actions.length}         color="#7C3AED" sub="needs attention"          link="/todos" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="My Priority Queue" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="Recent Activity"   items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
-      </div>
-    </AppLayout>
-  );
-
-  // FACTORY MANAGER — production queue
-  if (userRole === 'FACTORY_MANAGER') return (
-    <AppLayout title="Dashboard" subtitle="Production Queue">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="VPO Active"        value={sc('VPO_ISSUED')}         color="#0891B2" sub="in production"      link="/orders?status=VPO_ISSUED" />
-        <KpiCard label="With Contractor"   value={sc('PENDING_CONTRACTOR')} color="#F59E0B" sub="sent out"           link="/orders?status=PENDING_CONTRACTOR" />
-        <KpiCard label="Ready to Ship"     value={sc('READY_TO_SHIP')}      color="#3B82F6" sub="awaiting shipping"  link="/orders?status=READY_TO_SHIP" />
-        <KpiCard label="Priority Actions"  value={actions.length}           color="#DC2626" sub="need attention"     link="/todos" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="My Priority Queue" items={actions} link="/todos"         showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="Production Orders" items={recent}  link="/manufacturing" showMore={showMoreR} setShowMore={setShowMoreR} />
-      </div>
-    </AppLayout>
-  );
-
-  // STONE MANAGER — stone queue
-  if (userRole === 'STONE_MANAGER') return (
-    <AppLayout title="Dashboard" subtitle="Stone Queue">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Pending Stone"   value={sc('VPO_ISSUED')} color="#7C3AED" sub="awaiting dispatch"  link="/orders?status=VPO_ISSUED" />
-        <KpiCard label="Priority Tasks"  value={actions.length}   color="#DC2626" sub="> 1 day overdue"    link="/todos" />
-        <KpiCard label="Total VPO"       value={sc('VPO_ISSUED')} color="#0891B2" sub="in VPO stage"       link="/orders" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="Overdue Stone Orders" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="All Stone Orders"     items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
-      </div>
-    </AppLayout>
-  );
-
-  // SHIPPING MANAGER — shipping queue
-  if (userRole === 'SHIPPING_MANAGER') return (
-    <AppLayout title="Dashboard" subtitle="Shipping Queue">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Ready to Ship" value={sc('READY_TO_SHIP')} color="#3B82F6" sub="awaiting dispatch" link="/orders?status=READY_TO_SHIP" />
-        <KpiCard label="Shipped"       value={sc('SHIPPED')}       color="#8B5CF6" sub="in transit"        link="/orders?status=SHIPPED" />
-        <KpiCard label="Priority Tasks" value={actions.length}     color="#DC2626" sub="overdue items"     link="/todos" />
-      </div>
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <ActionSection title="Priority Shipments" items={actions} link="/todos"    showMore={showMoreA} setShowMore={setShowMoreA} />
-        <ActionSection title="Recent Shipments"   items={recent}  link="/shipping" showMore={showMoreR} setShowMore={setShowMoreR} />
-      </div>
-    </AppLayout>
-  );
-
-  // CUSTOMER — their orders only
-  if (userRole === 'CUSTOMER') return (
-    <AppLayout title="My Orders" subtitle="Track your custom jewelry">
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Active Orders"  value={activeOrders}            color="#1A2740" sub="in progress"      link="/orders" />
-        <KpiCard label="Ready to Ship"  value={sc('READY_TO_SHIP')}    color="#3B82F6" sub="being prepared"   link="/orders?status=READY_TO_SHIP" />
-        <KpiCard label="Shipped"        value={sc('SHIPPED')}           color="#8B5CF6" sub="on the way"       link="/orders?status=SHIPPED" />
-      </div>
-      <ActionSection title="My Orders" items={recent} link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
-    </AppLayout>
-  );
-
-  // Fallback
-  return <AppLayout title="Dashboard"><div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading…</div></AppLayout>;
+  return <AppLayout title="Dashboard"><div style={{ textAlign: 'center', padding: '60px', color: '#9BA8B5' }}>Loading…</div></AppLayout>;
 }
