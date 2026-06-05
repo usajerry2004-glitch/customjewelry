@@ -107,6 +107,9 @@ export class ManufacturingService {
     if (order.status !== OrderStatus.VPO_ISSUED && order.status !== OrderStatus.PENDING_CONTRACTOR) {
       throw new BadRequestException('Order must be in VPO_ISSUED or PENDING_CONTRACTOR to mark as ready to ship');
     }
+    if (order.status === OrderStatus.VPO_ISSUED && order.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+      throw new BadRequestException('Stone must be received before moving to Ready to Ship');
+    }
     order.status = OrderStatus.READY_TO_SHIP;
     order.processedDate = new Date();
     const saved = await this.orderRepo.save(order);

@@ -310,6 +310,14 @@ export class OrdersService {
       return skuOrder;
     }
 
+    // Factory Manager cannot move VPO_ISSUED orders until stone is received
+    if (user?.role === 'FACTORY_MANAGER' && [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP].includes(status)) {
+      const currentOrder = await this.findOne(id);
+      if (currentOrder.status === OrderStatus.VPO_ISSUED && currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+        throw new BadRequestException('Stone must be received before changing this order status');
+      }
+    }
+
     const patch: Partial<Order> = { status };
     if (quotedCost) patch.quotedCost = quotedCost;
     const updated = await this.update(id, patch, user);

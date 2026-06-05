@@ -882,17 +882,28 @@ export default function OrderDetail() {
           {movableStatuses.length > 0 && (
             <div style={cardStyle}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Move to Stage</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                {movableStatuses.map(s => {
-                  const sc = STATUS_CONFIG[s];
-                  return (
-                    <button key={s} onClick={() => moveStatus(s)} disabled={updatingStatus}
-                      style={{ background: sc.bg, border: `1px solid ${sc.color}40`, borderRadius: '8px', padding: '9px 14px', color: sc.color, fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: updatingStatus ? 0.6 : 1, transition: 'opacity 0.15s', letterSpacing: '0.2px' }}>
-                      → {sc.label}
-                    </button>
-                  );
-                })}
-              </div>
+
+              {/* Block Factory Manager until stone is received on VPO orders */}
+              {userRole === UserRole.FACTORY_MANAGER
+               && order.status === OrderStatus.VPO_ISSUED
+               && order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
+                <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '12px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500, lineHeight: 1.6 }}>
+                  ⏳ Cannot change status until stone is received.<br/>
+                  Waiting for Stone Manager to dispatch the stone.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {movableStatuses.map(s => {
+                    const sc = STATUS_CONFIG[s];
+                    return (
+                      <button key={s} onClick={() => moveStatus(s)} disabled={updatingStatus}
+                        style={{ background: sc.bg, border: `1px solid ${sc.color}40`, borderRadius: '8px', padding: '9px 14px', color: sc.color, fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: updatingStatus ? 0.6 : 1, transition: 'opacity 0.15s', letterSpacing: '0.2px' }}>
+                        → {sc.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
