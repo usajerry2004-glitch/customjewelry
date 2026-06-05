@@ -193,7 +193,6 @@ export default function Dashboard() {
       </div>
 
       {/* ── Pipeline ── */}
-      <Divider label="Order Pipeline" />
       <div style={{ ...card, padding: '20px 22px', marginBottom: 8 }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
           {PIPELINE_ORDER.map((status, i) => {
@@ -215,7 +214,6 @@ export default function Dashboard() {
       </div>
 
       {/* ── Analytics ── */}
-      <Divider label="Analytics" />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 8 }}>
 
         {/* Weekly Activity — Pie */}
@@ -304,7 +302,6 @@ export default function Dashboard() {
       </div>
 
       {/* ── Queues ── */}
-      <Divider label="Workload" />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <ActionSection title="My Action Queue" subtitle="Orders requiring your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
         <ActionSection title="New This Week"    subtitle="Last 7 days"                      items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
@@ -333,7 +330,6 @@ export default function Dashboard() {
   if (cfg) return (
     <AppLayout title="Dashboard" subtitle={cfg.subtitle} actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
       <RoleKpi items={cfg.kpis} />
-      <Divider label="Workload" />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <ActionSection title="My Priority Queue" subtitle="Needs your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
         <ActionSection title="Recent Activity"   subtitle="Last 7 days"          items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
