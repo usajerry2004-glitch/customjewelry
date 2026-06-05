@@ -105,7 +105,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
               ⚠ +{daysOverdue}d overdue
             </span>
           )}
-          {(order as any).stoneStatus === StoneStatus.PENDING_STONE && (
+          {order.status === 'VPO_ISSUED' && (order as any).stoneStatus !== StoneStatus.STONE_RECEIVED && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#5B21B6', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               💎 Pending Stone
             </span>

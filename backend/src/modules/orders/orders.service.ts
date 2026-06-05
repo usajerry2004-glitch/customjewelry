@@ -95,7 +95,7 @@ export class OrdersService {
       });
     } else if (user?.role === 'STONE_MANAGER') {
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
-      qb.andWhere('order.stoneStatus = :pendingStone', { pendingStone: 'PENDING_STONE' });
+      qb.andWhere('(order.stoneStatus = :pendingStone OR order.stoneStatus IS NULL)', { pendingStone: 'PENDING_STONE' });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
