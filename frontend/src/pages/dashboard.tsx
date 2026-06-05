@@ -128,8 +128,8 @@ export default function Dashboard() {
     const pc  = o.priorityLevel ? PRIORITY_COLORS[o.priorityLevel as keyof typeof PRIORITY_COLORS] : null;
     const img = refImages[o.id];
     return (
-      <div onClick={() => router.push(`/orders/${o.id}`)}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: pc ? `${pc}06` : '#FAFAF8', border: `1px solid ${pc ? pc + '25' : '#EDE9E2'}`, borderLeft: `3px solid ${pc || GOLD}20`, borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' }}
+      <div className="order-row-card" onClick={() => router.push(`/orders/${o.id}`)}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: pc ? `${pc}06` : '#FAFAF8', border: `1px solid ${pc ? pc + '25' : '#EDE9E2'}`, borderLeft: `3px solid ${pc || GOLD}20`, borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s', overflow: 'hidden' }}
         onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}10` : '#F5F3EF'}
         onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}06` : '#FAFAF8'}
       >
@@ -153,7 +153,7 @@ export default function Dashboard() {
   };
 
   const ActionSection = ({ title, subtitle, items, link, showMore, setShowMore }: any) => (
-    <div style={{ ...card, padding: '20px 22px' }}>
+    <div className="dash-action-card" style={{ ...card, padding: '20px 22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, margin: '0 0 3px' }}>{title}</h2>
