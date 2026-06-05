@@ -263,8 +263,15 @@ export default function PriorityTasksPage() {
 }
 
 const STATUS_BADGE: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
-  ORDER_REVISION: { icon: '↩', label: 'Revision Requested', color: '#C2410C', bg: '#FFF0E6', border: '#F97316' },
-  PENDING_CAD:    { icon: '⏳', label: 'Awaiting CAD Start', color: '#6D28D9', bg: '#EDE9FE', border: '#8B5CF6' },
+  CAD_IN_PROGRESS:    { icon: '🎨', label: 'CAD In Progress',    color: '#4338CA', bg: '#EEF2FF', border: '#6366F1' },
+  SKU_CREATION:       { icon: '🔖', label: 'SKU Creation',       color: '#C2410C', bg: '#FFEDD5', border: '#F97316' },
+  VPO_ISSUED:         { icon: '🏭', label: 'VPO Created',        color: '#0369A1', bg: '#E0F2FE', border: '#0EA5E9' },
+  PENDING_CONTRACTOR: { icon: '🤝', label: 'With Contractor',    color: '#B45309', bg: '#FEF3C7', border: '#F59E0B' },
+  READY_TO_SHIP:      { icon: '📦', label: 'Ready to Ship',      color: '#1D4ED8', bg: '#DBEAFE', border: '#3B82F6' },
+  SHIPPED:            { icon: '🚚', label: 'Shipped',            color: '#5B21B6', bg: '#EDE9FE', border: '#8B5CF6' },
+  REPAIR:             { icon: '🔧', label: 'Repair',             color: '#B91C1C', bg: '#FEE2E2', border: '#EF4444' },
+  COMPLETED:          { icon: '✅', label: 'Completed',          color: '#065F46', bg: '#D1FAE5', border: '#10B981' },
+  CANCELLED:          { icon: '✕',  label: 'Cancelled',          color: '#374151', bg: '#F3F4F6', border: '#9CA3AF' },
 };
 
 function PriorityOrderCard({ order, onClick }: { order: PriorityOrder; onClick: () => void }) {

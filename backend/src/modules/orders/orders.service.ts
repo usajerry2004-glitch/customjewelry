@@ -423,11 +423,12 @@ export class OrdersService {
       return q;
     };
 
-    // 0. ORDER_REVISION — always CRITICAL, highest priority
+    // 0. CAD revision requested — always CRITICAL
     const revisionOrders = await qb()
-      .andWhere('o.status = :rev', { rev: OrderStatus.ORDER_REVISION })
+      .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
+      .andWhere('o."cadSubStatus" = :r', { r: 'REVISION' })
       .getMany();
-    revisionOrders.forEach(o => results.push({ ...o, priorityReason: 'Customer requested revision', priorityLevel: 'CRITICAL' }));
+    revisionOrders.forEach(o => results.push({ ...o, priorityReason: 'Customer requested CAD revision', priorityLevel: 'CRITICAL' }));
 
     // 1. Priority customer orders — scoped to role's status domain
     const priorityCustomers = await qb()
