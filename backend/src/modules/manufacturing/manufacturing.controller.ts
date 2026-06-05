@@ -38,15 +38,15 @@ export class ManufacturingController {
     return this.manufacturingService.startProduction(id, body);
   }
 
-  @Patch(':id/jobbag')
+  @Patch(':id/contractor')
   @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Create job bag' })
-  createJobBag(
+  @ApiOperation({ summary: 'Move order to Pending Contractor' })
+  moveToContractor(
     @Param('id') id: string,
     @Body() body: { jobBagNumber?: string; vendorName?: string },
   ) {
-    return this.manufacturingService.createJobBag(id, body);
+    return this.manufacturingService.moveToContractor(id, body);
   }
 
   @Patch(':id/stone-sent')

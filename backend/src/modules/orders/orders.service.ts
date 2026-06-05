@@ -91,7 +91,7 @@ export class OrdersService {
       });
     } else if (user?.role === 'SHIPPING_MANAGER') {
       qb.andWhere('order.status IN (:...shippingStatuses)', {
-        shippingStatuses: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+        shippingStatuses: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
       });
     } else if (user?.role === 'STONE_MANAGER') {
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
@@ -141,7 +141,7 @@ export class OrdersService {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    const SHIPPING_STATUSES = [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
+    const SHIPPING_STATUSES = [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED];
     if (user?.role === 'SHIPPING_MANAGER' && !SHIPPING_STATUSES.includes(order.status)) {
       throw new NotFoundException(`Order ${id} not found`);
     }
@@ -365,17 +365,6 @@ export class OrdersService {
       ));
     }
 
-    // DELIVERED — email customer
-    if (status === OrderStatus.DELIVERED && updated.customerEmail) {
-      await this.emailService.sendOrderDelivered({
-        to: updated.customerEmail,
-        poNumber: updated.poNumber,
-        customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-        orderType: updated.orderType || '—',
-        orderId: updated.id,
-      });
-    }
-
     // COMPLETED — email customer
     if (status === OrderStatus.COMPLETED && updated.customerEmail) {
       await this.emailService.sendOrderDelivered({
@@ -391,42 +380,26 @@ export class OrdersService {
   }
 
   async authorize(id: string): Promise<Order> {
+    // Kept for API compatibility — orders now start at CAD_IN_PROGRESS directly.
+    // This notifies CAD designers that a new order is ready.
     const order = await this.findOne(id);
-    if (order.status !== OrderStatus.WAITING_CONFIRMATION) {
-      throw new ForbiddenException('Order must be in WAITING_CONFIRMATION status to authorize');
-    }
-    const updated = await this.orderRepo.save({ ...order, status: OrderStatus.PENDING_CAD });
-
-    // Email customer: order confirmed
-    if (updated.customerEmail) {
-      await this.emailService.sendOrderConfirmedToCustomer({
-        to: updated.customerEmail,
-        poNumber: updated.poNumber,
-        customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-        orderType: updated.orderType || '—',
-        orderId: updated.id,
-      });
-    }
-
-    // In-portal notification for CAD designers (no email for new job)
     const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER, UserRole.ADMIN]) } });
     await Promise.all(cadUsers.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type: NotificationType.STATUS_CHANGED,
-        title: `New CAD Job — ${updated.poNumber}`,
-        message: `Order ${updated.poNumber} is ready for CAD design.`,
-        orderId: updated.id,
+        title: `New CAD Job — ${order.poNumber}`,
+        message: `Order ${order.poNumber} is ready for CAD design.`,
+        orderId: order.id,
         targetUserId: u.id,
       })),
     ));
-
-    return updated;
+    return order;
   }
 
   async findPriority(user: { id: string; email: string; role: string }): Promise<any[]> {
     const now = new Date();
     const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
-    const FINAL = [OrderStatus.COMPLETED, OrderStatus.DELIVERED, OrderStatus.CANCELLED];
+    const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
     const results: any[] = [];
 
     // Role-specific SLA checks
@@ -434,11 +407,11 @@ export class OrdersService {
 
     // Base query scoped to what this role is responsible for
     const ROLE_STATUSES: Partial<Record<string, OrderStatus[]>> = {
-      [UserRole.CAD_DESIGNER]:    [OrderStatus.PENDING_CAD, OrderStatus.CAD_IN_PROGRESS, OrderStatus.ORDER_REVISION],
-      [UserRole.AUTHORIZER]:      [OrderStatus.WAITING_CONFIRMATION, OrderStatus.PENDING_CAD, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CUSTOMER_APPROVED, OrderStatus.WAITING_FOR_PRICE],
+      [UserRole.CAD_DESIGNER]:    [OrderStatus.CAD_IN_PROGRESS],
+      [UserRole.AUTHORIZER]:      [OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
       [UserRole.SKU_MANAGER]:     [OrderStatus.SKU_CREATION],
-      [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.ORDER_JOB_BAG_CREATED, OrderStatus.READY_TO_INVOICE],
-      [UserRole.SHIPPING_MANAGER]:[OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+      [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR],
+      [UserRole.SHIPPING_MANAGER]:[OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
       [UserRole.STONE_MANAGER]:   [OrderStatus.VPO_ISSUED],
     };
 
@@ -477,28 +450,28 @@ export class OrdersService {
     });
 
     if ([UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)) {
-      // CAD: in CAD_IN_PROGRESS > 2 days with no file uploaded (cadSubStatus is null)
+      // CAD: in CAD_IN_PROGRESS > 3 days with no file uploaded
       const cadOverdue = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
         .andWhere('(o."cadSubStatus" IS NULL OR o."cadSubStatus" = :u)', { u: 'PENDING' })
-        .andWhere('o."createdAt" < :d', { d: daysAgo(2) })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(3) })
         .getMany();
       cadOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'CAD file not uploaded — over 2 days', priorityLevel: 'MEDIUM' });
+          results.push({ ...o, priorityReason: 'CAD file not uploaded — over 3 days', priorityLevel: 'MEDIUM' });
       });
     }
 
     if ([UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Authorizer: awaiting quote (cadSubStatus=APPROVED) > 2 days
+      // Authorizer: awaiting quote price (cadSubStatus=APPROVED) > 1 day
       const quotePending = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
         .andWhere('o."cadSubStatus" = :cs', { cs: 'APPROVED' })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(2) })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
         .getMany();
       quotePending.forEach(o => {
         if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Quote price pending — over 2 days', priorityLevel: 'HIGH' });
+          results.push({ ...o, priorityReason: 'Quote price pending — over 1 day', priorityLevel: 'HIGH' });
       });
     }
 
@@ -515,7 +488,7 @@ export class OrdersService {
     }
 
     if ([UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Factory: in VPO_ISSUED > 4 days
+      // Factory: in VPO_ISSUED > 4 days or PENDING_CONTRACTOR > 21 days
       const factoryOverdue = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
         .andWhere('o."updatedAt" < :d', { d: daysAgo(4) })
@@ -523,6 +496,14 @@ export class OrdersService {
       factoryOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
           results.push({ ...o, priorityReason: 'In VPO stage — over 4 days', priorityLevel: 'MEDIUM' });
+      });
+      const contractorOverdue = await qb()
+        .andWhere('o.status = :s', { s: OrderStatus.PENDING_CONTRACTOR })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(21) })
+        .getMany();
+      contractorOverdue.forEach(o => {
+        if (!results.find(r => r.id === o.id))
+          results.push({ ...o, priorityReason: 'With contractor — over 21 days', priorityLevel: 'HIGH' });
       });
     }
 
@@ -539,7 +520,7 @@ export class OrdersService {
     }
 
     if ([UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Stone Manager: VPO_ISSUED with stone still pending > 1 day
+      // Stone Manager: VPO_ISSUED with stone pending > 1 day
       const stoneOverdue = await this.orderRepo.createQueryBuilder('o')
         .where('o.isArchived = false')
         .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })

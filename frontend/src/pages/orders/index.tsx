@@ -23,7 +23,6 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'All',           value: '' },
     { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
     { label: 'Shipped',       value: OrderStatus.SHIPPED },
-    { label: 'Completed',     value: OrderStatus.COMPLETED },
   ],
   FACTORY_MANAGER: [
     { label: 'All',                value: '' },
@@ -31,14 +30,14 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
   ],
   CAD_DESIGNER: [
-    { label: 'All',      value: '' },
-    { label: 'Pending',  value: 'cad_pending' },
-    { label: 'Revision', value: 'cad_revision' },
+    { label: 'All',            value: '' },
+    { label: 'Pending',        value: 'cad_pending' },
+    { label: 'Revision',       value: 'cad_revision' },
     { label: 'Awaiting Quote', value: 'cad_approved' },
   ],
   SKU_MANAGER: [
-    { label: 'All',         value: '' },
-    { label: 'SKU Creation',value: OrderStatus.SKU_CREATION },
+    { label: 'All',          value: '' },
+    { label: 'SKU Creation', value: OrderStatus.SKU_CREATION },
   ],
 };
 

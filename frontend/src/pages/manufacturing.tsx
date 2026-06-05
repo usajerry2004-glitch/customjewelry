@@ -5,7 +5,7 @@ import { Order, OrderStatus, StoneStatus, STATUS_CONFIG } from '../utils/types';
 
 export async function getServerSideProps() { return { props: {} }; }
 
-interface Metrics { pendingStart: number; inProgress: number; jobBagCreated: number; readyToShip: number; pendingStone: number }
+interface Metrics { inProgress: number; withContractor: number; readyToShip: number; pendingStone: number }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
 const inp: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', width: '100%' };
@@ -45,17 +45,16 @@ export default function ManufacturingPage() {
   };
 
   const kpi = [
-    { label: 'Pending Start',  value: metrics?.pendingStart ?? 0,  color: '#EA6C28' },
-    { label: 'VPO Issued',     value: metrics?.inProgress ?? 0,    color: '#0891B2' },
-    { label: 'Pending Stone',  value: metrics?.pendingStone ?? 0,  color: '#7C3AED' },
-    { label: 'Job Bag Created',value: metrics?.jobBagCreated ?? 0, color: '#0D9488' },
-    { label: 'Ready to Ship',  value: metrics?.readyToShip ?? 0,   color: '#2563EB' },
+    { label: 'VPO Issued',        value: metrics?.inProgress ?? 0,     color: '#0891B2' },
+    { label: 'Pending Stone',     value: metrics?.pendingStone ?? 0,   color: '#7C3AED' },
+    { label: 'With Contractor',   value: metrics?.withContractor ?? 0, color: '#F59E0B' },
+    { label: 'Ready to Ship',     value: metrics?.readyToShip ?? 0,    color: '#2563EB' },
   ];
 
   return (
     <AppLayout title="Manufacturing" subtitle="Factory queue & production tracking">
       {/* KPIs */}
-      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '28px' }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
         {kpi.map(k => (
           <div key={k.label} style={{ ...card, padding: '18px 20px' }}>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>{k.label}</div>
@@ -114,16 +113,6 @@ export default function ManufacturingPage() {
                     </div>
                   </div>
 
-                  {(order.status === OrderStatus.SKU_CREATION || order.status === OrderStatus.CUSTOMER_APPROVED) && (
-                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
-                      <input value={inputs.vpo} onChange={e => setVpo(order.id, 'vpo', e.target.value)} placeholder="VPO Number" style={inp} />
-                      <input value={inputs.jobBag} onChange={e => setVpo(order.id, 'jobBag', e.target.value)} placeholder="Job Bag Number" style={inp} />
-                      <button onClick={() => action(order.id, 'start', { vpoNumber: inputs.vpo, jobBagNumber: inputs.jobBag })} disabled={busy}
-                        style={{ background: '#0891B2', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        Issue VPO & Start
-                      </button>
-                    </div>
-                  )}
 
                   {order.status === OrderStatus.VPO_ISSUED && (
                     order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
@@ -133,11 +122,11 @@ export default function ManufacturingPage() {
                     ) : (
                       <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
                         <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                        <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
+                        <button onClick={() => action(order.id, 'contractor', { vendorName: inputs.vendor })} disabled={busy}
                           style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                          Pending Contractor
+                          Send to Contractor
                         </button>
-                        <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                        <button onClick={() => action(order.id, 'complete')} disabled={busy}
                           style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                           Ready to Ship
                         </button>
@@ -148,7 +137,7 @@ export default function ManufacturingPage() {
                   {order.status === OrderStatus.PENDING_CONTRACTOR && (
                     <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
                       <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                      <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                      <button onClick={() => action(order.id, 'complete')} disabled={busy}
                         style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                         Ready to Ship
                       </button>

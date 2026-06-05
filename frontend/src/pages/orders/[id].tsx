@@ -219,16 +219,16 @@ const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   [OrderStatus.CAD_IN_PROGRESS]:    [OrderStatus.CANCELLED],
   [OrderStatus.SKU_CREATION]:       [OrderStatus.CANCELLED],
   [OrderStatus.VPO_ISSUED]:         [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.CANCELLED],
-  [OrderStatus.PENDING_CONTRACTOR]: [OrderStatus.READY_TO_SHIP, OrderStatus.CANCELLED],
+  [OrderStatus.PENDING_CONTRACTOR]: [OrderStatus.READY_TO_SHIP],
   [OrderStatus.READY_TO_SHIP]:      [OrderStatus.SHIPPED],
-  [OrderStatus.SHIPPED]:            [OrderStatus.REPAIR, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [OrderStatus.SHIPPED]:            [OrderStatus.REPAIR, OrderStatus.COMPLETED],
   [OrderStatus.REPAIR]:             [OrderStatus.COMPLETED],
 };
 
 // Statuses each role is permitted to move an order into
 const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
   [UserRole.ADMIN]:            Object.values(OrderStatus),
-  [UserRole.AUTHORIZER]:       [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.REPAIR, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [UserRole.AUTHORIZER]:       [OrderStatus.CANCELLED, OrderStatus.REPAIR, OrderStatus.COMPLETED],
   [UserRole.SALES_REP]:        [OrderStatus.CANCELLED],
   [UserRole.CAD_DESIGNER]:     [],
   [UserRole.SKU_MANAGER]:      [],
