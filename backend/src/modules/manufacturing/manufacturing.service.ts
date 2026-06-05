@@ -62,51 +62,22 @@ export class ManufacturingService {
     if (order.status !== OrderStatus.VPO_ISSUED) {
       throw new BadRequestException('Order must be in VPO_ISSUED status');
     }
-    if (order.stoneStatus !== StoneStatus.PENDING_STONE) {
+    if (order.stoneStatus === StoneStatus.STONE_RECEIVED) {
       throw new BadRequestException('Stone has already been marked as sent');
     }
 
-    order.stoneStatus = StoneStatus.STONE_SENT;
+    // Stone sent = stone received on factory side, no manual action needed from factory
+    order.stoneStatus = StoneStatus.STONE_RECEIVED;
     const saved = await this.orderRepo.save(order);
 
-    // Notify all Factory Managers that stone is on its way
+    // Notify all Factory Managers — portal auto-shows Stone Received
     const factoryManagers = await this.userRepo.find({ where: { role: UserRole.FACTORY_MANAGER } });
     await Promise.all(
       factoryManagers.map(u =>
         this.notificationsService.create(
-          NotificationType.STONE_PENDING,
-          `Stone Sent — ${order.poNumber}`,
-          `Stone for order ${order.poNumber} has been dispatched by the Stone Manager. Please confirm receipt once it arrives.`,
-          order.id,
-          u.id,
-        ),
-      ),
-    );
-
-    return saved;
-  }
-
-  async confirmStoneReceived(id: string) {
-    const order = await this.orderRepo.findOne({ where: { id } });
-    if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.VPO_ISSUED) {
-      throw new BadRequestException('Order must be in VPO_ISSUED status');
-    }
-    if (order.stoneStatus !== StoneStatus.STONE_SENT) {
-      throw new BadRequestException('Stone must be marked as sent before confirming receipt');
-    }
-
-    order.stoneStatus = StoneStatus.STONE_RECEIVED;
-    const saved = await this.orderRepo.save(order);
-
-    // Notify all Stone Managers that stone was received
-    const stoneManagers = await this.userRepo.find({ where: { role: UserRole.STONE_MANAGER } });
-    await Promise.all(
-      stoneManagers.map(u =>
-        this.notificationsService.create(
           NotificationType.STONE_RECEIVED,
           `Stone Received — ${order.poNumber}`,
-          `Factory Manager has confirmed receipt of the stone for order ${order.poNumber}. Production can now proceed.`,
+          `Stone for order ${order.poNumber} has been sent and is now marked as received. You can proceed with production.`,
           order.id,
           u.id,
         ),

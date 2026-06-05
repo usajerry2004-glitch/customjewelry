@@ -31,7 +31,6 @@ export enum ManufacturingPath {
 
 export enum StoneStatus {
   PENDING_STONE = 'PENDING_STONE',
-  STONE_SENT = 'STONE_SENT',
   STONE_RECEIVED = 'STONE_RECEIVED',
 }
 
