@@ -174,7 +174,7 @@ export class SmartsheetImportService {
         const storeName  = getCell(row, 'Store Name') || '';
         const fullName   = getCell(row, 'Customer Full Name') || getCell(row, 'Customer Name') || '';
         const rawStatus  = (getCell(row, 'Status') || '').trim();
-        const status     = mapSmartsheetStatus(rawStatus) ?? OrderStatus.WAITING_CONFIRMATION;
+        const status     = mapSmartsheetStatus(rawStatus) ?? OrderStatus.CAD_IN_PROGRESS;
 
         // ── Customer ────────────────────────────────────────────────────
         const { user: customer, created } = await this.findOrCreateCustomer(email, storeName, fullName);

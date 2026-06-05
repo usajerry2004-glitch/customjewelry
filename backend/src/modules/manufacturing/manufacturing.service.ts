@@ -27,8 +27,8 @@ export class ManufacturingService {
   async startProduction(id: string, details: { vpoNumber?: string; jobBagNumber?: string; notes?: string }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.SKU_CREATION && order.status !== OrderStatus.CUSTOMER_APPROVED) {
-      throw new BadRequestException('Order must be in SKU_CREATION or CUSTOMER_APPROVED status to start production');
+    if (order.status !== OrderStatus.SKU_CREATION) {
+      throw new BadRequestException('Order must be in SKU_CREATION status to start production');
     }
 
     order.status = OrderStatus.VPO_ISSUED;

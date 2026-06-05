@@ -18,7 +18,7 @@ const testOrders = [
     approximateCaratWeight: '1.5 ct',
     customerNotes: 'Wants a simple band with side stones',
     quotedCost: 4500,
-    status: OrderStatus.WAITING_CONFIRMATION,
+    status: OrderStatus.CAD_IN_PROGRESS,
   },
   {
     poNumber: 'KJ-SALES1-002',
@@ -35,7 +35,7 @@ const testOrders = [
     approximateCaratWeight: '0.75 ct',
     customerNotes: 'Gold pendant with diamond',
     quotedCost: 2800,
-    status: OrderStatus.PENDING_CAD,
+    status: OrderStatus.CAD_IN_PROGRESS,
   },
   {
     poNumber: 'KJ-SALES2-001',
@@ -52,7 +52,7 @@ const testOrders = [
     approximateCaratWeight: '0.5 ct',
     customerNotes: 'Band with side baguette diamonds',
     quotedCost: 3200,
-    status: OrderStatus.WAITING_CONFIRMATION,
+    status: OrderStatus.CAD_IN_PROGRESS,
   },
   {
     poNumber: 'KJ-SALES2-002',
@@ -86,7 +86,7 @@ const testOrders = [
     approximateCaratWeight: '1.0 ct',
     customerNotes: 'Stud earrings - pair',
     quotedCost: 6500,
-    status: OrderStatus.CUSTOMER_APPROVED,
+    status: OrderStatus.CAD_IN_PROGRESS,
   },
   {
     poNumber: 'KJ-SALES1-003',

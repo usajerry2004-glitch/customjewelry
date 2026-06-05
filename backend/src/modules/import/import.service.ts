@@ -5,20 +5,19 @@ import * as XLSX from 'xlsx';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 
 const STATUS_MAP: Record<string, OrderStatus> = {
-  'ready to invoice':         OrderStatus.READY_TO_INVOICE,
-  'ready to ship':            OrderStatus.READY_TO_SHIP,
-  'shipped':                  OrderStatus.SHIPPED,
-  'delivered':                OrderStatus.DELIVERED,
-  'pending cad':              OrderStatus.PENDING_CAD,
-  'cad in progress':          OrderStatus.CAD_IN_PROGRESS,
-  'customer approved':        OrderStatus.CUSTOMER_APPROVED,
-  'customer rejected':        OrderStatus.CUSTOMER_REJECTED,
-  'sku creation':             OrderStatus.SKU_CREATION,
-  'vpo issued':               OrderStatus.VPO_ISSUED,
-  'pending contractor':       OrderStatus.PENDING_CONTRACTOR,
-  'order job bag created':    OrderStatus.ORDER_JOB_BAG_CREATED,
-  'waiting confirmation':     OrderStatus.WAITING_CONFIRMATION,
-  'cancelled':                OrderStatus.CANCELLED,
+  'ready to ship':        OrderStatus.READY_TO_SHIP,
+  'ready to invoice':     OrderStatus.READY_TO_SHIP,
+  'shipped':              OrderStatus.SHIPPED,
+  'delivered':            OrderStatus.SHIPPED,
+  'cad in progress':      OrderStatus.CAD_IN_PROGRESS,
+  'pending cad':          OrderStatus.CAD_IN_PROGRESS,
+  'customer approved':    OrderStatus.CAD_IN_PROGRESS,
+  'customer rejected':    OrderStatus.CANCELLED,
+  'sku creation':         OrderStatus.SKU_CREATION,
+  'vpo issued':           OrderStatus.VPO_ISSUED,
+  'pending contractor':   OrderStatus.PENDING_CONTRACTOR,
+  'waiting confirmation': OrderStatus.CAD_IN_PROGRESS,
+  'cancelled':            OrderStatus.CANCELLED,
 };
 
 function str(val: any): string | null {
@@ -76,7 +75,7 @@ export class ImportService {
       if (exists) { skipped++; continue; }
 
       const statusRaw = String(row['Status'] ?? '').trim().toLowerCase();
-      const status = STATUS_MAP[statusRaw] || OrderStatus.WAITING_CONFIRMATION;
+      const status = STATUS_MAP[statusRaw] || OrderStatus.CAD_IN_PROGRESS;
 
       let processedDate: Date | null = null;
       const pdRaw = row['Processed Date'];

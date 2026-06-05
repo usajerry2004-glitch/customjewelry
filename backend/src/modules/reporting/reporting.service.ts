@@ -63,7 +63,7 @@ export class ReportingService {
 
     const [newOrders, completedOrders, cancelledOrders, allActive] = await Promise.all([
       this.orderRepo.count({ where: { createdAt: Between(from, to) } }),
-      this.orderRepo.count({ where: { status: OrderStatus.DELIVERED, updatedAt: Between(from, to) } }),
+      this.orderRepo.count({ where: { status: OrderStatus.COMPLETED, updatedAt: Between(from, to) } }),
       this.orderRepo.count({ where: { status: OrderStatus.CANCELLED, updatedAt: Between(from, to) } }),
       this.orderRepo.count({ where: { createdAt: LessThan(to) } }),
     ]);
@@ -95,7 +95,7 @@ export class ReportingService {
 
     // Average days to delivery (for orders delivered in this period)
     const deliveredInPeriod = await this.orderRepo.find({
-      where: { status: OrderStatus.DELIVERED, updatedAt: Between(from, to) },
+      where: { status: OrderStatus.COMPLETED, updatedAt: Between(from, to) },
       select: ['createdAt', 'updatedAt'],
     });
 
@@ -111,7 +111,7 @@ export class ReportingService {
     const revenueRaw = await this.orderRepo
       .createQueryBuilder('o')
       .select('SUM(o.quotedCost)', 'total')
-      .where('o.status = :s', { s: OrderStatus.DELIVERED })
+      .where('o.status = :s', { s: OrderStatus.COMPLETED })
       .andWhere('o.updatedAt BETWEEN :from AND :to', { from, to })
       .getRawOne();
 

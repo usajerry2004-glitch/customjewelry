@@ -75,7 +75,7 @@ export class OrdersController {
   @Patch(':id/authorize')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Authorize order — moves to PENDING_CAD' })
+  @ApiOperation({ summary: 'Authorize order — notifies CAD team' })
   authorize(@Param('id') id: string) {
     return this.ordersService.authorize(id);
   }

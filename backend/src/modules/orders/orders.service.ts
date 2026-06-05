@@ -18,7 +18,6 @@ export class OrderFilterDto {
   @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
 }
 
-// CAD designers only see CAD_IN_PROGRESS orders
 const CAD_STATUSES = [OrderStatus.CAD_IN_PROGRESS];
 
 @Injectable()
@@ -545,9 +544,8 @@ export class OrdersService {
   async getForFactory() {
     return this.orderRepo.find({
       where: [
-        { status: OrderStatus.SKU_CREATION },
         { status: OrderStatus.VPO_ISSUED },
-        { status: OrderStatus.ORDER_JOB_BAG_CREATED },
+        { status: OrderStatus.PENDING_CONTRACTOR },
       ],
       order: { updatedAt: 'ASC' },
     });
@@ -577,7 +575,7 @@ export class OrdersService {
         } else if (user?.role === 'FACTORY_MANAGER') {
           qb.andWhere('o.kiraSkuNumber IS NOT NULL');
         } else if (user?.role === 'SHIPPING_MANAGER') {
-          if (![OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED].includes(status as OrderStatus)) {
+          if (![OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED].includes(status as OrderStatus)) {
             return { status, orders: [], count: 0 };
           }
         }
@@ -600,7 +598,7 @@ export class OrdersService {
     const revenue = await this.orderRepo
       .createQueryBuilder('o')
       .select('SUM(o.quotedCost)', 'total')
-      .where('o.status NOT IN (:...ex)', { ex: [OrderStatus.CANCELLED, OrderStatus.CUSTOMER_REJECTED] })
+      .where('o.status NOT IN (:...ex)', { ex: [OrderStatus.CANCELLED] })
       .getRawOne();
     return { total, byStatus, totalRevenue: revenue?.total || 0 };
   }

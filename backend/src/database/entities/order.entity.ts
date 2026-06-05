@@ -41,7 +41,7 @@ export class Order {
   @Column({ nullable: true })
   trackingNumber: string;
 
-  @Column({ type: 'varchar', default: OrderStatus.WAITING_CONFIRMATION })
+  @Column({ type: 'varchar', default: OrderStatus.CAD_IN_PROGRESS })
   status: OrderStatus;
 
   @Column({ type: 'varchar', default: ManufacturingPath.STANDARD })
