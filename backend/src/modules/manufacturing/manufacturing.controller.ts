@@ -49,10 +49,18 @@ export class ManufacturingController {
     return this.manufacturingService.createJobBag(id, body);
   }
 
-  @Patch(':id/stone-received')
+  @Patch(':id/stone-sent')
   @Roles(UserRole.ADMIN, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Stone Manager confirms stone received — notifies Factory Manager' })
+  @ApiOperation({ summary: 'Stone Manager marks stone as sent — notifies Factory Manager' })
+  markStoneSent(@Param('id') id: string) {
+    return this.manufacturingService.markStoneSent(id);
+  }
+
+  @Patch(':id/stone-received')
+  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Factory Manager confirms stone received — unlocks production' })
   confirmStoneReceived(@Param('id') id: string) {
     return this.manufacturingService.confirmStoneReceived(id);
   }

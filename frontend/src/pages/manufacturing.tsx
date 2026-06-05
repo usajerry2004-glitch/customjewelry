@@ -101,6 +101,8 @@ export default function ManufacturingPage() {
                         {order.status === OrderStatus.VPO_ISSUED && (
                           order.stoneStatus === StoneStatus.STONE_RECEIVED
                             ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
+                            : order.stoneStatus === StoneStatus.STONE_SENT
+                            ? <span style={{ background: '#FEF3C7', color: '#92400E', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>📦 Stone Sent</span>
                             : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
                         )}
                       </div>
@@ -126,23 +128,35 @@ export default function ManufacturingPage() {
                   )}
 
                   {order.status === OrderStatus.VPO_ISSUED && (
-                    order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
-                      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500 }}>
-                        ⏳ Waiting for Stone Manager to confirm stone receipt before production can proceed.
-                      </div>
-                    ) : (
-                      <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
-                        <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                        <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                          Pending Contractor
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Stone Sent → Factory Manager can confirm receipt */}
+                      {order.stoneStatus === StoneStatus.STONE_SENT && (
+                        <button onClick={() => action(order.id, 'stone-received')} disabled={busy}
+                          style={{ background: '#10B981', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                          ✓ Mark Stone Received
                         </button>
-                        <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
-                          style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                          Ready to Ship
-                        </button>
-                      </div>
-                    )
+                      )}
+                      {/* Production actions — only after stone is received */}
+                      {order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
+                        <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500 }}>
+                          {order.stoneStatus === StoneStatus.STONE_SENT
+                            ? '📦 Stone dispatched. Confirm receipt above to proceed.'
+                            : '⏳ Waiting for Stone Manager to dispatch the stone.'}
+                        </div>
+                      ) : (
+                        <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
+                          <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
+                          <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                            Pending Contractor
+                          </button>
+                          <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                            style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                            Ready to Ship
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {order.status === OrderStatus.PENDING_CONTRACTOR && (
