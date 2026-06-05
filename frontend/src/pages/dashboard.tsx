@@ -164,16 +164,9 @@ export default function Dashboard() {
               <div style={{ fontSize: 26, marginBottom: 8 }}>✅</div>
               <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All clear</div>
             </div>
-          : <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {items.slice(0, showMore ? items.length : 5).map((o: any) => <OrderRow key={o.id} o={o} />)}
-              </div>
-              {items.length > 5 && (
-                <button onClick={() => setShowMore(!showMore)} style={{ width: '100%', marginTop: 10, padding: '7px 0', background: 'none', border: `1px solid #E8E0D4`, borderRadius: 8, fontSize: 11, color: GOLD, cursor: 'pointer', fontWeight: 600, letterSpacing: '0.3px' }}>
-                  {showMore ? '▲ Show less' : `▼ Show ${items.length - 5} more`}
-                </button>
-              )}
-            </>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {items.map((o: any) => <OrderRow key={o.id} o={o} />)}
+            </div>
       }
     </div>
   );
