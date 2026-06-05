@@ -439,15 +439,31 @@ export class OrdersService {
         results.push({ ...o, priorityReason: 'Priority Customer', priorityLevel: 'HIGH' });
     });
 
-    // 2. Overall SLA: orders > 10 days old — scoped to role's status domain
-    const overdue10 = await qb()
-      .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
-      .andWhere('o."createdAt" < :d', { d: daysAgo(10) })
-      .getMany();
-    overdue10.forEach(o => {
-      if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'Order older than 10 days — not completed', priorityLevel: 'HIGH' });
-    });
+    // Stone Manager: stone pending > 1 day — run FIRST so it wins over generic overdue
+    if ([UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
+      const stoneOverdue = await this.orderRepo.createQueryBuilder('o')
+        .where('o.isArchived = false')
+        .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+        .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
+        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+        .getMany();
+      stoneOverdue.forEach(o => {
+        if (!results.find(r => r.id === o.id))
+          results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
+      });
+    }
+
+    // 2. Overall SLA: orders > 10 days old — skip Stone Manager (they only care about stone status)
+    if (role !== UserRole.STONE_MANAGER) {
+      const overdue10 = await qb()
+        .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
+        .andWhere('o."createdAt" < :d', { d: daysAgo(10) })
+        .getMany();
+      overdue10.forEach(o => {
+        if (!results.find(r => r.id === o.id))
+          results.push({ ...o, priorityReason: 'Order older than 10 days — not completed', priorityLevel: 'HIGH' });
+      });
+    }
 
     if ([UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)) {
       // CAD: in CAD_IN_PROGRESS > 1 day with no file uploaded
@@ -519,19 +535,6 @@ export class OrdersService {
       });
     }
 
-    if ([UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Stone Manager: VPO_ISSUED with stone pending > 1 day
-      const stoneOverdue = await this.orderRepo.createQueryBuilder('o')
-        .where('o.isArchived = false')
-        .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-        .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      stoneOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
-      });
-    }
 
     const LEVEL_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2 };
     return results.sort((a, b) => {
