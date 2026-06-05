@@ -30,13 +30,16 @@ const PRIORITY_COLORS = { CRITICAL: '#7C3AED', HIGH: '#DC2626', MEDIUM: '#F59E0B
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const router = useRouter();
-  const [metrics, setMetrics]     = useState<Metrics | null>(null);
-  const [overdue, setOverdue]     = useState<OverdueOrder[]>([]);
-  const [actions, setActions]     = useState<PriorityOrder[]>([]);
-  const [trend, setTrend]         = useState<TrendPoint[]>([]);
+  const [metrics, setMetrics]       = useState<Metrics | null>(null);
+  const [overdue, setOverdue]       = useState<OverdueOrder[]>([]);
+  const [actions, setActions]       = useState<PriorityOrder[]>([]);
+  const [trend, setTrend]           = useState<TrendPoint[]>([]);
   const [weekOrders, setWeekOrders] = useState<WeeklyOrder[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [userRole, setUserRole]   = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [userRole, setUserRole]     = useState('');
+  const [refImages, setRefImages]   = useState<Record<string, string>>({});
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const [showMoreWeek, setShowMoreWeek]       = useState(false);
 
   useEffect(() => {
     try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
@@ -54,9 +57,41 @@ export default function Dashboard() {
       ]);
       if (mRes.ok)     setMetrics(await mRes.json());
       if (slaRes.ok)   setOverdue(await slaRes.json());
-      if (priRes.ok)   setActions(await priRes.json());
       if (trendRes.ok) setTrend(await trendRes.json());
-      if (wRes.ok)     { const d = await wRes.json(); setWeekOrders(d.orders || []); }
+
+      let allOrderIds: string[] = [];
+      if (priRes.ok) {
+        const p = await priRes.json();
+        setActions(p);
+        allOrderIds.push(...p.map((o: any) => o.id));
+      }
+      if (wRes.ok) {
+        const d = await wRes.json();
+        const list = d.orders || [];
+        setWeekOrders(list);
+        allOrderIds.push(...list.map((o: any) => o.id));
+      }
+
+      // Fetch reference images for all order IDs
+      if (allOrderIds.length) {
+        const unique = [...new Set(allOrderIds)];
+        const entries = await Promise.all(
+          unique.map(async id => {
+            try {
+              const r = await apiFetch(`${API}/cad/order/${id}`);
+              if (!r.ok) return null;
+              const cads = await r.json();
+              const ref = cads.find((c: any) =>
+                c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image'
+              );
+              return ref ? [id, `/uploads/cad/${ref.fileName}`] : null;
+            } catch { return null; }
+          })
+        );
+        const map: Record<string, string> = {};
+        entries.forEach(e => { if (e) map[e[0]] = e[1]; });
+        setRefImages(map);
+      }
       setLoading(false);
     };
     load();
@@ -245,18 +280,23 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {actions.slice(0, 6).map(o => {
-                const pc = PRIORITY_COLORS[o.priorityLevel];
+              {actions.slice(0, showMoreActions ? actions.length : 5).map(o => {
+                const pc  = PRIORITY_COLORS[o.priorityLevel];
                 const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: '#6B7280', bg: '#F3F4F6' };
+                const img = refImages[o.id];
                 return (
                   <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: `${pc}08`, border: `1px solid ${pc}30`, borderLeft: `3px solid ${pc}`, borderRadius: '8px', cursor: 'pointer', gap: '8px' }}
+                    style={{ display: 'flex', alignItems: 'center', padding: '8px 10px', background: `${pc}08`, border: `1px solid ${pc}30`, borderLeft: `3px solid ${pc}`, borderRadius: '8px', cursor: 'pointer', gap: '10px' }}
                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = `${pc}14`}
                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = `${pc}08`}
                   >
+                    {img && (
+                      <img src={img} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    )}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy)', marginBottom: '2px' }}>{o.poNumber}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.priorityReason}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.storeName || o.customerFullName || '—'}</div>
+                      <div style={{ fontSize: '10px', color: pc, fontWeight: 600, marginTop: '2px' }}>{o.priorityReason}</div>
                     </div>
                     <span style={{ fontSize: '10px', background: cfg.bg, color: cfg.color, padding: '2px 7px', borderRadius: '99px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {cfg.label}
@@ -264,10 +304,11 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {actions.length > 6 && (
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', paddingTop: '4px' }}>
-                  +{actions.length - 6} more → <a href="/todos" style={{ color: 'var(--accent)', fontWeight: 600 }}>Priority Tasks</a>
-                </div>
+              {actions.length > 5 && (
+                <button onClick={() => setShowMoreActions(v => !v)}
+                  style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, paddingTop: '4px', textAlign: 'center' }}>
+                  {showMoreActions ? '▲ Show less' : `▼ Show ${actions.length - 5} more`}
+                </button>
               )}
             </div>
           )}
@@ -287,19 +328,24 @@ export default function Dashboard() {
             <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '13px' }}>No new orders this week.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {weekOrders.map(o => {
+              {weekOrders.slice(0, showMoreWeek ? weekOrders.length : 5).map(o => {
                 const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: '#6B7280', bg: '#F3F4F6' };
+                const img = refImages[o.id];
                 return (
                   <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', gap: '8px' }}
+                    style={{ display: 'flex', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer', gap: '10px' }}
                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'}
                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-input)'}
                   >
+                    {img ? (
+                      <img src={img} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div style={{ width: '44px', height: '44px', borderRadius: '6px', flexShrink: 0, background: 'var(--bg-card)', border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', color: 'var(--text-muted)' }}>🖼</div>
+                    )}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy)', marginBottom: '2px' }}>{o.poNumber}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {o.storeName || o.customerFullName || '—'}
-                        {o.orderType ? ` · ${o.orderType}` : ''}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -313,6 +359,12 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+              {weekOrders.length > 5 && (
+                <button onClick={() => setShowMoreWeek(v => !v)}
+                  style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, paddingTop: '4px', textAlign: 'center' }}>
+                  {showMoreWeek ? '▲ Show less' : `▼ Show ${weekOrders.length - 5} more`}
+                </button>
+              )}
             </div>
           )}
         </div>
