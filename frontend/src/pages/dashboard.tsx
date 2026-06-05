@@ -99,8 +99,8 @@ export default function Dashboard() {
 
   const Divider = ({ label }: { label: string }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '28px 0 18px' }}>
-      <div style={{ width: 3, height: 16, background: GOLD, borderRadius: 2, flexShrink: 0 }} />
-      <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 13, fontWeight: 700, color: NAVY, letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</span>
+      <div style={{ width: 3, height: 18, background: GOLD, borderRadius: 2, flexShrink: 0 }} />
+      <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 16, fontWeight: 700, color: NAVY, letterSpacing: '1px' }}>{label}</span>
       <div style={{ flex: 1, height: 1, background: '#E8E0D4' }} />
     </div>
   );
@@ -111,11 +111,11 @@ export default function Dashboard() {
       onMouseEnter={e => { if (link) { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(26,39,64,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(26,39,64,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
     >
-      <div style={{ fontSize: 10, color: '#9BA8B5', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 }}>{sub}</div>
-      <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 40, fontWeight: 600, color, lineHeight: 1, marginBottom: 6 }}>
+      <div style={{ fontSize: 12, color: '#9BA8B5', letterSpacing: '0.5px', marginBottom: 10, fontWeight: 500 }}>{sub}</div>
+      <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 40, fontWeight: 600, color, lineHeight: 1, marginBottom: 8 }}>
         {loading ? '—' : value}
       </div>
-      <div style={{ fontSize: 12, color: '#5C6B7A', fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 14, color: '#5C6B7A', fontWeight: 500 }}>{label}</div>
     </div>
   );
 
@@ -134,15 +134,15 @@ export default function Dashboard() {
           : <div style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
         }
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 2, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
-          <div style={{ fontSize: 11, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 3, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+          <div style={{ fontSize: 12, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}
             {o.priorityReason ? ` · ${o.priorityReason}` : ''}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <span style={{ fontSize: 10, background: cfg.bg, color: cfg.color, padding: '2px 8px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 3 }}>{cfg.label}</span>
-          <span style={{ fontSize: 10, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span style={{ fontSize: 11, background: cfg.bg, color: cfg.color, padding: '3px 9px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 4 }}>{cfg.label}</span>
+          <span style={{ fontSize: 11, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
       </div>
     );
@@ -152,10 +152,10 @@ export default function Dashboard() {
     <div style={{ ...card, padding: '20px 22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: '0 0 3px' }}>{title}</h2>
-          {subtitle && <div style={{ fontSize: 11, color: '#9BA8B5' }}>{subtitle}</div>}
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, margin: '0 0 3px' }}>{title}</h2>
+          {subtitle && <div style={{ fontSize: 12, color: '#9BA8B5' }}>{subtitle}</div>}
         </div>
-        <a href={link} style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
+        <a href={link} style={{ fontSize: 12, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
       </div>
       {loading
         ? <div style={{ color: '#9BA8B5', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Loading…</div>
@@ -204,8 +204,8 @@ export default function Dashboard() {
                   onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}1E`; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}10` : '#F9F8F5'; }}
                 >
-                  <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 28, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 5 }}>{loading ? '—' : count}</div>
-                  <div style={{ fontSize: 10, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3, letterSpacing: '0.2px' }}>{cfg.label}</div>
+                  <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 30, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 6 }}>{loading ? '—' : count}</div>
+                  <div style={{ fontSize: 11, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3 }}>{cfg.label}</div>
                 </div>
                 {!isLast && <div style={{ display: 'flex', alignItems: 'center', color: '#D4CEC6', fontSize: 14, flexShrink: 0 }}>›</div>}
               </React.Fragment>
@@ -220,8 +220,8 @@ export default function Dashboard() {
 
         {/* Weekly Activity — Pie */}
         <div style={{ ...card, padding: '20px 22px' }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Weekly Activity</h2>
-          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — last 7 days</div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Weekly Activity</h2>
+          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — last 7 days</div>
           {loading ? (
             <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
           ) : pieData.length === 0 ? (
@@ -235,9 +235,9 @@ export default function Dashboard() {
                 <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} />
               </PieChart>
             </ResponsiveContainer>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10 }}>
               {pieData.map(d => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#5C6B7A' }}>
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#5C6B7A' }}>
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: d.fill }} />
                   {d.name}
                 </div>
@@ -248,8 +248,8 @@ export default function Dashboard() {
 
         {/* Top Customers */}
         <div style={{ ...card, padding: '20px 22px' }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Top Customers</h2>
-          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Most active this month</div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Top Customers</h2>
+          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Most active this month</div>
           {loading ? (
             <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
           ) : topStores.length === 0 ? (
@@ -258,8 +258,8 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={190}>
               <BarChart data={topStores.slice(0, 5)} layout="vertical" margin={{ top: 2, right: 32, bottom: 0, left: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0EBE3" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10, fill: '#9BA8B5' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="store" tick={{ fontSize: 10, fill: '#5C6B7A' }} axisLine={false} tickLine={false} width={108} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: '#9BA8B5' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="store" tick={{ fontSize: 12, fill: '#5C6B7A' }} axisLine={false} tickLine={false} width={108} />
                 <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} formatter={(v) => [`${v} orders`, 'Orders']} />
                 <Bar dataKey="count" radius={[0,5,5,0]}>
                   {topStores.slice(0, 5).map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
@@ -275,7 +275,7 @@ export default function Dashboard() {
             <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: 0 }}>SLA Alerts</h2>
             <a href="/todos" style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
           </div>
-          <div style={{ fontSize: 11, color: '#9BA8B5', marginBottom: 14 }}>Orders older than 10 days not yet completed</div>
+          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Orders older than 10 days not yet completed</div>
           {loading ? (
             <div style={{ color: '#9BA8B5', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Loading…</div>
           ) : overdue.length === 0 ? (
@@ -292,10 +292,10 @@ export default function Dashboard() {
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.03)'}
                 >
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
-                    <div style={{ fontSize: 10, color: '#9BA8B5', marginTop: 1 }}>{o.storeName}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+                    <div style={{ fontSize: 12, color: '#9BA8B5', marginTop: 1 }}>{o.storeName}</div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', padding: '3px 9px', borderRadius: 99, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
                 </div>
               ))}
             </div>
