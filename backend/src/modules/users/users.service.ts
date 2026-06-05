@@ -41,9 +41,6 @@ export class UsersService {
     } else {
       qb.orderBy('u.createdAt', 'DESC');
     }
-    if (caller?.role === UserRole.SALES_REP) {
-      qb.andWhere('u.salesRepId = :salesRepId', { salesRepId: caller.id });
-    }
     return qb.getMany();
   }
 
