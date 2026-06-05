@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -12,6 +12,7 @@ interface Overdue   { id: string; poNumber: string; storeName: string; status: s
 interface Priority  { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
 interface Trend     { date: string; created: number; completed: number }
 interface RecentOrder { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; orderType?: string; createdAt: string }
+interface TopStore   { store: string; count: number }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
 const PIPELINE_ORDER: OrderStatus[] = [OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.REPAIR, OrderStatus.COMPLETED];
@@ -27,8 +28,10 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true);
   const [userRole, setUserRole] = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
-  const [showMoreA, setShowMoreA] = useState(false);
-  const [showMoreR, setShowMoreR] = useState(false);
+  const [topStores, setTopStores]   = useState<TopStore[]>([]);
+  const [chartTab, setChartTab]     = useState<'trend'|'stages'|'stores'>('trend');
+  const [showMoreA, setShowMoreA]   = useState(false);
+  const [showMoreR, setShowMoreR]   = useState(false);
 
   useEffect(() => {
     try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
@@ -37,16 +40,18 @@ export default function Dashboard() {
   useEffect(() => {
     const sevenAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const load = async () => {
-      const [mRes, slaRes, priRes, trendRes, rRes] = await Promise.all([
+      const [mRes, slaRes, priRes, trendRes, rRes, storeRes] = await Promise.all([
         apiFetch(`${API}/orders/metrics`),
         apiFetch(`${API}/sla/overdue`),
         apiFetch(`${API}/orders/priority`),
         apiFetch(`${API}/reporting/daily-trend`),
         apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
+        apiFetch(`${API}/reporting/report?period=month`),
       ]);
       if (mRes.ok)     setMetrics(await mRes.json());
       if (slaRes.ok)   setOverdue(await slaRes.json());
       if (trendRes.ok) setTrend(await trendRes.json());
+      if (storeRes.ok) { const d = await storeRes.json(); setTopStores(d.topStores || []); }
       let allIds: string[] = [];
       if (priRes.ok)  { const p = await priRes.json(); setActions(p); allIds.push(...p.map((o: any) => o.id)); }
       if (rRes.ok)    { const d = await rRes.json(); const list = d.orders || []; setRecent(list); allIds.push(...list.map((o: any) => o.id)); }
@@ -159,30 +164,91 @@ export default function Dashboard() {
     </div>
   );
 
+  const CHART_TABS = [
+    { key: 'trend',  label: '📈 Daily Activity',      desc: 'Created vs Completed — last 7 days' },
+    { key: 'stages', label: '📊 Stage Distribution',  desc: 'Live orders at each stage right now' },
+    { key: 'stores', label: '🏪 Top Stores',          desc: 'Most active stores this month' },
+  ] as const;
+
+  // Stage distribution data from metrics
+  const stageData = (metrics?.byStatus || [])
+    .filter(b => !['COMPLETED','CANCELLED'].includes(b.status) && parseInt(b.count) > 0)
+    .map(b => ({ name: STATUS_CONFIG[b.status]?.label || b.status, count: parseInt(b.count), color: STATUS_CONFIG[b.status]?.color || '#6B7280' }))
+    .sort((a, b) => b.count - a.count);
+
   const TrendChart = () => (
     <div style={{ ...card, padding: '18px 22px' }}>
-      <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Weekly Trend — Last 7 Days</h2>
-      {trend.length > 0
-        ? <>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
-                <Bar dataKey="created" fill="#1A2740" radius={[4,4,0,0]} name="Created" />
-                <Bar dataKey="completed" fill="#059669" radius={[4,4,0,0]} name="Completed" />
-              </BarChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', gap: 16, marginTop: 10, justifyContent: 'center' }}>
-              {[{ c: '#1A2740', l: 'Created' }, { c: '#059669', l: 'Completed' }].map(i => (
-                <div key={i.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: i.c }} />{i.l}
-                </div>
-              ))}
-            </div>
-          </>
-        : <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>{loading ? 'Loading…' : 'No data'}</div>}
+      {/* Header + tab switcher */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            {CHART_TABS.find(t => t.key === chartTab)?.label}
+          </h2>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+            {CHART_TABS.find(t => t.key === chartTab)?.desc}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {CHART_TABS.map(t => (
+            <button key={t.key} onClick={() => setChartTab(t.key)}
+              style={{ padding: '5px 11px', borderRadius: 20, fontSize: 11, cursor: 'pointer', fontWeight: chartTab === t.key ? 700 : 400, background: chartTab === t.key ? 'var(--navy)' : 'var(--bg-input)', color: chartTab === t.key ? '#fff' : 'var(--text-secondary)', border: `1px solid ${chartTab === t.key ? 'var(--navy)' : 'var(--border)'}`, transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+      ) : chartTab === 'trend' ? (
+        trend.length > 0 ? <>
+          <ResponsiveContainer width="100%" height={190}>
+            <BarChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
+              <Bar dataKey="created" fill="#1A2740" radius={[4,4,0,0]} name="Created" />
+              <Bar dataKey="completed" fill="#059669" radius={[4,4,0,0]} name="Completed" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 16, marginTop: 10, justifyContent: 'center' }}>
+            {[{ c: '#1A2740', l: 'Created' }, { c: '#059669', l: 'Completed' }].map(i => (
+              <div key={i.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-muted)' }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: i.c }} />{i.l}
+              </div>
+            ))}
+          </div>
+        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No data</div>
+
+      ) : chartTab === 'stages' ? (
+        stageData.length > 0 ? <>
+          <ResponsiveContainer width="100%" height={190}>
+            <BarChart data={stageData} layout="vertical" margin={{ top: 4, right: 40, bottom: 0, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={110} />
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
+              <Bar dataKey="count" radius={[0,4,4,0]} name="Orders">
+                {stageData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No active orders</div>
+
+      ) : (
+        topStores.length > 0 ? <>
+          <ResponsiveContainer width="100%" height={190}>
+            <BarChart data={topStores.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 40, bottom: 0, left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis type="category" dataKey="store" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={130} />
+              <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} cursor={{ fill: 'rgba(26,39,64,0.04)' }} />
+              <Bar dataKey="count" fill="#C09B58" radius={[0,4,4,0]} name="Orders" />
+            </BarChart>
+          </ResponsiveContainer>
+        </> : <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No store data this month</div>
+      )}
     </div>
   );
 
