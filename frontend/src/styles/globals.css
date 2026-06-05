@@ -172,24 +172,20 @@ input::placeholder, textarea::placeholder {
   .filter-row > input[type="search"] { width: 100% !important; }
 }
 
-/* Date filter chips row — always horizontal, scrollable */
-.date-filter-chips {
+/* Date filter row — chips + compact pickers all in one line */
+.date-filter-row {
   display: flex;
-  gap: 6px;
   flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-/* Date pickers — 2-column grid on all screens */
-.date-pickers-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 8px;
+  align-items: center;
   margin-bottom: 16px;
 }
-@media (max-width: 400px) {
-  .date-pickers-grid { grid-template-columns: 1fr; }
+.date-filter-row input {
+  width: 150px !important;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .date-filter-row input { width: calc(50% - 4px) !important; flex: 1 1 120px; }
 }
 
 /* Login page */
