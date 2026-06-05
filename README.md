@@ -1,4 +1,4 @@
-# 💎 JewelFlow OS — Custom Jewelry Workflow Management Platform
+# 💎 Kira Custom Jewelry — Custom Jewelry Workflow Management Platform
 
 > **Lead Engineer's Vision**: A premium, enterprise-grade workflow system replacing spreadsheets and disconnected tools with a beautiful, unified platform for the entire custom jewelry manufacturing lifecycle.
 
@@ -6,9 +6,9 @@
 
 ## 🌟 Project Summary
 
-JewelFlow OS is a purpose-built workflow management platform for custom jewelry businesses. It replaces Smartsheet/spreadsheet-based processes with a modern, real-time, role-aware system that tracks every order from customer inquiry to final delivery — including CAD design, SKU generation, stone requests, India manufacturing, US setting, and repair management.
+Kira Custom Jewelry is a purpose-built workflow management platform for custom jewelry businesses. It replaces Smartsheet/spreadsheet-based processes with a modern, real-time, role-aware system that tracks every order from customer inquiry to final delivery — including CAD design, SKU generation, stone requests, India manufacturing, US setting, and repair management.
 
-**Based on:** Real operational data from Kira Jewels custom order workflows (`Custom_Orders_-_Customer.xlsx`) and the technical blueprint (`JewelFlow_OS_Technical_Blueprint.docx`).
+**Based on:** Real operational data from Kira Jewels custom order workflows (`Custom_Orders_-_Customer.xlsx`) and the technical blueprint (`Kira_Custom_Jewelry_Technical_Blueprint.docx`).
 
 ---
 
@@ -125,8 +125,8 @@ jewelflow-os/
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/jewelflow-os.git
-cd jewelflow-os
+git clone https://github.com/your-org/kira-custom-jewelry.git
+cd kira-custom-jewelry
 
 # Backend
 cd backend && npm install
@@ -175,4 +175,4 @@ Visit: http://localhost:3000
 
 ## 📄 License
 
-Proprietary — © 2025 JewelFlow OS. All rights reserved.
+Proprietary — © 2025 Kira Custom Jewelry. All rights reserved.

@@ -28,6 +28,10 @@ import { SummaryModule } from './modules/summary/summary.module';
 import { ImportModule } from './modules/import/import.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
+import { EmailModule } from './modules/email/email.module';
+import { SmartsheetModule } from './modules/smartsheet/smartsheet.module';
+import { TodosModule } from './modules/todos/todos.module';
+import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 
 @Module({
@@ -45,17 +49,27 @@ import { AuthService } from './modules/auth/auth.service';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 5432),
-        username: config.get('DB_USERNAME', 'jewelflow'),
-        password: config.get('DB_PASSWORD', 'jewelflow123'),
-        database: config.get('DB_NAME', 'jewelflow'),
-        entities: [Order, User, CadFile, Sku, Notification, OrderMessage],
-        synchronize: true,
-        logging: false,
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        const isProduction = config.get('NODE_ENV') === 'production';
+        const base = {
+          entities: [Order, User, CadFile, Sku, Notification, OrderMessage, Todo],
+          synchronize: true,
+          logging: false,
+        };
+        if (databaseUrl) {
+          return { ...base, type: 'postgres' as const, url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false };
+        }
+        return {
+          ...base,
+          type: 'postgres' as const,
+          host: config.get('DB_HOST', 'localhost'),
+          port: config.get<number>('DB_PORT', 5432),
+          username: config.get('DB_USERNAME', 'jewelflow'),
+          password: config.get('DB_PASSWORD', 'jewelflow123'),
+          database: config.get('DB_NAME', 'jewelflow'),
+        };
+      },
       inject: [ConfigService],
     }),
     AuthModule,
@@ -71,6 +85,9 @@ import { AuthService } from './modules/auth/auth.service';
     ImportModule,
     SlaModule,
     ReportingModule,
+    EmailModule,
+    SmartsheetModule,
+    TodosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

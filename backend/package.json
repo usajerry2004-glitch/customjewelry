@@ -1,8 +1,8 @@
 {
-  "name": "jewelflow-os-backend",
+  "name": "kira-custom-jewelry-backend",
   "version": "1.0.0",
-  "description": "JewelFlow OS — Custom Jewelry Workflow Management API",
-  "author": "JewelFlow Engineering Team",
+  "description": "Kira Custom Jewelry — Custom Jewelry Workflow Management API",
+  "author": "Kira Custom Jewelry Team",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

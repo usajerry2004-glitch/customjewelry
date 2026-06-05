@@ -1,4 +1,4 @@
-# JewelFlow OS — Quick Start Guide
+# Kira Custom Jewelry — Quick Start Guide
 
 ## For Sales Reps
 

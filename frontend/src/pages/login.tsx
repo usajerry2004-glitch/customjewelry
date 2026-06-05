@@ -44,8 +44,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-page)' }}>
-      {/* Left panel - brand */}
+    <div className="login-wrapper" style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-page)' }}>
+      {/* Left panel - brand (desktop: side, mobile: top bar) */}
       <div className="login-left-panel" style={{
         width: '420px',
         background: 'var(--sidebar-bg)',
@@ -57,16 +57,22 @@ export default function LoginPage() {
         flexShrink: 0,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '36px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '2px', marginBottom: '8px' }}>
-            KIRA JEWELS
+          <img src="/logo.png" alt="Kira Jewels" style={{ height: '72px', width: 'auto', display: 'block', margin: '0 auto 10px', objectFit: 'contain' }} />
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '20px' }}>
+            Custom Jewelry
           </div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '48px' }}>
-            Custom
-          </div>
-          <div style={{ width: '48px', height: '1px', background: 'rgba(192,155,88,0.4)', margin: '0 auto 48px' }} />
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.8, maxWidth: '260px' }}>
+          <div style={{ width: '40px', height: '1px', background: 'rgba(192,155,88,0.4)', margin: '0 auto 20px' }} />
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, maxWidth: '240px', margin: 0 }}>
             Custom jewelry workflow management — from order to delivery.
           </p>
+        </div>
+      </div>
+
+      {/* Mobile-only logo bar (hidden on desktop via CSS) */}
+      <div className="login-mobile-logo" style={{ display: 'none' }}>
+        <img src="/logo.png" alt="Kira Jewels" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
+        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '6px' }}>
+          Custom Jewelry
         </div>
       </div>
 

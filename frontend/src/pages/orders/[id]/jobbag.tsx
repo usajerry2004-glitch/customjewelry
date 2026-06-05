@@ -117,7 +117,7 @@ export default function JobBagPage() {
               <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Scan to Open Order</div>
               <img src={qrUrl} alt={`QR code for order ${order.poNumber}`} width={180} height={180} style={{ border: '1px solid #e5e1d8', borderRadius: '8px', display: 'block' }} />
               <div style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', lineHeight: 1.5, maxWidth: '160px' }}>
-                Scan with phone camera to open this order in JewelFlow OS
+                Scan with phone camera to open this order in Kira Custom Jewelry
               </div>
               <div style={{ marginTop: '10px', width: '100%' }}>
                 <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Production Checklist</div>
@@ -134,7 +134,7 @@ export default function JobBagPage() {
           {/* Footer */}
           <div style={{ background: '#f9f8f5', borderTop: '1px solid #e5e1d8', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '10px', color: '#9ca3af' }}>SKU: {order.kiraSkuNumber || '—'} &nbsp;|&nbsp; Created: {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '—'}</div>
-            <div style={{ fontSize: '10px', color: '#9ca3af' }}>JewelFlow OS · Kira Jewels</div>
+            <div style={{ fontSize: '10px', color: '#9ca3af' }}>Kira Custom Jewelry · Kira Jewels</div>
           </div>
         </div>
       </div>

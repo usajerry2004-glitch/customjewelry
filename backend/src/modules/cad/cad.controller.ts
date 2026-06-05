@@ -1,13 +1,12 @@
 import {
-  Controller, Post, Get, Patch, Param, Body, UploadedFile,
+  Controller, Post, Get, Patch, Param, Body, UploadedFile, UploadedFiles,
   UseInterceptors, Request, UseGuards, ForbiddenException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
 import { CadService } from './cad.service';
-import { MessagesService } from '../messages/messages.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
@@ -20,26 +19,11 @@ const storage = diskStorage({
   },
 });
 
-// Post a system message to the order conversation
-async function postEvent(
-  messagesService: MessagesService,
-  orderId: string,
-  content: string,
-  user: any,
-) {
-  try {
-    await messagesService.postMessage(orderId, { content, isInternal: false }, user);
-  } catch { /* never block the main action if messaging fails */ }
-}
-
 @ApiTags('CAD')
 @ApiBearerAuth()
 @Controller('cad')
 export class CadController {
-  constructor(
-    private readonly cadService: CadService,
-    private readonly messagesService: MessagesService,
-  ) {}
+  constructor(private readonly cadService: CadService) {}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER)
@@ -55,7 +39,11 @@ export class CadController {
     if (req.user?.role === UserRole.CUSTOMER) {
       await this.cadService.assertCustomerOwnsOrder(orderId, req.user.email);
     }
-    return this.cadService.getByOrder(orderId);
+    const cads = await this.cadService.getByOrder(orderId);
+    if (req.user?.role === UserRole.CUSTOMER) {
+      return cads.filter(c => !c.originalName.toLowerCase().endsWith('.3dm'));
+    }
+    return cads;
   }
 
   @Post('reference/:orderId')
@@ -73,37 +61,31 @@ export class CadController {
   @Post('upload/:orderId')
   @Roles(UserRole.CAD_DESIGNER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Upload a CAD file (CAD Designer only)' })
+  @ApiOperation({ summary: 'Upload CAD files (CAD Designer only) — supports multiple files' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage }))
+  @UseInterceptors(FilesInterceptor('files', 20, { storage }))
   async upload(
     @Param('orderId') orderId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body('designerNotes') designerNotes: string,
     @Request() req: any,
   ) {
-    const cad = await this.cadService.upload(orderId, file, req.user?.email || 'designer', designerNotes);
-    const note = designerNotes ? `\n📝 Designer note: "${designerNotes}"` : '';
-    await postEvent(
-      this.messagesService, orderId,
-      `📎 CAD file uploaded — **${file.originalname}** (Rev #${cad.revisionNumber})${note}`,
-      req.user,
-    );
-    return cad;
+    const results = [];
+    for (const file of files) {
+      const cad = await this.cadService.upload(orderId, file, req.user?.email || 'designer', designerNotes);
+      results.push(cad);
+    }
+    // Single notification for the whole batch
+    if (results.length > 0) await this.cadService.notifyBatchUploaded(orderId);
+    return results;
   }
 
   @Patch(':id/send')
   @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Send CAD to customer for approval' })
-  async send(@Param('id') id: string, @Request() req: any) {
-    const cad = await this.cadService.sendForApproval(id);
-    await postEvent(
-      this.messagesService, cad.orderId,
-      `🔔 Design **${cad.originalName}** (Rev #${cad.revisionNumber}) has been sent for your review and approval.`,
-      req.user,
-    );
-    return cad;
+  async send(@Param('id') id: string) {
+    return this.cadService.sendForApproval(id);
   }
 
   @Patch(':id/approve')
@@ -114,14 +96,7 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    const cad = await this.cadService.approve(id, req.user?.email);
-    const note = feedback ? `\n💬 Feedback: "${feedback}"` : '';
-    await postEvent(
-      this.messagesService, cad.orderId,
-      `✅ Design **${cad.originalName}** (Rev #${cad.revisionNumber}) was approved.${note}`,
-      req.user,
-    );
-    return cad;
+    return this.cadService.approve(id, req.user?.email);
   }
 
   @Patch(':id/reject')
@@ -132,14 +107,7 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    const cad = await this.cadService.reject(id, feedback || 'Rejected');
-    const note = feedback ? `\n💬 Reason: "${feedback}"` : '';
-    await postEvent(
-      this.messagesService, cad.orderId,
-      `❌ Design **${cad.originalName}** (Rev #${cad.revisionNumber}) was rejected.${note}`,
-      req.user,
-    );
-    return cad;
+    return this.cadService.reject(id, feedback || 'Rejected');
   }
 
   @Patch(':id/revision')
@@ -150,13 +118,6 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    const cad = await this.cadService.requestRevision(id, feedback || 'Please revise');
-    const note = feedback ? `\n💬 Changes requested: "${feedback}"` : '';
-    await postEvent(
-      this.messagesService, cad.orderId,
-      `↺ Revision requested on **${cad.originalName}** (Rev #${cad.revisionNumber}).${note}`,
-      req.user,
-    );
-    return cad;
+    return this.cadService.requestRevision(id, feedback || 'Please revise');
   }
 }

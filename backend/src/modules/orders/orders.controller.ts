@@ -18,6 +18,12 @@ export class OrdersController {
     return this.ordersService.findAll(filters, req.user);
   }
 
+  @Get('priority')
+  @ApiOperation({ summary: 'Get priority orders for current user role' })
+  findPriority(@Request() req: any) {
+    return this.ordersService.findPriority(req.user);
+  }
+
   @Get('kanban')
   @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.STONE_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
@@ -57,9 +63,13 @@ export class OrdersController {
   @Patch(':id/status')
   @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.US_SETTER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update order status' })
-  updateStatus(@Param('id') id: string, @Body('status') status: OrderStatus, @Request() req: any) {
-    return this.ordersService.updateStatus(id, status, req.user);
+  @ApiOperation({ summary: 'Update order status (quotedCost required when moving to SKU_CREATION)' })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() body: { status: OrderStatus; quotedCost?: number },
+    @Request() req: any,
+  ) {
+    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost);
   }
 
   @Patch(':id/authorize')

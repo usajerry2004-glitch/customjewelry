@@ -11,7 +11,7 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.enableCors({
-    origin: true,
+    origin: process.env.FRONTEND_URL || true,
     credentials: true,
   });
 
@@ -28,7 +28,7 @@ async function bootstrap() {
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('JewelFlow OS API')
+    .setTitle('Kira Custom Jewelry API')
     .setDescription('Custom Jewelry Workflow Management Platform — REST API')
     .setVersion('1.0')
     .addBearerAuth()
@@ -48,7 +48,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  logger.log(`JewelFlow OS API running at: http://localhost:${port}`);
+  logger.log(`Kira Custom Jewelry API running at: http://localhost:${port}`);
   logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 bootstrap();

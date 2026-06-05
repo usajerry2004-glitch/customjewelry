@@ -37,7 +37,8 @@ export default function NewOrderPage() {
     diamondType: '', diamondQuality: '', centerStoneShape: '',
     approximateCaratWeight: '', customerNotes: '',
   });
-  const [refImage, setRefImage] = useState<File | null>(null);
+  const [refFiles, setRefFiles] = useState<File[]>([]);
+  const [refLink, setRefLink] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -53,7 +54,7 @@ export default function NewOrderPage() {
     try {
       const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        body: JSON.stringify({ ...form, manufacturingPath: 'STANDARD' }),
+        body: JSON.stringify({ ...form, manufacturingPath: 'STANDARD', referenceWeblink: refLink || undefined }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -63,19 +64,21 @@ export default function NewOrderPage() {
       }
       const order = await res.json();
 
-      // Upload reference image if provided
-      if (refImage && order.id) {
-        try {
-          const token = localStorage.getItem('jf_token');
-          const fd = new FormData();
-          fd.append('file', refImage);
-          fd.append('designerNotes', 'Customer reference image');
-          await fetch(`${API}/cad/upload/${order.id}`, {
-            method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            body: fd,
-          });
-        } catch {}
+      // Upload all reference files
+      if (refFiles.length > 0 && order.id) {
+        const token = localStorage.getItem('jf_token');
+        for (const file of refFiles) {
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('designerNotes', 'Reference image');
+            await fetch(`${API}/cad/reference/${order.id}`, {
+              method: 'POST',
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              body: fd,
+            });
+          } catch {}
+        }
       }
 
       router.replace('/customer/orders');
@@ -157,55 +160,87 @@ export default function NewOrderPage() {
 
           <SectionTitle>Reference & Notes</SectionTitle>
 
-          {/* Reference Image Upload */}
+          {/* Reference Link */}
           <div style={fieldWrap}>
-            <label style={labelStyle}>Reference Image (optional)</label>
+            <label style={labelStyle}>Reference Link (optional)</label>
+            <input
+              value={refLink}
+              onChange={e => setRefLink(e.target.value)}
+              placeholder="https://pinterest.com/pin/... or any inspiration URL"
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Reference Photos & Videos — multiple (max 10) */}
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Reference Photos / Videos (optional) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— max 10</span></label>
             <div
-              onClick={() => fileRef.current?.click()}
+              onClick={() => refFiles.length < 10 && fileRef.current?.click()}
               style={{
-                border: `2px dashed ${refImage ? 'var(--accent)' : 'var(--border)'}`,
+                border: `2px dashed ${refFiles.length ? 'var(--accent)' : 'var(--border)'}`,
                 borderRadius: 'var(--radius)',
                 padding: '20px',
                 textAlign: 'center',
-                cursor: 'pointer',
-                background: refImage ? 'rgba(192,155,88,0.05)' : 'var(--bg-input)',
+                cursor: refFiles.length >= 10 ? 'not-allowed' : 'pointer',
+                background: refFiles.length ? 'rgba(192,155,88,0.05)' : 'var(--bg-input)',
+                opacity: refFiles.length >= 10 ? 0.6 : 1,
                 transition: 'all 0.15s',
               }}
             >
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,.pdf"
+                accept="image/*,video/*,.pdf"
+                multiple
                 style={{ display: 'none' }}
-                onChange={e => setRefImage(e.target.files?.[0] || null)}
+                onChange={e => {
+                  const picked = Array.from(e.target.files || []);
+                  setRefFiles(prev => {
+                    const combined = [...prev, ...picked];
+                    return combined.slice(0, 10);
+                  });
+                  e.target.value = '';
+                }}
               />
-              {refImage ? (
-                <div>
-                  <div style={{ fontSize: '20px', marginBottom: '6px' }}>📎</div>
-                  <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 600 }}>{refImage.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {(refImage.size / 1024).toFixed(0)} KB · Click to change
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.4 }}>🖼</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    Upload inspiration photo or reference
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    JPG, PNG, PDF up to 10MB
-                  </div>
-                </div>
-              )}
+              <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.5 }}>🖼</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Click to add inspiration photos or videos
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                JPG, PNG, PDF, MP4, MOV — multiple files allowed
+              </div>
             </div>
-            {refImage && (
-              <button
-                onClick={() => setRefImage(null)}
-                style={{ marginTop: '6px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer', padding: '0' }}
-              >
-                ✕ Remove image
-              </button>
+            {refFiles.length > 0 && (
+              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {refFiles.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{f.type.startsWith('video') ? '🎬' : '🖼'}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(f.size / 1024).toFixed(0)} KB</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setRefFiles(prev => prev.filter((_, j) => j !== i))}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', flexShrink: 0, padding: '2px 6px' }}
+                    >✕</button>
+                  </div>
+                ))}
+                {refFiles.length >= 10 && (
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--danger)', padding: '4px 0' }}>
+                    Maximum 10 files reached
+                  </div>
+                )}
+                {refFiles.length < 10 && (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: '8px', padding: '7px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  + Add more files
+                </button>
+                )}
+              </div>
             )}
           </div>
 

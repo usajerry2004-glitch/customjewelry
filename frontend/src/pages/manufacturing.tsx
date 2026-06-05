@@ -37,6 +37,13 @@ export default function ManufacturingPage() {
     setActionLoading(null);
   };
 
+  const moveStatus = async (orderId: string, status: string) => {
+    setActionLoading(orderId + status);
+    await apiFetch(`${API}/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    await reload();
+    setActionLoading(null);
+  };
+
   const kpi = [
     { label: 'Pending Start',  value: metrics?.pendingStart ?? 0,  color: '#EA6C28' },
     { label: 'VPO Issued',     value: metrics?.inProgress ?? 0,    color: '#0891B2' },
@@ -113,21 +120,27 @@ export default function ManufacturingPage() {
                   )}
 
                   {order.status === OrderStatus.VPO_ISSUED && (
-                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
-                      <input value={inputs.jobBag} onChange={e => setVpo(order.id, 'jobBag', e.target.value)} placeholder="Job Bag Number" style={inp} />
+                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
                       <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                      <button onClick={() => action(order.id, 'jobbag', { jobBagNumber: inputs.jobBag, vendorName: inputs.vendor })} disabled={busy}
-                        style={{ background: '#0D9488', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        Create Job Bag
+                      <button onClick={() => moveStatus(order.id, 'PENDING_CONTRACTOR')} disabled={busy}
+                        style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                        Pending Contractor
+                      </button>
+                      <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                        style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                        Ready to Ship
                       </button>
                     </div>
                   )}
 
-                  {order.status === OrderStatus.ORDER_JOB_BAG_CREATED && (
-                    <button onClick={() => action(order.id, 'complete')} disabled={busy}
-                      style={{ width: '100%', background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '11px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
-                      Mark Manufacturing Complete — Move to Ready to Ship
-                    </button>
+                  {order.status === OrderStatus.PENDING_CONTRACTOR && (
+                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+                      <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
+                      <button onClick={() => moveStatus(order.id, 'READY_TO_SHIP')} disabled={busy}
+                        style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                        Ready to Ship
+                      </button>
+                    </div>
                   )}
                 </div>
               );

@@ -6,14 +6,16 @@ import { Order, OrderStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 const ALL_STATUS_FILTERS = [
-  { label: 'All',           value: '' },
-  { label: 'Waiting',       value: OrderStatus.WAITING_CONFIRMATION },
-  { label: 'CAD',           value: OrderStatus.CAD_IN_PROGRESS },
-  { label: 'Approved',      value: OrderStatus.CUSTOMER_APPROVED },
-  { label: 'VPO Issued',    value: OrderStatus.VPO_ISSUED },
-  { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
-  { label: 'Shipped',       value: OrderStatus.SHIPPED },
-  { label: 'Delivered',     value: OrderStatus.DELIVERED },
+  { label: 'All',                value: '' },
+  { label: 'CAD In Progress',    value: OrderStatus.CAD_IN_PROGRESS },
+  { label: 'SKU Creation',       value: OrderStatus.SKU_CREATION },
+  { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
+  { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
+  { label: 'Ready to Ship',      value: OrderStatus.READY_TO_SHIP },
+  { label: 'Shipped',            value: OrderStatus.SHIPPED },
+  { label: 'Repair',             value: OrderStatus.REPAIR },
+  { label: 'Completed',          value: OrderStatus.COMPLETED },
+  { label: 'Cancelled',          value: OrderStatus.CANCELLED },
 ];
 
 const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
@@ -21,26 +23,22 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'All',           value: '' },
     { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
     { label: 'Shipped',       value: OrderStatus.SHIPPED },
-    { label: 'Delivered',     value: OrderStatus.DELIVERED },
+    { label: 'Completed',     value: OrderStatus.COMPLETED },
   ],
   FACTORY_MANAGER: [
-    { label: 'All',           value: '' },
-    { label: 'SKU Created',   value: OrderStatus.SKU_CREATION },
-    { label: 'VPO Issued',    value: OrderStatus.VPO_ISSUED },
-    { label: 'Job Bag',       value: OrderStatus.ORDER_JOB_BAG_CREATED },
-    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
+    { label: 'All',                value: '' },
+    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
+    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
   ],
   CAD_DESIGNER: [
-    { label: 'All',           value: '' },
-    { label: 'Pending CAD',   value: OrderStatus.PENDING_CAD },
-    { label: 'CAD',           value: OrderStatus.CAD_IN_PROGRESS },
-    { label: 'Approved',      value: OrderStatus.CUSTOMER_APPROVED },
-    { label: 'Rejected',      value: OrderStatus.CUSTOMER_REJECTED },
+    { label: 'All',      value: '' },
+    { label: 'Pending',  value: 'cad_pending' },
+    { label: 'Revision', value: 'cad_revision' },
+    { label: 'Awaiting Quote', value: 'cad_approved' },
   ],
   SKU_MANAGER: [
-    { label: 'All',           value: '' },
-    { label: 'Approved',      value: OrderStatus.CUSTOMER_APPROVED },
-    { label: 'SKU Creation',  value: OrderStatus.SKU_CREATION },
+    { label: 'All',         value: '' },
+    { label: 'SKU Creation',value: OrderStatus.SKU_CREATION },
   ],
 };
 
@@ -74,10 +72,12 @@ export default function OrdersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDrop, setShowCustomerDrop] = useState(false);
-  const [refImage, setRefImage] = useState<File | null>(null);
+  const [refFiles, setRefFiles] = useState<File[]>([]);
+  const [refLink, setRefLink] = useState('');
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [cadSubFilter, setCadSubFilter] = useState('');
 
   useEffect(() => {
     try {
@@ -90,19 +90,32 @@ export default function OrdersPage() {
     } catch {}
   }, []);
 
+  const isCadSubFilter = ['cad_pending', 'cad_revision', 'cad_approved'].includes(statusFilter);
+  const showCadSubRow = (statusFilter === OrderStatus.CAD_IN_PROGRESS || isCadSubFilter) &&
+    ['ADMIN', 'AUTHORIZER'].includes(userRole);
+
   const load = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '50' });
+      const params = new URLSearchParams({ limit: '200' });
       if (search) params.set('search', search);
-      if (statusFilter) params.set('status', statusFilter);
+      // CAD sub-filters: send CAD_IN_PROGRESS to backend, filter locally
+      if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
+      if (isCadSubFilter) params.set('status', 'CAD_IN_PROGRESS');
+      if (statusFilter === OrderStatus.CAD_IN_PROGRESS) params.set('status', 'CAD_IN_PROGRESS');
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setOrders(data.orders || []);
-        setTotal(data.total || 0);
+        let list: any[] = data.orders || [];
+        // Apply CAD sub-filter (for both CAD designer role filters and admin inline sub-filter)
+        const activeCadSub = isCadSubFilter ? statusFilter : cadSubFilter;
+        if (activeCadSub === 'cad_pending')  list = list.filter((o: any) => !o.cadSubStatus || o.cadSubStatus === 'UPLOADED');
+        if (activeCadSub === 'cad_revision') list = list.filter((o: any) => o.cadSubStatus === 'REVISION');
+        if (activeCadSub === 'cad_approved') list = list.filter((o: any) => o.cadSubStatus === 'APPROVED');
+        setOrders(list);
+        setTotal(list.length);
       }
     } finally { setLoading(false); }
   };
@@ -119,7 +132,7 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  useEffect(() => { load(); }, [search, statusFilter, dateFrom, dateTo]);
+  useEffect(() => { load(); }, [search, statusFilter, cadSubFilter, dateFrom, dateTo]);
 
   const openNewOrderModal = async () => {
     setShowNew(true);
@@ -147,37 +160,40 @@ export default function OrdersPage() {
       } : {};
       const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        body: JSON.stringify({ ...newOrder, ...customerFields, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD' }),
+        body: JSON.stringify({ ...newOrder, ...customerFields, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD', referenceWeblink: refLink || undefined }),
       });
       if (res.ok) {
         const order = await res.json();
 
-        // Upload reference image if provided
-        if (refImage && order.id) {
-          try {
-            const token = localStorage.getItem('jf_token');
-            const fd = new FormData();
-            fd.append('file', refImage);
-            fd.append('designerNotes', 'Customer reference image');
-            await fetch(`${API}/cad/reference/${order.id}`, {
-              method: 'POST',
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-              body: fd,
-            });
-          } catch {}
+        // Upload all reference files
+        if (refFiles.length > 0 && order.id) {
+          const token = localStorage.getItem('jf_token');
+          for (const file of refFiles) {
+            try {
+              const fd = new FormData();
+              fd.append('file', file);
+              fd.append('designerNotes', 'Reference image');
+              await fetch(`${API}/cad/reference/${order.id}`, {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: fd,
+              });
+            } catch {}
+          }
         }
 
         setShowNew(false);
         setNewOrder({ storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
-        setRefImage(null);
+        setRefFiles([]);
+        setRefLink('');
         load();
       }
     } finally { setSaving(false); }
   };
 
-  const closeModal = () => { setShowNew(false); setRefImage(null); setSelectedCustomer(null); setCustomerSearch(''); };
+  const closeModal = () => { setShowNew(false); setRefFiles([]); setRefLink(''); setSelectedCustomer(null); setCustomerSearch(''); };
 
   return (
     <AppLayout
@@ -285,32 +301,63 @@ export default function OrdersPage() {
               </div>
             ))}
 
-            {/* Reference Image */}
+            {/* Reference Link */}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Reference Image (optional)</label>
+              <label style={labelStyle}>Reference Link (optional)</label>
+              <input
+                value={refLink}
+                onChange={e => setRefLink(e.target.value)}
+                placeholder="https://pinterest.com/pin/... or any inspiration URL"
+                style={{ ...inputStyle, width: '100%' }}
+              />
+            </div>
+
+            {/* Reference Files — images + videos, multiple (max 10) */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Reference Photos / Videos (optional) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— max 10</span></label>
               <div
-                onClick={() => fileRef.current?.click()}
+                onClick={() => refFiles.length < 10 && fileRef.current?.click()}
                 style={{
-                  border: `2px dashed ${refImage ? 'var(--accent)' : 'var(--border)'}`,
+                  border: `2px dashed ${refFiles.length ? 'var(--accent)' : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
-                  padding: '16px',
+                  padding: '14px',
                   textAlign: 'center',
-                  cursor: 'pointer',
-                  background: refImage ? 'rgba(192,155,88,0.04)' : 'var(--bg-input)',
+                  cursor: refFiles.length >= 10 ? 'not-allowed' : 'pointer',
+                  background: refFiles.length ? 'rgba(192,155,88,0.04)' : 'var(--bg-input)',
+                  opacity: refFiles.length >= 10 ? 0.6 : 1,
                   transition: 'all 0.15s',
                 }}
               >
-                <input ref={fileRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={e => setRefImage(e.target.files?.[0] || null)} />
-                {refImage ? (
-                  <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 600 }}>📎 {refImage.name}</div>
-                ) : (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🖼 Upload inspiration photo · JPG, PNG, PDF</div>
-                )}
+                <input
+                  ref={fileRef} type="file"
+                  accept="image/*,video/*,.pdf"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const picked = Array.from(e.target.files || []);
+                    setRefFiles(prev => {
+                      const combined = [...prev, ...picked];
+                      return combined.slice(0, 10);
+                    });
+                    e.target.value = '';
+                  }}
+                />
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  🖼 Click to add photos or videos · JPG, PNG, MP4, MOV, PDF
+                </div>
               </div>
-              {refImage && (
-                <button onClick={() => setRefImage(null)} style={{ marginTop: '4px', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer' }}>
-                  ✕ Remove
-                </button>
+              {refFiles.length > 0 && (
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {refFiles.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-input)', borderRadius: '6px', padding: '5px 10px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {f.type.startsWith('video') ? '🎬' : '🖼'} {f.name}
+                      </span>
+                      <button onClick={() => setRefFiles(prev => prev.filter((_, j) => j !== i))}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '11px', padding: '0 4px' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -342,7 +389,7 @@ export default function OrdersPage() {
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
-              onClick={() => setStatusFilter(f.value)}
+              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); }}
               style={{
                 padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
                 fontWeight: statusFilter === f.value ? 600 : 400,
@@ -357,6 +404,29 @@ export default function OrdersPage() {
           ))}
         </div>
       </div>
+
+      {/* CAD Sub-filters — shown for Admin/Authorizer when CAD In Progress is selected */}
+      {showCadSubRow && (
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid var(--accent)' }}>
+          {[
+            { label: 'All CAD', value: '' },
+            { label: '⏳ Pending CAD', value: 'cad_pending' },
+            { label: '↺ Revision', value: 'cad_revision' },
+            { label: '💰 Awaiting Quote', value: 'cad_approved' },
+          ].map(f => (
+            <button key={f.value} onClick={() => setCadSubFilter(f.value)}
+              style={{
+                padding: '4px 12px', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
+                fontWeight: cadSubFilter === f.value ? 700 : 400,
+                background: cadSubFilter === f.value ? 'var(--accent)' : 'var(--bg-card)',
+                color: cadSubFilter === f.value ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${cadSubFilter === f.value ? 'var(--accent)' : 'var(--border)'}`,
+                transition: 'all 0.15s',
+              }}
+            >{f.label}</button>
+          ))}
+        </div>
+      )}
 
       {/* Date Filters */}
       <div className="filter-row" style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap', alignItems: 'center' }}>

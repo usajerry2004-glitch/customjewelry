@@ -1,4 +1,4 @@
-# JewelFlow OS — System Architecture
+# Kira Custom Jewelry — System Architecture
 
 ## High-Level Architecture
 

@@ -14,26 +14,37 @@ export class NotificationsService {
     return this.notifRepo.save(notif);
   }
 
-  async findAll(userId?: string): Promise<Notification[]> {
-    const qb = this.notifRepo.createQueryBuilder('n').orderBy('n.createdAt', 'DESC').take(50);
-    if (userId) qb.where('n.targetUserId = :uid OR n.targetUserId IS NULL', { uid: userId });
-    return qb.getMany();
+  async findAll(userId: string): Promise<Notification[]> {
+    return this.notifRepo.createQueryBuilder('n')
+      .where('n.targetUserId = :uid', { uid: userId })
+      .orderBy('n.createdAt', 'DESC')
+      .take(50)
+      .getMany();
   }
 
-  async markRead(id: string): Promise<Notification> {
+  async markRead(id: string, userId: string): Promise<Notification> {
+    const notif = await this.notifRepo.findOne({ where: { id, targetUserId: userId } });
+    if (!notif) return notif;
     await this.notifRepo.update(id, { isRead: true });
-    return this.notifRepo.findOne({ where: { id } });
+    return { ...notif, isRead: true };
   }
 
-  async markAllRead(userId?: string): Promise<void> {
-    const qb = this.notifRepo.createQueryBuilder().update().set({ isRead: true });
-    if (userId) qb.where('targetUserId = :uid OR targetUserId IS NULL', { uid: userId });
-    await qb.execute();
+  async markAllRead(userId: string): Promise<void> {
+    await this.notifRepo.createQueryBuilder()
+      .update()
+      .set({ isRead: true })
+      .where('targetUserId = :uid', { uid: userId })
+      .execute();
   }
 
-  async unreadCount(userId?: string): Promise<number> {
-    const qb = this.notifRepo.createQueryBuilder('n').where('n.isRead = :r', { r: false });
-    if (userId) qb.andWhere('(n.targetUserId = :uid OR n.targetUserId IS NULL)', { uid: userId });
-    return qb.getCount();
+  async dismiss(id: string, userId: string): Promise<void> {
+    await this.notifRepo.delete({ id, targetUserId: userId });
+  }
+
+  async unreadCount(userId: string): Promise<number> {
+    return this.notifRepo.createQueryBuilder('n')
+      .where('n.targetUserId = :uid', { uid: userId })
+      .andWhere('n.isRead = :r', { r: false })
+      .getCount();
   }
 }

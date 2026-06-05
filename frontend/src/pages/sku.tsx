@@ -40,7 +40,7 @@ export default function SKUPage() {
     } finally { setGenerating(null); }
   };
 
-  const ordersWithoutSku = orders.filter(o => !o.kiraSkuNumber && (o.orderType || o.metalType));
+  const ordersWithoutSku = orders.filter(o => o.status === 'SKU_CREATION');
 
   return (
     <AppLayout title="SKU Management" subtitle="Generate and manage product SKUs">

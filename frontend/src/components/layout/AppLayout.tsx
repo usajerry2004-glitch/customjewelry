@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
-interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; }
+interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; }
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -50,13 +50,32 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
     setNotifs(p => p.map(n => ({ ...n, isRead: true })));
   };
 
+  const dismissNotif = async (e: React.MouseEvent, n: Notification) => {
+    e.stopPropagation();
+    await apiFetch(`${API}/notifications/${n.id}`, { method: 'DELETE' });
+    setNotifs(p => p.filter(x => x.id !== n.id));
+    if (!n.isRead) setUnread(c => Math.max(0, c - 1));
+  };
+
+  const handleNotifClick = async (n: Notification) => {
+    if (!n.isRead) {
+      await apiFetch(`${API}/notifications/${n.id}/read`, { method: 'PATCH' });
+      setNotifs(p => p.map(x => x.id === n.id ? { ...x, isRead: true } : x));
+      setUnread(c => Math.max(0, c - 1));
+    }
+    if (n.orderId) {
+      setShowNotifs(false);
+      router.push(`/orders/${n.orderId}`);
+    }
+  };
+
   const role = (user?.role as UserRole) || UserRole.ADMIN;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-page)' }}>
       <Sidebar activeRole={role} activePath={router.pathname} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Topbar */}
         <div style={{
@@ -149,20 +168,50 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                   <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
                     {notifs.length === 0 ? (
                       <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>
-                    ) : notifs.map(n => (
-                      <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: '1px solid var(--border-light)',
-                        background: n.isRead ? 'transparent' : 'rgba(192,155,88,0.05)',
-                      }}>
-                        <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 600, color: n.isRead ? 'var(--text-secondary)' : 'var(--text-primary)', marginBottom: '2px' }}>
-                          {n.title}
+                    ) : notifs.map(n => {
+                      const typeIcon: Record<string, string> = {
+                        CAD_UPLOADED: '📐', CAD_SENT_FOR_APPROVAL: '📤', CAD_APPROVED: '✅', CAD_REJECTED: '❌',
+                        ORDER_CREATED: '🆕', ORDER_AUTHORIZED: '✔', SKU_GENERATED: '🏷️',
+                        ORDER_IN_MANUFACTURING: '🏭', ORDER_SHIPPED: '📦', READY_TO_SHIP: '🚚',
+                        STATUS_CHANGED: '🔄', CUSTOMER_MESSAGE: '💬', MENTION: '@', SLA_OVERDUE: '⏰',
+                      };
+                      const icon = typeIcon[n.type] || '🔔';
+                      const clickable = !!n.orderId;
+                      return (
+                        <div key={n.id}
+                          onClick={() => handleNotifClick(n)}
+                          style={{
+                            padding: '12px 16px', borderBottom: '1px solid var(--border-light)',
+                            background: n.isRead ? 'transparent' : 'rgba(192,155,88,0.05)',
+                            cursor: clickable ? 'pointer' : 'default',
+                            display: 'flex', gap: '10px', alignItems: 'flex-start',
+                          }}
+                          onMouseEnter={e => { if (clickable) (e.currentTarget as HTMLDivElement).style.background = 'rgba(192,155,88,0.1)'; }}
+                          onMouseLeave={e => { if (clickable) (e.currentTarget as HTMLDivElement).style.background = n.isRead ? 'transparent' : 'rgba(192,155,88,0.05)'; }}
+                        >
+                          <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 600, color: n.isRead ? 'var(--text-secondary)' : 'var(--text-primary)', marginBottom: '2px' }}>
+                              {n.title}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{n.message}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', opacity: 0.7 }}>
+                              {new Date(n.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            {!n.isRead && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)' }} />}
+                            <button
+                              onClick={e => dismissNotif(e, n)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '12px', padding: '0', lineHeight: 1, opacity: 0.5 }}
+                              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                              onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+                              title="Dismiss"
+                            >✕</button>
+                          </div>
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{n.message}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', opacity: 0.7 }}>
-                          {new Date(n.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

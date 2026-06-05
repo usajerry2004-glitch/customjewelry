@@ -1,4 +1,4 @@
-# AWS Deployment Guide — JewelFlow OS
+# AWS Deployment Guide — Kira Custom Jewelry
 
 ## Infrastructure Overview
 
@@ -82,7 +82,7 @@ npx vercel --prod
 ```bash
 aws elasticache create-replication-group \
   --replication-group-id jewelflow-redis \
-  --description "JewelFlow Redis Cache" \
+  --description "Kira Custom Jewelry Redis Cache" \
   --node-type cache.t3.micro \
   --num-cache-clusters 1 \
   --engine redis \

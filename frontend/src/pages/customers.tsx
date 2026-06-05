@@ -13,6 +13,7 @@ interface Customer {
   email: string;
   role: string;
   isActive: boolean;
+  isPriority: boolean;
   createdAt: string;
   salesRepId?: string;
   storeName?: string;
@@ -58,13 +59,18 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState('');
   const [refImage, setRefImage] = useState<File | null>(null);
   const refImageRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const u = localStorage.getItem('jf_user');
-      if (u) setIsAdmin(JSON.parse(u).role === 'ADMIN');
+      if (u) {
+        const parsed = JSON.parse(u);
+        setIsAdmin(parsed.role === 'ADMIN');
+        setUserRole(parsed.role || '');
+      }
     } catch {}
   }, []);
 
@@ -173,6 +179,11 @@ export default function CustomersPage() {
     await load();
   };
 
+  const togglePriority = async (id: string) => {
+    await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
+    await load();
+  };
+
   const modalBg: React.CSSProperties = {
     position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.6)', zIndex: 100,
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
@@ -211,17 +222,17 @@ export default function CustomersPage() {
         <table className="customers-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-              {['Customer', 'Email', 'Sales Rep', 'Status', 'Joined', 'Actions'].map(h => (
+              {['Customer', 'Email', 'Sales Rep', 'Priority', 'Status', 'Joined', 'Actions'].map(h => (
                 <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
+              <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '48px', textAlign: 'center' }}>
+                <td colSpan={7} style={{ padding: '48px', textAlign: 'center' }}>
                   <div style={{ fontSize: '32px', marginBottom: '10px', opacity: 0.3 }}>👥</div>
                   <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No customers yet</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Click "+ Add Customer" to create the first account.</div>
@@ -249,6 +260,29 @@ export default function CustomersPage() {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>—</span>
                   )}
                 </td>
+                {/* Priority column */}
+                <td style={{ padding: '14px 16px' }}>
+                  {(isAdmin || userRole === 'AUTHORIZER') ? (
+                    <button
+                      onClick={() => togglePriority(c.id)}
+                      title={c.isPriority ? 'Click to set Regular' : 'Click to set Priority'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        padding: '4px 10px', borderRadius: '99px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+                        background: c.isPriority ? 'rgba(192,155,88,0.15)' : 'var(--bg-input)',
+                        color: c.isPriority ? 'var(--accent-dark)' : 'var(--text-muted)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {c.isPriority ? '★ Priority' : '☆ Regular'}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: c.isPriority ? 'var(--accent-dark)' : 'var(--text-muted)', fontWeight: c.isPriority ? 600 : 400 }}>
+                      {c.isPriority ? '★ Priority' : 'Regular'}
+                    </span>
+                  )}
+                </td>
+
                 <td style={{ padding: '14px 16px' }}>
                   <span style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '99px', background: c.isActive ? 'rgba(5,150,105,0.12)' : 'rgba(220,38,38,0.1)', color: c.isActive ? '#059669' : '#DC2626', fontWeight: 600 }}>
                     {c.isActive ? 'Active' : 'Inactive'}

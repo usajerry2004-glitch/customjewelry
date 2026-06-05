@@ -60,7 +60,7 @@ export class SkuService {
       generatedBy: generatedBy || 'sku-manager@kirajewels.one',
     });
     const saved = await this.skuRepo.save(sku);
-    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber, status: OrderStatus.SKU_CREATION });
+    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber, status: OrderStatus.VPO_ISSUED });
     return saved;
   }
 

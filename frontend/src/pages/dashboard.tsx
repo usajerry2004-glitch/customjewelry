@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [apiStatus, setApiStatus] = useState<'connecting' | 'live' | 'demo'>('connecting');
   const [isAdmin, setIsAdmin] = useState(false);
   const [overdueOrders, setOverdueOrders] = useState<{ id: string; poNumber: string; status: string; daysOverdue: number; slaLabel: string }[]>([]);
+  const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     try {
@@ -64,7 +65,29 @@ export default function Dashboard() {
         }
         if (oRes.ok) {
           const oData = await oRes.json();
-          if (oData.orders?.length) setOrders(oData.orders);
+          const orderList: Partial<Order>[] = oData.orders || [];
+          if (orderList.length) {
+            setOrders(orderList);
+            // Fetch first reference image for each order in parallel
+            const imageEntries = await Promise.all(
+              orderList.map(async (o) => {
+                try {
+                  const cRes = await apiFetch(`${API}/cad/order/${o.id}`);
+                  if (!cRes.ok) return null;
+                  const cads = await cRes.json();
+                  const ref = cads.find((c: any) =>
+                    c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image'
+                  );
+                  return ref ? [o.id!, `/uploads/cad/${ref.fileName}`] : null;
+                } catch { return null; }
+              })
+            );
+            const map: Record<string, string> = {};
+            for (const entry of imageEntries) {
+              if (entry) map[entry[0]] = entry[1];
+            }
+            setRefImages(map);
+          }
           gotRealData = true;
         }
         if (slaRes.ok) setOverdueOrders(await slaRes.json());
@@ -90,9 +113,6 @@ export default function Dashboard() {
       subtitle="Kira Jewels Custom — Order Management"
       actions={
         <>
-          <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '99px', fontWeight: 600, background: statusDot.bg, color: statusDot.color }}>
-            {statusDot.label}
-          </span>
           <button
             onClick={() => router.push('/orders')}
             style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
@@ -142,7 +162,7 @@ export default function Dashboard() {
             <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '40px 0', textAlign: 'center' }}>No orders yet.</div>
           ) : (
             orders.map((order) => (
-              <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} />
+              <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} referenceImage={refImages[order.id!]} onClick={() => router.push(`/orders/${order.id}`)} />
             ))
           )}
         </div>

@@ -46,6 +46,13 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
+  @Patch(':id/priority')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @ApiOperation({ summary: 'Toggle customer priority status (Admin/Authorizer)' })
+  togglePriority(@Param('id') id: string) {
+    return this.usersService.togglePriority(id);
+  }
+
   @Get(':id/orders')
   @ApiOperation({ summary: 'Get all orders for a customer' })
   getOrders(@Param('id') id: string) {

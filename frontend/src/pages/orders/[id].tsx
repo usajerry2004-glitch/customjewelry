@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, STATUS_CONFIG, UserRole } from '../../utils/types';
@@ -26,18 +26,19 @@ const CAD_ACTION_ROLES = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESI
 
 // ── CAD Viewer Modal ──────────────────────────────────────────────────────
 interface ViewerProps {
-  cad: CadFile; userRole: string;
+  cad: CadFile; userRole: string; batchCount?: number;
   onClose: () => void;
   onAction: (cadId: string, action: 'approve' | 'reject' | 'revision', feedback: string) => Promise<void>;
 }
 
-function CadViewerModal({ cad, userRole, onClose, onAction }: ViewerProps) {
+function CadViewerModal({ cad, userRole, batchCount = 1, onClose, onAction }: ViewerProps) {
   const [feedback, setFeedback] = useState('');
   const [acting, setActing] = useState(false);
   const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
   const isPdf   = ext === 'pdf';
-  const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
+  const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext);
+  const fileUrl = `/uploads/cad/${cad.fileName}`;
   const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
   const canAct  = CAD_ACTION_ROLES.includes(userRole as UserRole) && cad.status !== 'APPROVED';
 
@@ -79,7 +80,7 @@ function CadViewerModal({ cad, userRole, onClose, onAction }: ViewerProps) {
           background: 'var(--bg-input)', flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : '📎'}</span>
+            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : '📎'}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {cad.originalName}
@@ -128,6 +129,11 @@ function CadViewerModal({ cad, userRole, onClose, onAction }: ViewerProps) {
               style={{ width: '100%', height: '60vh', border: 'none' }}
               title={cad.originalName}
             />
+          ) : isVideo ? (
+            <video
+              src={fileUrl} controls
+              style={{ maxWidth: '100%', maxHeight: '60vh', display: 'block' }}
+            />
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>📎</div>
@@ -170,18 +176,23 @@ function CadViewerModal({ cad, userRole, onClose, onAction }: ViewerProps) {
                 rows={2}
                 style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box', marginBottom: '10px' }}
               />
+              {batchCount > 1 && (
+                <div style={{ fontSize: '11px', color: '#F59E0B', marginBottom: '8px', fontWeight: 600 }}>
+                  ⚠ Action applies to all {batchCount} files uploaded together
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button onClick={() => act('approve')} disabled={acting}
                   style={{ flex: 1, minWidth: '120px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', padding: '10px', color: '#059669', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ✓ Approve
+                  ✓ Approve{batchCount > 1 ? ' All' : ''}
                 </button>
                 <button onClick={() => act('revision')} disabled={acting}
                   style={{ flex: 1, minWidth: '140px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '8px', padding: '10px', color: '#8B5CF6', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ↺ Request Changes
+                  ↺ Request Changes{batchCount > 1 ? ' (All)' : ''}
                 </button>
                 <button onClick={() => act('reject')} disabled={acting}
                   style={{ flex: 1, minWidth: '100px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '10px', color: '#DC2626', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ✕ Reject
+                  ✕ Reject{batchCount > 1 ? ' All' : ''}
                 </button>
               </div>
             </>
@@ -203,18 +214,29 @@ export async function getServerSideProps() {
   return { props: {} };
 }
 
+// Valid next statuses from each current status (workflow transitions)
+const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  [OrderStatus.CAD_IN_PROGRESS]:    [OrderStatus.CANCELLED],
+  [OrderStatus.SKU_CREATION]:       [OrderStatus.CANCELLED],
+  [OrderStatus.VPO_ISSUED]:         [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.CANCELLED],
+  [OrderStatus.PENDING_CONTRACTOR]: [OrderStatus.READY_TO_SHIP, OrderStatus.CANCELLED],
+  [OrderStatus.READY_TO_SHIP]:      [OrderStatus.SHIPPED],
+  [OrderStatus.SHIPPED]:            [OrderStatus.REPAIR, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [OrderStatus.REPAIR]:             [OrderStatus.COMPLETED],
+};
+
 // Statuses each role is permitted to move an order into
 const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
-  [UserRole.ADMIN]: Object.values(OrderStatus).filter(s => s !== OrderStatus.CANCELLED),
-  [UserRole.SALES_REP]: [OrderStatus.WAITING_CONFIRMATION, OrderStatus.CANCELLED],
-  [UserRole.AUTHORIZER]: [OrderStatus.PENDING_CAD, OrderStatus.CANCELLED],
-  [UserRole.CAD_DESIGNER]: [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CUSTOMER_APPROVED, OrderStatus.CUSTOMER_REJECTED],
-  [UserRole.SKU_MANAGER]: [OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED],
-  [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.ORDER_JOB_BAG_CREATED, OrderStatus.READY_TO_INVOICE],
-  [UserRole.SHIPPING_MANAGER]: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
-  [UserRole.STONE_MANAGER]: [],
-  [UserRole.US_SETTER]: [OrderStatus.REPAIR],
-  [UserRole.CUSTOMER]: [],
+  [UserRole.ADMIN]:            Object.values(OrderStatus),
+  [UserRole.AUTHORIZER]:       [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.REPAIR, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [UserRole.SALES_REP]:        [OrderStatus.CANCELLED],
+  [UserRole.CAD_DESIGNER]:     [],
+  [UserRole.SKU_MANAGER]:      [],
+  [UserRole.FACTORY_MANAGER]:  [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP],
+  [UserRole.SHIPPING_MANAGER]: [OrderStatus.SHIPPED, OrderStatus.COMPLETED],
+  [UserRole.STONE_MANAGER]:    [],
+  [UserRole.US_SETTER]:        [OrderStatus.COMPLETED],
+  [UserRole.CUSTOMER]:         [],
 };
 
 const FIELD_GROUPS = [
@@ -225,6 +247,7 @@ const FIELD_GROUPS = [
       { key: 'kiraSkuNumber', label: 'Kira SKU' },
       { key: 'orderType', label: 'Order Type' },
       { key: 'manufacturingPath', label: 'Manufacturing Path' },
+      { key: 'referenceWeblink', label: 'Reference Link' },
     ],
   },
   {
@@ -263,7 +286,7 @@ const cardStyle = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
   borderRadius: 'var(--radius-lg)',
-  padding: '20px 22px',
+  padding: '14px 18px',
   boxShadow: 'var(--shadow-sm)',
 };
 
@@ -279,6 +302,13 @@ export default function OrderDetail() {
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [cads, setCads] = useState<CadFile[]>([]);
   const [viewingCad, setViewingCad] = useState<CadFile | null>(null);
+  const [shippingForm, setShippingForm] = useState({ trackingNumber: '', courierName: '', shippingNotes: '' });
+  const [savingShipping, setSavingShipping] = useState(false);
+  const refSectionRef = useRef<HTMLDivElement>(null);
+  const [priceModal, setPriceModal] = useState(false);
+  const [pendingPrice, setPendingPrice] = useState('');
+  const [quotedPriceInput, setQuotedPriceInput] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
 
   useEffect(() => {
     try {
@@ -294,17 +324,33 @@ export default function OrderDetail() {
       apiFetch(`${API}/orders/${id}`),
       apiFetch(`${API}/cad/order/${id}`),
     ]).then(async ([oRes, cRes]) => {
-      if (oRes.ok) setOrder(await oRes.json());
+      if (oRes.ok) {
+        const o = await oRes.json();
+        setOrder(o);
+        setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
+        setShippingForm({
+          trackingNumber: o.trackingNumber || '',
+          courierName: (o as any).courierName || '',
+          shippingNotes: (o as any).shippingNotes || '',
+        });
+      }
       if (cRes.ok) setCads(await cRes.json());
       setLoading(false);
     });
   }, [id]);
 
   const handleCadAction = async (cadId: string, action: 'approve' | 'reject' | 'revision', feedback: string) => {
-    await apiFetch(`${API}/cad/${cadId}/${action === 'revision' ? 'revision' : action}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ feedback }),
-    });
+    // Apply action to the clicked file AND all other SENT_FOR_APPROVAL files in the same order (batch)
+    const batchIds = cads
+      .filter(c => c.status === 'SENT_FOR_APPROVAL')
+      .map(c => c.id);
+    const targets = batchIds.length > 0 ? batchIds : [cadId];
+    for (const cid of targets) {
+      await apiFetch(`${API}/cad/${cid}/${action}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ feedback }),
+      });
+    }
     const res = await apiFetch(`${API}/cad/order/${id}`);
     if (res.ok) setCads(await res.json());
     const oRes = await apiFetch(`${API}/orders/${id}`);
@@ -327,15 +373,49 @@ export default function OrderDetail() {
     setSummaryLoading(false);
   };
 
-  const moveStatus = async (newStatus: OrderStatus) => {
+  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number) => {
     if (!order?.id) return;
+    // SKU_CREATION requires a price — show modal if not provided
+    if (newStatus === 'SKU_CREATION' as OrderStatus && !quotedCost) {
+      setPendingPrice(order.quotedCost ? String(order.quotedCost) : '');
+      setPriceModal(true);
+      return;
+    }
     setUpdatingStatus(true);
+    const body: any = { status: newStatus };
+    if (quotedCost) body.quotedCost = quotedCost;
     const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify(body),
     });
-    if (res.ok) setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
+    if (res.ok) {
+      const updated = await res.json();
+      setOrder(updated);
+    }
     setUpdatingStatus(false);
+  };
+
+  const saveQuotedPrice = async () => {
+    const price = parseFloat(quotedPriceInput);
+    if (!price || price <= 0 || !order?.id) return;
+    setSavingPrice(true);
+    const res = await apiFetch(`${API}/orders/${order.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ quotedCost: price }),
+    });
+    if (res.ok) {
+      // Reload order — if CAD was approved, backend auto-moves to SKU_CREATION
+      const fresh = await apiFetch(`${API}/orders/${order.id}`);
+      if (fresh.ok) setOrder(await fresh.json());
+    }
+    setSavingPrice(false);
+  };
+
+  const confirmPriceAndMove = async () => {
+    const price = parseFloat(pendingPrice);
+    if (!price || price <= 0) return;
+    setPriceModal(false);
+    await moveStatus('SKU_CREATION' as OrderStatus, price);
   };
 
   if (loading) {
@@ -359,7 +439,11 @@ export default function OrderDetail() {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
   const userRole = currentUser?.role || '';
   const allowedStatuses = ROLE_STAGE_PERMISSIONS[userRole] || [];
-  const movableStatuses = allowedStatuses.filter(s => s !== order.status);
+  const validNextStatuses = STATUS_TRANSITIONS[order.status as OrderStatus] ?? [];
+  // Admins see all valid transitions; other roles see only what they're permitted to do
+  const movableStatuses = userRole === UserRole.ADMIN
+    ? validNextStatuses
+    : allowedStatuses.filter(s => validNextStatuses.includes(s));
 
   return (
     <AppLayout
@@ -373,7 +457,7 @@ export default function OrderDetail() {
           >
             📊 Summary
           </button>
-          {['SKU_CREATION','VPO_ISSUED','PENDING_CONTRACTOR','ORDER_JOB_BAG_CREATED','READY_TO_INVOICE','READY_TO_SHIP','SHIPPED','DELIVERED'].includes(order.status!) && (
+          {['SKU_CREATION','VPO_ISSUED','PENDING_CONTRACTOR','READY_TO_SHIP','SHIPPED','COMPLETED'].includes(order.status!) && (
             <button
               onClick={() => router.push(`/orders/${id}/jobbag`)}
               style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#0369a1', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
@@ -390,34 +474,47 @@ export default function OrderDetail() {
         </div>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div className="order-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '24px', alignItems: 'start' }}>
+      {/* ── Outer: content (left) + sidebar (right, sticky) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '20px', alignItems: 'start' }}>
 
-          {/* Field groups */}
+        {/* ── Main content column ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="order-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+
+          {/* ── Col 1: Field groups ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {FIELD_GROUPS.map(group => {
-              const FINANCIAL_KEYS = ['quotedCost', 'invoiceNumber'];
+              // invoiceNumber stays admin-only; quotedCost is visible to everyone once set
+              const FINANCIAL_KEYS = ['invoiceNumber'];
               const visibleFields = userRole === UserRole.ADMIN
                 ? group.fields
                 : group.fields.filter(f => !FINANCIAL_KEYS.includes(f.key));
               if (visibleFields.length === 0) return null;
               return (
               <div key={group.title} style={cardStyle}>
-                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '10px' }}>
                   {group.title}
                 </h3>
-                <div className="order-spec-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+                <div className="order-spec-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                   {visibleFields.map(({ key, label, format }) => {
                     const raw = (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');
+                    const isLink = key === 'referenceWeblink' && raw;
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                           {label}
                         </div>
-                        <div style={{ fontSize: '13px', color: raw ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: raw ? 500 : 400 }}>
-                          {val || '—'}
-                        </div>
+                        {isLink ? (
+                          <a href={raw} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 500, wordBreak: 'break-all', textDecoration: 'underline' }}>
+                            {raw}
+                          </a>
+                        ) : (
+                          <div style={{ fontSize: '13px', color: raw ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: raw ? 500 : 400 }}>
+                            {val || '—'}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -436,196 +533,153 @@ export default function OrderDetail() {
             )}
           </div>
 
-          {/* Status sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-            {/* Current status */}
-            <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Current Status
-              </div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: cfg.bg, color: cfg.color, padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
-                {cfg.label}
-              </div>
-            </div>
-
-            {/* Created by */}
-            {(order.salesRepName || order.salesRepEmail) && (
-              <div style={cardStyle}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Created By
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {(order as any).salesRepName || order.salesRepEmail}
-                </div>
-                {(order as any).salesRepName && order.salesRepEmail && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                    {order.salesRepEmail}
-                  </div>
-                )}
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  {new Date(order.createdAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </div>
-              </div>
-            )}
-
-            {/* Authorize panel — only for WAITING_CONFIRMATION and authorizers/admin */}
-            {order.status === OrderStatus.WAITING_CONFIRMATION &&
-              (userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) && (
-              <div style={{ ...cardStyle, borderLeft: '3px solid var(--accent)' }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Awaiting Authorization
+          {/* ── Col 2: Reference Images & Videos ── */}
+          {(() => {
+            const refs = cads.filter(c => (c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image') && !c.originalName.toUpperCase().startsWith('CJ'));
+            const canUploadRef = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(userRole as UserRole);
+            return (
+              <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
+                    📌 Reference Files {refs.length > 0 && `(${refs.length})`}
+                  </h3>
+                  {canUploadRef && (
+                    <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '3px 10px', background: 'transparent', whiteSpace: 'nowrap' }}>
+                      + Add Reference
+                      <input type="file" accept="image/*,.pdf,.mp4,.mov" multiple style={{ display: 'none' }}
+                        onChange={async e => {
+                          const files = Array.from(e.target.files || []);
+                          if (!files.length || !order?.id) return;
+                          const token = localStorage.getItem('jf_token');
+                          for (const file of files) {
+                            const fd = new FormData();
+                            fd.append('file', file);
+                            await fetch(`${API}/cad/reference/${order.id}`, {
+                              method: 'POST',
+                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                              body: fd,
+                            });
+                          }
+                          const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                          if (cRes.ok) setCads(await cRes.json());
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
 
-                {summary ? (
-                  <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      AI Order Brief
+                {refs.length === 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} style={{ height: '110px', background: 'var(--bg-input)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.35 }}>
+                        <span style={{ fontSize: '22px' }}>🖼</span>
+                      </div>
+                    ))}
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+                      No reference files uploaded yet
                     </div>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>{summary}</p>
                   </div>
                 ) : (
-                  <button
-                    onClick={loadSummary}
-                    disabled={summaryLoading}
-                    style={{ width: '100%', marginBottom: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', opacity: summaryLoading ? 0.7 : 1 }}
-                  >
-                    {summaryLoading ? '✨ Generating…' : '✨ Generate AI Order Brief'}
-                  </button>
-                )}
-
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.6 }}>
-                  Review and authorize to release to the CAD design team.
-                </p>
-                <button
-                  onClick={authorizeOrder}
-                  disabled={authorizing}
-                  style={{ width: '100%', background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '11px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: authorizing ? 'not-allowed' : 'pointer', opacity: authorizing ? 0.7 : 1, letterSpacing: '0.3px' }}
-                >
-                  {authorizing ? 'Authorizing…' : 'Authorize Order'}
-                </button>
-              </div>
-            )}
-
-            {/* Move to Stage — role-filtered */}
-            {movableStatuses.length > 0 && (
-              <div style={cardStyle}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  Move to Stage
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                  {movableStatuses.map(s => {
-                    const sc = STATUS_CONFIG[s];
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => moveStatus(s)}
-                        disabled={updatingStatus}
-                        style={{
-                          background: sc.bg,
-                          border: `1px solid ${sc.color}40`,
-                          borderRadius: '8px',
-                          padding: '9px 14px',
-                          color: sc.color,
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: updatingStatus ? 'not-allowed' : 'pointer',
-                          textAlign: 'left',
-                          opacity: updatingStatus ? 0.6 : 1,
-                          transition: 'opacity 0.15s',
-                          letterSpacing: '0.2px',
-                        }}
-                      >
-                        → {sc.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Timeline */}
-            <div style={cardStyle}>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Timeline
-              </div>
-              {[
-                { label: 'Created', value: order.createdAt },
-                { label: 'Updated', value: order.updatedAt },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    {value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {refs.map(cad => {
+                      const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
+                      const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+                      const isVid = ['mp4','mov','avi','webm','mkv','wmv'].includes(ext);
+                      const fileUrl = `/uploads/cad/${cad.fileName}`;
+                      return (
+                        <div key={cad.id}
+                          onClick={() => setViewingCad(cad)}
+                          style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
+                        >
+                          {isImg ? (
+                            <img src={fileUrl} alt={cad.originalName}
+                              style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
+                              onError={e => { const img = e.target as HTMLImageElement; img.style.display = 'none'; const fb = img.nextElementSibling as HTMLElement; if (fb) fb.style.display = 'flex'; }}
+                            />
+                          ) : isVid ? (
+                            <video src={fileUrl} style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                          ) : null}
+                          <div style={{ width: '100%', height: '110px', display: (isImg || isVid) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>
+                            📎
+                          </div>
+                          <div style={{ padding: '5px 7px', borderTop: '1px solid var(--border)' }}>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {isImg ? '🖼' : isVid ? '🎬' : '📎'} {cad.originalName}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Reference Images (visible to all roles) ── */}
-        {(() => {
-          const refs = cads.filter(c => c.designerNotes === 'Reference image');
-          if (refs.length === 0) return null;
-          return (
-            <div style={cardStyle}>
-              <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 14px' }}>
-                📌 Reference Images ({refs.length})
-              </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {refs.map(cad => {
-                  const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
-                  const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-                  const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
-                  return (
-                    <div key={cad.id}
-                      onClick={() => setViewingCad(cad)}
-                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', width: '160px', flexShrink: 0, cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
-                    >
-                      {isImage ? (
-                        <img src={fileUrl} alt={cad.originalName}
-                          style={{ width: '160px', height: '120px', objectFit: 'cover', display: 'block' }}
-                          onError={e => {
-                            const img = e.target as HTMLImageElement;
-                            img.style.display = 'none';
-                            const fallback = img.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div style={{ width: '160px', height: '120px', display: isImage ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', background: 'var(--bg-input)' }}>
-                        🖼
-                      </div>
-                      <div style={{ padding: '6px 8px' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cad.originalName}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>by {cad.uploadedBy}</div>
-                      </div>
-                    </div>
-                  );
-                })}
+                )}
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
-        {/* ── CAD Design Files ── */}
+          </div>{/* ── end fields+refs sub-grid ── */}
+
+          {/* ── CAD Design Files ── */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
-              Design Files {cads.filter(c => c.designerNotes !== 'Reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image').length})`}
+              Design Files {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length > 0 && `(${cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length})`}
             </h3>
+            {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
+              <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}>
+                + Upload Files
+                <input type="file" accept="image/*,.pdf,.3dm,.obj,.stl,.dxf" multiple style={{ display: 'none' }}
+                  onChange={async e => {
+                    const files = Array.from(e.target.files || []);
+                    if (!files.length || !order?.id) return;
+                    const token = localStorage.getItem('jf_token');
+                    const fd = new FormData();
+                    files.forEach(f => fd.append('files', f));
+                    await fetch(`${API}/cad/upload/${order.id}`, {
+                      method: 'POST',
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      body: fd,
+                    });
+                    const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                    if (cRes.ok) setCads(await cRes.json());
+                    const oRes = await apiFetch(`${API}/orders/${order.id}`);
+                    if (oRes.ok) setOrder(await oRes.json());
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
           </div>
 
-          {cads.filter(c => c.designerNotes !== 'Reference image').length === 0 ? (
+          {(() => {
+            const pendingBatch = cads.filter(c => c.status === 'SENT_FOR_APPROVAL');
+            return pendingBatch.length > 0 && CAD_ACTION_ROLES.includes(userRole as UserRole) && (
+              <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 600 }}>
+                  {pendingBatch.length === 1 ? '1 design awaiting review' : `${pendingBatch.length} designs awaiting review as a batch`}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => handleCadAction(pendingBatch[0].id, 'approve', '')}
+                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '7px', padding: '6px 14px', color: '#059669', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                    ✓ Approve All
+                  </button>
+                  <button onClick={() => setViewingCad(pendingBatch[0])}
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    Review →
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+          {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length === 0 ? (
             <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>
               No CAD files uploaded yet for this order.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {cads.filter(c => c.designerNotes !== 'Reference image').map(cad => {
+              {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).map(cad => {
                 const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
                 const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                 const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
@@ -664,21 +718,220 @@ export default function OrderDetail() {
           )}
         </div>
 
-        {/* Conversation */}
-        {order.id && currentUser && (
-          <OrderConversation
-            orderId={order.id}
-            currentUserRole={currentUser.role}
-            currentUserId={currentUser.id}
-          />
-        )}
-      </div>
+          {/* Conversation */}
+          {order.id && currentUser && (
+            <OrderConversation
+              orderId={order.id}
+              currentUserRole={currentUser.role}
+              currentUserId={currentUser.id}
+            />
+          )}
+        </div>{/* ── end main content column ── */}
+
+        {/* ── Sidebar: sticky beside all content ── */}
+        <div style={{ position: 'sticky', top: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+          {/* Current status */}
+          <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>Current Status</div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: cfg.bg, color: cfg.color, padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+              {cfg.label}
+            </div>
+          </div>
+
+          {/* Quoted Price — editable for Authorizer/Admin, read-only for others */}
+          {userRole !== UserRole.CUSTOMER && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Quoted Price
+              </div>
+              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--text-muted)', pointerEvents: 'none' }}>$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={quotedPriceInput}
+                      onChange={e => setQuotedPriceInput(e.target.value)}
+                      placeholder="0.00"
+                      style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px 8px 22px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <button
+                    onClick={saveQuotedPrice}
+                    disabled={savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0}
+                    style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0) ? 0.5 : 1 }}
+                  >
+                    {savingPrice ? '…' : 'Save'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
+                  {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Created by */}
+          {(order.salesRepName || order.salesRepEmail) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>Created By</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{(order as any).salesRepName || order.salesRepEmail}</div>
+              {(order as any).salesRepName && order.salesRepEmail && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>{order.salesRepEmail}</div>
+              )}
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {new Date(order.createdAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+          )}
+
+          {/* CAD Approved — prompt to add quote price */}
+          {order.status === OrderStatus.CAD_IN_PROGRESS && (order as any).customerEmailApproval &&
+            (userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) && (
+            <div style={{ ...cardStyle, borderLeft: '3px solid #F59E0B' }}>
+              <div style={{ fontSize: '10px', color: '#F59E0B', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700 }}>CAD Approved — Price Required</div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>Add a quote price above to move this order to SKU Creation.</p>
+            </div>
+          )}
+
+          {/* Shipping Details — for Shipping Manager and Admin when order is being shipped */}
+          {(userRole === UserRole.SHIPPING_MANAGER || userRole === UserRole.ADMIN) &&
+            [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.COMPLETED].includes(order.status as OrderStatus) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Shipping Details</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Tracking Number</label>
+                  <input
+                    value={shippingForm.trackingNumber}
+                    onChange={e => setShippingForm(p => ({ ...p, trackingNumber: e.target.value }))}
+                    placeholder="e.g. 1Z999AA10123456784"
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Courier / Carrier</label>
+                  <input
+                    value={shippingForm.courierName}
+                    onChange={e => setShippingForm(p => ({ ...p, courierName: e.target.value }))}
+                    placeholder="e.g. FedEx, UPS, DHL"
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Additional Notes</label>
+                  <textarea
+                    value={shippingForm.shippingNotes}
+                    onChange={e => setShippingForm(p => ({ ...p, shippingNotes: e.target.value }))}
+                    placeholder="e.g. Signature required, fragile, insured for $X…"
+                    rows={3}
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <button
+                  disabled={savingShipping}
+                  onClick={async () => {
+                    if (!order?.id) return;
+                    setSavingShipping(true);
+                    const res = await apiFetch(`${API}/orders/${order.id}`, {
+                      method: 'PUT',
+                      body: JSON.stringify(shippingForm),
+                    });
+                    if (res.ok) setOrder(prev => prev ? { ...prev, ...shippingForm } : prev);
+                    setSavingShipping(false);
+                  }}
+                  style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px', fontSize: '12px', fontWeight: 600, cursor: savingShipping ? 'not-allowed' : 'pointer', opacity: savingShipping ? 0.6 : 1 }}
+                >
+                  {savingShipping ? 'Saving…' : 'Save Shipping Details'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Move to Stage */}
+          {movableStatuses.length > 0 && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Move to Stage</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {movableStatuses.map(s => {
+                  const sc = STATUS_CONFIG[s];
+                  return (
+                    <button key={s} onClick={() => moveStatus(s)} disabled={updatingStatus}
+                      style={{ background: sc.bg, border: `1px solid ${sc.color}40`, borderRadius: '8px', padding: '9px 14px', color: sc.color, fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: updatingStatus ? 0.6 : 1, transition: 'opacity 0.15s', letterSpacing: '0.2px' }}>
+                      → {sc.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Timeline */}
+          <div style={cardStyle}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Timeline</div>
+            {[{ label: 'Created', value: order.createdAt }, { label: 'Updated', value: order.updatedAt }].map(({ label, value }) => (
+              <div key={label} style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  {value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>{/* ── end sidebar ── */}
+
+      </div>{/* ── end outer grid ── */}
+
+      {/* ── Price Required Modal (SKU Creation) ── */}
+      {priceModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '380px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Set Quoted Price
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+              The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before moving this order to SKU Creation. The customer will be notified.
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Approximate Price ($)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={pendingPrice}
+              onChange={e => setPendingPrice(e.target.value)}
+              placeholder="e.g. 2500"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') confirmPriceAndMove(); }}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '15px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setPriceModal(false)}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={confirmPriceAndMove}
+                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
+                Confirm & Move to SKU Creation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CAD Viewer Modal */}
       {viewingCad && (
         <CadViewerModal
           cad={viewingCad}
           userRole={userRole}
+          batchCount={cads.filter(c => c.status === 'SENT_FOR_APPROVAL').length}
           onClose={() => setViewingCad(null)}
           onAction={handleCadAction}
         />

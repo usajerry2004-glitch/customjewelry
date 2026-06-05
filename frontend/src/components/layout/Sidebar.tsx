@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
   { icon: '📊', label: 'Reports',       path: '/reports',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP] },
+  { icon: '✓', label: 'Priority Tasks',   path: '/todos',           roles: Object.values(UserRole) as UserRole[] },
   { icon: '◇', label: 'Settings',       path: '/settings',        roles: [UserRole.ADMIN] },
 ];
 
@@ -42,7 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
         className={`app-sidebar${isOpen ? ' open' : ''}`}
         style={{
           width: '220px',
-          minHeight: '100vh',
+          height: '100vh',
+          overflowY: 'auto',
           background: 'var(--sidebar-bg)',
           borderRight: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
@@ -53,11 +55,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
         {/* Logo */}
         <div style={{ padding: '28px 22px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '0.5px', lineHeight: 1 }}>
-              KIRA JEWELS
-            </div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '5px', letterSpacing: '2px', textTransform: 'uppercase' }}>
-              Custom
+            <img
+              src="/logo.png"
+              alt="Kira Jewels"
+              style={{ height: '42px', width: 'auto', display: 'block', objectFit: 'contain' }}
+            />
+            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '6px', letterSpacing: '2px', textTransform: 'uppercase' }}>
+              Custom Jewelry
             </div>
           </div>
           {/* Close button — only visible on mobile via CSS */}

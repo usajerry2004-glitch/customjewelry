@@ -9,6 +9,8 @@ export enum OrderStatus {
   CAD_IN_PROGRESS = 'CAD_IN_PROGRESS',
   CUSTOMER_APPROVED = 'CUSTOMER_APPROVED',
   CUSTOMER_REJECTED = 'CUSTOMER_REJECTED',
+  ORDER_REVISION = 'ORDER_REVISION',
+  WAITING_FOR_PRICE = 'WAITING_FOR_PRICE',
   SKU_CREATION = 'SKU_CREATION',
   VPO_ISSUED = 'VPO_ISSUED',
   PENDING_CONTRACTOR = 'PENDING_CONTRACTOR',
@@ -17,6 +19,7 @@ export enum OrderStatus {
   READY_TO_SHIP = 'READY_TO_SHIP',
   SHIPPED = 'SHIPPED',
   DELIVERED = 'DELIVERED',
+  COMPLETED = 'COMPLETED',
   REPAIR = 'REPAIR',
   CANCELLED = 'CANCELLED',
 }
@@ -124,6 +127,12 @@ export class Order {
   shipMethod: string;
 
   @Column({ nullable: true })
+  courierName: string;
+
+  @Column({ nullable: true, type: 'text' })
+  shippingNotes: string;
+
+  @Column({ nullable: true })
   vendorName: string;
 
   @Column({ nullable: true })
@@ -144,8 +153,14 @@ export class Order {
   @Column({ default: false })
   customerEmailApproval: boolean;
 
+  @Column({ nullable: true, type: 'varchar' })
+  cadSubStatus: string | null;
+
   @Column({ default: false })
   isArchived: boolean;
+
+  @Column({ default: false })
+  isPriorityCustomer: boolean;
 
   @Column({ default: false })
   sentToRc: boolean;
@@ -167,6 +182,9 @@ export class Order {
 
   @Column({ nullable: true })
   refCustomerPo: string;
+
+  @Column({ nullable: true })
+  smartsheetRowId: string;
 
   @Column({ type: 'text', nullable: true })
   aiSummary: string;

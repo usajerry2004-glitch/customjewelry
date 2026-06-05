@@ -25,7 +25,7 @@ function CadViewer({ cad, onClose }: { cad: CadFile; onClose: () => void }) {
   const ext      = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
   const isPdf    = ext === 'pdf';
-  const fileUrl  = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
+  const fileUrl  = `/uploads/cad/${cad.fileName}`;
   const cs       = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
 
   useEffect(() => {
@@ -137,6 +137,7 @@ export default function CustomerOrderDetail() {
   const [cads, setCads] = useState<CadFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [cadFeedback, setCadFeedback] = useState<Record<string, string>>({});
+  const [batchFeedback, setBatchFeedback] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [viewingCad, setViewingCad] = useState<CadFile | null>(null);
@@ -168,6 +169,19 @@ export default function CustomerOrderDetail() {
       method: 'PATCH',
       body: JSON.stringify({ feedback }),
     });
+    await reload();
+    setActionLoading(null);
+  };
+
+  const batchCadAction = async (cadIds: string[], action: 'approve' | 'reject' | 'revision') => {
+    setActionLoading('batch-' + action);
+    for (const cadId of cadIds) {
+      await apiFetch(`${API}/cad/${cadId}/${action}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ feedback: batchFeedback }),
+      });
+    }
+    setBatchFeedback('');
     await reload();
     setActionLoading(null);
   };
@@ -289,7 +303,7 @@ export default function CustomerOrderDetail() {
 
       {/* Reference Images — always visible, customers can upload */}
       {(() => {
-        const refs = cads.filter(c => c.designerNotes === 'Reference image');
+        const refs = cads.filter(c => c.designerNotes === 'Reference image' && !c.originalName.toUpperCase().startsWith('CJ'));
         return (
         <div style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -326,7 +340,7 @@ export default function CustomerOrderDetail() {
             {refs.map(cad => {
               const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
-              const fileUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000'}/uploads/cad/${cad.fileName}`;
+              const fileUrl = `/uploads/cad/${cad.fileName}`;
               return (
                 <div key={cad.id}
                   onClick={() => setViewingCad(cad)}
@@ -361,94 +375,136 @@ export default function CustomerOrderDetail() {
       })()}
 
       {/* CAD Design Files */}
-      <div style={card}>
-        <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>
-          Design Files {cads.filter(c => c.designerNotes !== 'Reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image').length})`}
-        </h3>
+      {(() => {
+        const designFiles = cads.filter(c =>
+          (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') ||
+          c.originalName.toUpperCase().startsWith('CJ')
+        );
+        const pendingBatch = designFiles.filter(c => c.status === 'SENT_FOR_APPROVAL');
+        const otherFiles   = designFiles.filter(c => c.status !== 'SENT_FOR_APPROVAL');
+        const pendingIds   = pendingBatch.map(c => c.id);
 
-        {cads.filter(c => c.designerNotes !== 'Reference image').length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
-            No design files yet. Our CAD team will upload designs once your order is confirmed.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {cads.filter(c => c.designerNotes !== 'Reference image').map(cad => {
-              const cs = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
-              const needsApproval = cad.status === 'SENT_FOR_APPROVAL';
-              return (
-                <div key={cad.id} style={{ background: 'var(--bg-input)', border: `1px solid ${cs.color}30`, borderRadius: 'var(--radius)', padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: needsApproval ? '14px' : '0' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
-                        <span style={{ fontSize: '10px', background: `${cs.color}15`, color: cs.color, padding: '2px 8px', borderRadius: '99px' }}>
-                          {cs.label}
-                        </span>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
-                      </div>
-                      {cad.designerNotes && (
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Designer note: {cad.designerNotes}</div>
-                      )}
-                      {cad.customerFeedback && (
-                        <div style={{ fontSize: '12px', color: '#F59E0B', marginTop: '4px' }}>Your feedback: {cad.customerFeedback}</div>
-                      )}
+        return (
+          <div style={card}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 14px' }}>
+              Design Files {designFiles.length > 0 && `(${designFiles.length})`}
+            </h3>
+
+            {designFiles.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
+                No design files yet. Our CAD team will upload designs once your order is confirmed.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                {/* Pending batch — all SENT_FOR_APPROVAL files as a single review request */}
+                {pendingBatch.length > 0 && (
+                  <div style={{ background: 'var(--bg-input)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 'var(--radius)', padding: '14px 16px' }}>
+                    <div style={{ fontSize: '12px', color: '#F59E0B', marginBottom: '12px', fontWeight: 600 }}>
+                      {pendingBatch.length === 1
+                        ? 'This design is waiting for your review and approval.'
+                        : `${pendingBatch.length} designs are waiting for your review and approval.`}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                        {new Date(cad.createdAt).toLocaleDateString()}
-                      </span>
+
+                    {/* List each file in the batch */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                      {pendingBatch.map(cad => (
+                        <div key={cad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 12px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
+                              <span style={{ fontSize: '10px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', padding: '2px 8px', borderRadius: '99px' }}>Awaiting Your Approval</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
+                            </div>
+                            {cad.designerNotes && cad.designerNotes !== 'Reference image' && (
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Designer note: {cad.designerNotes}</div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(cad.createdAt).toLocaleDateString()}</span>
+                            <button
+                              onClick={() => setViewingCad(cad)}
+                              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                            >
+                              👁 View
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Single shared feedback + action buttons for the whole batch */}
+                    <textarea
+                      value={batchFeedback}
+                      onChange={e => setBatchFeedback(e.target.value)}
+                      placeholder="Optional feedback or revision notes…"
+                      rows={2}
+                      style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '10px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={() => setViewingCad(cad)}
-                        style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                        onClick={() => batchCadAction(pendingIds, 'approve')}
+                        disabled={!!actionLoading}
+                        style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: '7px', padding: '8px', color: '#059669', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
                       >
-                        👁 View
+                        Approve Design
+                      </button>
+                      <button
+                        onClick={() => batchCadAction(pendingIds, 'revision')}
+                        disabled={!!actionLoading}
+                        style={{ flex: 1, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '7px', padding: '8px', color: '#8B5CF6', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                      >
+                        Request Changes
+                      </button>
+                      <button
+                        onClick={() => batchCadAction(pendingIds, 'reject')}
+                        disabled={!!actionLoading}
+                        style={{ flex: 1, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '7px', padding: '8px', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                      >
+                        Reject
                       </button>
                     </div>
                   </div>
+                )}
 
-                  {needsApproval && (
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#F59E0B', marginBottom: '10px', fontWeight: 600 }}>
-                        This design is waiting for your review and approval.
-                      </div>
-                      <textarea
-                        value={cadFeedback[cad.id] || ''}
-                        onChange={e => setCadFeedback(p => ({ ...p, [cad.id]: e.target.value }))}
-                        placeholder="Optional feedback or revision notes…"
-                        rows={2}
-                        style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: '10px' }}
-                      />
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => cadAction(cad.id, 'approve')}
-                          disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.35)', borderRadius: '7px', padding: '8px', color: '#059669', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
-                        >
-                          Approve Design
-                        </button>
-                        <button
-                          onClick={() => cadAction(cad.id, 'revision')}
-                          disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '7px', padding: '8px', color: '#8B5CF6', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
-                        >
-                          Request Changes
-                        </button>
-                        <button
-                          onClick={() => cadAction(cad.id, 'reject')}
-                          disabled={!!actionLoading}
-                          style={{ flex: 1, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '7px', padding: '8px', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
-                        >
-                          Reject
-                        </button>
+                {/* Already-actioned files */}
+                {otherFiles.map(cad => {
+                  const cs = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
+                  return (
+                    <div key={cad.id} style={{ background: 'var(--bg-input)', border: `1px solid ${cs.color}30`, borderRadius: 'var(--radius)', padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
+                            <span style={{ fontSize: '10px', background: `${cs.color}15`, color: cs.color, padding: '2px 8px', borderRadius: '99px' }}>{cs.label}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
+                          </div>
+                          {cad.designerNotes && cad.designerNotes !== 'Reference image' && (
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Designer note: {cad.designerNotes}</div>
+                          )}
+                          {cad.customerFeedback && (
+                            <div style={{ fontSize: '12px', color: '#F59E0B', marginTop: '4px' }}>Your feedback: {cad.customerFeedback}</div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(cad.createdAt).toLocaleDateString()}</span>
+                          <button
+                            onClick={() => setViewingCad(cad)}
+                            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                          >
+                            👁 View
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Conversation with the team */}
       {order.id && currentUser && (

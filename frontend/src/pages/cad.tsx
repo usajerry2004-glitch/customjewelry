@@ -17,7 +17,7 @@ interface CadFile {
   customerFeedback?: string; uploadedBy?: string; approvedBy?: string;
   approvedAt?: string; createdAt: string;
 }
-interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; }
+interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; status?: string; }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px 22px', boxShadow: 'var(--shadow-sm)' };
 const lbl: React.CSSProperties = { display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '0.8px', textTransform: 'uppercase' };
@@ -31,6 +31,7 @@ export default function CADPage() {
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [selectedFileCount, setSelectedFileCount] = useState(0);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isCadDesigner, setIsCadDesigner] = useState(false);
@@ -49,7 +50,7 @@ export default function CADPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [fRes, oRes] = await Promise.all([apiFetch(`${API}/cad`), apiFetch(`${API}/orders?limit=100`)]);
+      const [fRes, oRes] = await Promise.all([apiFetch(`${API}/cad`), apiFetch(`${API}/orders?limit=200`)]);
       if (fRes.ok) setFiles(await fRes.json());
       if (oRes.ok) { const d = await oRes.json(); setOrders(d.orders || []); }
     } finally { setLoading(false); }
@@ -58,15 +59,21 @@ export default function CADPage() {
   useEffect(() => { loadAll(); }, []);
 
   const upload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file || !selectedOrderId) return;
+    const files = fileRef.current?.files;
+    if (!files || files.length === 0 || !selectedOrderId) return;
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      Array.from(files).forEach(f => fd.append('files', f));
       if (notes) fd.append('designerNotes', notes);
       const res = await apiFetch(`${API}/cad/upload/${selectedOrderId}`, { method: 'POST', body: fd });
-      if (res.ok) { setNotes(''); setSelectedOrderId(''); if (fileRef.current) fileRef.current.value = ''; await loadAll(); }
+      if (res.ok) {
+        setNotes('');
+        setSelectedOrderId('');
+        setSelectedFileCount(0);
+        if (fileRef.current) fileRef.current.value = '';
+        await loadAll();
+      }
     } finally { setUploading(false); }
   };
 
@@ -91,14 +98,25 @@ export default function CADPage() {
               <label style={lbl}>Order *</label>
               <select value={selectedOrderId} onChange={e => setSelectedOrderId(e.target.value)} style={inp}>
                 <option value="">Select order…</option>
-                {orders.map(o => (
-                  <option key={o.id} value={o.id}>{o.poNumber} — {o.storeName || o.customerFullName || 'Unknown'}</option>
-                ))}
+                {orders
+                  .filter(o => o.status === 'PENDING_CAD' || o.status === 'ORDER_REVISION')
+                  .map(o => (
+                    <option key={o.id} value={o.id}>
+                      {o.poNumber}{o.status === 'ORDER_REVISION' ? ' ↺ Revision' : ''} — {o.storeName || o.customerFullName || 'Unknown'}
+                    </option>
+                  ))}
               </select>
             </div>
             <div>
-              <label style={lbl}>File *</label>
-              <input ref={fileRef} type="file" accept=".stl,.obj,.3dm,.pdf,.jpg,.png,.zip" style={inp} />
+              <label style={lbl}>Files * {selectedFileCount > 1 && <span style={{ color: 'var(--accent-dark)', fontWeight: 700 }}>({selectedFileCount} selected)</span>}</label>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept=".stl,.obj,.3dm,.pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.avi,.webm,.mkv,.wmv,.zip"
+                style={inp}
+                onChange={e => setSelectedFileCount(e.target.files?.length ?? 0)}
+              />
             </div>
             <div>
               <label style={lbl}>Designer Notes</label>

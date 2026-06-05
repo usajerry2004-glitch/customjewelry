@@ -173,8 +173,19 @@ input::placeholder, textarea::placeholder {
 
 /* Login page */
 @media (max-width: 640px) {
+  .login-wrapper { flex-direction: column !important; }
   .login-left-panel { display: none !important; }
-  .login-right-panel { padding: 24px 16px !important; }
+  .login-mobile-logo {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--sidebar-bg);
+    padding: 28px 24px 22px;
+    text-align: center;
+    width: 100%;
+  }
+  .login-right-panel { padding: 32px 20px !important; }
 }
 
 /* Manufacturing / Shipping / CAD grids */

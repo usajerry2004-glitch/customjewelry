@@ -85,6 +85,18 @@ export class UsersService {
     return { orders, total };
   }
 
+  async togglePriority(id: string): Promise<User> {
+    const user = await this.findOne(id);
+    user.isPriority = !user.isPriority;
+    await this.userRepo.save(user);
+    // Sync isPriorityCustomer on all orders for this customer
+    await this.orderRepo.update(
+      { customerId: id },
+      { isPriorityCustomer: user.isPriority },
+    );
+    return user;
+  }
+
   async getStats(): Promise<{ totalCustomers: number; activeCustomers: number; totalStaff: number }> {
     const totalCustomers = await this.userRepo.count({ where: { role: UserRole.CUSTOMER } });
     const activeCustomers = await this.userRepo.count({ where: { role: UserRole.CUSTOMER, isActive: true } });
