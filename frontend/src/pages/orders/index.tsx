@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
-import { Order, OrderStatus } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 const ALL_STATUS_FILTERS = [
@@ -78,6 +78,7 @@ export default function OrdersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [cadSubFilter, setCadSubFilter] = useState('');
+  const [stoneSubFilter, setStoneSubFilter] = useState('');
 
   useEffect(() => {
     try {
@@ -93,6 +94,8 @@ export default function OrdersPage() {
   const isCadSubFilter = ['cad_pending', 'cad_revision', 'cad_approved'].includes(statusFilter);
   const showCadSubRow = (statusFilter === OrderStatus.CAD_IN_PROGRESS || isCadSubFilter) &&
     ['ADMIN', 'AUTHORIZER'].includes(userRole);
+  const showStoneSubRow = statusFilter === OrderStatus.VPO_ISSUED &&
+    ['ADMIN', 'FACTORY_MANAGER', 'AUTHORIZER'].includes(userRole);
 
   const load = async () => {
     setLoading(true);
@@ -114,6 +117,8 @@ export default function OrdersPage() {
         if (activeCadSub === 'cad_pending')  list = list.filter((o: any) => !o.cadSubStatus || o.cadSubStatus === 'UPLOADED');
         if (activeCadSub === 'cad_revision') list = list.filter((o: any) => o.cadSubStatus === 'REVISION');
         if (activeCadSub === 'cad_approved') list = list.filter((o: any) => o.cadSubStatus === 'APPROVED');
+        if (stoneSubFilter === 'stone_pending')  list = list.filter((o: any) => !o.stoneStatus || o.stoneStatus === StoneStatus.PENDING_STONE);
+        if (stoneSubFilter === 'stone_received') list = list.filter((o: any) => o.stoneStatus === StoneStatus.STONE_RECEIVED);
         setOrders(list);
         setTotal(list.length);
       }
@@ -132,7 +137,7 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  useEffect(() => { load(); }, [search, statusFilter, cadSubFilter, dateFrom, dateTo]);
+  useEffect(() => { load(); }, [search, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
 
   const openNewOrderModal = async () => {
     setShowNew(true);
@@ -389,7 +394,7 @@ export default function OrdersPage() {
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
-              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); }}
+              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); }}
               style={{
                 padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
                 fontWeight: statusFilter === f.value ? 600 : 400,
@@ -421,6 +426,28 @@ export default function OrdersPage() {
                 background: cadSubFilter === f.value ? 'var(--accent)' : 'var(--bg-card)',
                 color: cadSubFilter === f.value ? '#fff' : 'var(--text-secondary)',
                 border: `1px solid ${cadSubFilter === f.value ? 'var(--accent)' : 'var(--border)'}`,
+                transition: 'all 0.15s',
+              }}
+            >{f.label}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Stone Sub-filters — shown for Admin/Authorizer/Factory when VPO Created is selected */}
+      {showStoneSubRow && (
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid #7C3AED' }}>
+          {[
+            { label: 'All VPO',         value: '' },
+            { label: '💎 Pending Stone', value: 'stone_pending' },
+            { label: '✓ Stone Received', value: 'stone_received' },
+          ].map(f => (
+            <button key={f.value} onClick={() => setStoneSubFilter(f.value)}
+              style={{
+                padding: '4px 12px', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
+                fontWeight: stoneSubFilter === f.value ? 700 : 400,
+                background: stoneSubFilter === f.value ? '#7C3AED' : 'var(--bg-card)',
+                color: stoneSubFilter === f.value ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${stoneSubFilter === f.value ? '#7C3AED' : 'var(--border)'}`,
                 transition: 'all 0.15s',
               }}
             >{f.label}</button>
