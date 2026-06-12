@@ -1,12 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { join } from 'path';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
+import { EmailService } from '../email/email.service';
 
 export interface WebOrderDto {
   // Contact
@@ -48,24 +50,25 @@ export class PublicOrdersService {
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
+    private readonly emailService: EmailService,
   ) {}
 
-  // ── Auto-generate next PO number ─────────────────────────────────────
+  // ── Auto-generate next CO##### PO number ─────────────────────────────
   private async nextPo(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `KJ-${year}-`;
-    const latest = await this.orderRepo
+    const rows = await this.orderRepo
       .createQueryBuilder('o')
-      .where('o.poNumber LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('o.poNumber', 'DESC')
-      .getOne();
-    let seq = 1;
-    if (latest) {
-      const parts = latest.poNumber.split('-');
-      const last = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(last)) seq = last + 1;
+      .select('o.poNumber')
+      .where("o.poNumber LIKE 'CO%' OR o.poNumber LIKE '%(CO%'")
+      .getMany();
+    let maxSeq = 10612;
+    for (const row of rows) {
+      const po = row.poNumber;
+      const m1 = po.match(/^CO(\d+)$/);
+      if (m1) maxSeq = Math.max(maxSeq, parseInt(m1[1], 10));
+      const m2 = po.match(/\(CO(\d+)\)/);
+      if (m2) maxSeq = Math.max(maxSeq, parseInt(m2[1], 10));
     }
-    return `${prefix}${String(seq).padStart(4, '0')}`;
+    return `CO${String(maxSeq + 1).padStart(5, '0')}`;
   }
 
   // ── Find or create customer by email ─────────────────────────────────
@@ -93,11 +96,13 @@ export class PublicOrdersService {
     files: Express.Multer.File[],
   ): Promise<WebOrderResult> {
     try {
-      const customer = await this.findOrCreateCustomer(dto);
-      const poNumber = await this.nextPo();
+      const customer  = await this.findOrCreateCustomer(dto);
+      const poNumber  = await this.nextPo();
+      const trackingToken = randomBytes(32).toString('hex');
 
       const order = await this.orderRepo.save(this.orderRepo.create({
         poNumber,
+        trackingToken,
         status: OrderStatus.CAD_IN_PROGRESS,
         customerId:       customer.id,
         customerEmail:    customer.email,
@@ -147,9 +152,19 @@ export class PublicOrdersService {
         })),
       ));
 
+      // Email customer with tracking link
+      this.emailService.sendOrderPlaced({
+        to:             customer.email,
+        poNumber:       order.poNumber,
+        customerName:   order.customerFullName,
+        orderType:      order.orderType || 'Custom Order',
+        orderId:        order.id,
+        trackingToken,
+      }).catch(err => this.logger.warn('Order placed email failed:', err));
+
       this.logger.log(`Web order created: ${order.poNumber} for ${customer.email}`);
       return {
-        success: true,
+        success:  true,
         orderRef: order.poNumber,
         message:  `Your order ${order.poNumber} has been received. Our team will be in touch shortly.`,
       };
@@ -157,5 +172,128 @@ export class PublicOrdersService {
       this.logger.error('Web order creation failed', err);
       return { success: false, orderRef: '', message: 'Failed to submit order. Please try again.' };
     }
+  }
+
+  // ── Get order by tracking token ───────────────────────────────────────
+  async getOrderByToken(token: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const cadFiles = await this.cadRepo.find({
+      where: { orderId: order.id },
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      poNumber:       order.poNumber,
+      status:         order.status,
+      customerName:   order.customerFullName,
+      orderType:      order.orderType,
+      metalType:      order.metalType,
+      metalColor:     order.metalColor,
+      size:           order.size,
+      diamondQuality: order.diamondQuality,
+      centerStoneShape: order.centerStoneShape,
+      approximateCaratWeight: order.approximateCaratWeight,
+      customerNotes:  order.customerNotes,
+      createdAt:      order.createdAt,
+      updatedAt:      order.updatedAt,
+      trackingNumber: order.trackingNumber,
+      shipMethod:     order.shipMethod,
+      cadFiles: cadFiles.map(f => ({
+        id:             f.id,
+        status:         f.status,
+        originalName:   f.originalName,
+        fileName:       f.fileName,
+        designerNotes:  f.designerNotes,
+        customerFeedback: f.customerFeedback,
+        revisionNumber: f.revisionNumber,
+        createdAt:      f.createdAt,
+      })),
+    };
+  }
+
+  // ── Customer approves a CAD file ──────────────────────────────────────
+  async approveCad(token: string, cadId: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const cad = await this.cadRepo.findOne({ where: { id: cadId, orderId: order.id } });
+    if (!cad) throw new NotFoundException('CAD file not found');
+
+    cad.status     = CadFileStatus.APPROVED;
+    cad.approvedAt = new Date();
+    cad.approvedBy = order.customerEmail;
+    await this.cadRepo.save(cad);
+
+    order.customerEmailApproval = true;
+    await this.orderRepo.save(order);
+
+    // Notify team
+    const staff = await this.userRepo.find({
+      where: [{ role: UserRole.ADMIN }, { role: UserRole.AUTHORIZER }, { role: UserRole.CAD_DESIGNER }],
+    });
+    await Promise.all(staff.map(u =>
+      this.notifRepo.save(this.notifRepo.create({
+        type:         NotificationType.CAD_APPROVED,
+        title:        `Customer Approved CAD — ${order.poNumber}`,
+        message:      `${order.customerFullName} approved the CAD design.`,
+        orderId:      order.id,
+        targetUserId: u.id,
+      })),
+    ));
+
+    const staffEmails = staff.map(u => u.email).filter(Boolean);
+    if (staffEmails.length) {
+      this.emailService.sendCustomerApprovedCadToTeam({
+        to:           staffEmails,
+        poNumber:     order.poNumber,
+        customerName: order.customerFullName,
+        orderType:    order.orderType || 'Custom Order',
+        orderId:      order.id,
+      }).catch(err => this.logger.warn('CAD approved email failed:', err));
+    }
+
+    return { success: true, message: 'Design approved. Our team has been notified.' };
+  }
+
+  // ── Customer rejects a CAD file ───────────────────────────────────────
+  async rejectCad(token: string, cadId: string, feedback: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const cad = await this.cadRepo.findOne({ where: { id: cadId, orderId: order.id } });
+    if (!cad) throw new NotFoundException('CAD file not found');
+
+    cad.status           = CadFileStatus.REVISION_REQUESTED;
+    cad.customerFeedback = feedback || 'Customer requested changes.';
+    await this.cadRepo.save(cad);
+
+    // Notify CAD designers + admins
+    const staff = await this.userRepo.find({
+      where: [{ role: UserRole.ADMIN }, { role: UserRole.CAD_DESIGNER }],
+    });
+    await Promise.all(staff.map(u =>
+      this.notifRepo.save(this.notifRepo.create({
+        type:         NotificationType.CAD_REJECTED,
+        title:        `CAD Revision Requested — ${order.poNumber}`,
+        message:      `${order.customerFullName} requested changes: "${cad.customerFeedback}"`,
+        orderId:      order.id,
+        targetUserId: u.id,
+      })),
+    ));
+
+    const staffEmails = staff.map(u => u.email).filter(Boolean);
+    if (staffEmails.length) {
+      this.emailService.sendCadRevisionAlert({
+        to:           staffEmails,
+        poNumber:     order.poNumber,
+        customerName: order.customerFullName,
+        orderType:    order.orderType || 'Custom Order',
+        orderId:      order.id,
+      }).catch(err => this.logger.warn('CAD revision email failed:', err));
+    }
+
+    return { success: true, message: 'Revision requested. Our design team will update the CAD shortly.' };
   }
 }

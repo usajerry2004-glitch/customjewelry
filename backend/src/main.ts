@@ -10,8 +10,12 @@ async function bootstrap() {
 
   // Security
   app.use(helmet());
+  const allowedOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: process.env.FRONTEND_URL || true,
+    origin: allowedOrigins.length ? allowedOrigins : true,
     credentials: true,
   });
 

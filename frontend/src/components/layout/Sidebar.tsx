@@ -12,10 +12,10 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◈', label: 'Dashboard',      path: '/dashboard',       roles: Object.values(UserRole) as UserRole[] },
   { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[] },
   { icon: '⊞', label: 'Pipeline Board', path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
-  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER] },
+  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER] },
   { icon: '◈', label: 'SKU Management', path: '/sku',             roles: [UserRole.ADMIN, UserRole.SKU_MANAGER] },
   { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER] },
-  { icon: '▷', label: 'Shipping',       path: '/shipping',        roles: [UserRole.ADMIN, UserRole.SHIPPING_MANAGER] },
+  { icon: '💎', label: 'Stone',         path: '/stone',           roles: [UserRole.ADMIN, UserRole.STONE_MANAGER] },
   { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER] },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
@@ -45,11 +45,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
           width: '220px',
           height: '100vh',
           overflowY: 'auto',
-          background: 'var(--sidebar-bg)',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(180deg, #0D1E3A 0%, #0A1628 60%, #081220 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+          borderTop: '2px solid #C09B58',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
+          boxShadow: '4px 0 24px rgba(0,0,0,0.18)',
         }}
       >
         {/* Logo */}

@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Order, OrderStatus, StoneStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
+import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { EmailService } from '../email/email.service';
 
 export class OrderFilterDto {
@@ -18,7 +20,19 @@ export class OrderFilterDto {
   @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
 }
 
-const CAD_STATUSES = [OrderStatus.CAD_IN_PROGRESS];
+const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
+
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
+  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.SKU_CREATION],
+  [OrderStatus.SKU_CREATION]:    [OrderStatus.VPO_ISSUED],
+  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED],
+  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR],
+  [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED],
+  [OrderStatus.SHIPPED]:         [OrderStatus.COMPLETED],
+  [OrderStatus.COMPLETED]:       [],
+  [OrderStatus.CANCELLED]:       [],
+};
 
 @Injectable()
 export class OrdersService {
@@ -28,6 +42,7 @@ export class OrdersService {
     @InjectRepository(Order)        private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
+    @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     private readonly emailService: EmailService,
   ) {}
 
@@ -86,11 +101,7 @@ export class OrdersService {
       });
     } else if (user?.role === 'FACTORY_MANAGER') {
       qb.andWhere('order.status IN (:...factoryStatuses)', {
-        factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR],
-      });
-    } else if (user?.role === 'SHIPPING_MANAGER') {
-      qb.andWhere('order.status IN (:...shippingStatuses)', {
-        shippingStatuses: [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
+        factoryStatuses: [OrderStatus.VPO_ISSUED],
       });
     } else if (user?.role === 'STONE_MANAGER') {
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
@@ -100,7 +111,7 @@ export class OrdersService {
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
     if (filters.search) {
       qb.andWhere(
-        '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s)',
+        '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s OR order.customerFullName LIKE :s OR order.customerEmail LIKE :s)',
         { s: `%${filters.search}%` },
       );
     }
@@ -140,37 +151,35 @@ export class OrdersService {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    const SHIPPING_STATUSES = [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED];
-    if (user?.role === 'SHIPPING_MANAGER' && !SHIPPING_STATUSES.includes(order.status)) {
-      throw new NotFoundException(`Order ${id} not found`);
-    }
-
     return order;
   }
 
   private async generatePoNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const prefix = `KJ-${year}-`;
-    // Find highest existing sequence for this year
-    const latest = await this.orderRepo
+    // Find the highest CO##### number across both storage formats:
+    //   new: "CO10613"
+    //   old embedded: "KJ-2026-XXXX (CO10479)"
+    const rows = await this.orderRepo
       .createQueryBuilder('o')
-      .where('o.poNumber LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('o.poNumber', 'DESC')
-      .getOne();
-    let seq = 1;
-    if (latest) {
-      const parts = latest.poNumber.split('-');
-      const last = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(last)) seq = last + 1;
+      .select('o.poNumber')
+      .where("o.poNumber LIKE 'CO%' OR o.poNumber LIKE '%(CO%'")
+      .getMany();
+    let maxSeq = 10612; // floor = current Smartsheet max; next will be CO10613
+    for (const row of rows) {
+      const po = row.poNumber;
+      const m1 = po.match(/^CO(\d+)$/);
+      if (m1) maxSeq = Math.max(maxSeq, parseInt(m1[1], 10));
+      const m2 = po.match(/\(CO(\d+)\)/);
+      if (m2) maxSeq = Math.max(maxSeq, parseInt(m2[1], 10));
     }
-    return `${prefix}${String(seq).padStart(4, '0')}`;
+    return `CO${String(maxSeq + 1).padStart(5, '0')}`;
   }
 
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
     const data: Partial<Order> = { ...dto };
 
-    // Always auto-generate PO number — ignore any client-supplied value
-    data.poNumber = await this.generatePoNumber();
+    // Always auto-generate PO number and tracking token — ignore any client-supplied values
+    data.poNumber      = await this.generatePoNumber();
+    data.trackingToken = randomBytes(32).toString('hex');
 
     // Store creator's full name from the JWT
     if (user) {
@@ -202,35 +211,47 @@ export class OrdersService {
       if (customer?.isPriority) data.isPriorityCustomer = true;
     }
 
-    // Orders start directly in CAD_IN_PROGRESS — no authorization step needed
-    if (!data.status) data.status = OrderStatus.CAD_IN_PROGRESS;
+    // New orders start in NEW status — auth/admin reviews and moves to CAD_IN_PROGRESS
+    if (!data.status) data.status = OrderStatus.NEW;
 
     const order = this.orderRepo.create(data);
     const saved = await this.orderRepo.save(order);
 
-    // Email customer: order received
+    // Email customer: order received (with magic tracking link)
     const customerEmail = saved.customerEmail || (user?.role === 'CUSTOMER' ? user.email : null);
     if (customerEmail) {
       await this.emailService.sendOrderPlaced({
-        to: customerEmail,
-        poNumber: saved.poNumber,
-        customerName: saved.customerFullName || saved.storeName || 'Valued Customer',
-        orderType: saved.orderType || '—',
-        orderId: saved.id,
+        to:             customerEmail,
+        poNumber:       saved.poNumber,
+        customerName:   saved.customerFullName || saved.storeName || 'Valued Customer',
+        orderType:      saved.orderType || '—',
+        orderId:        saved.id,
+        trackingToken:  saved.trackingToken,
       });
     }
 
-    // Notify CAD designers: new order ready for CAD work
-    const cadDesigners = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER]) } });
-    await Promise.all(cadDesigners.map(u =>
+    // Notify authorizers/admins: new order received — they review before assigning CAD
+    const authTeam = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
+    const authEmails = authTeam.map(u => u.email).filter(Boolean);
+    await Promise.all(authTeam.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type: NotificationType.ORDER_CREATED,
-        title: `New Order — ${saved.poNumber}`,
-        message: `A new order ${saved.poNumber} is ready for CAD design.`,
+        title: `New Order Received — ${saved.poNumber}`,
+        message: `A new order ${saved.poNumber} has been placed and is awaiting your review.`,
         orderId: saved.id,
         targetUserId: u.id,
       })),
     ));
+    if (authEmails.length) {
+      await this.emailService.sendNewOrderToAuthorizers({
+        to: authEmails,
+        poNumber: saved.poNumber,
+        customerName: saved.customerFullName || saved.storeName || 'Valued Customer',
+        orderType: saved.orderType || '—',
+        storeName: saved.storeName || '',
+        orderId: saved.id,
+      });
+    }
 
     return saved;
   }
@@ -240,34 +261,33 @@ export class OrdersService {
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
 
-    // When quoted price is saved on a CAD-approved order → auto-move to SKU_CREATION
+    // When quoted price is saved on CAD_IN_PROGRESS order (not yet sent/approved) → auto-send to customer
     if (dto.quotedCost && Number(dto.quotedCost) > 0
         && saved.status === OrderStatus.CAD_IN_PROGRESS
-        && saved.customerEmailApproval === true) {
-      saved.status = OrderStatus.SKU_CREATION;
-      const skuOrder = await this.orderRepo.save(saved);
-      if (skuOrder.customerEmail) {
-        await this.emailService.sendOrderInProduction({
-          to: skuOrder.customerEmail,
-          poNumber: skuOrder.poNumber,
-          customerName: skuOrder.customerFullName || skuOrder.storeName || 'Valued Customer',
-          orderType: skuOrder.orderType || '—',
-          quotedCost: Number(skuOrder.quotedCost),
-          orderId: skuOrder.id,
-        });
+        && saved.customerEmailApproval !== true
+        && !saved.sentToCustomer) {
+      const allCads = await this.cadRepo.find({ where: { orderId: id } });
+      const uploadedDesignFiles = allCads.filter(
+        c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image'
+          && (c.status === CadFileStatus.UPLOADED || c.status === CadFileStatus.SENT_FOR_APPROVAL),
+      );
+      if (uploadedDesignFiles.length > 0) {
+        await this.orderRepo.update(id, { sentToCustomer: true });
+        // Only UPLOADED ones need a status bump; SENT_FOR_APPROVAL already correct
+        for (const cad of uploadedDesignFiles.filter(c => c.status === CadFileStatus.UPLOADED)) {
+          await this.cadRepo.update(cad.id, { status: CadFileStatus.SENT_FOR_APPROVAL });
+        }
+        if (saved.customerEmail) {
+          await this.emailService.sendCadReadyForApproval({
+            to:            saved.customerEmail,
+            poNumber:      saved.poNumber,
+            customerName:  saved.customerFullName || saved.storeName || 'Valued Customer',
+            orderType:     saved.orderType || '—',
+            orderId:       saved.id,
+            trackingToken: saved.trackingToken,
+          });
+        }
       }
-      // Notify SKU team
-      const skuUsers = await this.userRepo.find({ where: { role: In([UserRole.SKU_MANAGER]) } });
-      await Promise.all(skuUsers.map(u =>
-        this.notifRepo.save(this.notifRepo.create({
-          type: NotificationType.STATUS_CHANGED,
-          title: `SKU Creation — ${skuOrder.poNumber}`,
-          message: `Order ${skuOrder.poNumber} is ready for SKU generation.`,
-          orderId: skuOrder.id,
-          targetUserId: u.id,
-        })),
-      ));
-      return skuOrder;
     }
 
     return saved;
@@ -284,9 +304,19 @@ export class OrdersService {
       throw new ForbiddenException('Not authorized to change order status directly');
     }
 
-    // Manual cancellation by admin/authorizer → deactivate
+    // Manual cancellation by admin/authorizer → deactivate (allowed from any active status)
     if (status === OrderStatus.CANCELLED) {
       return this.update(id, { status: OrderStatus.CANCELLED, isArchived: true }, user);
+    }
+
+    // ── Status transition guard — prevent stage-skipping ─────────────────
+    const existing = await this.findOne(id);
+    const allowed = ALLOWED_TRANSITIONS[existing.status];
+    if (!allowed || !allowed.includes(status)) {
+      throw new BadRequestException(
+        `Cannot transition from ${existing.status} to ${status}. ` +
+        `Allowed next steps: ${allowed?.length ? allowed.join(', ') : 'none (order is in a terminal state)'}`,
+      );
     }
 
     // Require quoted price before moving to SKU Creation
@@ -319,11 +349,11 @@ export class OrdersService {
       return this.update(id, { status: OrderStatus.REPAIR, repairContractor: repairContractor.trim() }, user);
     }
 
-    // Factory Manager cannot move VPO_ISSUED orders until stone is received
-    if (user?.role === 'FACTORY_MANAGER' && [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP].includes(status)) {
+    // Factory Manager: moving VPO_ISSUED → MANUFACTURED requires stone received
+    if (user?.role === 'FACTORY_MANAGER' && status === OrderStatus.MANUFACTURED) {
       const currentOrder = await this.findOne(id);
-      if (currentOrder.status === OrderStatus.VPO_ISSUED && currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
-        throw new BadRequestException('Stone must be received before changing this order status');
+      if (currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+        throw new BadRequestException('Stone must be received before marking order as manufactured');
       }
     }
 
@@ -331,24 +361,56 @@ export class OrdersService {
     if (quotedCost) patch.quotedCost = quotedCost;
     const updated = await this.update(id, patch, user);
 
-    // READY_TO_SHIP — email customer + authorizers
-    if (status === OrderStatus.READY_TO_SHIP) {
-      if (updated.customerEmail) {
-        await this.emailService.sendOrderReady({
-          to: updated.customerEmail,
+    // NEW → CAD_IN_PROGRESS: notify CAD designers
+    if (status === OrderStatus.CAD_IN_PROGRESS) {
+      const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER, UserRole.ADMIN]) } });
+      const cadEmails = cadUsers.filter(u => u.role === UserRole.CAD_DESIGNER).map(u => u.email).filter(Boolean);
+      await Promise.all(cadUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.ORDER_CREATED,
+          title: `New CAD Job — ${updated.poNumber}`,
+          message: `Order ${updated.poNumber} is ready for CAD design.`,
+          orderId: updated.id,
+          targetUserId: u.id,
+        })),
+      ));
+      if (cadEmails.length) {
+        await this.emailService.sendPendingCadToDesigners({
+          to: cadEmails,
           poNumber: updated.poNumber,
           customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
           orderType: updated.orderType || '—',
           orderId: updated.id,
         });
       }
-      // In-portal notification for authorizers (no email)
+    }
+
+    // SKU_CREATION → VPO_ISSUED: notify Factory Manager and Stone Manager simultaneously
+    if (status === OrderStatus.VPO_ISSUED) {
+      const vpoUsers = await this.userRepo.find({
+        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]) },
+      });
+      await Promise.all(vpoUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `VPO Issued — ${updated.poNumber}`,
+          message: u.role === UserRole.STONE_MANAGER
+            ? `Order ${updated.poNumber} is ready — please arrange stones.`
+            : `Order ${updated.poNumber} has been issued to the factory for manufacturing.`,
+          orderId: updated.id,
+          targetUserId: u.id,
+        })),
+      ));
+    }
+
+    // MANUFACTURED — notify authorizers/admins (US team to receive)
+    if (status === OrderStatus.MANUFACTURED) {
       const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER, UserRole.ADMIN]) } });
       await Promise.all(teamUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
-          title: `Ready to Ship — ${updated.poNumber}`,
-          message: `Order ${updated.poNumber} is ready to ship.`,
+          title: `Manufactured — ${updated.poNumber}`,
+          message: `Order ${updated.poNumber} has been manufactured and is en route to the US office.`,
           orderId: updated.id,
           targetUserId: u.id,
         })),
@@ -424,10 +486,9 @@ export class OrdersService {
     // Base query scoped to what this role is responsible for
     const ROLE_STATUSES: Partial<Record<string, OrderStatus[]>> = {
       [UserRole.CAD_DESIGNER]:    [OrderStatus.CAD_IN_PROGRESS],
-      [UserRole.AUTHORIZER]:      [OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
+      [UserRole.AUTHORIZER]:      [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.SHIPPED],
       [UserRole.SKU_MANAGER]:     [OrderStatus.SKU_CREATION],
-      [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED, OrderStatus.PENDING_CONTRACTOR],
-      [UserRole.SHIPPING_MANAGER]:[OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED],
+      [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED],
       [UserRole.STONE_MANAGER]:   [OrderStatus.VPO_ISSUED],
     };
 
@@ -521,7 +582,7 @@ export class OrdersService {
     }
 
     if ([UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Factory: in VPO_ISSUED > 4 days or PENDING_CONTRACTOR > 21 days
+      // Factory: in VPO_ISSUED > 4 days
       const factoryOverdue = await qb()
         .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
         .andWhere('o."updatedAt" < :d', { d: daysAgo(4) })
@@ -529,26 +590,6 @@ export class OrdersService {
       factoryOverdue.forEach(o => {
         if (!results.find(r => r.id === o.id))
           results.push({ ...o, priorityReason: 'In VPO stage — over 4 days', priorityLevel: 'MEDIUM' });
-      });
-      const contractorOverdue = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.PENDING_CONTRACTOR })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(2) })
-        .getMany();
-      contractorOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'With contractor — over 2 days', priorityLevel: 'HIGH' });
-      });
-    }
-
-    if ([UserRole.SHIPPING_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Shipping: in READY_TO_SHIP > 1 day
-      const shipOverdue = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.READY_TO_SHIP })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      shipOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Ready to ship — over 1 day', priorityLevel: 'MEDIUM' });
       });
     }
 
@@ -576,17 +617,7 @@ export class OrdersService {
 
   async getForFactory() {
     return this.orderRepo.find({
-      where: [
-        { status: OrderStatus.VPO_ISSUED },
-        { status: OrderStatus.PENDING_CONTRACTOR },
-      ],
-      order: { updatedAt: 'ASC' },
-    });
-  }
-
-  async getForShipping() {
-    return this.orderRepo.find({
-      where: { status: OrderStatus.READY_TO_SHIP },
+      where: { status: OrderStatus.VPO_ISSUED },
       order: { updatedAt: 'ASC' },
     });
   }
@@ -607,13 +638,9 @@ export class OrdersService {
           }
         } else if (user?.role === 'FACTORY_MANAGER') {
           qb.andWhere('o.kiraSkuNumber IS NOT NULL');
-        } else if (user?.role === 'SHIPPING_MANAGER') {
-          if (![OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED].includes(status as OrderStatus)) {
-            return { status, orders: [], count: 0 };
-          }
         }
 
-        const [orders, count] = await qb.orderBy('o.updatedAt', 'DESC').take(15).getManyAndCount();
+        const [orders, count] = await qb.orderBy('o.updatedAt', 'DESC').take(500).getManyAndCount();
         return { status, orders, count };
       }),
     );

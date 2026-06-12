@@ -1,10 +1,301 @@
+import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-import { ComingSoon } from '../components/shared/ComingSoon';
+import { apiFetch, API } from '../utils/apiFetch';
+import { UserRole } from '../utils/types';
+
+export async function getServerSideProps() { return { props: {} }; }
+
+interface StaffUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+}
+
+const STAFF_ROLES = [
+  UserRole.SALES_REP,
+  UserRole.AUTHORIZER,
+  UserRole.CAD_DESIGNER,
+  UserRole.SKU_MANAGER,
+  UserRole.FACTORY_MANAGER,
+  UserRole.STONE_MANAGER,
+  UserRole.ADMIN,
+];
+
+const ROLE_LABELS: Record<string, string> = {
+  [UserRole.ADMIN]:           'Admin',
+  [UserRole.SALES_REP]:       'Sales Rep',
+  [UserRole.AUTHORIZER]:      'Authorizer',
+  [UserRole.CAD_DESIGNER]:    'CAD Designer',
+  [UserRole.SKU_MANAGER]:     'SKU Manager',
+  [UserRole.FACTORY_MANAGER]: 'Factory Manager',
+  [UserRole.STONE_MANAGER]:   'Stone Manager',
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  [UserRole.ADMIN]:           '#DC2626',
+  [UserRole.SALES_REP]:       '#2563EB',
+  [UserRole.AUTHORIZER]:      '#7C3AED',
+  [UserRole.CAD_DESIGNER]:    '#0891B2',
+  [UserRole.SKU_MANAGER]:     '#059669',
+  [UserRole.FACTORY_MANAGER]: '#D97706',
+  [UserRole.STONE_MANAGER]:   '#9333EA',
+};
+
+const card: React.CSSProperties = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  boxShadow: 'var(--shadow-sm)',
+};
+
+const inp: React.CSSProperties = {
+  background: 'var(--bg-input)',
+  border: '1px solid var(--border)',
+  borderRadius: '7px',
+  padding: '8px 10px',
+  color: 'var(--text-primary)',
+  fontSize: '13px',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
+const emptyForm = { firstName: '', lastName: '', email: '', role: UserRole.SALES_REP };
 
 export default function SettingsPage() {
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [successEmail, setSuccessEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const reload = async () => {
+    setLoading(true);
+    const res = await apiFetch(`${API}/users`);
+    if (res.ok) {
+      const all: StaffUser[] = await res.json();
+      setStaff(all.filter(u => u.role !== UserRole.CUSTOMER));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    reload();
+    try { const u = localStorage.getItem('jf_user'); if (u) setCurrentUserId(JSON.parse(u).id || null); } catch {}
+  }, []);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    const res = await apiFetch(`${API}/users/invite`, {
+      method: 'POST',
+      body: JSON.stringify(form),
+    });
+    if (res.ok) {
+      setSuccessEmail(form.email);
+      setForm(emptyForm);
+      setShowForm(false);
+      await reload();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data?.message || 'Failed to send invite. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  const handleRemove = async (u: StaffUser) => {
+    if (!confirm(`Remove ${u.firstName} ${u.lastName} (${u.email})? This cannot be undone.`)) return;
+    setRemovingId(u.id);
+    const res = await apiFetch(`${API}/users/${u.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      await reload();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data?.message || 'Failed to remove user.');
+    }
+    setRemovingId(null);
+  };
+
+  const activeCount  = staff.filter(u => u.isActive).length;
+  const pendingCount = staff.filter(u => !u.isActive).length;
+
   return (
-    <AppLayout title="Settings" subtitle="System configuration">
-      <ComingSoon icon="⚙️" title="System Settings" description="Configure roles, permissions, email notifications, integrations, and system-wide preferences." phase="Phase 3" />
+    <AppLayout title="Settings" subtitle="Team management & system configuration">
+
+      {/* Success banner */}
+      {successEmail && (
+        <div style={{ background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: '8px', padding: '12px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '13px', color: '#065F46', fontWeight: 500 }}>
+            ✓ Invite sent to <strong>{successEmail}</strong> — they'll receive their login credentials by email.
+          </span>
+          <button onClick={() => setSuccessEmail(null)} style={{ background: 'none', border: 'none', color: '#065F46', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>×</button>
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="dash-3col" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+        {[
+          { label: 'Total Staff',   value: staff.length,  color: '#1A2740' },
+          { label: 'Active',        value: activeCount,   color: '#059669' },
+          { label: 'Inactive',      value: pendingCount,  color: '#9CA3AF' },
+        ].map(k => (
+          <div key={k.label} style={{ ...card, padding: '18px 20px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>{k.label}</div>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '32px', fontWeight: 600, color: k.color, lineHeight: 1 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Team Members */}
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Team Members</h2>
+          <button
+            onClick={() => { setShowForm(f => !f); setError(null); setSuccessEmail(null); }}
+            style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {showForm ? 'Cancel' : '+ Invite Member'}
+          </button>
+        </div>
+
+        {/* Invite form */}
+        {showForm && (
+          <form onSubmit={handleInvite} style={{ padding: '20px 22px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>Invite a New Team Member</div>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>First Name</label>
+                <input
+                  required
+                  value={form.firstName}
+                  onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
+                  placeholder="Jane"
+                  style={inp}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Last Name</label>
+                <input
+                  required
+                  value={form.lastName}
+                  onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
+                  placeholder="Smith"
+                  style={inp}
+                />
+              </div>
+            </div>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Email Address</label>
+                <input
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="jane@kirajewels.one"
+                  style={inp}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Role</label>
+                <select
+                  value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                  style={{ ...inp, cursor: 'pointer' }}
+                >
+                  {STAFF_ROLES.map(r => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {error && (
+              <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '7px', padding: '10px 14px', fontSize: '12px', color: '#991B1B', marginBottom: '12px' }}>
+                {error}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '9px 22px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
+              >
+                {submitting ? 'Sending Invite…' : 'Send Invite'}
+              </button>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                A temporary password will be auto-generated and emailed to the new member.
+              </span>
+            </div>
+          </form>
+        )}
+
+        {/* Staff table */}
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+        ) : staff.length === 0 ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>No staff members found.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-input)' }}>
+                  {['Name', 'Email', 'Role', 'Status', 'Added', ''].map(h => (
+                    <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((u, i) => (
+                  <tr key={u.id} style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <td style={{ padding: '12px 18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${ROLE_COLORS[u.role] || '#6B7280'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: ROLE_COLORS[u.role] || '#6B7280', flexShrink: 0 }}>
+                          {u.firstName[0]}{u.lastName[0]}
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{u.firstName} {u.lastName}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>{u.email}</td>
+                    <td style={{ padding: '12px 18px' }}>
+                      <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
+                        {ROLE_LABELS[u.role] || u.role}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 18px' }}>
+                      <span style={{ background: u.isActive ? '#D1FAE5' : '#F3F4F6', color: u.isActive ? '#065F46' : '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 18px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                      {u.id !== currentUserId && (
+                        <button
+                          onClick={() => handleRemove(u)}
+                          disabled={removingId === u.id}
+                          style={{ background: 'none', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '4px 12px', color: '#DC2626', fontSize: '11px', fontWeight: 600, cursor: removingId === u.id ? 'not-allowed' : 'pointer', opacity: removingId === u.id ? 0.5 : 1 }}
+                        >
+                          {removingId === u.id ? 'Removing…' : 'Remove'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </AppLayout>
   );
 }

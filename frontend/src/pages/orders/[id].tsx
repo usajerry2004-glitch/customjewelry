@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, UserRole } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
+
+const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 
 // ── CAD types ────────────────────────────────────────────────────────────
 interface CadFile {
@@ -24,20 +27,31 @@ const CAD_STATUS_CFG: Record<string, { label: string; color: string; bg: string 
 // Roles allowed to take approve/reject/revision actions
 const CAD_ACTION_ROLES = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SALES_REP];
 
-// ── CAD Viewer Modal ──────────────────────────────────────────────────────
+// ── CAD Inline Viewer ─────────────────────────────────────────────────────
 interface ViewerProps {
-  cad: CadFile; userRole: string; batchCount?: number;
+  cad: CadFile;
+  cads?: CadFile[];      // full list for prev/next navigation
+  initialIndex?: number; // starting position in the list
+  userRole: string; batchCount?: number;
   onClose: () => void;
   onAction: (cadId: string, action: 'approve' | 'reject' | 'revision', feedback: string) => Promise<void>;
 }
 
-function CadViewerModal({ cad, userRole, batchCount = 1, onClose, onAction }: ViewerProps) {
+function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRole, batchCount = 1, onClose, onAction }: ViewerProps) {
+  const [idx, setIdx] = useState(initialIndex);
   const [feedback, setFeedback] = useState('');
   const [acting, setActing] = useState(false);
+
+  const list = cads.length > 0 ? cads : [initialCad];
+  const cad = list[idx] ?? initialCad;
+  const hasPrev = idx > 0;
+  const hasNext = idx < list.length - 1;
+
   const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
   const isPdf   = ext === 'pdf';
   const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext);
+  const isJcd   = ext === 'jcd';
   const fileUrl = `/uploads/cad/${cad.fileName}`;
   const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
   const canAct  = CAD_ACTION_ROLES.includes(userRole as UserRole) && cad.status !== 'APPROVED';
@@ -49,162 +63,197 @@ function CadViewerModal({ cad, userRole, batchCount = 1, onClose, onAction }: Vi
     onClose();
   };
 
-  // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'ArrowLeft'  && hasPrev) setIdx(i => i - 1);
+      if (e.key === 'ArrowRight' && hasNext) setIdx(i => i + 1);
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, hasPrev, hasNext]);
 
   return (
-    <div
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px',
-      }}
-    >
+    <div style={{
+      background: 'var(--bg-card)',
+      borderRadius: 'var(--radius-lg)',
+      border: `1px solid ${cs.color}50`,
+      boxShadow: `0 0 0 3px ${cs.color}18, 0 4px 24px rgba(0,0,0,0.12)`,
+      overflow: 'hidden',
+    }}>
+      {/* ── Header ── */}
       <div style={{
-        background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-        width: '100%', maxWidth: '900px', maxHeight: '92vh',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 18px', borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-input)', flexShrink: 0,
       }}>
-
-        {/* ── Header ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-input)', flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : '📎'}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {cad.originalName}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>·</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {new Date(cad.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>·</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>by {cad.uploadedBy}</span>
-              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <span style={{ fontSize: '18px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : isJcd ? '💎' : ext === '3dm' ? '🧊' : '📎'}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {cad.originalName}
             </div>
-            <span style={{ fontSize: '11px', background: cs.bg, color: cs.color, padding: '3px 10px', borderRadius: '99px', fontWeight: 700, flexShrink: 0 }}>
-              {cs.label}
-            </span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>·</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {new Date(cad.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>·</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>by {cad.uploadedBy}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+          <span style={{ fontSize: '11px', background: cs.bg, color: cs.color, padding: '3px 10px', borderRadius: '99px', fontWeight: 700, flexShrink: 0 }}>
+            {cs.label}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px', alignItems: 'center' }}>
+          {list.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px 6px' }}>
+              <button
+                onClick={() => setIdx(i => i - 1)} disabled={!hasPrev}
+                style={{ background: 'none', border: 'none', cursor: hasPrev ? 'pointer' : 'default', fontSize: '14px', opacity: hasPrev ? 1 : 0.3, padding: '2px 5px', lineHeight: 1, color: 'var(--text-primary)' }}
+              >
+                ‹
+              </button>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, minWidth: '34px', textAlign: 'center' }}>
+                {idx + 1} / {list.length}
+              </span>
+              <button
+                onClick={() => setIdx(i => i + 1)} disabled={!hasNext}
+                style={{ background: 'none', border: 'none', cursor: hasNext ? 'pointer' : 'default', fontSize: '14px', opacity: hasNext ? 1 : 0.3, padding: '2px 5px', lineHeight: 1, color: 'var(--text-primary)' }}
+              >
+                ›
+              </button>
+            </div>
+          )}
+          {!(ext === '3dm' && userRole === UserRole.CUSTOMER) && (
             <a
               href={fileUrl} download={cad.originalName}
-              style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
+              style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
               ↓ Download
             </a>
-            <button
-              onClick={onClose}
-              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 12px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 1 }}
-            >
-              ✕
-            </button>
+          )}
+          {ext === '3dm' && userRole === UserRole.CUSTOMER && (
+            <span style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 600 }}>
+              View Only
+            </span>
+          )}
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 1 }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* ── File Preview ── */}
+      <div style={{ background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px', maxHeight: '480px', overflow: 'auto' }}>
+        {isImage ? (
+          <img
+            src={fileUrl} alt={cad.originalName}
+            style={{ maxWidth: '100%', maxHeight: '460px', objectFit: 'contain', display: 'block' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : isPdf ? (
+          <iframe
+            src={`${fileUrl}#toolbar=1&navpanes=0`}
+            style={{ width: '100%', height: '460px', border: 'none' }}
+            title={cad.originalName}
+          />
+        ) : isVideo ? (
+          <video
+            src={fileUrl} controls
+            style={{ maxWidth: '100%', maxHeight: '460px', display: 'block' }}
+          />
+        ) : ext === '3dm' ? (
+          <ThreeDmViewer fileUrl={fileUrl} height={460} />
+        ) : isJcd ? (
+          <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '10px' }}>💎</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: '6px' }}>
+              JewelCAD Design File
+            </div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', marginBottom: '22px', lineHeight: 1.6, maxWidth: '280px', margin: '0 auto 22px' }}>
+              .jcd files require JewelCAD software to view.<br/>Download to open in JewelCAD or Matrix.
+            </div>
+            <a href={fileUrl} download={cad.originalName}
+              style={{ background: '#c09b58', color: '#fff', padding: '9px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              ↓ Download JCD File
+            </a>
           </div>
-        </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+            <div style={{ fontSize: '56px', marginBottom: '14px', opacity: 0.5 }}>📎</div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '18px' }}>
+              Preview not available for .{ext} files
+            </div>
+            <a href={fileUrl} download={cad.originalName}
+              style={{ background: 'var(--accent)', color: '#fff', padding: '9px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
+              ↓ Download File
+            </a>
+          </div>
+        )}
+      </div>
 
-        {/* ── File Preview ── */}
-        <div style={{ flex: 1, overflow: 'auto', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-          {isImage ? (
-            <img
-              src={fileUrl} alt={cad.originalName}
-              style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', display: 'block' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : isPdf ? (
-            <iframe
-              src={`${fileUrl}#toolbar=1&navpanes=0`}
-              style={{ width: '100%', height: '60vh', border: 'none' }}
-              title={cad.originalName}
-            />
-          ) : isVideo ? (
-            <video
-              src={fileUrl} controls
-              style={{ maxWidth: '100%', maxHeight: '60vh', display: 'block' }}
-            />
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>📎</div>
-              <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', marginBottom: '20px' }}>
-                Preview not available for .{ext} files
+      {/* ── Notes + Actions ── */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-card)' }}>
+        {(cad.designerNotes || cad.customerFeedback) && (
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            {cad.designerNotes && (
+              <div style={{ flex: 1, minWidth: '200px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Designer Note</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.designerNotes}</div>
               </div>
-              <a href={fileUrl} download={cad.originalName}
-                style={{ background: 'var(--accent)', color: '#fff', padding: '10px 24px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
-                ↓ Download File
-              </a>
-            </div>
-          )}
-        </div>
-
-        {/* ── Notes + Actions ── */}
-        <div style={{ borderTop: '1px solid var(--border)', padding: '16px 20px', flexShrink: 0, background: 'var(--bg-card)' }}>
-          {(cad.designerNotes || cad.customerFeedback) && (
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              {cad.designerNotes && (
-                <div style={{ flex: 1, minWidth: '200px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Designer Note</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.designerNotes}</div>
-                </div>
-              )}
-              {cad.customerFeedback && (
-                <div style={{ flex: 1, minWidth: '200px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Customer Feedback</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.customerFeedback}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canAct && (
-            <>
-              <textarea
-                value={feedback}
-                onChange={e => setFeedback(e.target.value)}
-                placeholder="Add feedback or revision notes (optional)…"
-                rows={2}
-                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box', marginBottom: '10px' }}
-              />
-              {batchCount > 1 && (
-                <div style={{ fontSize: '11px', color: '#F59E0B', marginBottom: '8px', fontWeight: 600 }}>
-                  ⚠ Action applies to all {batchCount} files uploaded together
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button onClick={() => act('approve')} disabled={acting}
-                  style={{ flex: 1, minWidth: '120px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', padding: '10px', color: '#059669', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ✓ Approve{batchCount > 1 ? ' All' : ''}
-                </button>
-                <button onClick={() => act('revision')} disabled={acting}
-                  style={{ flex: 1, minWidth: '140px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '8px', padding: '10px', color: '#8B5CF6', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ↺ Request Changes{batchCount > 1 ? ' (All)' : ''}
-                </button>
-                <button onClick={() => act('reject')} disabled={acting}
-                  style={{ flex: 1, minWidth: '100px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '10px', color: '#DC2626', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
-                  ✕ Reject{batchCount > 1 ? ' All' : ''}
-                </button>
+            )}
+            {cad.customerFeedback && (
+              <div style={{ flex: 1, minWidth: '200px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px', padding: '10px 14px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Customer Feedback</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{cad.customerFeedback}</div>
               </div>
-            </>
-          )}
-          {!canAct && cad.status === 'APPROVED' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10B981', fontSize: '13px', fontWeight: 600 }}>
-              <span style={{ fontSize: '18px' }}>✓</span>
-              Approved{cad.approvedBy ? ` by ${cad.approvedBy}` : ''}
-              {cad.approvedAt ? ` on ${new Date(cad.approvedAt).toLocaleDateString()}` : ''}
+            )}
+          </div>
+        )}
+
+        {canAct && (
+          <>
+            <textarea
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="Add feedback or revision notes (optional)…"
+              rows={2}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 12px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box', marginBottom: '10px' }}
+            />
+            {batchCount > 1 && (
+              <div style={{ fontSize: '11px', color: '#F59E0B', marginBottom: '8px', fontWeight: 600 }}>
+                ⚠ Action applies to all {batchCount} files uploaded together
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button onClick={() => act('approve')} disabled={acting}
+                style={{ flex: 1, minWidth: '120px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', padding: '10px', color: '#059669', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
+                ✓ Approve{batchCount > 1 ? ' All' : ''}
+              </button>
+              <button onClick={() => act('revision')} disabled={acting}
+                style={{ flex: 1, minWidth: '140px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '8px', padding: '10px', color: '#8B5CF6', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
+                ↺ Request Changes{batchCount > 1 ? ' (All)' : ''}
+              </button>
+              <button onClick={() => act('reject')} disabled={acting}
+                style={{ flex: 1, minWidth: '100px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '10px', color: '#DC2626', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: acting ? 0.6 : 1 }}>
+                ✕ Reject{batchCount > 1 ? ' All' : ''}
+              </button>
             </div>
-          )}
-        </div>
+          </>
+        )}
+        {!canAct && cad.status === 'APPROVED' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10B981', fontSize: '13px', fontWeight: 600 }}>
+            <span style={{ fontSize: '18px' }}>✓</span>
+            Approved{cad.approvedBy ? ` by ${cad.approvedBy}` : ''}
+            {cad.approvedAt ? ` on ${new Date(cad.approvedAt).toLocaleDateString()}` : ''}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -216,26 +265,26 @@ export async function getServerSideProps() {
 
 // Valid next statuses from each current status (workflow transitions)
 const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  [OrderStatus.CAD_IN_PROGRESS]:    [OrderStatus.CANCELLED],
-  [OrderStatus.SKU_CREATION]:       [OrderStatus.CANCELLED],
-  [OrderStatus.VPO_ISSUED]:         [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.CANCELLED],
-  [OrderStatus.PENDING_CONTRACTOR]: [OrderStatus.READY_TO_SHIP],
-  [OrderStatus.READY_TO_SHIP]:      [OrderStatus.SHIPPED],
-  [OrderStatus.SHIPPED]:            [OrderStatus.REPAIR, OrderStatus.COMPLETED],
-  [OrderStatus.REPAIR]:             [OrderStatus.COMPLETED],
+  [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED],
+  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.SKU_CREATION, OrderStatus.CANCELLED],
+  [OrderStatus.SKU_CREATION]:    [OrderStatus.VPO_ISSUED, OrderStatus.CANCELLED],
+  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CANCELLED],
+  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.CANCELLED],
+  [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  [OrderStatus.COMPLETED]:       [],
+  [OrderStatus.CANCELLED]:       [],
 };
 
 // Statuses each role is permitted to move an order into
 const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
-  [UserRole.ADMIN]:            Object.values(OrderStatus),
-  [UserRole.AUTHORIZER]:       [OrderStatus.CANCELLED, OrderStatus.REPAIR, OrderStatus.COMPLETED],
-  [UserRole.SALES_REP]:        [OrderStatus.CANCELLED],
-  [UserRole.CAD_DESIGNER]:     [],
-  [UserRole.SKU_MANAGER]:      [],
-  [UserRole.FACTORY_MANAGER]:  [OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP],
-  [UserRole.SHIPPING_MANAGER]: [OrderStatus.SHIPPED, OrderStatus.COMPLETED],
-  [UserRole.STONE_MANAGER]:    [],
-  [UserRole.CUSTOMER]:         [],
+  [UserRole.ADMIN]:           Object.values(OrderStatus),
+  [UserRole.AUTHORIZER]:      [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED, OrderStatus.REPAIR, OrderStatus.COMPLETED],
+  [UserRole.SALES_REP]:       [OrderStatus.CANCELLED],
+  [UserRole.CAD_DESIGNER]:    [],
+  [UserRole.SKU_MANAGER]:     [OrderStatus.VPO_ISSUED],
+  [UserRole.FACTORY_MANAGER]: [OrderStatus.MANUFACTURED],
+  [UserRole.STONE_MANAGER]:   [],
+  [UserRole.CUSTOMER]:        [],
 };
 
 const FIELD_GROUPS = [
@@ -274,8 +323,6 @@ const FIELD_GROUPS = [
     fields: [
       { key: 'quotedCost', label: 'Quoted Cost', format: (v: any) => v ? `$${Number(v).toLocaleString()}` : '—' },
       { key: 'vendorName', label: 'Vendor' },
-      { key: 'shipMethod', label: 'Ship Method' },
-      { key: 'trackingNumber', label: 'Tracking #' },
       { key: 'invoiceNumber', label: 'Invoice #' },
     ],
   },
@@ -301,8 +348,9 @@ export default function OrderDetail() {
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [cads, setCads] = useState<CadFile[]>([]);
   const [viewingCad, setViewingCad] = useState<CadFile | null>(null);
-  const [shippingForm, setShippingForm] = useState({ trackingNumber: '', courierName: '', shippingNotes: '' });
-  const [savingShipping, setSavingShipping] = useState(false);
+  const [viewingCadList, setViewingCadList] = useState<CadFile[]>([]);
+  const [viewingRef, setViewingRef] = useState<CadFile | null>(null);
+  const [viewingRefList, setViewingRefList] = useState<CadFile[]>([]);
   const refSectionRef = useRef<HTMLDivElement>(null);
   const [priceModal, setPriceModal] = useState(false);
   const [pendingPrice, setPendingPrice] = useState('');
@@ -310,6 +358,7 @@ export default function OrderDetail() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
+  const [sendingToCustomer, setSendingToCustomer] = useState(false);
 
   useEffect(() => {
     try {
@@ -320,24 +369,41 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (!id) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    setCads([]);
     setLoading(true);
-    Promise.all([
-      apiFetch(`${API}/orders/${id}`),
-      apiFetch(`${API}/cad/order/${id}`),
-    ]).then(async ([oRes, cRes]) => {
-      if (oRes.ok) {
-        const o = await oRes.json();
-        setOrder(o);
-        setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
-        setShippingForm({
-          trackingNumber: o.trackingNumber || '',
-          courierName: (o as any).courierName || '',
-          shippingNotes: (o as any).shippingNotes || '',
-        });
-      }
-      if (cRes.ok) setCads(await cRes.json());
-      setLoading(false);
+
+    const fetchOrder = apiFetch(`${API}/orders/${id}`, { signal })
+      .then(async (oRes) => {
+        if (signal.aborted) return;
+        if (oRes.ok) {
+          const o = await oRes.json();
+          setOrder(o);
+          setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
+        }
+      })
+      .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
+
+    const fetchCads = apiFetch(`${API}/cad/order/${id}`, { signal })
+      .then(async (cRes) => {
+        if (signal.aborted) return;
+        if (cRes.ok) {
+          setCads(await cRes.json());
+        } else {
+          console.error(`CAD files fetch failed: ${cRes.status} ${cRes.statusText} for order ${id}`);
+        }
+      })
+      .catch((e) => { if (!signal.aborted) console.error('CAD files fetch error:', e); });
+
+    Promise.all([fetchOrder, fetchCads]).finally(() => {
+      if (!signal.aborted) setLoading(false);
     });
+
+    return () => {
+      controller.abort();
+    };
   }, [id]);
 
   const handleCadAction = async (cadId: string, action: 'approve' | 'reject' | 'revision', feedback: string) => {
@@ -411,8 +477,11 @@ export default function OrderDetail() {
       method: 'PUT',
       body: JSON.stringify({ quotedCost: price }),
     });
+    if (res.ok && order.status === 'CAD_IN_PROGRESS' && !order.sentToCustomer) {
+      // Auto-send CAD files to customer — moves label from Awaiting Quote → Awaiting Approval
+      await apiFetch(`${API}/cad/order/${order.id}/send-to-customer`, { method: 'PATCH' });
+    }
     if (res.ok) {
-      // Reload order — if CAD was approved, backend auto-moves to SKU_CREATION
       const fresh = await apiFetch(`${API}/orders/${order.id}`);
       if (fresh.ok) setOrder(await fresh.json());
     }
@@ -430,6 +499,17 @@ export default function OrderDetail() {
     if (!repairContractorInput.trim()) return;
     setRepairModal(false);
     await moveStatus(OrderStatus.REPAIR, undefined, repairContractorInput.trim());
+  };
+
+  const sendCadToCustomer = async () => {
+    if (!order?.id) return;
+    setSendingToCustomer(true);
+    const res = await apiFetch(`${API}/cad/order/${order.id}/send-to-customer`, { method: 'PATCH' });
+    if (res.ok) {
+      const fresh = await apiFetch(`${API}/orders/${order.id}`);
+      if (fresh.ok) setOrder(await fresh.json());
+    }
+    setSendingToCustomer(false);
   };
 
   if (loading) {
@@ -460,18 +540,43 @@ export default function OrderDetail() {
     : allowedStatuses.filter(s => validNextStatuses.includes(s));
 
   return (
+    <>
+    <style>{`
+      @media print {
+        /* Unlock every overflow/height constraint from html down to the content pad */
+        html, body,
+        #__next, #__next > div,
+        .app-main, .main-content-pad {
+          height: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        /* Hide chrome */
+        .admin-topbar, .sidebar-nav,
+        .order-sticky-sidebar,
+        .topbar-actions, button { display: none !important; }
+        /* White background */
+        body { background: #fff !important; }
+        /* Collapse grids to single column */
+        .order-detail-outer { grid-template-columns: 1fr !important; }
+        .order-detail-grid  { grid-template-columns: 1fr !important; }
+        /* Fit media */
+        img, iframe, video { max-width: 100% !important; break-inside: avoid; }
+      }
+    `}</style>
     <AppLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.storeName || order.customerFullName || ''}
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            onClick={() => router.push(`/orders/${id}/summary`)}
+            onClick={() => window.print()}
             style={{ background: 'rgba(192,155,88,0.1)', border: '1px solid rgba(192,155,88,0.35)', borderRadius: '8px', padding: '7px 16px', color: 'var(--accent-dark)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
           >
-            📊 Summary
+            🖨 Print
           </button>
-          {['SKU_CREATION','VPO_ISSUED','PENDING_CONTRACTOR','READY_TO_SHIP','SHIPPED','COMPLETED'].includes(order.status!) && (
+          {['SKU_CREATION','VPO_ISSUED','MANUFACTURED','SHIPPED','COMPLETED'].includes(order.status!) && (
             <button
               onClick={() => router.push(`/orders/${id}/jobbag`)}
               style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#0369a1', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
@@ -584,7 +689,7 @@ export default function OrderDetail() {
                 </div>
 
                 {refs.length === 0 ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div className="card-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {[...Array(4)].map((_, i) => (
                       <div key={i} style={{ height: '110px', background: 'var(--bg-input)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.35 }}>
                         <span style={{ fontSize: '22px' }}>🖼</span>
@@ -595,7 +700,7 @@ export default function OrderDetail() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div className="card-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {refs.map(cad => {
                       const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                       const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
@@ -603,7 +708,7 @@ export default function OrderDetail() {
                       const fileUrl = `/uploads/cad/${cad.fileName}`;
                       return (
                         <div key={cad.id}
-                          onClick={() => setViewingCad(cad)}
+                          onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
                           style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
@@ -629,11 +734,35 @@ export default function OrderDetail() {
                     })}
                   </div>
                 )}
+
+                {/* ── Reference Image Modal ── */}
+                {viewingRef && (
+                  <div
+                    className="modal-bg"
+                    onClick={e => { if (e.target === e.currentTarget) setViewingRef(null); }}
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+                  >
+                    <div className="cad-viewer-modal" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto', borderRadius: 'var(--radius-lg)' }}>
+                      <CadInlineViewer
+                        cad={viewingRef}
+                        cads={viewingRefList}
+                        initialIndex={viewingRefList.findIndex(c => c.id === viewingRef.id)}
+                        userRole={userRole}
+                        batchCount={1}
+                        onClose={() => setViewingRef(null)}
+                        onAction={handleCadAction}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
 
           </div>{/* ── end fields+refs sub-grid ── */}
+
+          {/* ── Design Files + Conversation wrapper (relative so CAD modal scopes here) ── */}
+          <div style={{ position: 'relative' }}>
 
           {/* ── CAD Design Files ── */}
         <div style={cardStyle}>
@@ -668,32 +797,60 @@ export default function OrderDetail() {
           </div>
 
           {(() => {
-            const pendingBatch = cads.filter(c => c.status === 'SENT_FOR_APPROVAL');
-            return pendingBatch.length > 0 && CAD_ACTION_ROLES.includes(userRole as UserRole) && (
-              <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 600 }}>
-                  {pendingBatch.length === 1 ? '1 design awaiting review' : `${pendingBatch.length} designs awaiting review as a batch`}
+            const isAuthAdmin = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
+            const designFiles = cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ'));
+            const filesUploaded = designFiles.length > 0;
+            const alreadySent = (order as any).sentToCustomer;
+
+            // Auth/Admin: files uploaded but not yet sent to customer — prompt to set quote
+            if (isAuthAdmin && filesUploaded && !alreadySent && order.status === OrderStatus.CAD_IN_PROGRESS) {
+              return (
+                <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#6366F1', fontWeight: 700, marginBottom: '2px' }}>
+                    {designFiles.length === 1 ? '1 design file' : `${designFiles.length} design files`} uploaded — set quote to send to customer
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Enter and save the quoted price in the sidebar — files will be sent to the customer automatically.
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => handleCadAction(pendingBatch[0].id, 'approve', '')}
-                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '7px', padding: '6px 14px', color: '#059669', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                    ✓ Approve All
-                  </button>
-                  <button onClick={() => setViewingCad(pendingBatch[0])}
-                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                    Review →
-                  </button>
-                </div>
+              );
+            }
+
+            // Authorizer/Admin: customer can now review (files were sent)
+            if (isAuthAdmin && filesUploaded && alreadySent && order.status === OrderStatus.CAD_IN_PROGRESS) {
+              const pendingBatch = cads.filter(c => c.status === 'SENT_FOR_APPROVAL');
+              if (pendingBatch.length > 0) {
+                return (
+                  <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 600 }}>
+                      Sent to customer — awaiting their approval
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleCadAction(pendingBatch[0].id, 'approve', '')}
+                        style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '7px', padding: '6px 14px', color: '#059669', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                        ✓ Approve All
+                      </button>
+                      <button onClick={() => { setViewingCadList(pendingBatch); setViewingCad(pendingBatch[0]); }}
+                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        Review →
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
+          {(() => {
+            const designList = cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ'));
+            if (designList.length === 0) return (
+              <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>
+                No CAD files uploaded yet for this order.
               </div>
             );
-          })()}
-          {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>
-              No CAD files uploaded yet for this order.
-            </div>
-          ) : (
+            return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).map(cad => {
+              {designList.map(cad => {
                 const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
                 const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                 const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
@@ -701,7 +858,17 @@ export default function OrderDetail() {
                 return (
                   <div key={cad.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius)', border: `1px solid ${cs.color}25`, flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                      <span style={{ fontSize: '22px', flexShrink: 0 }}>{isImage ? '🖼' : isPdf ? '📄' : '📎'}</span>
+                      {isImage ? (
+                        <img
+                          src={`/uploads/cad/${cad.fileName}`}
+                          alt={cad.originalName}
+                          style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)', cursor: 'pointer' }}
+                          onClick={() => { setViewingCadList(designList); setViewingCad(cad); }}
+                          onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{isPdf ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : '📎'}</span>
+                      )}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {cad.originalName}
@@ -719,40 +886,114 @@ export default function OrderDetail() {
                         {cs.label}
                       </span>
                       <button
-                        onClick={() => setViewingCad(cad)}
+                        onClick={() => { setViewingCadList(designList); setViewingCad(cad); }}
                         style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
                         👁 View
                       </button>
+                      {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) &&
+                        cad.status !== 'APPROVED' && cad.status !== 'REJECTED' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Remove "${cad.originalName}"? This cannot be undone.`)) return;
+                            await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE' });
+                            const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                            if (cRes.ok) setCads(await cRes.json());
+                          }}
+                          title="Remove file"
+                          style={{ background: 'transparent', border: 'none', padding: '4px 6px', fontSize: '14px', color: '#9CA3AF', cursor: 'pointer', lineHeight: 1, borderRadius: '4px' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#9CA3AF')}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </div>
-
 
           {/* Conversation */}
           {order.id && currentUser && (
-            <OrderConversation
-              orderId={order.id}
-              currentUserRole={currentUser.role}
-              currentUserId={currentUser.id}
-            />
+            <div>
+              {order.smartsheetRowId && [UserRole.ADMIN, UserRole.AUTHORIZER].includes(currentUser.role as UserRole) && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
+                  <button
+                    onClick={async () => {
+                      const res = await apiFetch(`${API}/smartsheet/sync-comments/${order.id}`, { method: 'POST' });
+                      const data = await res.json();
+                      if (data.commentsImported > 0) {
+                        window.location.reload();
+                      } else if (data.errors?.length) {
+                        alert(`Sync failed: ${data.errors[0]}`);
+                      } else {
+                        alert('Already up to date — no new Smartsheet conversations found.');
+                      }
+                    }}
+                    style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
+                  >
+                    Sync from Smartsheet
+                  </button>
+                </div>
+              )}
+              <OrderConversation
+                orderId={order.id}
+                currentUserRole={currentUser.role}
+                currentUserId={currentUser.id}
+              />
+            </div>
           )}
+
+          {/* ── Design File Preview Modal (absolute: overlays Design Files + Conversation) ── */}
+          {viewingCad && (
+            <div
+              onClick={e => { if (e.target === e.currentTarget) setViewingCad(null); }}
+              style={{
+                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
+                zIndex: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                padding: '16px', overflowY: 'auto', borderRadius: 'var(--radius)',
+              }}
+            >
+              <div style={{ width: '100%', maxWidth: '900px', flexShrink: 0, borderRadius: 'var(--radius-lg)' }}>
+                <CadInlineViewer
+                  cad={viewingCad}
+                  cads={viewingCadList}
+                  initialIndex={viewingCadList.findIndex(c => c.id === viewingCad.id)}
+                  userRole={userRole}
+                  batchCount={cads.filter(c => c.status === 'SENT_FOR_APPROVAL').length}
+                  onClose={() => setViewingCad(null)}
+                  onAction={handleCadAction}
+                />
+              </div>
+            </div>
+          )}
+
+          </div>{/* ── end Design Files + Conversation wrapper ── */}
+
         </div>{/* ── end main content column ── */}
 
         {/* ── Sidebar: sticky beside all content ── */}
         <div className="order-sticky-sidebar" style={{ position: 'sticky', top: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
           {/* Current status */}
-          <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>Current Status</div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: cfg.bg, color: cfg.color, padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
-              {cfg.label}
-            </div>
-          </div>
+          {(() => {
+            const subLabel = order.status === OrderStatus.CAD_IN_PROGRESS ? getCadSubLabel(order as any) : null;
+            return (
+              <div style={{ ...cardStyle, borderTop: `3px solid ${cfg.color}` }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>Current Status</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: cfg.bg, color: cfg.color, padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+                  {subLabel || cfg.label}
+                </div>
+                {subLabel && (
+                  <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>CAD In Progress</div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Stone status — sidebar card */}
           {order.status === OrderStatus.VPO_ISSUED && (
@@ -838,59 +1079,6 @@ export default function OrderDetail() {
             </div>
           )}
 
-          {/* Shipping Details — for Shipping Manager and Admin when order is being shipped */}
-          {(userRole === UserRole.SHIPPING_MANAGER || userRole === UserRole.ADMIN) &&
-            [OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED, OrderStatus.COMPLETED].includes(order.status as OrderStatus) && (
-            <div style={cardStyle}>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Shipping Details</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Tracking Number</label>
-                  <input
-                    value={shippingForm.trackingNumber}
-                    onChange={e => setShippingForm(p => ({ ...p, trackingNumber: e.target.value }))}
-                    placeholder="e.g. 1Z999AA10123456784"
-                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Courier / Carrier</label>
-                  <input
-                    value={shippingForm.courierName}
-                    onChange={e => setShippingForm(p => ({ ...p, courierName: e.target.value }))}
-                    placeholder="e.g. FedEx, UPS, DHL"
-                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'block', marginBottom: '4px' }}>Additional Notes</label>
-                  <textarea
-                    value={shippingForm.shippingNotes}
-                    onChange={e => setShippingForm(p => ({ ...p, shippingNotes: e.target.value }))}
-                    placeholder="e.g. Signature required, fragile, insured for $X…"
-                    rows={3}
-                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  />
-                </div>
-                <button
-                  disabled={savingShipping}
-                  onClick={async () => {
-                    if (!order?.id) return;
-                    setSavingShipping(true);
-                    const res = await apiFetch(`${API}/orders/${order.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify(shippingForm),
-                    });
-                    if (res.ok) setOrder(prev => prev ? { ...prev, ...shippingForm } : prev);
-                    setSavingShipping(false);
-                  }}
-                  style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px', fontSize: '12px', fontWeight: 600, cursor: savingShipping ? 'not-allowed' : 'pointer', opacity: savingShipping ? 0.6 : 1 }}
-                >
-                  {savingShipping ? 'Saving…' : 'Save Shipping Details'}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Move to Stage */}
           {movableStatuses.length > 0 && (
@@ -939,8 +1127,8 @@ export default function OrderDetail() {
 
       {/* ── Price Required Modal (SKU Creation) ── */}
       {priceModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '380px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '380px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
               Set Quoted Price
             </div>
@@ -979,8 +1167,8 @@ export default function OrderDetail() {
 
       {/* Repair Contractor Modal */}
       {repairModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '400px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '400px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
               Send for Repair
             </div>
@@ -1015,16 +1203,7 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* CAD Viewer Modal */}
-      {viewingCad && (
-        <CadViewerModal
-          cad={viewingCad}
-          userRole={userRole}
-          batchCount={cads.filter(c => c.status === 'SENT_FOR_APPROVAL').length}
-          onClose={() => setViewingCad(null)}
-          onAction={handleCadAction}
-        />
-      )}
     </AppLayout>
+    </>
   );
 }

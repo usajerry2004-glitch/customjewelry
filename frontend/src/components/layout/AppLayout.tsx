@@ -78,17 +78,20 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
       <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Topbar */}
-        <div style={{
+        <div className="admin-topbar" style={{
           background: 'var(--topbar-bg)',
-          borderBottom: '1px solid var(--border-light)',
-          padding: '0 20px',
-          height: '62px',
+          borderBottom: '2px solid var(--border-light)',
+          borderBottomColor: 'var(--border-light)',
+          backgroundImage: 'linear-gradient(180deg, #FDFCFA 0%, #F9F6F1 100%)',
+          padding: '0 28px',
+          height: '66px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
-          boxShadow: '0 1px 0 rgba(26,39,64,0.06)',
+          boxShadow: '0 2px 12px rgba(26,39,64,0.08)',
           gap: '10px',
+          position: 'relative',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             {/* Hamburger */}
@@ -108,15 +111,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               {title && (
                 <div className="topbar-title" style={{
                   fontFamily: 'Cormorant Garamond, Georgia, serif',
-                  fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)',
-                  letterSpacing: '0.3px', lineHeight: 1, whiteSpace: 'nowrap',
+                  fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)',
+                  letterSpacing: '-0.3px', lineHeight: 1, whiteSpace: 'nowrap',
                   overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {title}
                 </div>
               )}
               {subtitle && (
-                <div className="topbar-subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', letterSpacing: '0.2px' }}>
+                <div className="topbar-subtitle" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                   {subtitle}
                 </div>
               )}
@@ -124,7 +127,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-            {actions}
+            {actions && <div className="topbar-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>{actions}</div>}
 
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
@@ -247,7 +250,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           </div>
         </div>
 
-        <div className="main-content-pad" style={{ flex: 1, overflow: 'auto', padding: '28px 32px' }}>
+        <div className="main-content-pad" style={{ flex: 1, overflow: 'auto', padding: '32px 36px' }}>
           {children}
         </div>
       </div>

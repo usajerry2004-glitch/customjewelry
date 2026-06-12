@@ -12,8 +12,7 @@ const SLA_RULES: { status: OrderStatus; maxDays: number; role: UserRole; label: 
   { status: OrderStatus.SKU_CREATION,      maxDays: 1,  role: UserRole.SKU_MANAGER,      label: 'SKU Creation' },
   { status: OrderStatus.VPO_ISSUED,        maxDays: 4,  role: UserRole.FACTORY_MANAGER,  label: 'VPO Issued' },
   { status: OrderStatus.VPO_ISSUED,        maxDays: 1,  role: UserRole.STONE_MANAGER,    label: 'Stone Pending' },
-  { status: OrderStatus.PENDING_CONTRACTOR,maxDays: 2,  role: UserRole.FACTORY_MANAGER,  label: 'Pending Contractor' },
-  { status: OrderStatus.READY_TO_SHIP,     maxDays: 2,  role: UserRole.SHIPPING_MANAGER, label: 'Ready to Ship' },
+  { status: OrderStatus.MANUFACTURED,      maxDays: 2,  role: UserRole.ADMIN,            label: 'Manufactured — pending dispatch' },
   { status: OrderStatus.REPAIR,            maxDays: 1,  role: UserRole.AUTHORIZER,       label: 'With Repair Contractor' },
 ];
 

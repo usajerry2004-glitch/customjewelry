@@ -1,8 +1,10 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { EmailService } from '../email/email.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -13,7 +15,13 @@ import { UserRole } from '../../database/entities/user.entity';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly logger = new Logger('Auth');
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * POST /auth/login
@@ -40,6 +48,32 @@ export class AuthController {
   @ApiOperation({ summary: 'Create a new staff account (Admin only)' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request a password reset link via email' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    const token = await this.authService.forgotPassword(dto.email);
+    if (token) {
+      const frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:3000').split(',')[0].trim();
+      const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
+      // Always log the link — use this directly if email delivery fails
+      this.logger.log(`\n\n🔑 PASSWORD RESET LINK for ${dto.email}:\n${resetUrl}\n`);
+      const sent = await this.emailService.sendPasswordResetEmail({ to: dto.email, token });
+      this.logger.log(`Email delivery for ${dto.email}: ${sent ? 'SUCCESS' : 'FAILED — use the link above'}`);
+    } else {
+      this.logger.warn(`Password reset requested for unknown email: ${dto.email}`);
+    }
+    return { message: 'If that email exists, a reset link has been sent.' };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using a valid reset token' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.password);
+    return { message: 'Password updated successfully.' };
   }
 
   @UseGuards(JwtAuthGuard)

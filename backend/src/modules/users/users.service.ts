@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -14,6 +14,13 @@ export class CreateUserDto {
   @IsEnum(UserRole) @IsOptional() role?: UserRole;
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() phone?: string;
+}
+
+export class InviteUserDto {
+  @IsString() firstName: string;
+  @IsString() lastName: string;
+  @IsEmail() email: string;
+  @IsEnum(UserRole) role: UserRole;
 }
 
 export class UpdateUserDto {
@@ -98,6 +105,20 @@ export class UsersService {
       { isPriorityCustomer: user.isPriority },
     );
     return user;
+  }
+
+  async inviteStaff(dto: InviteUserDto): Promise<{ user: User; tempPassword: string }> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const tempPassword = `KiRa-${rand(4)}-${rand(4)}`;
+    const user = await this.create({ ...dto, password: tempPassword });
+    return { user, tempPassword };
+  }
+
+  async remove(id: string, callerId: string): Promise<void> {
+    if (id === callerId) throw new BadRequestException('You cannot remove your own account');
+    const user = await this.findOne(id);
+    await this.userRepo.remove(user);
   }
 
   async getStats(): Promise<{ totalCustomers: number; activeCustomers: number; totalStaff: number }> {

@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -43,6 +45,34 @@ export class AuthService {
     return this.signToken(user);
   }
 
+  async forgotPassword(email: string): Promise<string | null> {
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) return null; // don't reveal if email exists
+    const secret = `${this.config.get('JWT_SECRET', 'dev-secret')}:reset`;
+    const token = this.jwtService.sign(
+      { sub: user.id, type: 'password_reset' },
+      { secret, expiresIn: '1h' },
+    );
+    return token;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const secret = `${this.config.get('JWT_SECRET', 'dev-secret')}:reset`;
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(token, { secret });
+    } catch {
+      throw new BadRequestException('Reset link is invalid or has expired.');
+    }
+    if (payload?.type !== 'password_reset') {
+      throw new BadRequestException('Invalid reset token.');
+    }
+    const user = await this.userRepo.findOne({ where: { id: payload.sub } });
+    if (!user) throw new BadRequestException('User not found.');
+    (user as any).passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.save(user);
+  }
+
   async seedAdmin() {
     // Passwords sourced from env vars; fall back to strong defaults.
     // These are ONLY used when creating accounts for the first time (if they don't exist).
@@ -55,7 +85,6 @@ export class AuthService {
       { firstName: 'Jake',     lastName: 'Morris',   email: 'sku@kirajewels.one',         password: process.env.SEED_SKU_PASSWORD      || 'KiRa@SkuMgr#2025!',   role: UserRole.SKU_MANAGER },
       { firstName: 'Arjun',   lastName: 'Singh',    email: 'factory@kirajewels.one',     password: process.env.SEED_FACTORY_PASSWORD  || 'KiRa@Factory#2025!',  role: UserRole.FACTORY_MANAGER },
       { firstName: 'Priya',    lastName: 'Mehta',    email: 'stone@kirajewels.one',       password: process.env.SEED_STONE_PASSWORD    || 'KiRa@Stone#2025!',    role: UserRole.STONE_MANAGER },
-      { firstName: 'Lisa',     lastName: 'Nguyen',   email: 'shipping@kirajewels.one',    password: process.env.SEED_SHIPPING_PASSWORD || 'KiRa@Shipping#2025!', role: UserRole.SHIPPING_MANAGER },
       { firstName: 'Emma',     lastName: 'Thompson', email: 'customer@example.com',       password: process.env.SEED_CUSTOMER_PASSWORD || 'KiRa@Customer#2025!', role: UserRole.CUSTOMER },
 
       // Additional Sales Reps for testing

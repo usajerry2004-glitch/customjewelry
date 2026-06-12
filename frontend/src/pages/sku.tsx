@@ -7,7 +7,7 @@ interface Sku {
   metalType?: string; metalColor?: string; centerStoneShape?: string;
   approximateCaratWeight?: string; generatedBy?: string; isActive: boolean; createdAt: string;
 }
-interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; kiraSkuNumber?: string; orderType?: string; metalType?: string; metalColor?: string; }
+interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; kiraSkuNumber?: string; orderType?: string; metalType?: string; metalColor?: string; status?: string; }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
 

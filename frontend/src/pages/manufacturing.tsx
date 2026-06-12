@@ -120,28 +120,11 @@ export default function ManufacturingPage() {
                         ⏳ Waiting for Stone Manager to send the stone before production can proceed.
                       </div>
                     ) : (
-                      <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
-                        <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
-                        <button onClick={() => action(order.id, 'contractor', { vendorName: inputs.vendor })} disabled={busy}
-                          style={{ background: 'var(--bg-card)', border: '1px solid var(--accent)', borderRadius: '7px', padding: '8px 16px', color: 'var(--accent-dark)', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                          Send to Contractor
-                        </button>
-                        <button onClick={() => action(order.id, 'complete')} disabled={busy}
-                          style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                          Ready to Ship
-                        </button>
-                      </div>
-                    )
-                  )}
-
-                  {order.status === OrderStatus.PENDING_CONTRACTOR && (
-                    <div className="mfg-action-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
-                      <input value={inputs.vendor} onChange={e => setVpo(order.id, 'vendor', e.target.value)} placeholder="Vendor / Factory Name" style={inp} />
                       <button onClick={() => action(order.id, 'complete')} disabled={busy}
                         style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                        Ready to Ship
+                        ✓ Mark as Manufactured
                       </button>
-                    </div>
+                    )
                   )}
                 </div>
               );

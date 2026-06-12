@@ -4,15 +4,15 @@ import {
 } from 'typeorm';
 
 export enum OrderStatus {
-  CAD_IN_PROGRESS    = 'CAD_IN_PROGRESS',
-  SKU_CREATION       = 'SKU_CREATION',
-  VPO_ISSUED         = 'VPO_ISSUED',
-  PENDING_CONTRACTOR = 'PENDING_CONTRACTOR',
-  READY_TO_SHIP      = 'READY_TO_SHIP',
-  SHIPPED            = 'SHIPPED',
-  REPAIR             = 'REPAIR',
-  COMPLETED          = 'COMPLETED',
-  CANCELLED          = 'CANCELLED',
+  NEW             = 'NEW',
+  CAD_IN_PROGRESS = 'CAD_IN_PROGRESS',
+  SKU_CREATION    = 'SKU_CREATION',
+  VPO_ISSUED      = 'VPO_ISSUED',
+  MANUFACTURED    = 'MANUFACTURED',
+  SHIPPED         = 'SHIPPED',
+  REPAIR          = 'REPAIR',
+  COMPLETED       = 'COMPLETED',
+  CANCELLED       = 'CANCELLED',
 }
 
 export enum ManufacturingPath {
@@ -34,6 +34,9 @@ export class Order {
 
   @Column({ unique: true })
   poNumber: string;
+
+  @Column({ unique: true, nullable: true })
+  trackingToken: string;
 
   @Column({ nullable: true })
   kiraSkuNumber: string;
@@ -187,9 +190,6 @@ export class Order {
 
   @Column({ nullable: true })
   smartsheetRowId: string;
-
-  @Column({ type: 'text', nullable: true })
-  aiSummary: string;
 
   @CreateDateColumn()
   createdAt: Date;

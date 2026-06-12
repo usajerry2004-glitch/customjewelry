@@ -90,15 +90,6 @@ export default function CustomerOrdersPage() {
                   </div>
                 </div>
 
-                {/* Progress bar */}
-                <div style={{ height: '4px', background: 'var(--border)', borderRadius: '99px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${progress}%`, background: cfg.color, borderRadius: '99px', transition: 'width 0.4s ease' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Order placed</span>
-                  <span style={{ fontSize: '10px', color: cfg.color, fontWeight: 600 }}>{progress}% complete</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Delivered</span>
-                </div>
               </div>
             );
           })}

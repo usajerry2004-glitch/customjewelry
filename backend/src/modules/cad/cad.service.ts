@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, MoreThan } from 'typeorm';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -28,13 +28,21 @@ export class CadService {
     title: string,
     message: string,
     orderId: string,
+    dedupe = false,
   ): Promise<void> {
     await Promise.all(
-      users.map(u =>
-        this.notifRepo.save(
+      users.map(async u => {
+        if (dedupe) {
+          const cutoff = new Date(Date.now() - 60_000);
+          const recent = await this.notifRepo.findOne({
+            where: { type, orderId, targetUserId: u.id, createdAt: MoreThan(cutoff) },
+          });
+          if (recent) return;
+        }
+        await this.notifRepo.save(
           this.notifRepo.create({ type, title, message, orderId, targetUserId: u.id }),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -58,28 +66,58 @@ export class CadService {
     return this.cadRepo.save(cad);
   }
 
-  // Called once after all files in a batch are uploaded
+  // Called once after all files in a batch are uploaded.
+  // Files are held for auth/admin review — NOT automatically sent to customer.
   async notifyBatchUploaded(orderId: string): Promise<void> {
-    await this.orderRepo.update(orderId, { status: OrderStatus.CAD_IN_PROGRESS, sentToCustomer: true, cadSubStatus: 'UPLOADED' });
+    await this.orderRepo.update(orderId, { cadSubStatus: 'UPLOADED' });
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
 
-    if (order.customerEmail) {
-      await this.emailService.sendCadReadyForApproval({
-        to: order.customerEmail,
+    // In-app notification → both Authorizer and Admin; email → Authorizer only
+    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
+    if (authUsers.length) {
+      await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
+        `CAD Files Ready for Review — ${order.poNumber}`,
+        `CAD designer has uploaded file(s) for order ${order.poNumber}. Please review and set the quote price.`,
+        order.id);
+    }
+    const authorizerEmails = authUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
+    if (authorizerEmails.length) {
+      await this.emailService.sendCadSentForApprovalToAuthorizers({
+        to: authorizerEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
       });
     }
+  }
 
-    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
-    if (authUsers.length) {
-      await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
-        `CAD Design Ready for Review — ${order.poNumber}`,
-        `CAD design(s) for order ${order.poNumber} have been sent to the customer for review.`,
-        order.id);
+  // Auth/Admin explicitly sends CAD files to customer after reviewing price
+  async sendToCustomer(orderId: string): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+    await this.orderRepo.update(orderId, { sentToCustomer: true });
+
+    // Mark all non-reference design files as SENT_FOR_APPROVAL so the customer portal shows approval buttons
+    const allCads = await this.cadRepo.find({ where: { orderId } });
+    const designFiles = allCads.filter(
+      c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image'
+        && c.status === CadFileStatus.UPLOADED,
+    );
+    for (const cad of designFiles) {
+      await this.cadRepo.update(cad.id, { status: CadFileStatus.SENT_FOR_APPROVAL });
+    }
+
+    if (order.customerEmail) {
+      await this.emailService.sendCadReadyForApproval({
+        to:            order.customerEmail,
+        poNumber:      order.poNumber,
+        customerName:  order.customerFullName || order.storeName || 'Valued Customer',
+        orderType:     order.orderType || '—',
+        orderId:       order.id,
+        trackingToken: order.trackingToken,
+      });
     }
   }
 
@@ -108,29 +146,28 @@ export class CadService {
     const cad = await this.findOne(id);
     cad.status = CadFileStatus.SENT_FOR_APPROVAL;
     const saved = await this.cadRepo.save(cad);
-    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, sentToCustomer: true });
+    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED' });
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (!order) return saved;
 
-    // Email customer: design ready to review
-    if (order.customerEmail) {
-      await this.emailService.sendCadReadyForApproval({
-        to: order.customerEmail,
+    // In-app notification → both Authorizer and Admin; email → Authorizer only
+    const { users: saUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
+    if (saUsers.length) {
+      await this.notifyTeam(saUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
+        `CAD File Ready for Review — ${order.poNumber}`,
+        `CAD design for order ${order.poNumber} has been uploaded. Please review and set the quote price.`,
+        order.id);
+    }
+    const saAuthorizerEmails = saUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
+    if (saAuthorizerEmails.length) {
+      await this.emailService.sendCadSentForApprovalToAuthorizers({
+        to: saAuthorizerEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
       });
-    }
-
-    // In-portal notification for authorizers (no email)
-    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
-    if (authUsers.length) {
-      await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
-        `CAD Sent for Approval — ${order.poNumber}`,
-        `CAD design for order ${order.poNumber} has been sent to the customer for review.`,
-        order.id);
     }
 
     return saved;
@@ -142,26 +179,17 @@ export class CadService {
     cad.approvedAt = new Date();
     cad.approvedBy = approvedBy;
     const saved = await this.cadRepo.save(cad);
-    // Stay at CAD_IN_PROGRESS — status moves to SKU_CREATION only after price is added
     await this.orderRepo.update(cad.orderId, { customerEmailApproval: true, cadSubStatus: 'APPROVED' });
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      const { emails, users } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
-      if (users.length) {
-        await this.notifyTeam(users, NotificationType.CAD_APPROVED,
-          `Quote Price Required — ${order.poNumber}`,
-          `CAD approved for order ${order.poNumber}. Please add a quote price to move it to SKU Creation.`,
+      await this.orderRepo.update(order.id, { status: OrderStatus.SKU_CREATION });
+      const { users: skuUsers } = await this.getTeamEmails([UserRole.SKU_MANAGER, UserRole.AUTHORIZER, UserRole.ADMIN]);
+      if (skuUsers.length) {
+        await this.notifyTeam(skuUsers, NotificationType.STATUS_CHANGED,
+          `SKU Creation — ${order.poNumber}`,
+          `Customer approved the CAD for order ${order.poNumber}. Please proceed with SKU creation.`,
           order.id);
-      }
-      if (emails.length) {
-        await this.emailService.sendPriceRequiredToAuthorizers({
-          to: emails,
-          poNumber: order.poNumber,
-          customerName: order.customerFullName || order.storeName || 'Valued Customer',
-          orderType: order.orderType || '—',
-          orderId: order.id,
-        });
       }
     }
 
@@ -184,7 +212,7 @@ export class CadService {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `Order Cancelled — ${order.poNumber}`,
           `Customer rejected the CAD for order ${order.poNumber} and the order has been cancelled.`,
-          order.id);
+          order.id, true);
       }
     }
 
@@ -196,8 +224,8 @@ export class CadService {
     cad.status = CadFileStatus.REVISION_REQUESTED;
     cad.customerFeedback = feedback;
     const saved = await this.cadRepo.save(cad);
-    // Status stays CAD_IN_PROGRESS — CAD person must upload revised file
-    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, customerEmailApproval: false, cadSubStatus: 'REVISION' });
+    // Reset sentToCustomer — revised design must go through auth review before customer sees it
+    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, customerEmailApproval: false, cadSubStatus: 'REVISION', sentToCustomer: false });
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
@@ -206,7 +234,7 @@ export class CadService {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `CAD Revision Requested — ${order.poNumber}`,
           `Revision requested for order ${order.poNumber}: "${feedback}". Please upload a revised design.`,
-          order.id);
+          order.id, true);
       }
       if (emails.length) {
         await this.emailService.sendCadRevisionAlert({
@@ -222,8 +250,21 @@ export class CadService {
     return saved;
   }
 
+  async deleteFile(id: string): Promise<void> {
+    const cad = await this.findOne(id);
+    if (cad.status === CadFileStatus.APPROVED || cad.status === CadFileStatus.REJECTED) {
+      throw new ForbiddenException('Cannot delete a file that has already been approved or rejected');
+    }
+    await this.cadRepo.delete(id);
+  }
+
   async getAll(): Promise<CadFile[]> {
     return this.cadRepo.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async isVisibleToCustomer(orderId: string): Promise<boolean> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    return !!(order?.sentToCustomer);
   }
 
   async assertCustomerOwnsOrder(orderId: string, customerEmail: string): Promise<void> {
@@ -236,6 +277,41 @@ export class CadService {
   async assertCustomerOwnsCadFile(cadId: string, customerEmail: string): Promise<void> {
     const cad = await this.findOne(cadId);
     await this.assertCustomerOwnsOrder(cad.orderId, customerEmail);
+  }
+
+  async getThumbnails(orderIds: string[]): Promise<Record<string, string>> {
+    if (!orderIds.length) return {};
+    const cads = await this.cadRepo
+      .createQueryBuilder('c')
+      .where('c.orderId IN (:...ids)', { ids: orderIds })
+      .andWhere(`(c.designerNotes = 'Reference image' OR c.designerNotes = 'Customer reference image')`)
+      .orderBy('c.createdAt', 'ASC')
+      .getMany();
+    const map: Record<string, string> = {};
+    for (const cad of cads) {
+      if (!map[cad.orderId]) map[cad.orderId] = cad.fileName;
+    }
+    return map;
+  }
+
+  async getStatusCounts(): Promise<Record<string, number>> {
+    const rows: { label: string; count: string }[] = await this.orderRepo.query(`
+      SELECT
+        CASE
+          WHEN "cadSubStatus" IS NULL                                         THEN 'PENDING_CAD'
+          WHEN "cadSubStatus" = 'REVISION'                                    THEN 'REVISION'
+          WHEN "cadSubStatus" = 'UPLOADED' AND "quotedCost" IS NOT NULL       THEN 'AWAITING_APPROVAL'
+          WHEN "cadSubStatus" = 'UPLOADED' AND "quotedCost" IS NULL           THEN 'AWAITING_QUOTE'
+          ELSE "cadSubStatus"
+        END AS label,
+        COUNT(*) AS count
+      FROM orders
+      WHERE status = 'CAD_IN_PROGRESS'
+      GROUP BY label
+    `);
+    const result: Record<string, number> = {};
+    for (const row of rows) result[row.label] = parseInt(row.count, 10);
+    return result;
   }
 
   private async findOne(id: string): Promise<CadFile> {

@@ -14,7 +14,7 @@ export class ShippingService {
 
   async getReadyToShip() {
     return this.orderRepo.find({
-      where: { status: OrderStatus.READY_TO_SHIP },
+      where: { status: OrderStatus.MANUFACTURED },
       order: { updatedAt: 'ASC' },
     });
   }
@@ -30,8 +30,8 @@ export class ShippingService {
   async dispatch(id: string, details: { trackingNumber?: string; shipMethod?: string }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.READY_TO_SHIP) {
-      throw new BadRequestException('Order must be in READY_TO_SHIP status to dispatch');
+    if (order.status !== OrderStatus.MANUFACTURED) {
+      throw new BadRequestException('Order must be in MANUFACTURED status to dispatch');
     }
     order.status = OrderStatus.SHIPPED;
     if (details.trackingNumber) order.trackingNumber = details.trackingNumber;
@@ -61,9 +61,9 @@ export class ShippingService {
   }
 
   async getMetrics() {
-    const readyToShip = await this.orderRepo.count({ where: { status: OrderStatus.READY_TO_SHIP } });
-    const shipped     = await this.orderRepo.count({ where: { status: OrderStatus.SHIPPED } });
-    const completed   = await this.orderRepo.count({ where: { status: OrderStatus.COMPLETED } });
-    return { readyToShip, shipped, completed };
+    const manufactured = await this.orderRepo.count({ where: { status: OrderStatus.MANUFACTURED } });
+    const shipped      = await this.orderRepo.count({ where: { status: OrderStatus.SHIPPED } });
+    const completed    = await this.orderRepo.count({ where: { status: OrderStatus.COMPLETED } });
+    return { manufactured, shipped, completed };
   }
 }

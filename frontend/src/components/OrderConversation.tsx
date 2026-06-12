@@ -3,19 +3,19 @@ import { apiFetch, API } from '../utils/apiFetch';
 import { OrderMessage } from '../utils/types';
 
 const ROLE_COLORS: Record<string, string> = {
-  ADMIN:            '#C09B58',
-  AUTHORIZER:       '#F59E0B',
-  CAD_DESIGNER:     '#6366F1',
-  SKU_MANAGER:      '#F97316',
-  FACTORY_MANAGER:  '#0D9488',
-  SHIPPING_MANAGER: '#2563EB',
-  SALES_REP:        '#8B5CF6',
-  CUSTOMER:         '#059669',
+  ADMIN:          '#C09B58',
+  AUTHORIZER:     '#F59E0B',
+  CAD_DESIGNER:   '#6366F1',
+  SKU_MANAGER:    '#F97316',
+  FACTORY_MANAGER:'#0D9488',
+  STONE_MANAGER:  '#9333EA',
+  SALES_REP:      '#8B5CF6',
+  CUSTOMER:       '#059669',
 };
 
 const MENTION_ROLES = [
   '@ADMIN', '@AUTHORIZER', '@CAD_DESIGNER', '@SKU_MANAGER',
-  '@FACTORY_MANAGER', '@SHIPPING_MANAGER', '@SALES_REP',
+  '@FACTORY_MANAGER', '@STONE_MANAGER', '@SALES_REP',
 ];
 
 // CAD event messages start with one of these emojis

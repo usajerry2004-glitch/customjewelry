@@ -57,8 +57,8 @@ export default function ShippingPage() {
   const ShipCard = ({ order, isReady }: { order: Order; isReady: boolean }) => {
     const inputs = getTracking(order.id);
     const busy = !!actionLoading;
-    const statusColor = isReady ? '#2563EB' : order.status === OrderStatus.DELIVERED ? '#059669' : '#6366F1';
-    const statusLabel = isReady ? 'Ready to Ship' : order.status === OrderStatus.DELIVERED ? 'Delivered' : 'Shipped';
+    const statusColor = isReady ? '#2563EB' : order.status === OrderStatus.COMPLETED ? '#059669' : '#6366F1';
+    const statusLabel = isReady ? 'Ready to Ship' : order.status === OrderStatus.COMPLETED ? 'Completed' : 'Shipped';
 
     return (
       <div style={{ background: 'var(--bg-input)', border: `1px solid ${statusColor}25`, borderLeft: `3px solid ${statusColor}`, borderRadius: 'var(--radius)', padding: '16px', marginBottom: '10px' }}>

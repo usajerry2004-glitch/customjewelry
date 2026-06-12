@@ -124,7 +124,9 @@ export default function LoginPage() {
           </form>
 
           <p style={{ marginTop: '28px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            Contact your administrator if you need access or have forgotten your password.
+            <a href="/forgot-password" style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500 }}>
+              Forgot your password?
+            </a>
           </p>
         </div>
       </div>

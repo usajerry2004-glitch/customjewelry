@@ -12,7 +12,7 @@ export class ManufacturingController {
   constructor(private readonly manufacturingService: ManufacturingService) {}
 
   @Get('queue')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get manufacturing queue' })
   getQueue() {
@@ -20,7 +20,7 @@ export class ManufacturingController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Manufacturing metrics' })
   getMetrics() {
@@ -38,17 +38,6 @@ export class ManufacturingController {
     return this.manufacturingService.startProduction(id, body);
   }
 
-  @Patch(':id/contractor')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Move order to Pending Contractor' })
-  moveToContractor(
-    @Param('id') id: string,
-    @Body() body: { jobBagNumber?: string; vendorName?: string },
-  ) {
-    return this.manufacturingService.moveToContractor(id, body);
-  }
-
   @Patch(':id/stone-sent')
   @Roles(UserRole.ADMIN, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
@@ -60,7 +49,7 @@ export class ManufacturingController {
   @Patch(':id/complete')
   @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Mark manufacturing complete — moves to READY_TO_SHIP' })
+  @ApiOperation({ summary: 'Mark manufacturing complete — moves to MANUFACTURED' })
   complete(@Param('id') id: string) {
     return this.manufacturingService.completeManufacturing(id);
   }

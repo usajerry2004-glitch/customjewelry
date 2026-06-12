@@ -6,24 +6,22 @@ import { Order, OrderStatus, StoneStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 const ALL_STATUS_FILTERS = [
-  { label: 'All',                value: '' },
-  { label: 'CAD In Progress',    value: OrderStatus.CAD_IN_PROGRESS },
-  { label: 'SKU Creation',       value: OrderStatus.SKU_CREATION },
-  { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
-  { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
-  { label: 'Ready to Ship',      value: OrderStatus.READY_TO_SHIP },
-  { label: 'Shipped',            value: OrderStatus.SHIPPED },
-  { label: 'Repair',             value: OrderStatus.REPAIR },
-  { label: 'Completed',          value: OrderStatus.COMPLETED },
-  { label: 'Cancelled',          value: OrderStatus.CANCELLED },
+  { label: 'All',             value: '' },
+  { label: 'New',             value: OrderStatus.NEW },
+  { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
+  { label: 'SKU Creation',    value: OrderStatus.SKU_CREATION },
+  { label: 'VPO Issued',      value: OrderStatus.VPO_ISSUED },
+  { label: 'Manufactured',    value: OrderStatus.MANUFACTURED },
+  { label: 'Repair',          value: OrderStatus.REPAIR },
+  { label: 'Completed',       value: OrderStatus.COMPLETED },
+  { label: 'Cancelled',       value: OrderStatus.CANCELLED },
 ];
 
 const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
   CAD_DESIGNER: [
-    { label: 'All',            value: '' },
-    { label: 'Pending',        value: 'cad_pending' },
-    { label: 'Revision',       value: 'cad_revision' },
-    { label: 'Awaiting Quote', value: 'cad_approved' },
+    { label: 'All',      value: '' },
+    { label: 'Pending',  value: 'cad_pending' },
+    { label: 'Revision', value: 'cad_revision' },
   ],
   SKU_MANAGER: [
     { label: 'All',          value: '' },
@@ -31,36 +29,27 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
   ],
   STONE_MANAGER: [
     { label: 'All',        value: '' },
-    { label: 'VPO Created', value: OrderStatus.VPO_ISSUED },
+    { label: 'VPO Issued', value: OrderStatus.VPO_ISSUED },
   ],
   FACTORY_MANAGER: [
-    { label: 'All',                value: '' },
-    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
-    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
-  ],
-  SHIPPING_MANAGER: [
-    { label: 'All',           value: '' },
-    { label: 'Ready to Ship', value: OrderStatus.READY_TO_SHIP },
-    { label: 'Shipped',       value: OrderStatus.SHIPPED },
+    { label: 'All',          value: '' },
+    { label: 'VPO Issued',   value: OrderStatus.VPO_ISSUED },
+    { label: 'Manufactured', value: OrderStatus.MANUFACTURED },
   ],
   CUSTOMER: [
     { label: 'All',             value: '' },
     { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
-    { label: 'VPO Created',     value: OrderStatus.VPO_ISSUED },
-    { label: 'Ready to Ship',   value: OrderStatus.READY_TO_SHIP },
-    { label: 'Shipped',         value: OrderStatus.SHIPPED },
     { label: 'Completed',       value: OrderStatus.COMPLETED },
   ],
   SALES_REP: [
-    { label: 'All',                value: '' },
-    { label: 'CAD In Progress',    value: OrderStatus.CAD_IN_PROGRESS },
-    { label: 'SKU Creation',       value: OrderStatus.SKU_CREATION },
-    { label: 'VPO Created',        value: OrderStatus.VPO_ISSUED },
-    { label: 'Pending Contractor', value: OrderStatus.PENDING_CONTRACTOR },
-    { label: 'Ready to Ship',      value: OrderStatus.READY_TO_SHIP },
-    { label: 'Shipped',            value: OrderStatus.SHIPPED },
-    { label: 'Completed',          value: OrderStatus.COMPLETED },
-    { label: 'Cancelled',          value: OrderStatus.CANCELLED },
+    { label: 'All',             value: '' },
+    { label: 'New',             value: OrderStatus.NEW },
+    { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
+    { label: 'SKU Creation',    value: OrderStatus.SKU_CREATION },
+    { label: 'VPO Issued',      value: OrderStatus.VPO_ISSUED },
+    { label: 'Manufactured',    value: OrderStatus.MANUFACTURED },
+    { label: 'Completed',       value: OrderStatus.COMPLETED },
+    { label: 'Cancelled',       value: OrderStatus.CANCELLED },
   ],
 };
 
@@ -96,7 +85,7 @@ export default function OrdersPage() {
   const [dateTo, setDateTo] = useState('');
   const [activeMonth, setActiveMonth] = useState('');
   const [showNew, setShowNew] = useState(false);
-  const [newOrder, setNewOrder] = useState({ storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+  const [newOrder, setNewOrder] = useState({ storeName: '', orderType: '', metalType: '', metalColor: '' });
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -106,8 +95,12 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [cadSubFilter, setCadSubFilter] = useState('');
   const [stoneSubFilter, setStoneSubFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [customerFilterInput, setCustomerFilterInput] = useState('');
+  const [showFilterDrop, setShowFilterDrop] = useState(false);
 
   // Sync statusFilter when URL query changes (Next.js router)
   useEffect(() => {
@@ -128,7 +121,7 @@ export default function OrdersPage() {
     } catch {}
   }, []);
 
-  const isCadSubFilter = ['cad_pending', 'cad_revision', 'cad_approved'].includes(statusFilter);
+  const isCadSubFilter = ['cad_pending', 'cad_awaiting_quote', 'cad_awaiting_approval', 'cad_revision', 'cad_approved'].includes(statusFilter);
   const showCadSubRow = (statusFilter === OrderStatus.CAD_IN_PROGRESS || isCadSubFilter) &&
     ['ADMIN', 'AUTHORIZER'].includes(userRole);
   const showStoneSubRow = statusFilter === OrderStatus.VPO_ISSUED &&
@@ -151,13 +144,24 @@ export default function OrdersPage() {
         let list: any[] = data.orders || [];
         // Apply CAD sub-filter (for both CAD designer role filters and admin inline sub-filter)
         const activeCadSub = isCadSubFilter ? statusFilter : cadSubFilter;
-        if (activeCadSub === 'cad_pending')  list = list.filter((o: any) => !o.cadSubStatus || o.cadSubStatus === 'UPLOADED');
-        if (activeCadSub === 'cad_revision') list = list.filter((o: any) => o.cadSubStatus === 'REVISION');
-        if (activeCadSub === 'cad_approved') list = list.filter((o: any) => o.cadSubStatus === 'APPROVED');
+        if (activeCadSub === 'cad_pending')           list = list.filter((o: any) => !o.cadSubStatus);
+        if (activeCadSub === 'cad_awaiting_quote')   list = list.filter((o: any) => o.cadSubStatus === 'UPLOADED' && !o.sentToCustomer);
+        if (activeCadSub === 'cad_awaiting_approval') list = list.filter((o: any) => o.cadSubStatus === 'UPLOADED' && o.sentToCustomer);
+        if (activeCadSub === 'cad_revision')          list = list.filter((o: any) => o.cadSubStatus === 'REVISION');
+        if (activeCadSub === 'cad_approved')          list = list.filter((o: any) => o.cadSubStatus === 'APPROVED');
         if (stoneSubFilter === 'stone_pending')  list = list.filter((o: any) => !o.stoneStatus || o.stoneStatus === StoneStatus.PENDING_STONE);
         if (stoneSubFilter === 'stone_received') list = list.filter((o: any) => o.stoneStatus === StoneStatus.STONE_RECEIVED);
         setOrders(list);
         setTotal(list.length);
+
+        // Batch-fetch thumbnails for visible orders (non-blocking)
+        const ids = list.map((o: any) => o.id).filter(Boolean);
+        if (ids.length) {
+          apiFetch(`${API}/cad/thumbnails?orderIds=${ids.join(',')}`)
+            .then(r => r.ok ? r.json() : {})
+            .then(map => setThumbnails(map))
+            .catch(() => {});
+        }
       }
     } finally { setLoading(false); }
   };
@@ -202,7 +206,7 @@ export default function OrdersPage() {
       } : {};
       const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        body: JSON.stringify({ ...newOrder, ...customerFields, quotedCost: Number(newOrder.quotedCost) || undefined, manufacturingPath: 'STANDARD', referenceWeblink: refLink || undefined }),
+        body: JSON.stringify({ ...newOrder, ...customerFields, manufacturingPath: 'STANDARD', referenceWeblink: refLink || undefined }),
       });
       if (res.ok) {
         const order = await res.json();
@@ -210,22 +214,24 @@ export default function OrdersPage() {
         // Upload all reference files
         if (refFiles.length > 0 && order.id) {
           const token = localStorage.getItem('jf_token');
+          let uploadFailed = false;
           for (const file of refFiles) {
             try {
               const fd = new FormData();
               fd.append('file', file);
-              fd.append('designerNotes', 'Reference image');
-              await fetch(`${API}/cad/reference/${order.id}`, {
+              const r = await fetch(`${API}/cad/reference/${order.id}`, {
                 method: 'POST',
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: fd,
               });
-            } catch {}
+              if (!r.ok) uploadFailed = true;
+            } catch { uploadFailed = true; }
           }
+          if (uploadFailed) alert('Order created but one or more reference files failed to upload. You can add them from the order detail page.');
         }
 
         setShowNew(false);
-        setNewOrder({ storeName: '', orderType: '', metalType: '', metalColor: '', quotedCost: '' });
+        setNewOrder({ storeName: '', orderType: '', metalType: '', metalColor: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
         setRefFiles([]);
@@ -252,8 +258,8 @@ export default function OrdersPage() {
     >
       {/* New Order Modal */}
       {showNew && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.5)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', width: '500px', maxWidth: '94vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.5)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', width: '500px', maxWidth: '94vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 New Order
@@ -334,7 +340,6 @@ export default function OrdersPage() {
               { label: 'Order Type',  key: 'orderType',  placeholder: 'e.g. Engagement Ring' },
               { label: 'Metal Type',  key: 'metalType',  placeholder: 'e.g. 18K' },
               { label: 'Metal Color', key: 'metalColor', placeholder: 'e.g. White Gold' },
-              ...(isAdmin ? [{ label: 'Quoted Cost ($)', key: 'quotedCost', placeholder: 'e.g. 3500' }] : []),
             ].map(({ label, key, placeholder }) => (
               <div key={key} style={fieldStyle}>
                 <label style={labelStyle}>{label}</label>
@@ -424,7 +429,7 @@ export default function OrdersPage() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search PO number, store, SKU…"
+          placeholder="Search PO number, store, customer, SKU…"
           style={{ ...inputStyle, flex: '1 1 200px', minWidth: '140px', maxWidth: '300px' }}
         />
 
@@ -465,10 +470,11 @@ export default function OrdersPage() {
       {showCadSubRow && (
         <div className="status-tabs-row" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid var(--accent)' }}>
           {[
-            { label: 'All CAD', value: '' },
-            { label: '⏳ Pending CAD', value: 'cad_pending' },
-            { label: '↺ Revision', value: 'cad_revision' },
-            { label: '💰 Awaiting Quote', value: 'cad_approved' },
+            { label: 'All CAD',             value: '' },
+            { label: '⏳ Pending CAD',      value: 'cad_pending' },
+            { label: '💰 Awaiting Quote',   value: 'cad_awaiting_quote' },
+            { label: '✅ Awaiting Approval', value: 'cad_awaiting_approval' },
+            { label: '↺ Revision',          value: 'cad_revision' },
           ].map(f => (
             <button key={f.value} onClick={() => setCadSubFilter(f.value)}
               style={{
@@ -511,9 +517,8 @@ export default function OrdersPage() {
         {(() => {
           const now = new Date();
           const months = [
-            { label: 'This Month',   y: now.getFullYear(), m: now.getMonth() + 1 },
-            { label: 'Last Month',   y: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), m: now.getMonth() === 0 ? 12 : now.getMonth() },
-            { label: '3 Months Ago', y: now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear(), m: ((now.getMonth() - 2 + 12) % 12) + 1 },
+            { label: 'This Month', y: now.getFullYear(), m: now.getMonth() + 1 },
+            { label: 'Last Month', y: now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), m: now.getMonth() === 0 ? 12 : now.getMonth() },
           ];
           return months.map(({ label, y, m }) => {
             const key = `${y}-${String(m).padStart(2, '0')}`;
@@ -530,10 +535,6 @@ export default function OrdersPage() {
             );
           });
         })()}
-        <input type="month" value={activeMonth}
-          onChange={e => { if (!e.target.value) { clearDates(); return; } const [y,m]=e.target.value.split('-').map(Number); applyMonth(y,m); }}
-          style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }} title="Pick a month"
-        />
         <input type="date" value={dateFrom}
           onChange={e => { setDateFrom(e.target.value); setActiveMonth(''); }}
           style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }}
@@ -547,30 +548,81 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {/* Kanban link */}
-      <div style={{ marginBottom: '20px' }}>
-        <button
-          onClick={() => router.push('/orders/kanban')}
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500, boxShadow: 'var(--shadow-sm)' }}
-        >
-          ⊞ Switch to Kanban view →
-        </button>
-      </div>
+      {/* Customer filter combobox */}
+      {(() => {
+        const countMap: Record<string, number> = {};
+        orders.forEach(o => {
+          const name = o.storeName || o.customerFullName || '';
+          if (name) countMap[name] = (countMap[name] || 0) + 1;
+        });
+        const allNames = Object.keys(countMap).sort((a, b) => a.localeCompare(b));
+        const q = customerFilterInput.toLowerCase();
+        const filtered = customerFilterInput
+          ? allNames.filter(n => n.toLowerCase().includes(q))
+          : allNames;
+        return (
+          <div style={{ position: 'relative', marginBottom: '20px', display: 'inline-block' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  value={customerFilterInput}
+                  onChange={e => { setCustomerFilterInput(e.target.value); setCustomerFilter(''); setShowFilterDrop(true); }}
+                  onFocus={() => setShowFilterDrop(true)}
+                  onBlur={() => setTimeout(() => setShowFilterDrop(false), 150)}
+                  placeholder="Filter by customer / store…"
+                  style={{ ...inputStyle, width: '280px', paddingRight: customerFilter ? '28px' : '12px' }}
+                />
+                {customerFilter && (
+                  <button
+                    onMouseDown={e => { e.preventDefault(); setCustomerFilter(''); setCustomerFilterInput(''); setShowFilterDrop(false); }}
+                    style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: '0', lineHeight: 1 }}
+                  >✕</button>
+                )}
+              </div>
+            </div>
+            {showFilterDrop && filtered.length > 0 && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, width: '280px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: 200, maxHeight: '220px', overflowY: 'auto' }}>
+                {filtered.map(name => (
+                  <div
+                    key={name}
+                    onMouseDown={e => { e.preventDefault(); setCustomerFilter(name); setCustomerFilterInput(name); setShowFilterDrop(false); }}
+                    style={{ padding: '9px 14px', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)', background: customerFilter === name ? 'rgba(192,155,88,0.1)' : 'transparent', fontWeight: customerFilter === name ? 600 : 400, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
+                    onMouseEnter={e => { if (customerFilter !== name) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = customerFilter === name ? 'rgba(192,155,88,0.1)' : 'transparent'; }}
+                  >
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                    <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', background: 'rgba(192,155,88,0.12)', border: '1px solid rgba(192,155,88,0.25)', borderRadius: '99px', padding: '1px 8px' }}>{countMap[name]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Orders grid */}
-      {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>Loading orders…</div>
-      ) : orders.length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>
-          No orders found.{search || statusFilter ? ' Try clearing your filters.' : ''}
-        </div>
-      ) : (
-        <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
-          {orders.map(order => (
-            <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} />
-          ))}
-        </div>
-      )}
+      {(() => {
+        const activeQ = (customerFilter || customerFilterInput).toLowerCase();
+        const displayOrders = activeQ
+          ? orders.filter(o =>
+              (o.customerFullName || '').toLowerCase().includes(activeQ) ||
+              (o.storeName || '').toLowerCase().includes(activeQ)
+            )
+          : orders;
+        return loading ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>Loading orders…</div>
+        ) : displayOrders.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>
+            No orders found.{search || statusFilter || customerFilter || customerFilterInput ? ' Try clearing your filters.' : ''}
+          </div>
+        ) : (
+          <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+            {displayOrders.map(order => (
+              <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} referenceImage={thumbnails[order.id!] ? `/uploads/cad/${thumbnails[order.id!]}` : undefined} currentUserRole={userRole} />
+            ))}
+          </div>
+        );
+      })()}
     </AppLayout>
   );
 }

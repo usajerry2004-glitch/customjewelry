@@ -12,15 +12,15 @@ export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}
 
   @Get('ready')
-  @Roles(UserRole.ADMIN, UserRole.SHIPPING_MANAGER, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Get orders ready to ship' })
+  @ApiOperation({ summary: 'Get manufactured orders ready to ship' })
   getReadyToShip() {
     return this.shippingService.getReadyToShip();
   }
 
   @Get('shipped')
-  @Roles(UserRole.ADMIN, UserRole.SHIPPING_MANAGER, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get shipped/delivered orders' })
   getShipped() {
@@ -28,7 +28,7 @@ export class ShippingController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.SHIPPING_MANAGER, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Shipping metrics' })
   getMetrics() {
@@ -36,7 +36,7 @@ export class ShippingController {
   }
 
   @Patch(':id/dispatch')
-  @Roles(UserRole.ADMIN, UserRole.SHIPPING_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Dispatch order — requires tracking number' })
   dispatch(

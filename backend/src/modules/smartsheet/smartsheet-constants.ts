@@ -1,8 +1,10 @@
 import { OrderStatus } from '../../database/entities/order.entity';
 
 export const STATUS_MAP: Record<string, OrderStatus> = {
+  // New orders (freshly submitted, not yet assigned)
+  'new':                             OrderStatus.NEW,
+
   // CAD In Progress (all early-stage statuses map here)
-  'new':                             OrderStatus.CAD_IN_PROGRESS,
   'waiting confirmation':            OrderStatus.CAD_IN_PROGRESS,
   'waiting for confirmation':        OrderStatus.CAD_IN_PROGRESS,
   'awaiting confirmation':           OrderStatus.CAD_IN_PROGRESS,
@@ -17,11 +19,6 @@ export const STATUS_MAP: Record<string, OrderStatus> = {
   'design in progress':              OrderStatus.CAD_IN_PROGRESS,
   'in progress':                     OrderStatus.CAD_IN_PROGRESS,
   'cad wip':                         OrderStatus.CAD_IN_PROGRESS,
-  'customer approved':               OrderStatus.CAD_IN_PROGRESS,
-  'customer cad approved':           OrderStatus.CAD_IN_PROGRESS,
-  'approved by customer':            OrderStatus.CAD_IN_PROGRESS,
-  'cad approved':                    OrderStatus.CAD_IN_PROGRESS,
-  'approved':                        OrderStatus.CAD_IN_PROGRESS,
   'order revision':                  OrderStatus.CAD_IN_PROGRESS,
   'revision requested':              OrderStatus.CAD_IN_PROGRESS,
   'revision':                        OrderStatus.CAD_IN_PROGRESS,
@@ -29,6 +26,13 @@ export const STATUS_MAP: Record<string, OrderStatus> = {
   'waiting for price':               OrderStatus.CAD_IN_PROGRESS,
   'price pending':                   OrderStatus.CAD_IN_PROGRESS,
   'awaiting price':                  OrderStatus.CAD_IN_PROGRESS,
+
+  // Customer approved → SKU Creation stage
+  'customer approved':               OrderStatus.SKU_CREATION,
+  'customer cad approved':           OrderStatus.SKU_CREATION,
+  'approved by customer':            OrderStatus.SKU_CREATION,
+  'cad approved':                    OrderStatus.SKU_CREATION,
+  'approved':                        OrderStatus.SKU_CREATION,
 
   // SKU Creation
   'kira sku issued':                 OrderStatus.SKU_CREATION,
@@ -50,24 +54,24 @@ export const STATUS_MAP: Record<string, OrderStatus> = {
   'order job bag created':           OrderStatus.VPO_ISSUED,
   'job bag':                         OrderStatus.VPO_ISSUED,
 
-  // Pending Contractor
-  'pending contractor':              OrderStatus.PENDING_CONTRACTOR,
-  'pending igi':                     OrderStatus.PENDING_CONTRACTOR,
-  'with contractor':                 OrderStatus.PENDING_CONTRACTOR,
-  'at contractor':                   OrderStatus.PENDING_CONTRACTOR,
-  'with vendor':                     OrderStatus.PENDING_CONTRACTOR,
+  // Repair
+  'pending contractor':              OrderStatus.REPAIR,
+  'with contractor':                 OrderStatus.REPAIR,
+  'at contractor':                   OrderStatus.REPAIR,
 
-  // Ready to Ship
-  'ready to ship':                   OrderStatus.READY_TO_SHIP,
-  'ready for shipping':              OrderStatus.READY_TO_SHIP,
-  'ready to invoice':                OrderStatus.READY_TO_SHIP,
-  'invoice ready':                   OrderStatus.READY_TO_SHIP,
+  // Manufactured (Ready to Ship / Invoice)
+  'pending igi':                     OrderStatus.MANUFACTURED,
+  'with vendor':                     OrderStatus.MANUFACTURED,
+  'ready to ship':                   OrderStatus.MANUFACTURED,
+  'ready for shipping':              OrderStatus.MANUFACTURED,
+  'ready to invoice':                OrderStatus.MANUFACTURED,
+  'invoice ready':                   OrderStatus.MANUFACTURED,
 
-  // Shipped
-  'shipped':                         OrderStatus.SHIPPED,
-  'dispatched':                      OrderStatus.SHIPPED,
-  'delivered':                       OrderStatus.SHIPPED,
-  'received':                        OrderStatus.SHIPPED,
+  // Shipped → treated as Manufactured (package is on its way, still in fulfilment)
+  'shipped':                         OrderStatus.MANUFACTURED,
+  'dispatched':                      OrderStatus.MANUFACTURED,
+  'delivered':                       OrderStatus.MANUFACTURED,
+  'received':                        OrderStatus.MANUFACTURED,
 
   // Repair
   'repair':                          OrderStatus.REPAIR,

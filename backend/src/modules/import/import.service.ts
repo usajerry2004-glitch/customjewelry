@@ -4,21 +4,69 @@ import { Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 
-const STATUS_MAP: Record<string, OrderStatus> = {
-  'ready to ship':        OrderStatus.READY_TO_SHIP,
-  'ready to invoice':     OrderStatus.READY_TO_SHIP,
-  'shipped':              OrderStatus.SHIPPED,
-  'delivered':            OrderStatus.SHIPPED,
-  'cad in progress':      OrderStatus.CAD_IN_PROGRESS,
-  'pending cad':          OrderStatus.CAD_IN_PROGRESS,
-  'customer approved':    OrderStatus.CAD_IN_PROGRESS,
-  'customer rejected':    OrderStatus.CANCELLED,
-  'sku creation':         OrderStatus.SKU_CREATION,
-  'vpo issued':           OrderStatus.VPO_ISSUED,
-  'pending contractor':   OrderStatus.PENDING_CONTRACTOR,
-  'waiting confirmation': OrderStatus.CAD_IN_PROGRESS,
-  'cancelled':            OrderStatus.CANCELLED,
-};
+// Smartsheet → portal status mapping (status string is the primary signal)
+// Smartsheet assigns a "Kira Sku #" reference code to every order at creation,
+// so SKU presence alone cannot be used to infer portal status.
+
+const SS_CANCELLED  = new Set(['cancelled', 'customer rejected']);
+
+const SS_MANUFACTURED = new Set([
+  'ready to ship', 'ready to invoice', 'shipped', 'delivered',
+  'pending contractor', 'pending igi',
+]);
+
+const SS_VPO = new Set([
+  'vpo issued to cj', 'order & job bag created', 'order & job bag crea',
+  'dia added to job bag',
+]);
+
+const SS_SKU_CREATION = new Set(['kira sku issued']);
+
+// Customer has approved the CAD — awaiting approval label
+const SS_CUSTOMER_APPROVED = new Set(['customer approved']);
+
+// CAD work is in progress — awaiting quote label
+const SS_CAD = new Set(['pending cad 3dm', 'pending cad', 'cad in progress']);
+
+// NEW — order received, no work started yet
+const SS_NEW = new Set(['new', 'waiting confirmation', 'need info']);
+
+function resolveImportedStatus(statusRaw: string, quotedCost: number | null, _skuNumber: string | null, _customerApproved: boolean): {
+  status: OrderStatus;
+  cadSubStatus: string | null;
+  sentToCustomer: boolean;
+} {
+  const s = statusRaw.toLowerCase().trim();
+
+  if (SS_CANCELLED.has(s))
+    return { status: OrderStatus.CANCELLED, cadSubStatus: null, sentToCustomer: false };
+
+  if (SS_MANUFACTURED.has(s))
+    return { status: OrderStatus.MANUFACTURED, cadSubStatus: null, sentToCustomer: false };
+
+  if (SS_VPO.has(s))
+    return { status: OrderStatus.VPO_ISSUED, cadSubStatus: null, sentToCustomer: false };
+
+  if (SS_SKU_CREATION.has(s))
+    return { status: OrderStatus.SKU_CREATION, cadSubStatus: null, sentToCustomer: false };
+
+  if (SS_CUSTOMER_APPROVED.has(s)) {
+    // If a quote is present the CAD was sent for approval; otherwise move to SKU_CREATION
+    if (quotedCost && quotedCost > 0)
+      return { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED', sentToCustomer: true };
+    return { status: OrderStatus.SKU_CREATION, cadSubStatus: null, sentToCustomer: false };
+  }
+
+  if (SS_CAD.has(s)) {
+    // CAD started — awaiting approval if quote present, awaiting quote if not
+    if (quotedCost && quotedCost > 0)
+      return { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED', sentToCustomer: true };
+    return { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED', sentToCustomer: false };
+  }
+
+  // "new", "waiting confirmation", "need info", or anything unrecognised → NEW
+  return { status: OrderStatus.NEW, cadSubStatus: null, sentToCustomer: false };
+}
 
 function str(val: any): string | null {
   const s = String(val ?? '').trim();
@@ -74,8 +122,11 @@ export class ImportService {
       const exists = await this.orderRepo.findOne({ where: { poNumber } });
       if (exists) { skipped++; continue; }
 
-      const statusRaw = String(row['Status'] ?? '').trim().toLowerCase();
-      const status = STATUS_MAP[statusRaw] || OrderStatus.CAD_IN_PROGRESS;
+      const statusRaw   = String(row['Status'] ?? '').trim();
+      const quotedCostV = money(row['Kira Quoted Cost']);
+      const skuNumberV  = str(row['Kira Sku #']);
+      const custApproved = String(row['Customer Email Contact approval'] ?? '').toLowerCase() === 'approved';
+      const { status, cadSubStatus, sentToCustomer: sentToCustomerV } = resolveImportedStatus(statusRaw, quotedCostV, skuNumberV, custApproved);
 
       let processedDate: Date | null = null;
       const pdRaw = row['Processed Date'];
@@ -88,7 +139,8 @@ export class ImportService {
         const order = this.orderRepo.create({
           poNumber,
           status,
-          kiraSkuNumber:           str(row['Kira Sku #']),
+          cadSubStatus,
+          kiraSkuNumber:           skuNumberV,
           trackingNumber:          str(row['Tracking']),
           storeName:               str(row['Store Name']),
           customerFullName:        str(row['Customer Full Name']) || str(row['Customer Name']),
@@ -106,7 +158,7 @@ export class ImportService {
           referenceWeblink:        str(row['Reference Weblink']),
           stockNumber:             str(row['Stock No# (If from Inventory)']),
           customerNotes:           str(row['Customer Comments']),
-          quotedCost:              money(row['Kira Quoted Cost']),
+          quotedCost:              quotedCostV,
           goldLockPrice:           money(row['Gold Lock']),
           invoiceNumber:           str(row['Invoice #']),
           shipMethod:              str(row['Ship Method']),
@@ -121,10 +173,10 @@ export class ImportService {
           timeFrame:               str(row['Time Frame']),
           phoneNumber:             str(row['Phone Number']),
           refCustomerPo:           str(row['Ref Customer PO#']) || str(row['Customer PO# / Reference No#']),
-          customerEmailApproval:   String(row['Customer Email Contact approval'] ?? '').toLowerCase() === 'approved',
+          customerEmailApproval:   custApproved,
           sentToRc:                String(row['Send to RC'] ?? '').toLowerCase() === 'yes',
           isArchived:              String(row['Archive'] ?? '').toLowerCase() === 'yes',
-          sentToCustomer:          String(row['Send to Customer'] ?? '').toLowerCase() === 'yes',
+          sentToCustomer:          sentToCustomerV,
           processedDate,
         });
         await this.orderRepo.save(order);

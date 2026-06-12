@@ -1,5 +1,6 @@
 import {
-  Controller, Post, Body, UploadedFiles, UseInterceptors,
+  Controller, Post, Get, Patch, Body, Param,
+  UploadedFiles, UseInterceptors,
   Headers, ForbiddenException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -28,11 +29,7 @@ export class PublicOrdersController {
     private readonly config: ConfigService,
   ) {}
 
-  /**
-   * POST /api/v1/public/orders
-   * Called by the WordPress PHP form — no JWT required.
-   * Protected by x-api-key header (shared secret).
-   */
+  // ── WordPress / web form order submission ─────────────────────────────
   @Post('orders')
   @Public()
   @UseInterceptors(FilesInterceptor('files', 5, { storage }))
@@ -42,14 +39,12 @@ export class PublicOrdersController {
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    // Validate API key
     const expected = this.config.get<string>('WORDPRESS_API_KEY', '');
     if (!expected || apiKey !== expected) {
       this.logger.warn(`Web order rejected — invalid API key`);
       throw new ForbiddenException('Invalid API key');
     }
 
-    // Require at minimum email + first name
     if (!body.email || !body.firstName) {
       throw new BadRequestException('email and firstName are required');
     }
@@ -76,5 +71,34 @@ export class PublicOrdersController {
       },
       files || [],
     );
+  }
+
+  // ── Customer order tracking (magic link, no auth) ─────────────────────
+  @Get('track/:token')
+  @Public()
+  @ApiOperation({ summary: 'Get order status by tracking token' })
+  async getTracking(@Param('token') token: string) {
+    return this.service.getOrderByToken(token);
+  }
+
+  @Patch('track/:token/cad/:cadId/approve')
+  @Public()
+  @ApiOperation({ summary: 'Customer approves a CAD design' })
+  async approveCad(
+    @Param('token') token: string,
+    @Param('cadId') cadId: string,
+  ) {
+    return this.service.approveCad(token, cadId);
+  }
+
+  @Patch('track/:token/cad/:cadId/reject')
+  @Public()
+  @ApiOperation({ summary: 'Customer requests CAD revision' })
+  async rejectCad(
+    @Param('token') token: string,
+    @Param('cadId') cadId: string,
+    @Body() body: any,
+  ) {
+    return this.service.rejectCad(token, cadId, body?.feedback || '');
   }
 }

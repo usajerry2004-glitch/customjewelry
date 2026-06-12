@@ -24,8 +24,8 @@ const card: React.CSSProperties = {
 };
 
 const PIPELINE_ORDER: OrderStatus[] = [
-  OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED,
-  OrderStatus.PENDING_CONTRACTOR, OrderStatus.READY_TO_SHIP, OrderStatus.SHIPPED,
+  OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED,
+  OrderStatus.MANUFACTURED, OrderStatus.SHIPPED,
   OrderStatus.REPAIR, OrderStatus.COMPLETED,
 ];
 
@@ -37,9 +37,10 @@ export default function Dashboard() {
   const [metrics, setMetrics]     = useState<Metrics | null>(null);
   const [overdue, setOverdue]     = useState<Overdue[]>([]);
   const [actions, setActions]     = useState<Priority[]>([]);
-  const [trend, setTrend]         = useState<Trend[]>([]);
   const [recent, setRecent]       = useState<RecentOrder[]>([]);
-  const [topStores, setTopStores]     = useState<TopStore[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+  const [monthReport, setMonthReport]     = useState<any>(null);
+  const [monthLoading, setMonthLoading]   = useState(false);
   const [myOrderTotal, setMyOrderTotal] = useState<number>(0);
   const [loading, setLoading]         = useState(true);
   const [userRole, setUserRole]   = useState('');
@@ -54,18 +55,14 @@ export default function Dashboard() {
   useEffect(() => {
     const sevenAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const load = async () => {
-      const [mRes, slaRes, priRes, trendRes, rRes, storeRes] = await Promise.all([
+      const [mRes, slaRes, priRes, rRes] = await Promise.all([
         apiFetch(`${API}/orders/metrics`),
         apiFetch(`${API}/sla/overdue`),
         apiFetch(`${API}/orders/priority`),
-        apiFetch(`${API}/reporting/daily-trend`),
         apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
-        apiFetch(`${API}/reporting/report?period=month`),
       ]);
-      if (mRes.ok)     setMetrics(await mRes.json());
-      if (slaRes.ok)   setOverdue(await slaRes.json());
-      if (trendRes.ok) setTrend(await trendRes.json());
-      if (storeRes.ok) { const d = await storeRes.json(); setTopStores(d.topStores || []); }
+      if (mRes.ok)   setMetrics(await mRes.json());
+      if (slaRes.ok) setOverdue(await slaRes.json());
       // Fetch role-filtered total (used by Sales Rep and other roles)
       const myRes = await apiFetch(`${API}/orders?limit=1`);
       if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
@@ -90,14 +87,31 @@ export default function Dashboard() {
     load();
   }, []);
 
+  useEffect(() => {
+    const y = selectedMonth.getFullYear();
+    const m = String(selectedMonth.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, selectedMonth.getMonth() + 1, 0).getDate();
+    const from = `${y}-${m}-01`;
+    const to   = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    setMonthLoading(true);
+    apiFetch(`${API}/reporting/report?from=${from}&to=${to}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setMonthReport(d); setMonthLoading(false); });
+  }, [selectedMonth]);
+
   const sc = (s: string) => parseInt(metrics?.byStatus.find(b => b.status === s)?.count || '0');
   const activeOrders  = metrics?.byStatus.reduce((t, b) => ['COMPLETED','CANCELLED'].includes(b.status) ? t : t + parseInt(b.count), 0) ?? 0;
-  const totalReceived  = trend.reduce((s, t) => s + t.created, 0);
-  const totalCompleted = trend.reduce((s, t) => s + t.completed, 0);
+  const monthReceived  = monthReport?.newOrders ?? 0;
+  const monthCompleted = monthReport?.completedOrders ?? 0;
   const pieData = [
-    { name: `Received  ${totalReceived}`,   value: totalReceived,  fill: NAVY },
-    { name: `Completed  ${totalCompleted}`, value: totalCompleted, fill: GOLD },
+    { name: `Received  ${monthReceived}`,   value: monthReceived,  fill: NAVY },
+    { name: `Completed  ${monthCompleted}`, value: monthCompleted, fill: GOLD },
   ].filter(d => d.value > 0);
+  const now2 = new Date();
+  const isCurrentMonth = selectedMonth.getFullYear() === now2.getFullYear() && selectedMonth.getMonth() === now2.getMonth();
+  const monthLabel = selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const goPrev = () => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1));
+  const goNext = () => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1));
 
   // ── Shared components ────────────────────────────────────────────────────────
 
@@ -191,7 +205,7 @@ export default function Dashboard() {
 
       {/* ── Pipeline ── */}
       <div style={{ ...card, padding: '20px 22px', marginBottom: 8 }}>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
+        <div className="pipeline-row" style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
           {PIPELINE_ORDER.map((status, i) => {
             const cfg = STATUS_CONFIG[status]; const count = sc(status); const isLast = i === PIPELINE_ORDER.length - 1;
             return (
@@ -211,16 +225,26 @@ export default function Dashboard() {
       </div>
 
       {/* ── Analytics ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '28px 0 18px' }}>
+        <div style={{ width: 3, height: 18, background: GOLD, borderRadius: 2, flexShrink: 0 }} />
+        <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 16, fontWeight: 700, color: NAVY, letterSpacing: '1px', whiteSpace: 'nowrap' }}>Monthly Analytics</span>
+        <div style={{ flex: 1, height: 1, background: '#E8E0D4' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <button onClick={goPrev} style={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY, fontSize: 16, fontWeight: 700, lineHeight: 1, padding: 0 }}>‹</button>
+          <span style={{ fontSize: 13, fontWeight: 600, color: NAVY, minWidth: 108, textAlign: 'center', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{monthLabel}</span>
+          <button onClick={goNext} disabled={isCurrentMonth} style={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 6, width: 28, height: 28, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isCurrentMonth ? '#C9D0D8' : NAVY, fontSize: 16, fontWeight: 700, lineHeight: 1, padding: 0 }}>›</button>
+        </div>
+      </div>
       <div className="dash-3col">
 
-        {/* Weekly Activity — Pie */}
+        {/* Monthly Activity — Pie */}
         <div style={{ ...card, padding: '20px 22px' }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Weekly Activity</h2>
-          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — last 7 days</div>
-          {loading ? (
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Monthly Activity</h2>
+          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — {monthLabel}</div>
+          {monthLoading ? (
             <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
           ) : pieData.length === 0 ? (
-            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No orders this week</div>
+            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No orders this month</div>
           ) : <>
             <ResponsiveContainer width="100%" height={155}>
               <PieChart>
@@ -244,20 +268,20 @@ export default function Dashboard() {
         {/* Top Customers */}
         <div style={{ ...card, padding: '20px 22px' }}>
           <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Top Customers</h2>
-          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Most active this month</div>
-          {loading ? (
+          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Most active — {monthLabel}</div>
+          {monthLoading ? (
             <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
-          ) : topStores.length === 0 ? (
+          ) : !monthReport?.topStores?.length ? (
             <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No data this month</div>
           ) : (
             <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={topStores.slice(0, 5)} layout="vertical" margin={{ top: 2, right: 32, bottom: 0, left: 4 }}>
+              <BarChart data={monthReport.topStores.slice(0, 5)} layout="vertical" margin={{ top: 2, right: 32, bottom: 0, left: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F0EBE3" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12, fill: '#9BA8B5' }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="store" tick={{ fontSize: 12, fill: '#5C6B7A' }} axisLine={false} tickLine={false} width={108} />
                 <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} formatter={(v) => [`${v} orders`, 'Orders']} />
                 <Bar dataKey="count" radius={[0,5,5,0]}>
-                  {topStores.slice(0, 5).map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
+                  {monthReport.topStores.slice(0, 5).map((_: any, i: number) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -317,10 +341,9 @@ export default function Dashboard() {
     SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: myOrderTotal, color: NAVY, sub: 'my customers only', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     CAD_DESIGNER:    { subtitle: 'CAD Queue',         kpis: [{ label: 'In CAD Queue', value: sc('CAD_IN_PROGRESS'), color: '#6366F1', sub: 'awaiting design', link: '/orders?status=CAD_IN_PROGRESS' }, { label: 'Revision Needed', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('revision')).length, color: '#DC2626', sub: 'customer requested', link: '/todos' }, { label: 'Awaiting Quote', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('quote')).length, color: GOLD_DARK, sub: 'approved, needs price', link: '/todos' }] },
     SKU_MANAGER:     { subtitle: 'SKU Queue',         kpis: [{ label: 'Pending SKU', value: sc('SKU_CREATION'), color: '#F97316', sub: 'ready for generation', link: '/orders?status=SKU_CREATION' }, { label: 'Priority Tasks', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
-    FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'With Contractor', value: sc('PENDING_CONTRACTOR'), color: GOLD_DARK, sub: 'sent out', link: '/orders?status=PENDING_CONTRACTOR' }, { label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'awaiting shipping', link: '/orders?status=READY_TO_SHIP' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
+    FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'Manufactured', value: sc('MANUFACTURED'), color: '#8B5CF6', sub: 'done, en route to US', link: '/orders?status=MANUFACTURED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
     STONE_MANAGER:   { subtitle: 'Stone Queue',       kpis: [{ label: 'Pending Stone', value: sc('VPO_ISSUED'), color: '#7C3AED', sub: 'awaiting dispatch', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#DC2626', sub: '> 1 day overdue', link: '/todos' }] },
-    SHIPPING_MANAGER:{ subtitle: 'Shipping Queue',    kpis: [{ label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'awaiting dispatch', link: '/orders?status=READY_TO_SHIP' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#8B5CF6', sub: 'in transit', link: '/orders?status=SHIPPED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'overdue items', link: '/todos' }] },
-    CUSTOMER:        { subtitle: 'My Orders',         kpis: [{ label: 'Active Orders', value: activeOrders, color: NAVY, sub: 'in progress', link: '/orders' }, { label: 'Ready to Ship', value: sc('READY_TO_SHIP'), color: '#3B82F6', sub: 'being prepared', link: '/orders?status=READY_TO_SHIP' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#8B5CF6', sub: 'on the way', link: '/orders?status=SHIPPED' }] },
+    CUSTOMER:        { subtitle: 'My Orders',         kpis: [{ label: 'Active Orders', value: activeOrders, color: NAVY, sub: 'in progress', link: '/orders' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#3B82F6', sub: 'on the way', link: '/orders?status=SHIPPED' }, { label: 'Completed', value: sc('COMPLETED'), color: '#10B981', sub: 'delivered', link: '/orders?status=COMPLETED' }] },
   };
 
   const cfg = roleConfigs[userRole];

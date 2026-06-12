@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../../../utils/types';
 import { OrderConversation } from '../../../components/OrderConversation';
+
+const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -20,44 +23,52 @@ interface CadFile {
   createdAt: string;
 }
 
+
 // ── Inline viewer modal (customer-facing) ─────────────────────────────────
-function CadViewer({ cad, onClose }: { cad: CadFile; onClose: () => void }) {
+function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIndex: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(initialIndex);
+  const cad      = cads[idx];
   const ext      = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
   const isPdf    = ext === 'pdf';
+  const is3dm    = ext === '3dm';
   const fileUrl  = `/uploads/cad/${cad.fileName}`;
   const cs       = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft')  setIdx(i => Math.max(0, i - 1));
+      if (e.key === 'ArrowRight') setIdx(i => Math.min(cads.length - 1, i + 1));
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, cads.length]);
 
   return (
     <div
+      className="modal-bg"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
     >
-      <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', width: '100%', maxWidth: '860px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="modal-box" style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', width: '100%', maxWidth: '860px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : '📎'}</span>
+            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : is3dm ? '📐' : '📎'}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cad.originalName}</div>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
                 <span style={{ fontSize: '11px', background: `${cs.color}18`, color: cs.color, padding: '1px 8px', borderRadius: '99px', fontWeight: 700 }}>{cs.label}</span>
+                {cads.length > 1 && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{idx + 1} / {cads.length}</span>
+                )}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
-            <a href={fileUrl} download={cad.originalName}
-              style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
-              ↓ Download
-            </a>
             <button onClick={onClose}
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 12px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)' }}>
               ✕
@@ -65,24 +76,49 @@ function CadViewer({ cad, onClose }: { cad: CadFile; onClose: () => void }) {
           </div>
         </div>
 
-        {/* Preview */}
-        <div style={{ flex: 1, overflow: 'auto', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
+        {/* Preview with slider arrows */}
+        <div style={{ flex: 1, overflow: 'auto', background: '#111827', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px', position: 'relative' }}>
+          {cads.length > 1 && (
+            <>
+              <button
+                onClick={() => setIdx(i => Math.max(0, i - 1))}
+                disabled={idx === 0}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', fontSize: '22px', lineHeight: 1, cursor: idx === 0 ? 'not-allowed' : 'pointer', color: '#fff', opacity: idx === 0 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.15s' }}
+              >‹</button>
+              <button
+                onClick={() => setIdx(i => Math.min(cads.length - 1, i + 1))}
+                disabled={idx === cads.length - 1}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 10, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', fontSize: '22px', lineHeight: 1, cursor: idx === cads.length - 1 ? 'not-allowed' : 'pointer', color: '#fff', opacity: idx === cads.length - 1 ? 0.25 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.15s' }}
+              >›</button>
+            </>
+          )}
           {isImage ? (
             <img src={fileUrl} alt={cad.originalName}
               style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', display: 'block' }} />
           ) : isPdf ? (
             <iframe src={`${fileUrl}#toolbar=1`} style={{ width: '100%', height: '65vh', border: 'none' }} title={cad.originalName} />
+          ) : is3dm ? (
+            <ThreeDmViewer fileUrl={fileUrl} height={480} />
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '56px', marginBottom: '14px', opacity: 0.4 }}>📎</div>
-              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '18px' }}>Preview not available for .{ext} files</div>
-              <a href={fileUrl} download={cad.originalName}
-                style={{ background: 'var(--accent)', color: '#fff', padding: '10px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
-                ↓ Download File
-              </a>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>Preview not available for .{ext} files</div>
             </div>
           )}
         </div>
+
+        {/* Dot indicators */}
+        {cads.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '10px', background: '#111827', flexShrink: 0 }}>
+            {cads.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                style={{ width: i === idx ? '20px' : '8px', height: '8px', borderRadius: '4px', border: 'none', background: i === idx ? 'var(--accent, #6366F1)' : 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Notes footer */}
         {(cad.designerNotes || cad.customerFeedback) && (
@@ -115,14 +151,12 @@ const CAD_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 const TIMELINE = [
-  { status: 'WAITING_CONFIRMATION', label: 'Order Received' },
-  { status: 'PENDING_CAD', label: 'CAD Design' },
-  { status: 'CAD_IN_PROGRESS', label: 'Design Review' },
-  { status: 'CUSTOMER_APPROVED', label: 'Approved' },
-  { status: 'VPO_ISSUED', label: 'Manufacturing' },
-  { status: 'READY_TO_SHIP', label: 'Ready to Ship' },
-  { status: 'SHIPPED', label: 'Shipped' },
-  { status: 'DELIVERED', label: 'Delivered' },
+  { status: 'NEW',            label: 'Order Received' },
+  { status: 'CAD_IN_PROGRESS', label: 'CAD Design' },
+  { status: 'SKU_CREATION',   label: 'Design Approved' },
+  { status: 'VPO_ISSUED',     label: 'In Production' },
+  { status: 'MANUFACTURED',   label: 'Manufactured' },
+  { status: 'COMPLETED',      label: 'Completed' },
 ];
 
 const card: React.CSSProperties = {
@@ -140,7 +174,7 @@ export default function CustomerOrderDetail() {
   const [batchFeedback, setBatchFeedback] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
-  const [viewingCad, setViewingCad] = useState<CadFile | null>(null);
+  const [viewerState, setViewerState] = useState<{ list: CadFile[]; idx: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -337,13 +371,13 @@ export default function CustomerOrderDetail() {
             </div>
           ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {refs.map(cad => {
+            {refs.map((cad, cadIdx) => {
               const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
               const fileUrl = `/uploads/cad/${cad.fileName}`;
               return (
                 <div key={cad.id}
-                  onClick={() => setViewingCad(cad)}
+                  onClick={() => setViewerState({ list: refs, idx: cadIdx })}
                   style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', width: '150px', cursor: 'pointer' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
@@ -408,7 +442,7 @@ export default function CustomerOrderDetail() {
 
                     {/* List each file in the batch */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                      {pendingBatch.map(cad => (
+                      {pendingBatch.map((cad, cadIdx) => (
                         <div key={cad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 12px' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -423,7 +457,7 @@ export default function CustomerOrderDetail() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(cad.createdAt).toLocaleDateString()}</span>
                             <button
-                              onClick={() => setViewingCad(cad)}
+                              onClick={() => setViewerState({ list: pendingBatch, idx: cadIdx })}
                               style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                             >
                               👁 View
@@ -468,7 +502,7 @@ export default function CustomerOrderDetail() {
                 )}
 
                 {/* Already-actioned files */}
-                {otherFiles.map(cad => {
+                {otherFiles.map((cad, cadIdx) => {
                   const cs = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
                   return (
                     <div key={cad.id} style={{ background: 'var(--bg-input)', border: `1px solid ${cs.color}30`, borderRadius: 'var(--radius)', padding: '14px 16px' }}>
@@ -489,7 +523,7 @@ export default function CustomerOrderDetail() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(cad.createdAt).toLocaleDateString()}</span>
                           <button
-                            onClick={() => setViewingCad(cad)}
+                            onClick={() => setViewerState({ list: otherFiles, idx: cadIdx })}
                             style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                           >
                             👁 View
@@ -518,8 +552,8 @@ export default function CustomerOrderDetail() {
       )}
     </CustomerLayout>
 
-    {viewingCad && (
-      <CadViewer cad={viewingCad} onClose={() => setViewingCad(null)} />
+    {viewerState && (
+      <CadViewer cads={viewerState.list} initialIndex={viewerState.idx} onClose={() => setViewerState(null)} />
     )}
     </>
   );

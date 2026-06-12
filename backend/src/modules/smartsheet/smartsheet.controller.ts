@@ -40,18 +40,36 @@ export class SmartsheetController {
     return this.importService.importMayOrders(sheetId, from, to);
   }
 
+  @Post('import/rows')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Import specific Smartsheet rows by row ID — bypasses date filter' })
+  importRows(@Body() body: { rowIds: string[] }) {
+    const sheetId = this.config.get('SMARTSHEET_SHEET_ID', '2085580205674372');
+    return this.importService.importByRowIds(sheetId, body.rowIds);
+  }
+
   @Post('import/patch-media')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Patch reference images + comments onto already-imported orders' })
-  @ApiQuery({ name: 'from', required: false, example: '2026-05-15' })
-  @ApiQuery({ name: 'to',   required: false, example: '2026-05-31' })
+  @ApiOperation({ summary: 'Patch reference images + comments onto already-imported orders. Omit from/to to process all rows.' })
+  @ApiQuery({ name: 'from', required: false, description: 'Start date (omit to process all rows)' })
+  @ApiQuery({ name: 'to',   required: false, description: 'End date (omit to process all rows)' })
   patchMedia(
-    @Query('from') from = '2026-05-15',
-    @Query('to')   to   = '2026-05-31',
+    @Query('from') from?: string,
+    @Query('to')   to?:   string,
   ) {
     const sheetId = this.config.get('SMARTSHEET_SHEET_ID', '2085580205674372');
     return this.importService.patchMediaAndComments(sheetId, from, to);
+  }
+
+  @Post('sync-comments/:orderId')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Sync Smartsheet conversations for a specific portal order' })
+  syncComments(@Param('orderId') orderId: string) {
+    const sheetId = this.config.get('SMARTSHEET_SHEET_ID', '2085580205674372');
+    return this.importService.syncCommentsForOrder(orderId, sheetId);
   }
 
   // ── Manual sync (re-pulls latest status + fields for all imported orders) ─

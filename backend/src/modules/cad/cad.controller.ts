@@ -1,11 +1,11 @@
 import {
-  Controller, Post, Get, Patch, Param, Body, UploadedFile, UploadedFiles,
+  Controller, Post, Get, Patch, Delete, Param, Query, Body, UploadedFile, UploadedFiles,
   UseInterceptors, Request, UseGuards, ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CadService } from './cad.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -25,6 +25,12 @@ const storage = diskStorage({
 export class CadController {
   constructor(private readonly cadService: CadService) {}
 
+  @Get('status-counts')
+  @ApiOperation({ summary: 'Count of CAD files by status for CAD_IN_PROGRESS orders' })
+  async getStatusCounts() {
+    return this.cadService.getStatusCounts();
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER)
   @UseGuards(RolesGuard)
@@ -38,12 +44,35 @@ export class CadController {
   async getByOrder(@Param('orderId') orderId: string, @Request() req: any) {
     if (req.user?.role === UserRole.CUSTOMER) {
       await this.cadService.assertCustomerOwnsOrder(orderId, req.user.email);
+      const cads = await this.cadService.getByOrder(orderId);
+      const visible = await this.cadService.isVisibleToCustomer(orderId);
+      if (!visible) {
+        // Before CAD is sent, customers can still see their reference images
+        return cads.filter(c =>
+          c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image'
+        );
+      }
+      return cads;
     }
     const cads = await this.cadService.getByOrder(orderId);
-    if (req.user?.role === UserRole.CUSTOMER) {
-      return cads.filter(c => !c.originalName.toLowerCase().endsWith('.3dm'));
-    }
     return cads;
+  }
+
+  @Patch('order/:orderId/send-to-customer')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Send CAD files to customer for approval (Admin/Authorizer only)' })
+  async sendToCustomer(@Param('orderId') orderId: string) {
+    await this.cadService.sendToCustomer(orderId);
+    return { sent: true };
+  }
+
+  @Get('thumbnails')
+  @ApiOperation({ summary: 'Get first reference image filename for a batch of orders' })
+  @ApiQuery({ name: 'orderIds', required: true, description: 'Comma-separated order IDs' })
+  async getThumbnails(@Query('orderIds') orderIds: string) {
+    const ids = (orderIds || '').split(',').map(s => s.trim()).filter(Boolean);
+    return this.cadService.getThumbnails(ids);
   }
 
   @Post('reference/:orderId')
@@ -108,6 +137,15 @@ export class CadController {
       throw new ForbiddenException('Not authorized');
     }
     return this.cadService.reject(id, feedback || 'Rejected');
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.CAD_DESIGNER, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Delete a CAD file (CAD Designer or Admin, only if not yet approved/rejected)' })
+  async deleteFile(@Param('id') id: string) {
+    await this.cadService.deleteFile(id);
+    return { deleted: true };
   }
 
   @Patch(':id/revision')

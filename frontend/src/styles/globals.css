@@ -1,18 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+/* Fonts loaded via <link> in _app.tsx — no duplicate @import needed */
 
 :root {
-  --bg-page:      #F5F3EF;
-  --bg-card:      #FFFFFF;
-  --bg-input:     #F9F8F5;
-  --bg-hover:     #F0EDE7;
-  --sidebar-bg:   #0D1B35;
-  --sidebar-border: rgba(255,255,255,0.08);
-  --topbar-bg:    #FFFFFF;
-  --border:       #E5DFD5;
-  --border-light: #EDE9E2;
+  --bg-page:      #F2EFE9;
+  --bg-card:      #FDFCFA;
+  --bg-input:     #F7F4EF;
+  --bg-hover:     #EDE8DF;
+  --sidebar-bg:   #0A1628;
+  --sidebar-border: rgba(255,255,255,0.07);
+  --topbar-bg:    #FDFCFA;
+  --border:       #DDD7CB;
+  --border-light: #E8E2D8;
   --text-primary: #1A2740;
-  --text-secondary: #5C6B7A;
-  --text-muted:   #9BA8B5;
+  --text-secondary: #4A5968;
+  --text-muted:   #8A97A4;
   --text-inverse: #FFFFFF;
   --accent:       #C09B58;
   --accent-dark:  #A07C3A;
@@ -21,12 +21,12 @@
   --navy-hover:   #243452;
   --danger:       #DC2626;
   --success:      #059669;
-  --shadow-sm:    0 1px 3px rgba(26,39,64,0.08), 0 1px 2px rgba(26,39,64,0.04);
-  --shadow-md:    0 4px 12px rgba(26,39,64,0.10), 0 2px 4px rgba(26,39,64,0.06);
-  --shadow-lg:    0 12px 32px rgba(26,39,64,0.14), 0 4px 8px rgba(26,39,64,0.06);
-  --radius-sm:    6px;
-  --radius:       10px;
-  --radius-lg:    14px;
+  --shadow-sm:    0 2px 8px rgba(26,39,64,0.08), 0 1px 2px rgba(26,39,64,0.04);
+  --shadow-md:    0 6px 20px rgba(26,39,64,0.10), 0 2px 6px rgba(26,39,64,0.06);
+  --shadow-lg:    0 16px 40px rgba(26,39,64,0.14), 0 4px 10px rgba(26,39,64,0.07);
+  --radius-sm:    7px;
+  --radius:       12px;
+  --radius-lg:    16px;
 }
 
 * {
@@ -39,7 +39,37 @@ body {
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force DM Sans everywhere */
+*, *::before, *::after {
+  font-family: inherit;
+}
+
+/* Cormorant Garamond on all headings — overrides inline styles */
+h1, h2, h3,
+.topbar-title,
+[style*="Cormorant"],
+[style*="cormorant"],
+[style*="Georgia"] {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* Force DM Sans on all inputs, buttons, labels */
+input, select, textarea, button, label, th, td, span, p, div, a {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+}
+
+/* Re-apply Cormorant for elements that explicitly want it */
+[style*="Cormorant Garamond"],
+[style*="fontFamily: 'Cormorant"],
+[style*='fontFamily: "Cormorant'] {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
 }
 
 a {
@@ -473,6 +503,181 @@ input::placeholder, textarea::placeholder {
   .input-group { flex-direction: column !important; }
   .input-group input,
   .input-group button { width: 100% !important; }
+}
+
+/* ── Admin topbar responsive ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .admin-topbar { padding: 0 14px !important; }
+}
+
+/* ── Customer portal topnav responsive ──────────────────────────────── */
+@media (max-width: 640px) {
+  .customer-topnav { padding: 0 16px !important; height: auto !important; min-height: 56px; flex-wrap: wrap !important; }
+  .customer-topnav-left { gap: 12px !important; }
+  .customer-username { display: none !important; }
+  .customer-page-header { padding: 14px 16px !important; }
+}
+
+/* ── Aesthetic Polish Layer ──────────────────────────────────────────── */
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(192,155,88,0.25); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(192,155,88,0.5); }
+
+/* Text selection */
+::selection { background: rgba(192,155,88,0.18); color: #1A2740; }
+
+/* Page title (h1 in topbar) */
+h1 {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+/* Section headings (h2 used in cards) */
+h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+/* Large KPI numbers — force Cormorant Garamond regardless of inline styles */
+.kpi-value,
+[style*="fontSize: '36"],
+[style*="fontSize: '40"],
+[style*="fontSize: '48"],
+[style*="fontSize: '32"],
+[style*='fontSize: "36'],
+[style*='fontSize: "40'],
+[style*='fontSize: "32'] {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+/* Card universal polish */
+[style*="borderRadius"][style*="boxShadow"],
+[style*="border-radius"][style*="box-shadow"] {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Topbar title refinement */
+.topbar-title {
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-size: 27px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px !important;
+  color: var(--text-primary) !important;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+.topbar-subtitle {
+  font-size: 11px !important;
+  letter-spacing: 0.3px !important;
+  color: var(--text-muted) !important;
+  margin-top: 1px !important;
+}
+
+/* Sidebar nav link refinement */
+.app-sidebar a {
+  transition: all 0.15s ease !important;
+}
+.app-sidebar a:hover {
+  color: rgba(255,255,255,0.75) !important;
+  background: rgba(192,155,88,0.08) !important;
+}
+
+/* Table header refinement */
+thead th {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+  color: var(--text-muted) !important;
+}
+
+/* Table row hover */
+tbody tr {
+  transition: background 0.12s ease;
+}
+tbody tr:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* Status badge polish */
+[style*="border-radius: 99px"],
+[style*="borderRadius: 99px"],
+[style*="borderRadius:'99px'"] {
+  font-size: 11px !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* Button refinement */
+button {
+  transition: opacity 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease !important;
+  letter-spacing: 0.2px;
+}
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26,39,64,0.15) !important;
+}
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Input refinement */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* Gold divider utility */
+.gold-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(192,155,88,0.4), transparent);
+  margin: 20px 0;
+}
+
+/* Sidebar logo area subtle shine */
+.app-sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(192,155,88,0.3), transparent);
+  pointer-events: none;
+}
+.app-sidebar { position: relative; }
+
+/* Better link underline style in content areas */
+.prose a, .content a {
+  text-decoration: underline;
+  text-decoration-color: rgba(192,155,88,0.4);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s;
+}
+.prose a:hover, .content a:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* Notification badge pulse */
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192,155,88,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(192,155,88,0); }
+}
+
+/* Page fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.main-content-pad {
+  animation: fadeIn 0.25s ease forwards;
 }
 
 /* ── Print / PDF styles ───────────────────────────────────────────────── */

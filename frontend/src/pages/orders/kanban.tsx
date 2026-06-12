@@ -2,19 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
-import { Order, STATUS_CONFIG } from '../../utils/types';
+import { Order, STATUS_CONFIG, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 interface KanbanColumn { status: string; orders: Partial<Order>[]; count: number; }
 
 const COLUMN_ORDER = [
-  'CAD_IN_PROGRESS', 'SKU_CREATION',
-  'VPO_ISSUED', 'PENDING_CONTRACTOR',
-  'READY_TO_SHIP', 'SHIPPED',
-  'REPAIR', 'COMPLETED', 'CANCELLED',
+  'NEW', 'CAD_IN_PROGRESS', 'SKU_CREATION',
+  'VPO_ISSUED', 'MANUFACTURED', 'COMPLETED',
+  'REPAIR', 'CANCELLED', 'SHIPPED',
 ];
 
 const PHASES = [
+  {
+    label: 'New',
+    icon: '📥',
+    statuses: ['NEW'],
+    color: '#EC4899',
+  },
   {
     label: 'Design',
     icon: '✏️',
@@ -24,21 +29,28 @@ const PHASES = [
   {
     label: 'Production',
     icon: '🏭',
-    statuses: ['VPO_ISSUED', 'PENDING_CONTRACTOR'],
+    statuses: ['VPO_ISSUED'],
     color: '#F59E0B',
   },
   {
     label: 'Fulfilment',
     icon: '🚚',
-    statuses: ['READY_TO_SHIP', 'SHIPPED'],
+    statuses: ['MANUFACTURED', 'COMPLETED'],
     color: '#10B981',
   },
   {
     label: 'Aftercare',
     icon: '🔧',
-    statuses: ['REPAIR', 'COMPLETED', 'CANCELLED'],
+    statuses: ['REPAIR', 'CANCELLED'],
     color: '#EF4444',
   },
+];
+
+const CAD_SUB_LABELS: { status: string; label: string; color: string }[] = [
+  { status: 'PENDING_CAD',       label: 'Pending CAD',       color: '#6B7280' },
+  { status: 'AWAITING_QUOTE',    label: 'Awaiting Quote',    color: '#F59E0B' },
+  { status: 'AWAITING_APPROVAL', label: 'Awaiting Approval', color: '#3B82F6' },
+  { status: 'REVISION',          label: 'Revision',          color: '#8B5CF6' },
 ];
 
 export default function KanbanPage() {
@@ -46,17 +58,28 @@ export default function KanbanPage() {
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string>('CAD_IN_PROGRESS');
+  const [userRole, setUserRole] = useState('');
+  const [cadCounts, setCadCounts] = useState<Record<string, number>>({});
+  const [cadSubFilter, setCadSubFilter] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch(`${API}/orders/kanban`).then(async res => {
-      if (res.ok) {
-        const data: KanbanColumn[] = await res.json();
+    try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
+  }, []);
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch(`${API}/orders/kanban`),
+      apiFetch(`${API}/cad/status-counts`),
+    ]).then(async ([kanbanRes, cadRes]) => {
+      if (kanbanRes.ok) {
+        const data: KanbanColumn[] = await kanbanRes.json();
         setColumns(
           [...data]
             .sort((a, b) => COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status))
             .filter(col => COLUMN_ORDER.includes(col.status))
         );
       }
+      if (cadRes.ok) setCadCounts(await cadRes.json());
       setLoading(false);
     });
   }, []);
@@ -82,7 +105,10 @@ export default function KanbanPage() {
   };
 
   const getColumn = (status: string) => columns.find(c => c.status === status);
-  const selectedCol = getColumn(selected);
+  const rawSelectedCol = getColumn(selected);
+  const selectedCol = selected === 'CAD_IN_PROGRESS' && cadSubFilter
+    ? { ...rawSelectedCol!, orders: (rawSelectedCol?.orders || []).filter(o => getCadSubLabel(o as any) === CAD_SUB_LABELS.find(s => s.status === cadSubFilter)?.label) }
+    : rawSelectedCol;
   const selectedCfg = STATUS_CONFIG[selected] || { label: selected, color: '#6B7280', bg: '#F3F4F6' };
   const totalOrders = columns.reduce((sum, c) => sum + c.count, 0);
   const nextStatus = COLUMN_ORDER[COLUMN_ORDER.indexOf(selected) + 1];
@@ -153,40 +179,62 @@ export default function KanbanPage() {
                       const isSelected = selected === status;
                       const count = col?.count || 0;
                       return (
-                        <button
-                          key={status}
-                          onClick={() => setSelected(status)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '7px 10px', borderRadius: '8px', cursor: 'pointer',
-                            border: isSelected ? `1.5px solid ${cfg.color}60` : '1.5px solid transparent',
-                            background: isSelected ? `${cfg.color}12` : 'var(--bg-input)',
-                            transition: 'all 0.12s', width: '100%', textAlign: 'left',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-                            <div style={{
-                              width: '7px', height: '7px', borderRadius: '50%',
-                              background: cfg.color, flexShrink: 0,
-                              boxShadow: isSelected ? `0 0 5px ${cfg.color}80` : 'none',
-                            }} />
+                        <React.Fragment key={status}>
+                          <button
+                            onClick={() => { setSelected(status); if (status !== 'CAD_IN_PROGRESS') setCadSubFilter(null); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '7px 10px', borderRadius: '8px', cursor: 'pointer',
+                              border: isSelected ? `1.5px solid ${cfg.color}60` : '1.5px solid transparent',
+                              background: isSelected ? `${cfg.color}12` : 'var(--bg-input)',
+                              transition: 'all 0.12s', width: '100%', textAlign: 'left',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                              <div style={{
+                                width: '7px', height: '7px', borderRadius: '50%',
+                                background: cfg.color, flexShrink: 0,
+                                boxShadow: isSelected ? `0 0 5px ${cfg.color}80` : 'none',
+                              }} />
+                              <span style={{
+                                fontSize: '11px',
+                                color: isSelected ? cfg.color : 'var(--text-secondary)',
+                                fontWeight: isSelected ? 700 : 500,
+                                lineHeight: 1.3,
+                                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                              }}>
+                                {cfg.label}
+                              </span>
+                            </div>
                             <span style={{
-                              fontSize: '11px',
-                              color: isSelected ? cfg.color : 'var(--text-secondary)',
-                              fontWeight: isSelected ? 700 : 500,
-                              lineHeight: 1.3,
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                              fontSize: '12px', fontWeight: 700, flexShrink: 0, marginLeft: '6px',
+                              color: count > 0 ? cfg.color : 'var(--text-muted)',
                             }}>
-                              {cfg.label}
+                              {count}
                             </span>
-                          </div>
-                          <span style={{
-                            fontSize: '12px', fontWeight: 700, flexShrink: 0, marginLeft: '6px',
-                            color: count > 0 ? cfg.color : 'var(--text-muted)',
-                          }}>
-                            {count}
-                          </span>
-                        </button>
+                          </button>
+                          {/* CAD label sub-rows — only for CAD_IN_PROGRESS */}
+                          {status === 'CAD_IN_PROGRESS' && CAD_SUB_LABELS.filter(s => (cadCounts[s.status] || 0) > 0).length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '2px', paddingLeft: '12px', borderLeft: '2px solid var(--border)' }}>
+                              {CAD_SUB_LABELS.filter(s => (cadCounts[s.status] || 0) > 0).map(s => {
+                                const isSubSelected = cadSubFilter === s.status;
+                                return (
+                                  <button
+                                    key={s.status}
+                                    onClick={() => { setSelected('CAD_IN_PROGRESS'); setCadSubFilter(isSubSelected ? null : s.status); }}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 7px', borderRadius: '5px', cursor: 'pointer', width: '100%', textAlign: 'left', border: isSubSelected ? `1px solid ${s.color}50` : '1px solid transparent', background: isSubSelected ? `${s.color}15` : `${s.color}08`, transition: 'all 0.12s' }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                                      <span style={{ fontSize: '10px', color: s.color, fontWeight: isSubSelected ? 700 : 600 }}>{s.label}</span>
+                                    </div>
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: s.color }}>{cadCounts[s.status]}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -237,7 +285,7 @@ export default function KanbanPage() {
               <div className="kanban-orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(272px, 1fr))', gap: '10px' }}>
                 {selectedCol.orders.map(order => (
                   <div key={order.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} />
+                    <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} currentUserRole={userRole} />
                     {nextCfg && (
                       <button
                         onClick={() => updateStatus(order.id!, nextStatus)}

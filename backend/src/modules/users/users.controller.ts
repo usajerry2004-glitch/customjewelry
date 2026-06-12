@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
-import { UsersService, CreateUserDto, UpdateUserDto } from './users.service';
+import { UsersService, CreateUserDto, UpdateUserDto, InviteUserDto } from './users.service';
+import { EmailService } from '../email/email.service';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -12,7 +13,10 @@ import { UsersService, CreateUserDto, UpdateUserDto } from './users.service';
 @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER)
 @UseGuards(RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get user stats' })
@@ -39,6 +43,20 @@ export class UsersController {
     return this.usersService.create(dto, caller);
   }
 
+  @Post('invite')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Invite a new staff member — auto-generates temp password and sends email' })
+  async inviteStaff(@Body() dto: InviteUserDto) {
+    const { user, tempPassword } = await this.usersService.inviteStaff(dto);
+    await this.emailService.sendStaffInvite({
+      to: user.email,
+      firstName: user.firstName,
+      role: user.role,
+      tempPassword,
+    });
+    return user;
+  }
+
   @Patch(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update user — name, password, active status (Admin only)' })
@@ -51,6 +69,13 @@ export class UsersController {
   @ApiOperation({ summary: 'Toggle customer priority status (Admin/Authorizer)' })
   togglePriority(@Param('id') id: string) {
     return this.usersService.togglePriority(id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Remove a user (Admin only). Cannot remove yourself.' })
+  remove(@Param('id') id: string, @CurrentUser() caller: any) {
+    return this.usersService.remove(id, caller.id);
   }
 
   @Get(':id/orders')

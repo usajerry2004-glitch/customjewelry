@@ -16,17 +16,13 @@ export class ManufacturingService {
 
   async getQueue() {
     const orders = await this.orderRepo.find({
-      where: [
-        { status: OrderStatus.VPO_ISSUED },
-        { status: OrderStatus.PENDING_CONTRACTOR },
-      ],
+      where: { status: OrderStatus.VPO_ISSUED },
     });
 
-    // Sort priority: Pending Contractor → Stone Received → Pending Stone
+    // Sort: Stone Received first (ready for production), then Pending Stone (waiting)
     const priority = (o: Order): number => {
-      if (o.status === OrderStatus.PENDING_CONTRACTOR) return 0;
-      if (o.status === OrderStatus.VPO_ISSUED && o.stoneStatus === StoneStatus.STONE_RECEIVED) return 1;
-      return 2; // VPO + pending/null stone — waiting
+      if (o.stoneStatus === StoneStatus.STONE_RECEIVED) return 0;
+      return 1; // pending/null stone — waiting
     };
 
     return orders.sort((a, b) => {
@@ -98,60 +94,34 @@ export class ManufacturingService {
     return saved;
   }
 
-  async moveToContractor(id: string, details: { jobBagNumber?: string; vendorName?: string }) {
-    const order = await this.orderRepo.findOne({ where: { id } });
-    if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.VPO_ISSUED) {
-      throw new BadRequestException('Order must be in VPO_ISSUED status');
-    }
-    if (order.stoneStatus !== StoneStatus.STONE_RECEIVED) {
-      throw new BadRequestException('Stone must be received before moving to contractor');
-    }
-    order.status = OrderStatus.PENDING_CONTRACTOR;
-    if (details.jobBagNumber) order.rcJobBagNumber = details.jobBagNumber;
-    if (details.vendorName)   order.vendorName     = details.vendorName;
-    return this.orderRepo.save(order);
-  }
-
   async completeManufacturing(id: string) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.VPO_ISSUED && order.status !== OrderStatus.PENDING_CONTRACTOR) {
-      throw new BadRequestException('Order must be in VPO_ISSUED or PENDING_CONTRACTOR to mark as ready to ship');
+    if (order.status !== OrderStatus.VPO_ISSUED) {
+      throw new BadRequestException('Order must be in VPO_ISSUED status to mark as manufactured');
     }
-    if (order.status === OrderStatus.VPO_ISSUED && order.stoneStatus !== StoneStatus.STONE_RECEIVED) {
-      throw new BadRequestException('Stone must be received before moving to Ready to Ship');
+    if (order.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+      throw new BadRequestException('Stone must be received before marking order as manufactured');
     }
-    order.status = OrderStatus.READY_TO_SHIP;
+    order.status = OrderStatus.MANUFACTURED;
     order.processedDate = new Date();
     const saved = await this.orderRepo.save(order);
 
     await this.notificationsService.create(
       NotificationType.ORDER_IN_MANUFACTURING,
-      'Order Ready to Ship',
-      `Order ${order.poNumber} has completed manufacturing and is ready for shipping.`,
+      `Manufactured — ${order.poNumber}`,
+      `Order ${order.poNumber} has been manufactured and is en route to the US office.`,
       order.id,
       null,
     );
-
-    if (order.customerId) {
-      await this.notificationsService.create(
-        NotificationType.ORDER_IN_MANUFACTURING,
-        'Your order is ready!',
-        `Great news! Your order ${order.poNumber} has been manufactured and is ready for shipping.`,
-        order.id,
-        order.customerId,
-      );
-    }
 
     return saved;
   }
 
   async getMetrics() {
-    const inProgress        = await this.orderRepo.count({ where: { status: OrderStatus.VPO_ISSUED } });
-    const withContractor    = await this.orderRepo.count({ where: { status: OrderStatus.PENDING_CONTRACTOR } });
-    const readyToShip       = await this.orderRepo.count({ where: { status: OrderStatus.READY_TO_SHIP } });
-    const pendingStone      = await this.orderRepo.count({ where: { status: OrderStatus.VPO_ISSUED, stoneStatus: StoneStatus.PENDING_STONE } });
-    return { inProgress, withContractor, readyToShip, pendingStone };
+    const inProgress   = await this.orderRepo.count({ where: { status: OrderStatus.VPO_ISSUED } });
+    const manufactured = await this.orderRepo.count({ where: { status: OrderStatus.MANUFACTURED } });
+    const pendingStone = await this.orderRepo.count({ where: { status: OrderStatus.VPO_ISSUED, stoneStatus: StoneStatus.PENDING_STONE } });
+    return { inProgress, manufactured, pendingStone };
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 
 export interface EmailPayload {
   to: string | string[];
@@ -10,31 +11,45 @@ export interface EmailPayload {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly from = 'Kira Custom Jewelry <onboarding@resend.dev>';
   private readonly frontendUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:3000');
+    this.frontendUrl = (this.config.get('FRONTEND_URL', 'http://localhost:3000')).split(',')[0].trim();
   }
 
   async send(payload: EmailPayload): Promise<boolean> {
-    const apiKey = this.config.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      this.logger.warn(`Email skipped (RESEND_API_KEY not set): ${payload.subject}`);
+    const gmailUser = this.config.get<string>('GMAIL_USER');
+    const gmailPass = this.config.get<string>('GMAIL_APP_PASSWORD');
+
+    if (!gmailUser || !gmailPass) {
+      this.logger.warn(`Email skipped (GMAIL_USER or GMAIL_APP_PASSWORD not set): ${payload.subject}`);
       return false;
     }
+
     try {
-      const { Resend } = await import('resend');
-      const resend = new Resend(apiKey);
-      // In test mode, redirect all emails to the override address
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: { user: gmailUser, pass: gmailPass },
+      });
+
       const override = this.config.get<string>('TEST_EMAIL_OVERRIDE');
-      const to = override ? [override] : (Array.isArray(payload.to) ? payload.to : [payload.to]);
-      const { error } = await resend.emails.send({ from: this.from, to, subject: payload.subject, html: payload.html });
-      if (error) { this.logger.error('Resend error:', error); return false; }
-      this.logger.log(`Email sent: "${payload.subject}" → ${to.join(', ')}`);
+      const to = override
+        ? override
+        : (Array.isArray(payload.to) ? payload.to.join(', ') : payload.to);
+
+      await transporter.sendMail({
+        from: `Kira Custom Jewelry <${gmailUser}>`,
+        to,
+        subject: payload.subject,
+        html: payload.html,
+      });
+
+      this.logger.log(`Email sent: "${payload.subject}" → ${to}`);
       return true;
     } catch (err) {
-      this.logger.error('Email send failed:', err?.message);
+      this.logger.error('Email send failed:', (err as Error)?.message);
       return false;
     }
   }
@@ -45,24 +60,8 @@ export class EmailService {
     return `${this.frontendUrl}/orders/${orderId}`;
   }
 
-  async sendPriceRequiredToAuthorizers(opts: {
-    to: string[];
-    poNumber: string;
-    customerName: string;
-    orderType: string;
-    orderId: string;
-  }) {
-    if (!opts.to.length) return;
-    return this.send({
-      to: opts.to,
-      subject: `[Price Required] ${opts.poNumber} — Customer Approved CAD`,
-      html: emailLayout(`
-        <h2 style="color:#9333EA;margin:0 0 16px">Approximate Price Required</h2>
-        <p>The customer has <strong>approved the CAD design</strong> for the order below. Please log in and add an approximate quoted price to move the order into production.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
-        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#9333EA')}">Add Price & Move to Production →</a>
-      `),
-    });
+  trackUrl(token: string) {
+    return `${this.frontendUrl}/track/${token}`;
   }
 
   async sendNewOrderToAuthorizers(opts: {
@@ -235,7 +234,9 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    trackingToken?: string;
   }) {
+    const trackLink = opts.trackingToken ? this.trackUrl(opts.trackingToken) : null;
     return this.send({
       to: opts.to,
       subject: `We received your order — ${opts.poNumber}`,
@@ -244,6 +245,7 @@ export class EmailService {
         <p>Hi ${opts.customerName},</p>
         <p>Thank you for placing your custom jewelry order with Kira Custom Jewelry. Our team has received it and will review it shortly. You'll receive another email once it's confirmed and our design team begins work.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${trackLink ? `<a href="${trackLink}" style="${btnStyle('#C09B58')}">Track Your Order →</a>` : ''}
         <p style="margin-top:20px;font-size:12px;color:#9CA3AF">If you have any questions, please contact your sales representative.</p>
       `),
     });
@@ -275,16 +277,19 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    trackingToken?: string;
   }) {
+    const reviewLink = opts.trackingToken ? this.trackUrl(opts.trackingToken) : this.orderUrl(opts.orderId);
     return this.send({
       to: opts.to,
       subject: `Your CAD design is ready to review — ${opts.poNumber}`,
       html: emailLayout(`
         <h2 style="color:#6366F1;margin:0 0 16px">Your Design is Ready for Review</h2>
         <p>Hi ${opts.customerName},</p>
-        <p>Our design team has completed the CAD for your order. Please log in to review the design and either approve it or request changes.</p>
+        <p>Our design team has completed the CAD for your order. Click the button below to review the design and either approve it or request changes.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
-        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#6366F1')}">Review Design →</a>
+        <a href="${reviewLink}" style="${btnStyle('#6366F1')}">Review & Approve Design →</a>
+        <p style="margin-top:16px;font-size:12px;color:#9CA3AF">No login required — the link above takes you directly to your order.</p>
       `),
     });
   }
@@ -337,6 +342,51 @@ export class EmailService {
         <p>Your custom jewelry is on its way. Please use the tracking number below to follow your shipment.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType, trackingRow + shipRow)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#3B82F6')}">View Order →</a>
+      `),
+    });
+  }
+
+  async sendPasswordResetEmail(opts: { to: string; token: string }) {
+    const resetUrl = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(opts.token)}`;
+    return this.send({
+      to: opts.to,
+      subject: `Reset your Kira Custom Jewelry password`,
+      html: emailLayout(`
+        <h2 style="color:#1A2740;margin:0 0 16px">Password Reset Request</h2>
+        <p>We received a request to reset the password for your account (<strong>${opts.to}</strong>).</p>
+        <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+        <a href="${resetUrl}" style="${btnStyle('#C09B58')}">Reset Password →</a>
+        <p style="margin-top:24px;font-size:12px;color:#9CA3AF">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+      `),
+    });
+  }
+
+  async sendStaffInvite(opts: {
+    to: string;
+    firstName: string;
+    role: string;
+    tempPassword: string;
+  }) {
+    return this.send({
+      to: opts.to,
+      subject: `You've been invited to Kira Custom Jewelry`,
+      html: emailLayout(`
+        <h2 style="color:#1A2740;margin:0 0 16px">Welcome to Kira Custom Jewelry! 👋</h2>
+        <p>Hi ${opts.firstName},</p>
+        <p>An admin has created an account for you on the <strong>Kira Custom Jewelry Order Management Platform</strong>. Use the credentials below to log in.</p>
+        <table style="width:100%;border:1px solid #E8E4DC;border-radius:8px;border-collapse:collapse;margin:20px 0">
+          <tr style="background:#F9F8F6"><td colspan="2" style="padding:12px 16px;font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #E8E4DC">Your Login Details</td></tr>
+          <tr><td style="padding:10px 16px;color:#6B7280;font-size:13px;border-bottom:1px solid #F0EDE8;width:140px">Email</td><td style="padding:10px 16px;font-weight:700;color:#1A2740;border-bottom:1px solid #F0EDE8">${opts.to}</td></tr>
+          <tr><td style="padding:10px 16px;color:#6B7280;font-size:13px;border-bottom:1px solid #F0EDE8">Temporary Password</td><td style="padding:10px 16px;font-family:monospace;font-size:15px;font-weight:700;color:#7C3AED;border-bottom:1px solid #F0EDE8;letter-spacing:1px">${opts.tempPassword}</td></tr>
+          <tr><td style="padding:10px 16px;color:#6B7280;font-size:13px">Role</td><td style="padding:10px 16px;color:#1A2740">${opts.role.replace(/_/g, ' ')}</td></tr>
+        </table>
+        <p style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400E;margin:0 0 20px">
+          ⚠️ This is a <strong>one-time temporary password</strong>. Please set your own password after logging in.
+        </p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <a href="${this.frontendUrl}/login" style="${btnStyle('#1A2740')}">Log In Now →</a>
+          <a href="${this.frontendUrl}/reset-password-request" style="${btnStyle('#C09B58')}">Set My Password →</a>
+        </div>
       `),
     });
   }

@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth.store';
 import '../styles/globals.css';
 
 const PUBLIC_ROUTES = ['/login'];
+const PUBLIC_PREFIXES = ['/track/'];
 const CUSTOMER_ROUTES = ['/customer/orders', '/customer/orders/new'];
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -17,7 +18,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   useEffect(() => {
-    const isPublic = PUBLIC_ROUTES.includes(router.pathname);
+    const isPublic = PUBLIC_ROUTES.includes(router.pathname) || PUBLIC_PREFIXES.some(p => router.pathname.startsWith(p));
     const isCustomerRoute = router.pathname.startsWith('/customer/');
     const stored = typeof window !== 'undefined' ? localStorage.getItem('jf_token') : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('jf_user') : null;

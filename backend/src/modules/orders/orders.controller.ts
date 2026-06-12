@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Put, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService, OrderFilterDto } from './orders.service';
-import { Order, OrderStatus } from '../../database/entities/order.entity';
+import { Order } from '../../database/entities/order.entity';
+import { UpdateStatusDto } from './update-status.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
@@ -25,7 +26,7 @@ export class OrdersController {
   }
 
   @Get('kanban')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Kanban board' })
   kanban(@Request() req: any) {
@@ -33,7 +34,7 @@ export class OrdersController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Order metrics' })
   metrics() {
@@ -61,12 +62,12 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.SHIPPING_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Update order status (quotedCost required when moving to SKU_CREATION)' })
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: OrderStatus; quotedCost?: number; repairContractor?: string },
+    @Body() body: UpdateStatusDto,
     @Request() req: any,
   ) {
     return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor);

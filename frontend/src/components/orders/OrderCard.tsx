@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, STATUS_CONFIG, StoneStatus } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR } from '../../utils/types';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -8,6 +8,7 @@ interface OrderCardProps {
   hideFinancials?: boolean;
   daysOverdue?: number;
   referenceImage?: string;
+  currentUserRole?: string;
 }
 
 function calcPriorityReason(order: Partial<Order>): string | null {
@@ -18,24 +19,27 @@ function calcPriorityReason(order: Partial<Order>): string | null {
   return null;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, daysOverdue, referenceImage }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, daysOverdue, referenceImage, currentUserRole }) => {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
-  const awaitingQuote = order.status === 'CAD_IN_PROGRESS' && (order as any).cadSubStatus === 'APPROVED';
+  const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
   const priorityReason = calcPriorityReason(order);
+  const actionPending = currentUserRole ? needsActionFromRole(order as any, currentUserRole) : false;
+  const actionColor = actionPending ? (ROLE_ACTION_COLOR[currentUserRole!] || '#6B7280') : null;
 
   return (
     <div
       onClick={() => onClick?.(order)}
       style={{
-        background: awaitingQuote ? 'rgba(192,155,88,0.06)' : 'var(--bg-card)',
-        border: awaitingQuote ? '2px solid var(--accent)' : '1px solid var(--border)',
-        borderLeft: awaitingQuote ? '4px solid var(--accent-dark)' : undefined,
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderLeft: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
         padding: compact ? '12px 16px' : '16px 20px',
         cursor: 'pointer',
+        outline: 'none',
         transition: 'box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease',
         marginBottom: '8px',
-        boxShadow: awaitingQuote ? '0 0 0 3px rgba(192,155,88,0.15)' : 'var(--shadow-sm)',
+        boxShadow: 'var(--shadow-sm)',
         display: 'flex',
         gap: '14px',
         alignItems: 'stretch',
@@ -77,7 +81,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
             whiteSpace: 'nowrap',
             letterSpacing: '0.3px',
           }}>
-            {cfg.label}
+            {cadSubLabel || cfg.label}
           </span>
         </div>
 
@@ -94,12 +98,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           {order.orderType && <Tag text={order.orderType} />}
           {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
           {!hideFinancials && order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
-          {order.status === 'CAD_IN_PROGRESS' && (() => {
-            const sub = (order as any).cadSubStatus;
-            if (sub === 'APPROVED') return <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent-dark)', background: 'rgba(192,155,88,0.15)', border: '1px solid var(--accent)', borderRadius: '5px', padding: '1px 7px' }}>💰 Awaiting Quote</span>;
-            if (sub === 'REVISION') return <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>;
-            return <span style={{ fontSize: '10px', fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '5px', padding: '1px 7px' }}>⏳ Pending CAD</span>;
-          })()}
+          {cadSubLabel === 'Revision' && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>
+          )}
           {daysOverdue !== undefined && daysOverdue > 0 && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               ⚠ +{daysOverdue}d overdue
@@ -110,7 +111,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
               💎 Pending Stone
             </span>
           )}
-          {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && (
+          {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && order.status === 'VPO_ISSUED' && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#065F46', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               💎 Stone Received
             </span>

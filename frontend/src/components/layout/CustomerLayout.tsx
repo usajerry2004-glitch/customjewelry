@@ -16,16 +16,17 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-page)', color: 'var(--text-primary)' }}>
       {/* Top nav */}
-      <div style={{
+      <div className="customer-topnav" style={{
         background: 'var(--sidebar-bg)',
         padding: '0 36px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         height: '64px',
+        flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '36px' }}>
-          <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '1px' }}>
+        <div className="customer-topnav-left" style={{ display: 'flex', alignItems: 'center', gap: '36px', minWidth: 0 }}>
+          <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '1px', flexShrink: 0 }}>
             KIRA JEWELS
           </div>
           <nav style={{ display: 'flex', gap: '4px' }}>
@@ -67,7 +68,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
               }}>
                 {user.firstName[0]}{user.lastName[0]}
               </div>
-              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
+              <span className="customer-username" style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
                 {user.firstName} {user.lastName}
               </span>
               <button
@@ -87,7 +88,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
 
       {/* Page header */}
       {(title || actions) && (
-        <div style={{
+        <div className="customer-page-header" style={{
           background: 'var(--bg-card)',
           borderBottom: '1px solid var(--border-light)',
           padding: '20px 36px',
