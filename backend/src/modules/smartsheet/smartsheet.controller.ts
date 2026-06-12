@@ -72,6 +72,17 @@ export class SmartsheetController {
     return this.importService.syncCommentsForOrder(orderId, sheetId);
   }
 
+  // ── Smart sync: update existing + import only new rows ───────────────────
+
+  @Post('smart-sync')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Update already-imported orders + import new Smartsheet rows; skip old rows never imported' })
+  smartSync() {
+    const sheetId = this.config.get('SMARTSHEET_SHEET_ID', '2085580205674372');
+    return this.importService.smartSync(sheetId);
+  }
+
   // ── Manual sync (re-pulls latest status + fields for all imported orders) ─
 
   @Post('sync')

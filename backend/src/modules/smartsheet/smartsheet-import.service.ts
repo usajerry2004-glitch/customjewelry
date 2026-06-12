@@ -584,4 +584,119 @@ export class SmartsheetImportService {
     this.logger.log(`Comment sync for ${orderId} — imported:${result.commentsImported} errors:${result.errors.length}`);
     return result;
   }
+
+  // ── Smart sync: update existing + import new rows only ───────────────────
+  // - Rows already in DB (matched by smartsheetRowId or refCustomerPo) → update all fields
+  // - Rows NOT in DB but created AFTER our last import → import as new orders
+  // - Rows NOT in DB and older than our last import → skip (intentionally not imported before)
+  async smartSync(sheetId: string): Promise<{
+    updated: number; added: number; skipped: number; errors: string[];
+    orders: { po: string; action: 'updated' | 'added' | 'skipped' }[];
+  }> {
+    const result = { updated: 0, added: 0, skipped: 0, errors: [] as string[], orders: [] as { po: string; action: 'updated' | 'added' | 'skipped' }[] };
+
+    // Cutoff = most recent createdAt among all orders with a smartsheetRowId.
+    // Smartsheet rows created AFTER this date are "new" — rows before it were
+    // available during the original import and intentionally not pulled.
+    const cutoffRow = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('MAX(o.createdAt)', 'maxDate')
+      .where('o.smartsheetRowId IS NOT NULL')
+      .getRawOne();
+    const cutoff: Date | null = cutoffRow?.maxDate ? new Date(cutoffRow.maxDate) : null;
+    this.logger.log(`Smart sync — cutoff date: ${cutoff?.toISOString() ?? 'none (first run)'}`);
+
+    // Fetch all rows (base + rich merged for attachments/discussions)
+    const baseSheet = await this.smGet(`/sheets/${sheetId}`);
+    const richSheet = await this.smGet(`/sheets/${sheetId}?include=attachments,discussions`);
+    const richMap: Record<string, any> = {};
+    for (const r of (richSheet.rows || [])) richMap[String(r.id)] = r;
+    const allRows: any[] = (baseSheet.rows || []).map((r: any) => richMap[String(r.id)] ?? r);
+
+    const colMap: Record<string, number> = {};
+    baseSheet.columns.forEach((c: any) => { colMap[c.title] = c.id; });
+    const getCell = (row: any, title: string): string | null => {
+      const colId = colMap[title];
+      if (!colId) return null;
+      const cell = row.cells?.find((c: any) => c.columnId === colId);
+      return cell?.displayValue ?? cell?.value ?? null;
+    };
+
+    const systemUser = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
+    this.logger.log(`Smart sync — processing ${allRows.length} Smartsheet rows`);
+
+    for (const row of allRows) {
+      const rowId = String(row.id);
+      const smartsheetPo = getCell(row, 'PO #') || '';
+
+      try {
+        // Check if order already exists in our DB
+        const existing = await this.orderRepo.findOne({
+          where: smartsheetPo
+            ? [{ smartsheetRowId: rowId }, { refCustomerPo: smartsheetPo }]
+            : [{ smartsheetRowId: rowId }],
+        });
+
+        if (existing) {
+          // ── UPDATE existing order with latest Smartsheet data ──────────
+          const rawStatus = (getCell(row, 'Status') || '').trim();
+          const mappedStatus = mapSmartsheetStatus(rawStatus);
+
+          const update: Partial<Order> = {
+            smartsheetRowId: rowId,
+            ...(mappedStatus ? { status: mappedStatus } : {}),
+            ...(getCell(row, 'Kira Sku #')                                              ? { kiraSkuNumber:   getCell(row, 'Kira Sku #')! }                                           : {}),
+            ...(getCell(row, 'Tracking') || getCell(row, 'Tracking #')                  ? { trackingNumber:  (getCell(row, 'Tracking') || getCell(row, 'Tracking #'))! }             : {}),
+            ...(getCell(row, 'Invoice #')                                                ? { invoiceNumber:   getCell(row, 'Invoice #')! }                                            : {}),
+            ...(getCell(row, 'Ship Method')                                              ? { shipMethod:      getCell(row, 'Ship Method')! }                                          : {}),
+            ...(getCell(row, 'Vendor Name')                                              ? { vendorName:      getCell(row, 'Vendor Name')! }                                         : {}),
+            ...(getCell(row, 'Factory Status')                                           ? { factoryStatus:   getCell(row, 'Factory Status')! }                                      : {}),
+            ...(getCell(row, 'VPO order details')                                        ? { vpoOrderDetails: getCell(row, 'VPO order details')! }                                   : {}),
+            ...(getCell(row, 'RC Order #')                                               ? { rcOrderNumber:   getCell(row, 'RC Order #')! }                                          : {}),
+            ...(getCell(row, 'RC Job Bag #')                                             ? { rcJobBagNumber:  getCell(row, 'RC Job Bag #')! }                                        : {}),
+            ...(getCell(row, 'RC VPO #')                                                 ? { rcVpoNumber:     getCell(row, 'RC VPO #')! }                                            : {}),
+            ...(getCell(row, 'Time Frame')                                               ? { timeFrame:       getCell(row, 'Time Frame')! }                                          : {}),
+            ...(this.parseCost(getCell(row, 'Kira Quoted Cost') || getCell(row, 'Cost')) != null ? { quotedCost: this.parseCost(getCell(row, 'Kira Quoted Cost') || getCell(row, 'Cost'))! } : {}),
+            ...(getCell(row, 'Customer Comments') || getCell(row, 'Additional Comments') ? { customerNotes: (getCell(row, 'Customer Comments') || getCell(row, 'Additional Comments'))! } : {}),
+            ...(getCell(row, 'Kira Status Comments')                                     ? { internalNotes:   getCell(row, 'Kira Status Comments')! }                               : {}),
+            ...(getCell(row, 'Store Name')                                               ? { storeName:       getCell(row, 'Store Name')! }                                          : {}),
+            ...(getCell(row, 'Metal Type')                                               ? { metalType:       getCell(row, 'Metal Type')! }                                          : {}),
+            ...(getCell(row, 'Metal Color')                                              ? { metalColor:      getCell(row, 'Metal Color')! }                                         : {}),
+          };
+
+          await this.orderRepo.update(existing.id, update);
+          result.updated++;
+          result.orders.push({ po: existing.poNumber, action: 'updated' });
+
+        } else {
+          // ── Decide: new (import) or old (skip) ────────────────────────
+          const rowDate = row.createdAt ? new Date(row.createdAt) : null;
+          if (cutoff && rowDate && rowDate <= cutoff) {
+            result.skipped++;
+            result.orders.push({ po: smartsheetPo || rowId, action: 'skipped' });
+            continue;
+          }
+
+          // ── IMPORT as new order (full import with attachments) ─────────
+          const importSummary: ImportSummary = {
+            ordersCreated: 0, ordersUpdated: 0, ordersSkipped: 0, customersCreated: 0,
+            attachmentsImported: 0, commentsImported: 0, errors: [], orders: [],
+          };
+          await this.processRow(sheetId, row, getCell, systemUser, importSummary);
+          result.added++;
+          result.errors.push(...importSummary.errors);
+          const newPo = importSummary.orders[0]?.po || smartsheetPo || rowId;
+          result.orders.push({ po: newPo, action: 'added' });
+        }
+
+      } catch (err: any) {
+        const label = smartsheetPo || rowId;
+        result.errors.push(`Row ${label}: ${err.message}`);
+        this.logger.error(`Smart sync error on row ${label}: ${err.message}`);
+      }
+    }
+
+    this.logger.log(`Smart sync complete — updated:${result.updated} added:${result.added} skipped:${result.skipped} errors:${result.errors.length}`);
+    return result;
+  }
 }
