@@ -303,7 +303,7 @@ export default function TrackPage() {
                     <div key={f.id} style={{ border: '1px solid #E8E4DC', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
                       {/\.(jpg|jpeg|png|gif|webp)$/i.test(f.fileName) && (
                         <img
-                          src={`/uploads/cad/${f.fileName}`}
+                          src={`${f.filePath || '/uploads/cad/' + f.fileName}`}
                           alt={f.originalName}
                           style={{ width: '100%', maxHeight: 400, objectFit: 'contain', background: '#F9F8F6', display: 'block' }}
                         />
@@ -365,7 +365,7 @@ export default function TrackPage() {
                           {CAD_STATUS_LABELS[f.status] || f.status}
                         </span>
                         {/\.(jpg|jpeg|png|gif|webp)$/i.test(f.fileName) && (
-                          <a href={`/uploads/cad/${f.fileName}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#6366F1', textDecoration: 'none' }}>View</a>
+                          <a href={`${f.filePath || '/uploads/cad/' + f.fileName}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#6366F1', textDecoration: 'none' }}>View</a>
                         )}
                       </div>
                     </div>

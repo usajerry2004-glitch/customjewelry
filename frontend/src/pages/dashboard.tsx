@@ -74,7 +74,7 @@ export default function Dashboard() {
             if (!r.ok) return;
             const cads = await r.json();
             const ref = cads.find((c: any) => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
-            if (ref) map[id] = `/uploads/cad/${ref.fileName}`;
+            if (ref) map[id] = ref.filePath || `/uploads/cad/${ref.fileName}`;
           } catch {}
         }));
         setRefImages(map);

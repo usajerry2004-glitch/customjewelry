@@ -2,9 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
-import { writeFileSync } from 'fs';
 import * as bcrypt from 'bcryptjs';
+import { SpacesService } from '../spaces/spaces.service';
 import { Order, OrderStatus, ManufacturingPath } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -30,6 +29,7 @@ export class SmartsheetImportService {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly spaces: SpacesService,
     @InjectRepository(Order)        private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
@@ -132,10 +132,10 @@ export class SmartsheetImportService {
 
       const buffer = Buffer.from(await res.arrayBuffer());
       const ext = originalName.includes('.') ? originalName.split('.').pop() : 'bin';
-      const fileName = `${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
-      writeFileSync(join(process.cwd(), 'uploads', 'cad', fileName), buffer);
+      const key = `cad/${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
+      const location = await this.spaces.uploadBuffer(buffer, key, mimeType);
 
-      return { fileName, originalName, mimeType };
+      return { fileName: key, originalName, mimeType, filePath: location };
     } catch (e) {
       this.logger.warn(`Attachment ${attachmentId} download failed: ${e.message}`);
       return null;
@@ -263,7 +263,7 @@ export class SmartsheetImportService {
       if (isCjFile) cadFilesImported++;
       await this.cadRepo.save(this.cadRepo.create({
         orderId: order.id, originalName: dl.originalName, fileName: dl.fileName,
-        filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+        filePath: dl.filePath ?? dl.fileName,
         uploadedBy: att.createdBy?.name || 'Smartsheet Import', revisionNumber: 1,
         designerNotes: isCjFile ? 'Smartsheet import' : 'Reference image', status: CadFileStatus.UPLOADED,
       }));
@@ -444,7 +444,7 @@ export class SmartsheetImportService {
             orderId: order.id,
             originalName: dl.originalName,
             fileName: dl.fileName,
-            filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+            filePath: dl.filePath ?? dl.fileName,
             uploadedBy: att.createdBy?.name || 'Smartsheet Import',
             revisionNumber: 1,
             designerNotes: isCjFile ? 'Smartsheet import' : 'Reference image',
@@ -537,7 +537,7 @@ export class SmartsheetImportService {
             orderId: order.id,
             originalName: dl.originalName,
             fileName: dl.fileName,
-            filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+            filePath: dl.filePath ?? dl.fileName,
             uploadedBy: att.createdBy?.name || 'Smartsheet Import',
             revisionNumber: 1,
             designerNotes: isCjFile ? 'Smartsheet import' : 'Reference image',
@@ -596,7 +596,7 @@ export class SmartsheetImportService {
         const isCjFile = (att.name || '').toLowerCase().startsWith('cj');
         await this.cadRepo.save(this.cadRepo.create({
           orderId, originalName: dl.originalName, fileName: dl.fileName,
-          filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+          filePath: dl.filePath ?? dl.fileName,
           uploadedBy: att.createdBy?.name || 'Smartsheet', revisionNumber: 1,
           designerNotes: isCjFile ? 'Smartsheet sync' : 'Reference image',
           status: CadFileStatus.UPLOADED,
@@ -618,7 +618,7 @@ export class SmartsheetImportService {
               const isCjFile = (att.name || '').toLowerCase().startsWith('cj');
               await this.cadRepo.save(this.cadRepo.create({
                 orderId, originalName: dl.originalName, fileName: dl.fileName,
-                filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+                filePath: dl.filePath ?? dl.fileName,
                 uploadedBy: att.createdBy?.name || comment.createdBy?.name || 'Smartsheet',
                 revisionNumber: 1,
                 designerNotes: isCjFile ? 'Smartsheet sync' : 'Reference image',

@@ -4,9 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { join } from 'path';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 import { Order } from './database/entities/order.entity';
@@ -33,6 +31,7 @@ import { EmailModule } from './modules/email/email.module';
 import { SmartsheetModule } from './modules/smartsheet/smartsheet.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { RepairsModule } from './modules/repairs/repairs.module';
+import { SpacesModule } from './modules/spaces/spaces.module';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 
@@ -45,10 +44,7 @@ import { AuthService } from './modules/auth/auth.service';
       limit: 300,
     }]),
     ScheduleModule.forRoot(),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-    }),
+    SpacesModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService): TypeOrmModuleOptions => {

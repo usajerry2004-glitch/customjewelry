@@ -53,11 +53,12 @@ export class CadService {
     const existing = await this.cadRepo.find({ where: { orderId } });
     const revisionNumber = existing.length + 1;
 
+    const s3File = file as any;
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,
-      fileName: file.filename,
-      filePath: file.path,
+      fileName:     s3File.key      ?? file.filename,
+      filePath:     s3File.location ?? file.path,
       uploadedBy,
       revisionNumber,
       designerNotes,
@@ -125,11 +126,12 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     const existing = await this.cadRepo.find({ where: { orderId } });
+    const s3File = file as any;
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,
-      fileName: file.filename,
-      filePath: file.path,
+      fileName:     s3File.key      ?? file.filename,
+      filePath:     s3File.location ?? file.path,
       uploadedBy,
       revisionNumber: existing.length + 1,
       designerNotes: 'Reference image',
@@ -289,7 +291,7 @@ export class CadService {
       .getMany();
     const map: Record<string, string> = {};
     for (const cad of cads) {
-      if (!map[cad.orderId]) map[cad.orderId] = cad.fileName;
+      if (!map[cad.orderId]) map[cad.orderId] = cad.filePath || cad.fileName;
     }
     return map;
   }

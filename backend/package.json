@@ -23,7 +23,7 @@
     "seed": "ts-node src/database/seeds/run-seeds.ts"
   },
   "dependencies": {
-    "@sentry/node": "^8.0.0",
+    "@aws-sdk/client-s3": "^3.1073.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.1.1",
     "@nestjs/core": "^10.0.0",
@@ -36,6 +36,7 @@
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^10.0.1",
+    "@sentry/node": "^8.0.0",
     "@types/nodemailer": "^8.0.1",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
@@ -43,6 +44,7 @@
     "date-fns": "^3.0.6",
     "helmet": "^7.1.0",
     "multer": "^1.4.5-lts.1",
+    "multer-s3": "^3.0.1",
     "nodemailer": "^8.0.11",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

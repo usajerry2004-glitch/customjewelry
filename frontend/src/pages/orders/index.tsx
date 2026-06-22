@@ -753,7 +753,7 @@ export default function OrdersPage() {
                       order={order}
                       hideFinancials={!isAdmin}
                       onClick={selectMode ? undefined : () => router.push(`/orders/${order.id}`)}
-                      referenceImage={thumbnails[order.id!] ? `/uploads/cad/${thumbnails[order.id!]}` : undefined}
+                      referenceImage={thumbnails[order.id!] || undefined}
                       currentUserRole={userRole}
                     />
                   </div>

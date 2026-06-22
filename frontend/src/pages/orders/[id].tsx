@@ -54,7 +54,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
   const isPdf   = ext === 'pdf';
   const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext);
   const isJcd   = ext === 'jcd';
-  const fileUrl = `/uploads/cad/${cad.fileName}`;
+  const fileUrl = `${cad.filePath || '/uploads/cad/' + cad.fileName}`;
   const companionForJcd = isJcd
     ? list.find(f => {
         const base = cad.originalName.replace(/\.jcd$/i, '');
@@ -184,7 +184,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
           companionForJcd ? (
             <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img
-                src={`/uploads/cad/${companionForJcd.fileName}`}
+                src={`${companionForJcd.filePath || '/uploads/cad/' + companionForJcd.fileName}`}
                 alt={cad.originalName}
                 style={{ maxWidth: '100%', maxHeight: '460px', objectFit: 'contain', display: 'block' }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -729,7 +729,7 @@ export default function OrderDetail() {
                       const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                       const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
                       const isVid = ['mp4','mov','avi','webm','mkv','wmv'].includes(ext);
-                      const fileUrl = `/uploads/cad/${cad.fileName}`;
+                      const fileUrl = `${cad.filePath || '/uploads/cad/' + cad.fileName}`;
                       return (
                         <div key={cad.id}
                           onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
@@ -883,7 +883,7 @@ export default function OrderDetail() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       {isImage ? (
                         <img
-                          src={`/uploads/cad/${cad.fileName}`}
+                          src={`${cad.filePath || '/uploads/cad/' + cad.fileName}`}
                           alt={cad.originalName}
                           style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)', cursor: 'pointer' }}
                           onClick={() => { setViewingCadList(designList); setViewingCad(cad); }}
