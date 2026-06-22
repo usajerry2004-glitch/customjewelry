@@ -120,7 +120,7 @@ export class SmartsheetImportService {
   }
 
   // ── Download Smartsheet attachment and save to disk ───────────────────
-  private async downloadAttachment(sheetId: string, attachmentId: number | string): Promise<{ fileName: string; originalName: string; mimeType: string } | null> {
+  private async downloadAttachment(sheetId: string, attachmentId: number | string): Promise<{ fileName: string; originalName: string; mimeType: string; filePath: string } | null> {
     try {
       const meta = await this.smGet(`/sheets/${sheetId}/attachments/${attachmentId}`);
       const url: string = meta.url;

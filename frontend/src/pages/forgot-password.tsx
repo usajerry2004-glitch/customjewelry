@@ -31,10 +31,13 @@ export default function ForgotPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      if (res.ok) {
-        setSent(true);
-      } else {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
         setError('Something went wrong. Please try again.');
+      } else if (data.found === false) {
+        setError('No account found with that email address. Please check and try again.');
+      } else {
+        setSent(true);
       }
     } catch {
       setError('Cannot connect to server.');

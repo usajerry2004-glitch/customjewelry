@@ -82,7 +82,7 @@ export class CadController {
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Upload CAD files (CAD Designer only) — supports multiple files' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('files', 20, multerOptions))
+  @UseInterceptors(FilesInterceptor('files', 20))
   async upload(
     @Param('orderId') orderId: string,
     @UploadedFiles() files: Express.Multer.File[],
