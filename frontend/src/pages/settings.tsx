@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { UserRole } from '../utils/types';
+import { toast } from '../utils/toast';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -120,7 +121,7 @@ export default function SettingsPage() {
       await reload();
     } else {
       const data = await res.json().catch(() => ({}));
-      alert(data?.message || 'Failed to remove user.');
+      toast.error(data?.message || 'Failed to remove user.');
     }
     setRemovingId(null);
   };
@@ -240,12 +241,20 @@ export default function SettingsPage() {
 
         {/* Staff table */}
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+          <div style={{ padding: '16px 22px' }}>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <span className="skeleton" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+                <span className="skeleton skeleton-text" style={{ flex: 1 }} />
+                <span className="skeleton skeleton-badge" />
+              </div>
+            ))}
+          </div>
         ) : staff.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>No staff members found.</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-scroll">
+            <table className="staff-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-input)' }}>
                   {['Name', 'Email', 'Role', 'Status', 'Added', ''].map(h => (

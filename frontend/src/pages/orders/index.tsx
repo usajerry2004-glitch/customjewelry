@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
+import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
 import { Order, OrderStatus, StoneStatus } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
+import { toast } from '../../utils/toast';
 
 const ALL_STATUS_FILTERS = [
   { label: 'All',             value: '' },
@@ -101,6 +103,11 @@ export default function OrdersPage() {
   const [customerFilter, setCustomerFilter] = useState('');
   const [customerFilterInput, setCustomerFilterInput] = useState('');
   const [showFilterDrop, setShowFilterDrop] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   // Sync statusFilter when URL query changes (Next.js router)
   useEffect(() => {
@@ -127,34 +134,28 @@ export default function OrdersPage() {
   const showStoneSubRow = statusFilter === OrderStatus.VPO_ISSUED &&
     ['ADMIN', 'FACTORY_MANAGER', 'AUTHORIZER'].includes(userRole);
 
-  const load = async () => {
+  const load = async (pageNum = 0) => {
     setLoading(true);
+    setSelectedIds(new Set());
     try {
-      const params = new URLSearchParams({ limit: '200' });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageNum * PAGE_SIZE) });
       if (search) params.set('search', search);
-      // CAD sub-filters: send CAD_IN_PROGRESS to backend, filter locally
       if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
-      if (isCadSubFilter) params.set('status', 'CAD_IN_PROGRESS');
-      if (statusFilter === OrderStatus.CAD_IN_PROGRESS) params.set('status', 'CAD_IN_PROGRESS');
+      if (isCadSubFilter) {
+        params.set('status', 'CAD_IN_PROGRESS');
+        params.set('cadSubFilter', statusFilter);
+      }
+      if (statusFilter === OrderStatus.CAD_IN_PROGRESS && cadSubFilter) params.set('cadSubFilter', cadSubFilter);
+      if (stoneSubFilter) params.set('stoneSubFilter', stoneSubFilter);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
-        let list: any[] = data.orders || [];
-        // Apply CAD sub-filter (for both CAD designer role filters and admin inline sub-filter)
-        const activeCadSub = isCadSubFilter ? statusFilter : cadSubFilter;
-        if (activeCadSub === 'cad_pending')           list = list.filter((o: any) => !o.cadSubStatus);
-        if (activeCadSub === 'cad_awaiting_quote')   list = list.filter((o: any) => o.cadSubStatus === 'UPLOADED' && !o.sentToCustomer);
-        if (activeCadSub === 'cad_awaiting_approval') list = list.filter((o: any) => o.cadSubStatus === 'UPLOADED' && o.sentToCustomer);
-        if (activeCadSub === 'cad_revision')          list = list.filter((o: any) => o.cadSubStatus === 'REVISION');
-        if (activeCadSub === 'cad_approved')          list = list.filter((o: any) => o.cadSubStatus === 'APPROVED');
-        if (stoneSubFilter === 'stone_pending')  list = list.filter((o: any) => !o.stoneStatus || o.stoneStatus === StoneStatus.PENDING_STONE);
-        if (stoneSubFilter === 'stone_received') list = list.filter((o: any) => o.stoneStatus === StoneStatus.STONE_RECEIVED);
+        const list: any[] = data.orders || [];
         setOrders(list);
-        setTotal(list.length);
+        setTotal(data.total ?? list.length);
 
-        // Batch-fetch thumbnails for visible orders (non-blocking)
         const ids = list.map((o: any) => o.id).filter(Boolean);
         if (ids.length) {
           apiFetch(`${API}/cad/thumbnails?orderIds=${ids.join(',')}`)
@@ -164,6 +165,39 @@ export default function OrdersPage() {
         }
       }
     } finally { setLoading(false); }
+  };
+
+  const isFactoryManager = userRole === 'FACTORY_MANAGER';
+
+  const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()); setStoneSubFilter(''); };
+
+  const handleBulkManufactured = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await apiFetch(`${API}/orders/bulk/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orderIds: Array.from(selectedIds), status: OrderStatus.MANUFACTURED }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.message || `Request failed (${res.status}). Please try again.`);
+        return;
+      }
+      if (data.succeeded === 0) {
+        toast.error(`${data.failed} order(s) could not be updated. Make sure all selected orders have Stone Received status.`, 'Could not mark as Manufactured');
+        return;
+      }
+      exitSelectMode();
+      load(page);
+      if (data.failed > 0) {
+        toast.warning(`${data.succeeded} marked as Manufactured. ${data.failed} skipped (stone not received).`);
+      } else {
+        toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} marked as Manufactured.`);
+      }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally { setBulkLoading(false); }
   };
 
   const applyMonth = (year: number, month: number) => {
@@ -178,7 +212,8 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  useEffect(() => { load(); }, [search, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(0); load(0); }, [search, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
+  useEffect(() => { if (page > 0) load(page); }, [page]);
 
   const openNewOrderModal = async () => {
     setShowNew(true);
@@ -213,7 +248,6 @@ export default function OrdersPage() {
 
         // Upload all reference files
         if (refFiles.length > 0 && order.id) {
-          const token = localStorage.getItem('jf_token');
           let uploadFailed = false;
           for (const file of refFiles) {
             try {
@@ -221,13 +255,13 @@ export default function OrdersPage() {
               fd.append('file', file);
               const r = await fetch(`${API}/cad/reference/${order.id}`, {
                 method: 'POST',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                credentials: 'include',
                 body: fd,
               });
               if (!r.ok) uploadFailed = true;
             } catch { uploadFailed = true; }
           }
-          if (uploadFailed) alert('Order created but one or more reference files failed to upload. You can add them from the order detail page.');
+          if (uploadFailed) toast.warning('Order created but one or more reference files failed to upload. You can add them from the order detail page.', 'Upload incomplete');
         }
 
         setShowNew(false);
@@ -248,12 +282,38 @@ export default function OrdersPage() {
       title="Orders"
       subtitle={`${total} total orders`}
       actions={
-        <button
-          onClick={openNewOrderModal}
-          style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
-        >
-          + New Order
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {isFactoryManager && (
+            <button
+              onClick={() => {
+                if (selectMode) {
+                  exitSelectMode();
+                } else {
+                  setSelectMode(true);
+                  setSelectedIds(new Set());
+                  setStatusFilter(OrderStatus.VPO_ISSUED);
+                  setStoneSubFilter('stone_received');
+                  setCadSubFilter('');
+                }
+              }}
+              style={{
+                background: selectMode ? 'var(--accent)' : 'var(--bg-input)',
+                color: selectMode ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${selectMode ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              {selectMode ? '✕ Cancel' : '☑ Select'}
+            </button>
+          )}
+          <button
+            onClick={openNewOrderModal}
+            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
+          >
+            + New Order
+          </button>
+        </div>
       }
     >
       {/* New Order Modal */}
@@ -570,7 +630,8 @@ export default function OrdersPage() {
                   onFocus={() => setShowFilterDrop(true)}
                   onBlur={() => setTimeout(() => setShowFilterDrop(false), 150)}
                   placeholder="Filter by customer / store…"
-                  style={{ ...inputStyle, width: '280px', paddingRight: customerFilter ? '28px' : '12px' }}
+                  className="customer-filter-input"
+                  style={{ ...inputStyle, width: '280px', maxWidth: '100%', paddingRight: customerFilter ? '28px' : '12px' }}
                 />
                 {customerFilter && (
                   <button
@@ -581,7 +642,7 @@ export default function OrdersPage() {
               </div>
             </div>
             {showFilterDrop && filtered.length > 0 && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, width: '280px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: 200, maxHeight: '220px', overflowY: 'auto' }}>
+              <div className="customer-filter-drop" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, width: '280px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: 200, maxHeight: '220px', overflowY: 'auto' }}>
                 {filtered.map(name => (
                   <div
                     key={name}
@@ -600,6 +661,13 @@ export default function OrdersPage() {
         );
       })()}
 
+      {/* Select mode hint bar */}
+      {selectMode && selectedIds.size === 0 && (
+        <div style={{ marginBottom: '12px', padding: '10px 16px', background: 'rgba(192,155,88,0.08)', border: '1px solid rgba(192,155,88,0.3)', borderRadius: '8px', fontSize: '12px', color: 'var(--accent-dark)', fontWeight: 500 }}>
+          Only orders with Stone Received can be selected. Tap them to select, then mark as Manufactured.
+        </div>
+      )}
+
       {/* Orders grid */}
       {(() => {
         const activeQ = (customerFilter || customerFilterInput).toLowerCase();
@@ -609,20 +677,150 @@ export default function OrdersPage() {
               (o.storeName || '').toLowerCase().includes(activeQ)
             )
           : orders;
-        return loading ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>Loading orders…</div>
-        ) : displayOrders.length === 0 ? (
+
+        if (loading) return <SkeletonOrderGrid count={8} />;
+
+        if (displayOrders.length === 0) return (
           <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>
             No orders found.{search || statusFilter || customerFilter || customerFilterInput ? ' Try clearing your filters.' : ''}
           </div>
-        ) : (
-          <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
-            {displayOrders.map(order => (
-              <OrderCard key={order.id} order={order} hideFinancials={!isAdmin} onClick={() => router.push(`/orders/${order.id}`)} referenceImage={thumbnails[order.id!] ? `/uploads/cad/${thumbnails[order.id!]}` : undefined} currentUserRole={userRole} />
-            ))}
-          </div>
+        );
+
+        const selectableOrders = displayOrders.filter(o => o.stoneStatus === StoneStatus.STONE_RECEIVED);
+        const allSelectableSelected = selectableOrders.length > 0 && selectableOrders.every(o => selectedIds.has(o.id!));
+
+        return (
+          <>
+            {/* Select-all row — only in select mode for factory manager */}
+            {selectMode && displayOrders.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                <button
+                  disabled={selectableOrders.length === 0}
+                  onClick={() => {
+                    if (allSelectableSelected) {
+                      setSelectedIds(s => { const n = new Set(s); selectableOrders.forEach(o => n.delete(o.id!)); return n; });
+                    } else {
+                      setSelectedIds(s => { const n = new Set(s); selectableOrders.forEach(o => o.id && n.add(o.id)); return n; });
+                    }
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '7px', background: allSelectableSelected ? 'var(--accent)' : 'var(--bg-card)', border: `1px solid ${allSelectableSelected ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: selectableOrders.length === 0 ? 'not-allowed' : 'pointer', color: allSelectableSelected ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s', opacity: selectableOrders.length === 0 ? 0.5 : 1 }}
+                >
+                  <span style={{ fontSize: '14px' }}>{allSelectableSelected ? '☑' : '☐'}</span>
+                  {allSelectableSelected ? 'Deselect all' : `Select all Stone Received (${selectableOrders.length})`}
+                </button>
+                {selectedIds.size > 0 && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selectedIds.size} selected</span>
+                )}
+              </div>
+            )}
+
+            <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+              {displayOrders.map(order => {
+                const isSelected = selectedIds.has(order.id!);
+                const isSelectable = order.stoneStatus === StoneStatus.STONE_RECEIVED;
+                return (
+                  <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
+                    onClick={selectMode ? (e) => {
+                      if (!isSelectable) return;
+                      e.preventDefault();
+                      setSelectedIds(s => { const n = new Set(s); n.has(order.id!) ? n.delete(order.id!) : n.add(order.id!); return n; });
+                    } : undefined}
+                  >
+                    {/* Selection indicator overlay for factory manager select mode */}
+                    {selectMode && isSelectable && (
+                      <div style={{
+                        position: 'absolute', inset: 0, zIndex: 2, borderRadius: 'var(--radius)',
+                        border: `2px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
+                        background: isSelected ? 'rgba(192,155,88,0.06)' : 'transparent',
+                        pointerEvents: 'none', transition: 'all 0.1s',
+                      }} />
+                    )}
+                    {selectMode && isSelectable && (
+                      <div style={{
+                        position: 'absolute', top: '10px', left: '10px', zIndex: 3,
+                        width: '22px', height: '22px', borderRadius: '50%',
+                        background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.92)',
+                        border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                        transition: 'all 0.1s',
+                        pointerEvents: 'none',
+                      }}>
+                        {isSelected && <span style={{ color: '#fff', fontSize: '13px', lineHeight: 1, fontWeight: 700 }}>✓</span>}
+                      </div>
+                    )}
+                    <OrderCard
+                      order={order}
+                      hideFinancials={!isAdmin}
+                      onClick={selectMode ? undefined : () => router.push(`/orders/${order.id}`)}
+                      referenceImage={thumbnails[order.id!] ? `/uploads/cad/${thumbnails[order.id!]}` : undefined}
+                      currentUserRole={userRole}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {total > PAGE_SIZE && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '24px', flexWrap: 'wrap' }}>
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage(p => p - 1)}
+                  style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page === 0 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+                >← Prev</button>
+                {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPage(i)}
+                    style={{ padding: '6px 12px', borderRadius: '7px', border: `1px solid ${page === i ? 'var(--navy)' : 'var(--border)'}`, background: page === i ? 'var(--navy)' : 'var(--bg-card)', color: page === i ? '#fff' : 'var(--text-primary)', cursor: 'pointer', fontSize: '12px', fontWeight: page === i ? 700 : 400 }}
+                  >{i + 1}</button>
+                )).slice(Math.max(0, page - 2), page + 5)}
+                <button
+                  disabled={page >= Math.ceil(total / PAGE_SIZE) - 1}
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page >= Math.ceil(total / PAGE_SIZE) - 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page >= Math.ceil(total / PAGE_SIZE) - 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+                >Next →</button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Page {page + 1} of {Math.ceil(total / PAGE_SIZE)} · {total} total
+                </span>
+              </div>
+            )}
+          </>
         );
       })()}
+
+      {/* Floating bulk action bar — fixed bottom, factory manager only */}
+      {selectMode && selectedIds.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 500, display: 'flex', alignItems: 'center', gap: '12px',
+          background: 'var(--navy)', borderRadius: '12px', padding: '12px 20px',
+          boxShadow: '0 8px 32px rgba(26,39,64,0.4)', minWidth: '320px',
+          animation: 'fadeSlideUp 0.2s ease',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>
+              {selectedIds.size} order{selectedIds.size > 1 ? 's' : ''} selected
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '11px' }}>Mark all as Manufactured?</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={exitSelectMode}
+            style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 14px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleBulkManufactured}
+            disabled={bulkLoading}
+            style={{ background: 'var(--accent)', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
+          >
+            {bulkLoading ? 'Marking…' : '✓ Mark as Manufactured'}
+          </button>
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -3,8 +3,20 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
+import * as Sentry from '@sentry/node';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
+  // Initialise Sentry before the app boots so all errors are captured from startup
+  const sentryDsn = process.env.SENTRY_DSN;
+  if (sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      tracesSampleRate: 0.1,
+      environment: process.env.NODE_ENV || 'development',
+    });
+  }
+
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
@@ -28,6 +40,9 @@ async function bootstrap() {
     }),
   );
 
+  // Global exception filter — logs 5xx to console and ships them to Sentry
+  app.useGlobalFilters(new AllExceptionsFilter());
+
   app.setGlobalPrefix('api/v1');
 
   // Swagger
@@ -45,7 +60,6 @@ async function bootstrap() {
     .addTag('Shipping', 'Shipment tracking')
     .addTag('Repairs', 'US setter repair workflow')
     .addTag('Customers', 'Customer management')
-    .addTag('Reporting', 'Analytics and metrics')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

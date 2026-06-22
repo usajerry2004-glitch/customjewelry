@@ -237,7 +237,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                 </div>
                 <button
                   className="topbar-signout"
-                  onClick={() => { clearAuth(); router.replace('/login'); }}
+                  onClick={() => {
+                    clearAuth();
+                    // Clear httpOnly cookie server-side
+                    fetch('/api/proxy/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+                    router.replace('/login');
+                  }}
                   style={{
                     background: 'none', border: '1px solid var(--border)', borderRadius: '6px',
                     padding: '5px 10px', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer',

@@ -103,7 +103,7 @@ export class PublicOrdersService {
       const order = await this.orderRepo.save(this.orderRepo.create({
         poNumber,
         trackingToken,
-        status: OrderStatus.CAD_IN_PROGRESS,
+        status: OrderStatus.NEW,
         customerId:       customer.id,
         customerEmail:    customer.email,
         customerFullName: `${dto.firstName} ${dto.lastName}`.trim(),
@@ -162,6 +162,22 @@ export class PublicOrdersService {
         trackingToken,
       }).catch(err => this.logger.warn('Order placed email failed:', err));
 
+      // Email authorizers + admins about the new order
+      const authEmails = staff
+        .filter(u => u.role === UserRole.AUTHORIZER)
+        .map(u => u.email)
+        .filter(Boolean);
+      if (authEmails.length) {
+        this.emailService.sendNewOrderToAuthorizers({
+          to:           authEmails,
+          poNumber:     order.poNumber,
+          customerName: order.customerFullName,
+          orderType:    order.orderType || 'Custom Order',
+          storeName:    order.storeName || 'Web Order',
+          orderId:      order.id,
+        }).catch(err => this.logger.warn('New order authorizer email failed:', err));
+      }
+
       this.logger.log(`Web order created: ${order.poNumber} for ${customer.email}`);
       return {
         success:  true,
@@ -200,6 +216,7 @@ export class PublicOrdersService {
       updatedAt:      order.updatedAt,
       trackingNumber: order.trackingNumber,
       shipMethod:     order.shipMethod,
+      quotedCost:     order.quotedCost ?? null,
       cadFiles: cadFiles.map(f => ({
         id:             f.id,
         status:         f.status,

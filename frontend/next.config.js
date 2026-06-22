@@ -1,6 +1,9 @@
+const { withSentryConfig } = require('@sentry/nextjs');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+  output: 'standalone',
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
     if (!isServer) {
@@ -20,7 +23,6 @@ const nextConfig = {
         source: '/api/proxy/:path*',
         destination: `${backend}/api/v1/:path*`,
       },
-      // Proxy uploaded CAD files so they work via tunnel and with auth headers
       {
         source: '/uploads/:path*',
         destination: `${backend}/uploads/:path*`,
@@ -29,4 +31,10 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  // Suppress Sentry CLI output during builds
+  silent: true,
+  // Disable source map upload until SENTRY_AUTH_TOKEN is configured
+  disableServerWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
+  disableClientWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
+});

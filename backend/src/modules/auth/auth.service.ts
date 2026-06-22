@@ -87,15 +87,17 @@ export class AuthService {
       { firstName: 'Priya',    lastName: 'Mehta',    email: 'stone@kirajewels.one',       password: process.env.SEED_STONE_PASSWORD    || 'KiRa@Stone#2025!',    role: UserRole.STONE_MANAGER },
       { firstName: 'Emma',     lastName: 'Thompson', email: 'customer@example.com',       password: process.env.SEED_CUSTOMER_PASSWORD || 'KiRa@Customer#2025!', role: UserRole.CUSTOMER },
 
-      // Additional Sales Reps for testing
-      { firstName: 'Michael',  lastName: 'Johnson',  email: 'sales2@kirajewels.one',      password: 'KiRa@Sales2#2025!',   role: UserRole.SALES_REP },
-      { firstName: 'Jessica',  lastName: 'Williams', email: 'sales3@kirajewels.one',      password: 'KiRa@Sales3#2025!',   role: UserRole.SALES_REP },
-
-      // Additional Customers for testing
-      { firstName: 'John',     lastName: 'Anderson', email: 'john.anderson@customer.com', password: 'KiRa@Cust1#2025!',    role: UserRole.CUSTOMER },
-      { firstName: 'Amanda',   lastName: 'Martinez', email: 'amanda.martinez@customer.com', password: 'KiRa@Cust2#2025!',  role: UserRole.CUSTOMER },
-      { firstName: 'David',    lastName: 'Brown',    email: 'david.brown@customer.com',   password: 'KiRa@Cust3#2025!',    role: UserRole.CUSTOMER },
     ];
+
+    // Dev-only test accounts — never created in production
+    const devSeeds = process.env.NODE_ENV !== 'production' ? [
+      { firstName: 'Michael',  lastName: 'Johnson',  email: 'sales2@kirajewels.one',        password: 'KiRa@Sales2#2025!', role: UserRole.SALES_REP },
+      { firstName: 'Jessica',  lastName: 'Williams', email: 'sales3@kirajewels.one',        password: 'KiRa@Sales3#2025!', role: UserRole.SALES_REP },
+      { firstName: 'John',     lastName: 'Anderson', email: 'john.anderson@customer.com',   password: 'KiRa@Cust1#2025!',  role: UserRole.CUSTOMER },
+      { firstName: 'Amanda',   lastName: 'Martinez', email: 'amanda.martinez@customer.com', password: 'KiRa@Cust2#2025!',  role: UserRole.CUSTOMER },
+      { firstName: 'David',    lastName: 'Brown',    email: 'david.brown@customer.com',     password: 'KiRa@Cust3#2025!',  role: UserRole.CUSTOMER },
+    ] : [];
+    seeds.push(...devSeeds);
     for (const seed of seeds) {
       const exists = await this.userRepo.findOne({ where: { email: seed.email } });
       if (exists) continue; // Never overwrite existing accounts

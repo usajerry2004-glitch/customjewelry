@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { Order, OrderStatus } from '../utils/types';
+import { toast } from '../utils/toast';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -36,7 +37,7 @@ export default function ShippingPage() {
 
   const dispatch = async (order: Order) => {
     const inputs = getTracking(order.id);
-    if (!inputs.tracking.trim()) { alert('Please enter a tracking number.'); return; }
+    if (!inputs.tracking.trim()) { toast.warning('Please enter a tracking number.'); return; }
     setActionLoading(order.id + 'dispatch');
     await apiFetch(`${API}/shipping/${order.id}/dispatch`, { method: 'PATCH', body: JSON.stringify({ trackingNumber: inputs.tracking, shipMethod: inputs.method }) });
     await reload(); setActionLoading(null);

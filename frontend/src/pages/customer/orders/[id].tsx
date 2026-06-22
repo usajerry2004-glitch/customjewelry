@@ -31,8 +31,18 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
   const ext      = (cad.originalName.split('.').pop() || '').toLowerCase();
   const isImage  = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
   const isPdf    = ext === 'pdf';
+  const isVideo  = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
   const is3dm    = ext === '3dm';
+  const isJcd    = ext === 'jcd';
   const fileUrl  = `/uploads/cad/${cad.fileName}`;
+  const companionForJcd = isJcd
+    ? cads.find(f => {
+        const base = cad.originalName.replace(/\.jcd$/i, '');
+        const fBase = f.originalName.replace(/\.[^.]+$/, '');
+        const fExt = (f.originalName.split('.').pop() || '').toLowerCase();
+        return f.id !== cad.id && fBase === base && ['jpg','jpeg','png','webp'].includes(fExt);
+      })
+    : undefined;
   const cs       = CAD_STATUS[cad.status] || { label: cad.status, color: '#64748B' };
 
   useEffect(() => {
@@ -56,7 +66,7 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : is3dm ? '📐' : '📎'}</span>
+            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : is3dm ? '📐' : isJcd ? '💎' : '📎'}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cad.originalName}</div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '2px', alignItems: 'center' }}>
@@ -97,8 +107,34 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
               style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', display: 'block' }} />
           ) : isPdf ? (
             <iframe src={`${fileUrl}#toolbar=1`} style={{ width: '100%', height: '65vh', border: 'none' }} title={cad.originalName} />
+          ) : isVideo ? (
+            <video
+              src={fileUrl}
+              controls
+              style={{ maxWidth: '100%', maxHeight: '65vh', display: 'block', borderRadius: '6px' }}
+            />
           ) : is3dm ? (
             <ThreeDmViewer fileUrl={fileUrl} height={480} />
+          ) : isJcd ? (
+            companionForJcd ? (
+              <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={`/uploads/cad/${companionForJcd.fileName}`}
+                  alt={cad.originalName}
+                  style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', display: 'block' }}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div style={{ position: 'absolute', bottom: '12px', left: '12px', background: 'rgba(0,0,0,0.75)', color: '#c09b58', fontSize: '11px', fontWeight: 600, padding: '5px 12px', borderRadius: '6px' }}>
+                  💎 JewelCAD Design File
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                <div style={{ fontSize: '64px', marginBottom: '12px' }}>💎</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: '6px' }}>JewelCAD Design File</div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>Use Download to open in JewelCAD or Matrix.</div>
+              </div>
+            )
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '56px', marginBottom: '14px', opacity: 0.4 }}>📎</div>
@@ -350,12 +386,11 @@ export default function CustomerOrderDetail() {
                 onChange={async e => {
                   const file = e.target.files?.[0];
                   if (!file || !order?.id) return;
-                  const token = localStorage.getItem('jf_token');
                   const fd = new FormData();
                   fd.append('file', file);
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cad/reference/${order.id}`, {
+                  const res = await fetch(`/api/proxy/cad/reference/${order.id}`, {
                     method: 'POST',
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    credentials: 'include',
                     body: fd,
                   });
                   if (res.ok) reload();
@@ -370,11 +405,13 @@ export default function CustomerOrderDetail() {
               No reference images yet. Upload an inspiration photo to share with our design team.
             </div>
           ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          <div className="ref-images-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
             {refs.map((cad, cadIdx) => {
               const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+              const isVid = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
               const fileUrl = `/uploads/cad/${cad.fileName}`;
+              const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : '📎';
               return (
                 <div key={cad.id}
                   onClick={() => setViewerState({ list: refs, idx: cadIdx })}
@@ -394,7 +431,7 @@ export default function CustomerOrderDetail() {
                     />
                   ) : null}
                   <div style={{ width: '150px', height: '110px', display: isImage ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', background: 'var(--bg-input)' }}>
-                    🖼
+                    {fallbackIcon}
                   </div>
                   <div style={{ padding: '5px 8px', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {cad.originalName}

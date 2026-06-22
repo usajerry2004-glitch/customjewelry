@@ -3,11 +3,12 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useAuthStore } from '../store/auth.store';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Toaster } from '../components/Toaster';
 import '../styles/globals.css';
 
 const PUBLIC_ROUTES = ['/login'];
 const PUBLIC_PREFIXES = ['/track/'];
-const CUSTOMER_ROUTES = ['/customer/orders', '/customer/orders/new'];
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -20,15 +21,14 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.includes(router.pathname) || PUBLIC_PREFIXES.some(p => router.pathname.startsWith(p));
     const isCustomerRoute = router.pathname.startsWith('/customer/');
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('jf_token') : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('jf_user') : null;
     const role = storedUser ? JSON.parse(storedUser).role : null;
 
-    if (!stored && !isPublic) {
+    if (!storedUser && !isPublic) {
       router.replace('/login');
       return;
     }
-    if (stored && !isPublic) {
+    if (storedUser && !isPublic) {
       if (role === 'CUSTOMER' && !isCustomerRoute) {
         router.replace('/customer/orders');
       } else if (role !== 'CUSTOMER' && isCustomerRoute) {
@@ -38,13 +38,15 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router.pathname]);
 
   return (
-    <>
+    <ErrorBoundary>
       <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
       <Component {...pageProps} />
-    </>
+      <Toaster />
+    </ErrorBoundary>
   );
 }

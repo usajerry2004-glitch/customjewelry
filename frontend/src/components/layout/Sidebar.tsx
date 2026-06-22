@@ -19,7 +19,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER] },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
-  { icon: '📊', label: 'Reports',       path: '/reports',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP] },
   { icon: '✓', label: 'Priority Tasks',   path: '/todos',           roles: Object.values(UserRole) as UserRole[] },
   { icon: '◇', label: 'Settings',       path: '/settings',        roles: [UserRole.ADMIN] },
 ];

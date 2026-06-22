@@ -66,7 +66,6 @@ export default function NewOrderPage() {
 
       // Upload all reference files
       if (refFiles.length > 0 && order.id) {
-        const token = localStorage.getItem('jf_token');
         for (const file of refFiles) {
           try {
             const fd = new FormData();
@@ -74,7 +73,7 @@ export default function NewOrderPage() {
             fd.append('designerNotes', 'Reference image');
             await fetch(`${API}/cad/reference/${order.id}`, {
               method: 'POST',
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              credentials: 'include',
               body: fd,
             });
           } catch {}

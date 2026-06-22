@@ -11,6 +11,32 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
 
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf',
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-ms-wmv',
+  'application/octet-stream', 'model/vnd.3dm', 'application/rhino',
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+  '.pdf',
+  '.mp4', '.mov', '.webm', '.avi', '.mkv', '.wmv',
+  '.3dm', '.jcd', '.obj', '.stl', '.dxf', '.step', '.stp',
+]);
+
+const cadFileFilter = (
+  _: any,
+  file: Express.Multer.File,
+  cb: (error: Error | null, accept: boolean) => void,
+) => {
+  const ext = extname(file.originalname).toLowerCase();
+  if (ALLOWED_EXTENSIONS.has(ext) || ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    return cb(null, true);
+  }
+  cb(new Error(`File type not allowed: ${ext || file.mimetype}`), false);
+};
+
 const storage = diskStorage({
   destination: join(process.cwd(), 'uploads', 'cad'),
   filename: (_, file, cb) => {
@@ -18,6 +44,12 @@ const storage = diskStorage({
     cb(null, unique + extname(file.originalname));
   },
 });
+
+const multerOptions = {
+  storage,
+  fileFilter: cadFileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+};
 
 @ApiTags('CAD')
 @ApiBearerAuth()
@@ -78,7 +110,7 @@ export class CadController {
   @Post('reference/:orderId')
   @ApiOperation({ summary: 'Upload a reference image for an order (all staff)' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage }))
+  @UseInterceptors(FileInterceptor('file', multerOptions))
   async uploadReference(
     @Param('orderId') orderId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -92,7 +124,7 @@ export class CadController {
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Upload CAD files (CAD Designer only) — supports multiple files' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('files', 20, { storage }))
+  @UseInterceptors(FilesInterceptor('files', 20, multerOptions))
   async upload(
     @Param('orderId') orderId: string,
     @UploadedFiles() files: Express.Multer.File[],

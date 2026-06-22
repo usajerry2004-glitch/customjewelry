@@ -8,6 +8,7 @@ import { Order, OrderStatus, StoneStatus } from '../../database/entities/order.e
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
+import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
 
 export class OrderFilterDto {
@@ -16,6 +17,8 @@ export class OrderFilterDto {
   @IsOptional() @IsString() vendorName?: string;
   @IsOptional() @IsString() dateFrom?: string;
   @IsOptional() @IsString() dateTo?: string;
+  @IsOptional() @IsString() cadSubFilter?: string;
+  @IsOptional() @IsString() stoneSubFilter?: string;
   @IsOptional() @IsNumber() @Min(0) @Type(() => Number) offset?: number;
   @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
 }
@@ -43,8 +46,33 @@ export class OrdersService {
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
+    @InjectRepository(OrderEvent)   private readonly eventRepo: Repository<OrderEvent>,
     private readonly emailService: EmailService,
   ) {}
+
+  private logEvent(
+    orderId: string,
+    action: string,
+    user?: { id?: string; email: string },
+    fromStatus?: string,
+    toStatus?: string,
+    note?: string,
+  ) {
+    const ev = this.eventRepo.create({
+      orderId,
+      userId: user?.id,
+      userEmail: user?.email || 'system',
+      action,
+      fromStatus,
+      toStatus,
+      note,
+    });
+    this.eventRepo.save(ev).catch(() => {});
+  }
+
+  async getEvents(orderId: string): Promise<OrderEvent[]> {
+    return this.eventRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
+  }
 
   // Send in-app notifications + optional Resend email to authorizers and CAD designers on revision
   private async notifyRevision(order: Order): Promise<void> {
@@ -101,7 +129,7 @@ export class OrdersService {
       });
     } else if (user?.role === 'FACTORY_MANAGER') {
       qb.andWhere('order.status IN (:...factoryStatuses)', {
-        factoryStatuses: [OrderStatus.VPO_ISSUED],
+        factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED],
       });
     } else if (user?.role === 'STONE_MANAGER') {
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
@@ -109,6 +137,25 @@ export class OrdersService {
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
+
+    // CAD sub-filters (applied server-side so pagination is accurate)
+    if (filters.cadSubFilter === 'cad_pending')
+      qb.andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' });
+    else if (filters.cadSubFilter === 'cad_awaiting_quote')
+      qb.andWhere('(order.cadSubStatus = :csUploaded AND order.sentToCustomer = :notSent)', { csUploaded: 'UPLOADED', notSent: false });
+    else if (filters.cadSubFilter === 'cad_awaiting_approval')
+      qb.andWhere('(order.cadSubStatus = :csUploaded2 AND order.sentToCustomer = :sent)', { csUploaded2: 'UPLOADED', sent: true });
+    else if (filters.cadSubFilter === 'cad_revision')
+      qb.andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' });
+    else if (filters.cadSubFilter === 'cad_approved')
+      qb.andWhere('order.cadSubStatus = :csApproved', { csApproved: 'APPROVED' });
+
+    // Stone sub-filters
+    if (filters.stoneSubFilter === 'stone_pending')
+      qb.andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
+    else if (filters.stoneSubFilter === 'stone_received')
+      qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
+
     if (filters.search) {
       qb.andWhere(
         '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s OR order.customerFullName LIKE :s OR order.customerEmail LIKE :s)',
@@ -143,7 +190,9 @@ export class OrdersService {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    if (user?.role === 'FACTORY_MANAGER' && !order.kiraSkuNumber) {
+    if (user?.role === 'FACTORY_MANAGER' &&
+        order.status !== OrderStatus.VPO_ISSUED &&
+        order.status !== OrderStatus.MANUFACTURED) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
@@ -360,6 +409,7 @@ export class OrdersService {
     const patch: Partial<Order> = { status };
     if (quotedCost) patch.quotedCost = quotedCost;
     const updated = await this.update(id, patch, user);
+    this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
     // NEW → CAD_IN_PROGRESS: notify CAD designers
     if (status === OrderStatus.CAD_IN_PROGRESS) {
@@ -382,6 +432,15 @@ export class OrdersService {
           orderType: updated.orderType || '—',
           orderId: updated.id,
         });
+      }
+      if (updated.customerEmail) {
+        this.emailService.sendOrderConfirmedToCustomer({
+          to:           updated.customerEmail,
+          poNumber:     updated.poNumber,
+          customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
+          orderType:    updated.orderType || '—',
+          orderId:      updated.id,
+        }).catch(err => this.logger.warn('Order confirmed customer email failed:', err));
       }
     }
 

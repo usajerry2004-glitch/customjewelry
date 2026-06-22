@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Delete, Query, Param, Body,
-  UseGuards, Headers, Res,
+  UseGuards, Headers, Res, HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -132,6 +132,7 @@ export class SmartsheetController {
    */
   @Post('webhook/callback')
   @Public()
+  @HttpCode(200)
   @ApiOperation({ summary: 'Smartsheet live-sync callback (public)' })
   async webhookCallback(
     @Headers('smartsheet-hook-challenge') challenge: string,

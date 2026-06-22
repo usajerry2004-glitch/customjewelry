@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -38,9 +38,6 @@ export default function Dashboard() {
   const [overdue, setOverdue]     = useState<Overdue[]>([]);
   const [actions, setActions]     = useState<Priority[]>([]);
   const [recent, setRecent]       = useState<RecentOrder[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
-  const [monthReport, setMonthReport]     = useState<any>(null);
-  const [monthLoading, setMonthLoading]   = useState(false);
   const [myOrderTotal, setMyOrderTotal] = useState<number>(0);
   const [loading, setLoading]         = useState(true);
   const [userRole, setUserRole]   = useState('');
@@ -87,31 +84,9 @@ export default function Dashboard() {
     load();
   }, []);
 
-  useEffect(() => {
-    const y = selectedMonth.getFullYear();
-    const m = String(selectedMonth.getMonth() + 1).padStart(2, '0');
-    const lastDay = new Date(y, selectedMonth.getMonth() + 1, 0).getDate();
-    const from = `${y}-${m}-01`;
-    const to   = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
-    setMonthLoading(true);
-    apiFetch(`${API}/reporting/report?from=${from}&to=${to}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setMonthReport(d); setMonthLoading(false); });
-  }, [selectedMonth]);
 
   const sc = (s: string) => parseInt(metrics?.byStatus.find(b => b.status === s)?.count || '0');
   const activeOrders  = metrics?.byStatus.reduce((t, b) => ['COMPLETED','CANCELLED'].includes(b.status) ? t : t + parseInt(b.count), 0) ?? 0;
-  const monthReceived  = monthReport?.newOrders ?? 0;
-  const monthCompleted = monthReport?.completedOrders ?? 0;
-  const pieData = [
-    { name: `Received  ${monthReceived}`,   value: monthReceived,  fill: NAVY },
-    { name: `Completed  ${monthCompleted}`, value: monthCompleted, fill: GOLD },
-  ].filter(d => d.value > 0);
-  const now2 = new Date();
-  const isCurrentMonth = selectedMonth.getFullYear() === now2.getFullYear() && selectedMonth.getMonth() === now2.getMonth();
-  const monthLabel = selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const goPrev = () => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1));
-  const goNext = () => setSelectedMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1));
 
   // ── Shared components ────────────────────────────────────────────────────────
 
@@ -224,72 +199,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Analytics ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '28px 0 18px' }}>
-        <div style={{ width: 3, height: 18, background: GOLD, borderRadius: 2, flexShrink: 0 }} />
-        <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 16, fontWeight: 700, color: NAVY, letterSpacing: '1px', whiteSpace: 'nowrap' }}>Monthly Analytics</span>
-        <div style={{ flex: 1, height: 1, background: '#E8E0D4' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <button onClick={goPrev} style={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 6, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: NAVY, fontSize: 16, fontWeight: 700, lineHeight: 1, padding: 0 }}>‹</button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: NAVY, minWidth: 108, textAlign: 'center', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{monthLabel}</span>
-          <button onClick={goNext} disabled={isCurrentMonth} style={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 6, width: 28, height: 28, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isCurrentMonth ? '#C9D0D8' : NAVY, fontSize: 16, fontWeight: 700, lineHeight: 1, padding: 0 }}>›</button>
-        </div>
-      </div>
-      <div className="dash-3col">
-
-        {/* Monthly Activity — Pie */}
-        <div style={{ ...card, padding: '20px 22px' }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Monthly Activity</h2>
-          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Received vs Completed — {monthLabel}</div>
-          {monthLoading ? (
-            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
-          ) : pieData.length === 0 ? (
-            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No orders this month</div>
-          ) : <>
-            <ResponsiveContainer width="100%" height={155}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={68} innerRadius={34} paddingAngle={4}>
-                  {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10 }}>
-              {pieData.map(d => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#5C6B7A' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: d.fill }} />
-                  {d.name}
-                </div>
-              ))}
-            </div>
-          </>}
-        </div>
-
-        {/* Top Customers */}
-        <div style={{ ...card, padding: '20px 22px' }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 600, color: NAVY, marginBottom: 3 }}>Top Customers</h2>
-          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Most active — {monthLabel}</div>
-          {monthLoading ? (
-            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>Loading…</div>
-          ) : !monthReport?.topStores?.length ? (
-            <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9BA8B5', fontSize: 13 }}>No data this month</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={monthReport.topStores.slice(0, 5)} layout="vertical" margin={{ top: 2, right: 32, bottom: 0, left: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0EBE3" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12, fill: '#9BA8B5' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="store" tick={{ fontSize: 12, fill: '#5C6B7A' }} axisLine={false} tickLine={false} width={108} />
-                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #E8E0D4', borderRadius: 8, fontSize: 12, boxShadow: '0 4px 12px rgba(26,39,64,0.1)' }} formatter={(v) => [`${v} orders`, 'Orders']} />
-                <Bar dataKey="count" radius={[0,5,5,0]}>
-                  {monthReport.topStores.slice(0, 5).map((_: any, i: number) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* SLA Alerts */}
-        <div style={{ ...card, padding: '20px 22px', borderTop: `3px solid ${overdue.length > 0 ? '#DC2626' : '#059669'}` }}>
+      {/* SLA Alerts */}
+      <div style={{ ...card, padding: '20px 22px', borderTop: `3px solid ${overdue.length > 0 ? '#DC2626' : '#059669'}`, margin: '0 0 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
             <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: 0 }}>SLA Alerts</h2>
             <a href="/todos" style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
@@ -319,7 +230,6 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-        </div>
       </div>
 
       {/* ── Queues ── */}

@@ -72,10 +72,11 @@ function JumpBar({ critical, high, medium, onJump }: { critical: number; high: n
 
 // ── Section ────────────────────────────────────────────────────────────────
 function PrioritySection({
-  id, icon, label, color, orders, open, onToggle, router,
+  id, icon, label, color, orders, open, onToggle, router, statusFilter, onStatusChange,
 }: {
   id: string; icon: string; label: string; color: string;
   orders: PriorityOrder[]; open: boolean; onToggle: () => void; router: ReturnType<typeof useRouter>;
+  statusFilter: string; onStatusChange: (v: string) => void;
 }) {
   const compact = orders.length > COMPACT_THRESHOLD;
 
@@ -103,11 +104,37 @@ function PrioritySection({
       {open && (
         compact ? (
           // ── Compact table ────────────────────────────────────────────────
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: '4px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <div className="table-scroll" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: '4px' }}>
+            <table className="todos-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border)' }}>
-                  {['PO Number', 'Store / Customer', 'Status', 'Reason', 'Age'].map(h => (
+                  {['PO Number', 'Store / Customer'].map(h => (
+                    <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                  <th style={{ padding: '8px 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', fontSize: '11px' }}>STATUS</span>
+                      <select
+                        value={statusFilter}
+                        onChange={e => onStatusChange(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          fontSize: '10px', fontWeight: 600, cursor: 'pointer', outline: 'none',
+                          border: `1px solid ${statusFilter !== 'ALL' ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: '6px', padding: '2px 5px',
+                          background: statusFilter !== 'ALL' ? 'rgba(192,155,88,0.12)' : 'var(--bg-input)',
+                          color: statusFilter !== 'ALL' ? 'var(--accent-dark)' : 'var(--text-muted)',
+                          maxWidth: '120px',
+                        }}
+                      >
+                        <option value="ALL">All</option>
+                        {Object.entries(STATUS_BADGE).map(([key, cfg]) => (
+                          <option key={key} value={key}>{cfg.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  {['Reason', 'Age'].map(h => (
                     <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -160,6 +187,7 @@ export default function PriorityTasksPage() {
   const [priorityOrders, setPriorityOrders] = useState<PriorityOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'sec-critical': true, 'sec-high': true, 'sec-medium': false,
   });
@@ -188,13 +216,14 @@ export default function PriorityTasksPage() {
     });
   }, []);
 
-  const filtered = search.trim()
-    ? priorityOrders.filter(o =>
-        o.poNumber.toLowerCase().includes(search.toLowerCase()) ||
-        (o.storeName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (o.customerFullName || '').toLowerCase().includes(search.toLowerCase())
-      )
-    : priorityOrders;
+  const filtered = priorityOrders.filter(o => {
+    const matchesText = !search.trim() ||
+      o.poNumber.toLowerCase().includes(search.toLowerCase()) ||
+      (o.storeName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (o.customerFullName || '').toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    return matchesText && matchesStatus;
+  });
 
   const criticalOrders = filtered.filter(o => o.priorityLevel === 'CRITICAL');
   const highOrders     = filtered.filter(o => o.priorityLevel === 'HIGH');
@@ -226,6 +255,7 @@ export default function PriorityTasksPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter by PO number or store…"
+              className="todos-search"
               style={{
                 flex: 1, minWidth: '220px', maxWidth: '320px',
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -248,12 +278,15 @@ export default function PriorityTasksPage() {
           <JumpBar critical={criticalOrders.length} high={highOrders.length} medium={medOrders.length} onJump={jumpTo} />
 
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '13px' }}>No orders match "{search}"</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No orders match{search ? ` "${search}"` : ''}{statusFilter !== 'ALL' ? ` with status "${STATUS_BADGE[statusFilter]?.label || statusFilter}"` : ''}
+              {statusFilter !== 'ALL' && <span style={{ marginLeft: '8px', cursor: 'pointer', color: 'var(--accent)', fontWeight: 600 }} onClick={() => setStatusFilter('ALL')}>Clear filter</span>}
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <PrioritySection id="sec-critical" icon="🚨" label="Critical — Needs Immediate Action" color="#7C3AED" orders={criticalOrders} open={openSections['sec-critical']} onToggle={() => toggleSection('sec-critical')} router={router} />
-              <PrioritySection id="sec-high"     icon="🔴" label="High Priority"                   color="#DC2626" orders={highOrders}     open={openSections['sec-high']}     onToggle={() => toggleSection('sec-high')}     router={router} />
-              <PrioritySection id="sec-medium"   icon="🟡" label="Medium Priority"                 color="#F59E0B" orders={medOrders}       open={openSections['sec-medium']}   onToggle={() => toggleSection('sec-medium')}   router={router} />
+              <PrioritySection id="sec-critical" icon="🚨" label="Critical — Needs Immediate Action" color="#7C3AED" orders={criticalOrders} open={openSections['sec-critical']} onToggle={() => toggleSection('sec-critical')} router={router} statusFilter={statusFilter} onStatusChange={setStatusFilter} />
+              <PrioritySection id="sec-high"     icon="🔴" label="High Priority"                   color="#DC2626" orders={highOrders}     open={openSections['sec-high']}     onToggle={() => toggleSection('sec-high')}     router={router} statusFilter={statusFilter} onStatusChange={setStatusFilter} />
+              <PrioritySection id="sec-medium"   icon="🟡" label="Medium Priority"                 color="#F59E0B" orders={medOrders}       open={openSections['sec-medium']}   onToggle={() => toggleSection('sec-medium')}   router={router} statusFilter={statusFilter} onStatusChange={setStatusFilter} />
             </div>
           )}
         </>

@@ -125,4 +125,6 @@ export const FIELD_MAP: [string, string][] = [
   ['RC Job Bag #',                  'rcJobBagNumber'],
   ['RC VPO #',                      'rcVpoNumber'],
   ['Time Frame',                    'timeFrame'],
+  ['Store Name',                    'storeName'],
+  ['Customer Name',                 'storeName'],
 ];

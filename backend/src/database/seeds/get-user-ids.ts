@@ -24,22 +24,13 @@ import { User } from '../entities/user.entity';
       ],
     });
 
-    console.log('\n========== NEW USERS - COMPLETE CREDENTIALS ==========\n');
-
-    const passwords: any = {
-      'sales2@kirajewels.one': 'KiRa@Sales2#2025!',
-      'sales3@kirajewels.one': 'KiRa@Sales3#2025!',
-      'john.anderson@customer.com': 'KiRa@Cust1#2025!',
-      'amanda.martinez@customer.com': 'KiRa@Cust2#2025!',
-      'david.brown@customer.com': 'KiRa@Cust3#2025!',
-    };
+    console.log('\n========== NEW USERS ==========\n');
 
     newUsers.forEach(u => {
       console.log(`Name: ${u.firstName} ${u.lastName}`);
       console.log(`Email: ${u.email}`);
       console.log(`User ID: ${u.id}`);
       console.log(`Role: ${u.role}`);
-      console.log(`Password: ${passwords[u.email]}`);
       console.log('-------------------------------------------');
     });
 

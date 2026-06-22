@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { toast } from '../../utils/toast';
 
 const API = '/api/proxy';
 
@@ -72,6 +73,7 @@ interface OrderData {
   createdAt: string;
   trackingNumber: string | null;
   shipMethod: string | null;
+  quotedCost: number | null;
   cadFiles: CadFile[];
 }
 
@@ -84,9 +86,9 @@ export default function TrackPage() {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [actionResult, setActionResult] = useState<{ cadId: string; type: 'approved' | 'rejected' } | null>(null);
-  const [rejectModal, setRejectModal] = useState<{ cadId: string } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionResult, setActionResult] = useState<'approved' | 'rejected' | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -100,54 +102,66 @@ export default function TrackPage() {
       .catch(() => { setError('We couldn\'t find your order. Please check your link or contact us.'); setLoading(false); });
   }, [token]);
 
-  const handleApprove = async (cadId: string) => {
-    setActionLoading(cadId);
+  const handleApproveAll = async () => {
+    if (!order) return;
+    setActionLoading(true);
     try {
-      const r = await fetch(`${API}/public/track/${token}/cad/${cadId}/approve`, { method: 'PATCH' });
-      if (!r.ok) throw new Error();
-      setActionResult({ cadId, type: 'approved' });
-      setOrder(prev => prev ? {
-        ...prev,
-        cadFiles: prev.cadFiles.map(f => f.id === cadId ? { ...f, status: 'APPROVED' } : f),
-      } : prev);
-    } catch {
-      alert('Something went wrong. Please try again.');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!rejectModal) return;
-    setActionLoading(rejectModal.cadId);
-    try {
-      const r = await fetch(`${API}/public/track/${token}/cad/${rejectModal.cadId}/reject`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback }),
-      });
-      if (!r.ok) throw new Error();
-      setActionResult({ cadId: rejectModal.cadId, type: 'rejected' });
+      await Promise.all(
+        approvalFiles.map(f =>
+          fetch(`${API}/public/track/${token}/cad/${f.id}/approve`, { method: 'PATCH' })
+        )
+      );
       setOrder(prev => prev ? {
         ...prev,
         cadFiles: prev.cadFiles.map(f =>
-          f.id === rejectModal.cadId ? { ...f, status: 'REVISION_REQUESTED', customerFeedback: feedback } : f
+          f.status === 'SENT_FOR_APPROVAL' ? { ...f, status: 'APPROVED' } : f
         ),
       } : prev);
-      setRejectModal(null);
-      setFeedback('');
+      setActionResult('approved');
     } catch {
-      alert('Something went wrong. Please try again.');
+      toast.error('Something went wrong. Please try again.');
     } finally {
-      setActionLoading(null);
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    if (!order || !feedback.trim()) return;
+    setActionLoading(true);
+    try {
+      await Promise.all(
+        approvalFiles.map(f =>
+          fetch(`${API}/public/track/${token}/cad/${f.id}/reject`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedback }),
+          })
+        )
+      );
+      setOrder(prev => prev ? {
+        ...prev,
+        cadFiles: prev.cadFiles.map(f =>
+          f.status === 'SENT_FOR_APPROVAL'
+            ? { ...f, status: 'REVISION_REQUESTED', customerFeedback: feedback }
+            : f
+        ),
+      } : prev);
+      setShowRejectModal(false);
+      setFeedback('');
+      setActionResult('rejected');
+    } catch {
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const activeStep = order ? STEPS.findIndex(s => !s.statuses.includes(order.status)) - 1 : -1;
   const completedUpTo = order ? STEPS.filter(s => s.statuses.includes(order.status)).length - 1 : -1;
 
+  const quoteSet = order && order.quotedCost != null && order.quotedCost > 0;
   const approvalFiles = order?.cadFiles.filter(f => f.status === 'SENT_FOR_APPROVAL') ?? [];
-  const otherFiles    = order?.cadFiles.filter(f => f.status !== 'SENT_FOR_APPROVAL') ?? [];
+  const historyFiles  = order?.cadFiles.filter(f => f.status !== 'SENT_FOR_APPROVAL' && f.status !== 'UPLOADED') ?? [];
 
   return (
     <>
@@ -174,14 +188,10 @@ export default function TrackPage() {
 
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '32px 16px 64px' }}>
 
-          {/* Loading */}
           {loading && (
-            <div style={{ textAlign: 'center', padding: '80px 0', color: '#6B7280' }}>
-              Loading your order…
-            </div>
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#6B7280' }}>Loading your order…</div>
           )}
 
-          {/* Error */}
           {error && (
             <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 12, padding: 32, textAlign: 'center' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>😕</div>
@@ -190,7 +200,6 @@ export default function TrackPage() {
             </div>
           )}
 
-          {/* Order loaded */}
           {order && (
             <>
               {/* PO + summary */}
@@ -207,11 +216,11 @@ export default function TrackPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px 24px', marginTop: 20 }}>
                   {[
-                    { label: 'Order Type',    value: order.orderType },
-                    { label: 'Metal',         value: [order.metalType, order.metalColor].filter(Boolean).join(' ') || null },
-                    { label: 'Size',          value: order.size },
-                    { label: 'Stone Shape',   value: order.centerStoneShape },
-                    { label: 'Carat Weight',  value: order.approximateCaratWeight },
+                    { label: 'Order Type',      value: order.orderType },
+                    { label: 'Metal',           value: [order.metalType, order.metalColor].filter(Boolean).join(' ') || null },
+                    { label: 'Size',            value: order.size },
+                    { label: 'Stone Shape',     value: order.centerStoneShape },
+                    { label: 'Carat Weight',    value: order.approximateCaratWeight },
                     { label: 'Diamond Quality', value: order.diamondQuality },
                   ].filter(r => r.value).map(row => (
                     <div key={row.label}>
@@ -225,6 +234,15 @@ export default function TrackPage() {
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F0EDE8' }}>
                     <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Your Notes</div>
                     <div style={{ fontSize: 14, color: '#4B5563', lineHeight: 1.6 }}>{order.customerNotes}</div>
+                  </div>
+                )}
+
+                {order.quotedCost != null && order.quotedCost > 0 && (
+                  <div style={{ marginTop: 16, background: '#F0FDF4', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#16A34A', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Quoted Price</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#1A2740' }}>${Number(order.quotedCost).toLocaleString()}</div>
+                    </div>
                   </div>
                 )}
 
@@ -258,7 +276,7 @@ export default function TrackPage() {
                           <div style={{ width: 2, height: 24, background: done && i < completedUpTo ? '#1A2740' : '#E8E4DC', marginTop: 2 }} />
                         )}
                       </div>
-                      <div style={{ paddingTop: 4, paddingBottom: i < STEPS.length - 1 ? 0 : 0 }}>
+                      <div style={{ paddingTop: 4 }}>
                         <div style={{ fontSize: 14, fontWeight: current ? 700 : 500, color: done ? '#1A2740' : '#9CA3AF' }}>
                           {step.label}
                           {current && <span style={{ marginLeft: 8, fontSize: 11, background: '#C09B58', color: '#fff', borderRadius: 10, padding: '1px 8px', fontWeight: 600 }}>Current</span>}
@@ -269,17 +287,18 @@ export default function TrackPage() {
                 })}
               </div>
 
-              {/* CAD files pending approval */}
-              {approvalFiles.length > 0 && (
+              {/* CAD approval — only visible after quote is set */}
+              {quoteSet && approvalFiles.length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 12, border: '2px solid #6366F1', padding: '24px 28px', marginBottom: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#6366F1', animation: 'pulse 2s infinite' }} />
                     <div style={{ fontSize: 12, color: '#6366F1', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Action Required — Design Review</div>
                   </div>
                   <p style={{ color: '#4B5563', fontSize: 14, marginBottom: 20, marginTop: 0 }}>
-                    Our design team has completed your CAD. Please review the design below and either <strong>approve it</strong> to move into production, or <strong>request changes</strong>.
+                    Our design team has completed your CAD. Please review all designs below and either <strong>approve</strong> to move into production, or <strong>request changes</strong>.
                   </p>
 
+                  {/* All design files — no per-file buttons */}
                   {approvalFiles.map(f => (
                     <div key={f.id} style={{ border: '1px solid #E8E4DC', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
                       {/\.(jpg|jpeg|png|gif|webp)$/i.test(f.fileName) && (
@@ -289,43 +308,46 @@ export default function TrackPage() {
                           style={{ width: '100%', maxHeight: 400, objectFit: 'contain', background: '#F9F8F6', display: 'block' }}
                         />
                       )}
-                      <div style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: 13, color: '#1A2740', fontWeight: 600, marginBottom: 4 }}>{f.originalName}</div>
-                        {f.designerNotes && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 12 }}>{f.designerNotes}</div>}
-
-                        {actionResult?.cadId === f.id ? (
-                          <div style={{ padding: '10px 14px', borderRadius: 8, background: actionResult.type === 'approved' ? '#ECFDF5' : '#FFF7ED', color: actionResult.type === 'approved' ? '#059669' : '#D97706', fontWeight: 600, fontSize: 14 }}>
-                            {actionResult.type === 'approved' ? '✓ Design approved — our team has been notified!' : '✓ Revision requested — we\'ll update the design shortly.'}
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            <button
-                              onClick={() => handleApprove(f.id)}
-                              disabled={actionLoading === f.id}
-                              style={{ background: '#10B981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: actionLoading === f.id ? 0.7 : 1 }}
-                            >
-                              {actionLoading === f.id ? 'Processing…' : '✓ Approve Design'}
-                            </button>
-                            <button
-                              onClick={() => setRejectModal({ cadId: f.id })}
-                              disabled={!!actionLoading}
-                              style={{ background: '#fff', color: '#DC2626', border: '1.5px solid #DC2626', borderRadius: 8, padding: '10px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                            >
-                              Request Changes
-                            </button>
-                          </div>
-                        )}
+                      <div style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: 13, color: '#1A2740', fontWeight: 600 }}>{f.originalName}</div>
+                        {f.designerNotes && <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>{f.designerNotes}</div>}
                       </div>
                     </div>
                   ))}
+
+                  {/* Single set of action buttons for all files */}
+                  {actionResult ? (
+                    <div style={{ padding: '14px 18px', borderRadius: 8, background: actionResult === 'approved' ? '#ECFDF5' : '#FFF7ED', color: actionResult === 'approved' ? '#059669' : '#D97706', fontWeight: 600, fontSize: 14 }}>
+                      {actionResult === 'approved'
+                        ? '✓ Designs approved — our team has been notified and will move your order into production!'
+                        : '✓ Revision requested — we\'ll update the designs and send you a new version shortly.'}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                      <button
+                        onClick={handleApproveAll}
+                        disabled={actionLoading}
+                        style={{ background: '#10B981', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 28px', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: actionLoading ? 0.7 : 1 }}
+                      >
+                        {actionLoading ? 'Processing…' : '✓ Approve Design' + (approvalFiles.length > 1 ? 's' : '')}
+                      </button>
+                      <button
+                        onClick={() => setShowRejectModal(true)}
+                        disabled={actionLoading}
+                        style={{ background: '#fff', color: '#DC2626', border: '1.5px solid #DC2626', borderRadius: 8, padding: '12px 28px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                      >
+                        Request Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Other CAD files (reference / previous revisions) */}
-              {otherFiles.length > 0 && (
+              {/* Design history — only visible after quote is set */}
+              {quoteSet && historyFiles.length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8E4DC', padding: '24px 28px', marginBottom: 20 }}>
                   <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>Design History</div>
-                  {otherFiles.map(f => (
+                  {historyFiles.map(f => (
                     <div key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #F0EDE8', gap: 12, flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ fontSize: 13, color: '#1A2740', fontWeight: 500 }}>{f.originalName}</div>
@@ -362,12 +384,12 @@ export default function TrackPage() {
       </div>
 
       {/* Reject modal */}
-      {rejectModal && (
-        <div className="modal-bg" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div className="modal-box" style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440 }}>
+      {showRejectModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 440 }}>
             <h3 style={{ margin: '0 0 8px', color: '#1A2740', fontSize: 18 }}>Request Changes</h3>
             <p style={{ color: '#6B7280', fontSize: 14, margin: '0 0 16px' }}>
-              Please describe what changes you'd like to the design. Our team will revise it and send you an updated version.
+              Please describe what changes you'd like. Our team will revise and send you an updated version.
             </p>
             <textarea
               value={feedback}
@@ -378,17 +400,17 @@ export default function TrackPage() {
             />
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
               <button
-                onClick={() => { setRejectModal(null); setFeedback(''); }}
+                onClick={() => { setShowRejectModal(false); setFeedback(''); }}
                 style={{ background: '#F3F4F6', color: '#374151', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 500, fontSize: 14, cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
-                onClick={handleReject}
-                disabled={!feedback.trim() || actionLoading === rejectModal.cadId}
+                onClick={handleRejectAll}
+                disabled={!feedback.trim() || actionLoading}
                 style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer', opacity: !feedback.trim() ? 0.5 : 1 }}
               >
-                {actionLoading === rejectModal.cadId ? 'Submitting…' : 'Submit Request'}
+                {actionLoading ? 'Submitting…' : 'Submit Request'}
               </button>
             </div>
           </div>

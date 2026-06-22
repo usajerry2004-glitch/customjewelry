@@ -13,9 +13,14 @@ dist/
 build/
 coverage/
 
-# Environment
+# Environment — never commit secrets
 .env
+.env.local
 .env.*.local
+.env.production
+.env.staging
+**/.env.production
+**/.env.staging
 
 # OS
 .DS_Store

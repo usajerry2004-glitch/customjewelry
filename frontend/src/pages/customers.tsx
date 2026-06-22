@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
@@ -53,9 +54,16 @@ export default function CustomersPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterPriority, setFilterPriority] = useState<'all' | 'priority' | 'regular'>('all');
+  const [filterSalesRep, setFilterSalesRep] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [showCreate, setShowCreate] = useState(false);
   const [showOrder, setShowOrder] = useState<Customer | null>(null);
   const [showOrders, setShowOrders] = useState<{ customer: Customer; orders: Order[] } | null>(null);
+  const [showOrdersTop, setShowOrdersTop] = useState(200);
+  const [showOrdersH, setShowOrdersH] = useState(400);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -100,15 +108,27 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, []);
 
-  const filtered = customers
-    .filter(c =>
-      `${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())
-    )
+  const allFiltered = customers
+    .filter(c => {
+      if (search && !`${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterStatus === 'active' && !c.isActive) return false;
+      if (filterStatus === 'inactive' && c.isActive) return false;
+      if (filterPriority === 'priority' && !c.isPriority) return false;
+      if (filterPriority === 'regular' && c.isPriority) return false;
+      if (filterSalesRep && c.salesRepId !== filterSalesRep) return false;
+      return true;
+    })
     .sort((a, b) => {
       const nameA = (a.storeName || `${a.firstName} ${a.lastName}`).toLowerCase();
       const nameB = (b.storeName || `${b.firstName} ${b.lastName}`).toLowerCase();
       return nameA.localeCompare(nameB);
     });
+
+  const totalPages = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const filtered = allFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const resetPage = () => setPage(1);
 
   const createCustomer = async () => {
     if (!newUser.firstName || !newUser.email || !newUser.password) {
@@ -151,12 +171,11 @@ export default function CustomersPage() {
       const created = await res.json();
       if (refImage && created.id) {
         try {
-          const token = localStorage.getItem('jf_token');
           const fd = new FormData();
           fd.append('file', refImage);
           await fetch(`${API}/cad/reference/${created.id}`, {
             method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: 'include',
             body: fd,
           });
         } catch {}
@@ -172,7 +191,15 @@ export default function CustomersPage() {
     setSaving(false);
   };
 
-  const viewOrders = async (customer: Customer) => {
+  const viewOrders = async (customer: Customer, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const vh = window.innerHeight;
+    const mh = Math.min(400, vh - 80);
+    const rowY = rect.top;
+    const spaceBelow = vh - rowY - 20;
+    const rawTop = spaceBelow >= mh ? rowY - 12 : rowY - mh + 30;
+    setShowOrdersTop(Math.min(Math.max(rawTop, 12), vh - mh - 12));
+    setShowOrdersH(mh);
     const res = await apiFetch(`${API}/users/${customer.id}/orders`);
     if (res.ok) {
       const data = await res.json();
@@ -213,14 +240,55 @@ export default function CustomersPage() {
         </button>
       }
     >
-      {/* Search */}
-      <div style={{ marginBottom: '16px' }}>
+      {/* Search + Filters */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); resetPage(); }}
           placeholder="Search by name or email…"
-          style={{ ...INPUT, maxWidth: '360px' }}
+          style={{ ...INPUT, maxWidth: '280px', flex: '1 1 200px' }}
         />
+        <select
+          value={filterStatus}
+          onChange={e => { setFilterStatus(e.target.value as any); resetPage(); }}
+          style={{ ...INPUT, width: 'auto', flex: '0 0 auto', cursor: 'pointer' }}
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select
+          value={filterPriority}
+          onChange={e => { setFilterPriority(e.target.value as any); resetPage(); }}
+          style={{ ...INPUT, width: 'auto', flex: '0 0 auto', cursor: 'pointer' }}
+        >
+          <option value="all">All Priority</option>
+          <option value="priority">Priority</option>
+          <option value="regular">Regular</option>
+        </select>
+        {Object.keys(salesRepMap).length > 0 && (
+          <select
+            value={filterSalesRep}
+            onChange={e => { setFilterSalesRep(e.target.value); resetPage(); }}
+            style={{ ...INPUT, width: 'auto', flex: '0 0 auto', cursor: 'pointer' }}
+          >
+            <option value="">All Sales Reps</option>
+            {Object.entries(salesRepMap).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        )}
+        {(search || filterStatus !== 'all' || filterPriority !== 'all' || filterSalesRep) && (
+          <button
+            onClick={() => { setSearch(''); setFilterStatus('all'); setFilterPriority('all'); setFilterSalesRep(''); resetPage(); }}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 13px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Clear filters
+          </button>
+        )}
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+          {allFiltered.length} result{allFiltered.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       {/* Table */}
@@ -302,7 +370,7 @@ export default function CustomersPage() {
                     <button onClick={() => { setShowOrder(c); setError(''); }} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent-dark)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                       + Order
                     </button>
-                    <button onClick={() => viewOrders(c)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
+                    <button onClick={e => viewOrders(c, e)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                       View Orders
                     </button>
                     {isAdmin && c.isActive && (
@@ -317,6 +385,60 @@ export default function CustomersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, allFiltered.length)} of {allFiltered.length}
+          </span>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === 1 ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === 1 ? 'default' : 'pointer', opacity: safePage === 1 ? 0.5 : 1 }}
+            >
+              ‹ Prev
+            </button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              let pg: number;
+              if (totalPages <= 7) {
+                pg = i + 1;
+              } else if (safePage <= 4) {
+                pg = i + 1;
+                if (i === 6) pg = totalPages;
+              } else if (safePage >= totalPages - 3) {
+                pg = i === 0 ? 1 : totalPages - 6 + i;
+              } else {
+                const map = [1, 0, safePage - 1, safePage, safePage + 1, 0, totalPages];
+                pg = map[i];
+              }
+              if (pg === 0) return <span key={`ellipsis-${i}`} style={{ padding: '0 4px', color: 'var(--text-muted)', fontSize: '12px' }}>…</span>;
+              return (
+                <button
+                  key={pg}
+                  onClick={() => setPage(pg)}
+                  style={{
+                    padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer',
+                    background: pg === safePage ? 'var(--navy)' : 'var(--bg-input)',
+                    color: pg === safePage ? '#fff' : 'var(--text-primary)',
+                    fontWeight: pg === safePage ? 700 : 400,
+                  }}
+                >
+                  {pg}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === totalPages ? 'default' : 'pointer', opacity: safePage === totalPages ? 0.5 : 1 }}
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Create Customer Modal ── */}
       {showCreate && (
@@ -434,21 +556,54 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* ── Customer Orders Modal ── */}
-      {showOrders && (
-        <div className="modal-bg" style={modalBg} onClick={() => setShowOrders(null)}>
-          <div className="modal-box" style={{ ...modalBox, maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+      {/* ── Customer Orders Modal (portal: outside scroll container) ── */}
+      {showOrders && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.6)', zIndex: 1000 }}
+            onClick={() => setShowOrders(null)}
+          />
+          {/* Modal card — anchored to clicked row's viewport position */}
+          <div
+            style={{
+              position: 'fixed',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              top: `${showOrdersTop}px`,
+              zIndex: 1001,
+              width: '560px',
+              maxWidth: 'calc(100vw - 32px)',
+              maxHeight: `${showOrdersH}px`,
+              overflowY: 'auto',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                  {showOrders.customer.firstName} {showOrders.customer.lastName}
+                  {showOrders.customer.storeName || `${showOrders.customer.firstName} ${showOrders.customer.lastName}`}
                 </h2>
+                {showOrders.customer.storeName && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '1px' }}>{showOrders.customer.firstName} {showOrders.customer.lastName}</div>
+                )}
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>{showOrders.orders.length} order{showOrders.orders.length !== 1 ? 's' : ''}</p>
               </div>
-              <button onClick={() => { setShowOrders(null); setShowOrder(showOrders.customer); setError(''); }}
-                style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                + New Order
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button onClick={() => { setShowOrders(null); setShowOrder(showOrders.customer); setError(''); }}
+                  style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  + New Order
+                </button>
+                <button onClick={() => setShowOrders(null)}
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-muted)', fontSize: '14px', cursor: 'pointer', lineHeight: 1 }}>
+                  ✕
+                </button>
+              </div>
             </div>
 
             {showOrders.orders.length === 0 ? (
@@ -459,8 +614,7 @@ export default function CustomersPage() {
                   const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: '#64748B' };
                   return (
                     <div key={o.id} onClick={() => { setShowOrders(null); router.push(`/orders/${o.id}`); }}
-                      style={{ background: 'var(--bg-input)', border: `1px solid ${cfg.color}25`, borderRadius: 'var(--radius)', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        transition: 'box-shadow 0.15s' }}
+                      style={{ background: 'var(--bg-input)', border: `1px solid ${cfg.color}25`, borderRadius: 'var(--radius)', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'box-shadow 0.15s' }}
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-sm)'}
                       onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'}
                     >
@@ -480,7 +634,8 @@ export default function CustomersPage() {
               </div>
             )}
           </div>
-        </div>
+        </>,
+        document.body
       )}
     </AppLayout>
   );

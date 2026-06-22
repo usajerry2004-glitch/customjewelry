@@ -265,12 +265,6 @@ export default function KanbanPage() {
                   {selectedCol?.count || 0} {selectedCol?.count === 1 ? 'order' : 'orders'}
                 </span>
               </div>
-              {nextCfg && (selectedCol?.count || 0) > 0 && (
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ color: nextCfg.color, fontWeight: 600 }}>→ {nextCfg.label}</span>
-                  &nbsp;button advances each order
-                </span>
-              )}
             </div>
 
             {/* Empty state */}
@@ -284,27 +278,8 @@ export default function KanbanPage() {
               /* Order cards grid — auto-fills available width, no horizontal scroll */
               <div className="kanban-orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(272px, 1fr))', gap: '10px' }}>
                 {selectedCol.orders.map(order => (
-                  <div key={order.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div key={order.id}>
                     <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} currentUserRole={userRole} />
-                    {nextCfg && (
-                      <button
-                        onClick={() => updateStatus(order.id!, nextStatus)}
-                        style={{
-                          fontSize: '11px', padding: '5px 10px', borderRadius: '7px', cursor: 'pointer',
-                          fontWeight: 600, letterSpacing: '0.2px',
-                          border: `1px solid ${nextCfg.color}40`,
-                          background: `${nextCfg.color}0D`,
-                          color: nextCfg.color,
-                          display: 'flex', alignItems: 'center', gap: '5px',
-                          width: '100%', justifyContent: 'center',
-                          transition: 'background 0.12s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = `${nextCfg.color}1A`)}
-                        onMouseLeave={e => (e.currentTarget.style.background = `${nextCfg.color}0D`)}
-                      >
-                        → Move to {nextCfg.label}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>

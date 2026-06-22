@@ -15,6 +15,7 @@ import { CadFile } from './database/entities/cad-file.entity';
 import { Sku } from './database/entities/sku.entity';
 import { Notification } from './database/entities/notification.entity';
 import { OrderMessage } from './database/entities/order-message.entity';
+import { OrderEvent } from './database/entities/order-event.entity';
 
 import { OrdersModule } from './modules/orders/orders.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -28,10 +29,10 @@ import { UsersModule } from './modules/users/users.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { ImportModule } from './modules/import/import.module';
 import { SlaModule } from './modules/sla/sla.module';
-import { ReportingModule } from './modules/reporting/reporting.module';
 import { EmailModule } from './modules/email/email.module';
 import { SmartsheetModule } from './modules/smartsheet/smartsheet.module';
 import { TodosModule } from './modules/todos/todos.module';
+import { RepairsModule } from './modules/repairs/repairs.module';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 
@@ -53,9 +54,9 @@ import { AuthService } from './modules/auth/auth.service';
       useFactory: (config: ConfigService): TypeOrmModuleOptions => {
         const databaseUrl = config.get<string>('DATABASE_URL');
         const isProduction = config.get<string>('NODE_ENV') === 'production';
-        const entities = [Order, User, CadFile, Sku, Notification, OrderMessage, Todo];
+        const entities = [Order, User, CadFile, Sku, Notification, OrderMessage, Todo, OrderEvent];
         if (databaseUrl) {
-          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: true, logging: false };
+          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: !isProduction, logging: false };
         }
         return {
           type: 'postgres',
@@ -65,7 +66,7 @@ import { AuthService } from './modules/auth/auth.service';
           password: config.get<string>('DB_PASSWORD') || 'jewelflow123',
           database: config.get<string>('DB_NAME') || 'jewelflow',
           entities,
-          synchronize: true,
+          synchronize: !isProduction,
           logging: false,
         };
       },
@@ -83,10 +84,10 @@ import { AuthService } from './modules/auth/auth.service';
     MessagesModule,
     ImportModule,
     SlaModule,
-    ReportingModule,
     EmailModule,
     SmartsheetModule,
     TodosModule,
+    RepairsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

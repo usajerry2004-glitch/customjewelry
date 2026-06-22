@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Res, UseGuards, Logger } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
@@ -31,9 +32,26 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 300, ttl: 60000 } })
   @Post('login')
-  @ApiOperation({ summary: 'Login and receive JWT' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @ApiOperation({ summary: 'Login and receive JWT (also sets httpOnly cookie)' })
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('jf_token', result.access_token, {
+      httpOnly: true,
+      sameSite: isProduction ? 'strict' : 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    return result;
+  }
+
+  @Public()
+  @Post('logout')
+  @ApiOperation({ summary: 'Clear auth cookie' })
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('jf_token', { path: '/', httpOnly: true });
+    return { ok: true };
   }
 
   /**

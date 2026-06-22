@@ -48,6 +48,24 @@ export class SmartsheetImportService {
     return res.json();
   }
 
+  private async smPut(path: string, body: any): Promise<void> {
+    const res = await fetch(`${this.base}${path}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      this.logger.warn(`Smartsheet PUT ${path} → ${res.status}: ${text}`);
+    }
+  }
+
+  // Write the portal PO number back to the Smartsheet row so both systems match
+  private async writePoToRow(sheetId: string, rowId: string, poColumnId: number, poNumber: string): Promise<void> {
+    await this.smPut(`/sheets/${sheetId}/rows`, [{ id: Number(rowId), cells: [{ columnId: poColumnId, value: poNumber }] }]);
+    this.logger.log(`Wrote PO ${poNumber} → Smartsheet row ${rowId}`);
+  }
+
   // ── Parse "$1,500.00" → 1500 ──────────────────────────────────────────
   private parseCost(v: any): number | undefined {
     if (!v) return undefined;
@@ -141,10 +159,20 @@ export class SmartsheetImportService {
       return cell?.displayValue ?? cell?.value ?? null;
     };
     const systemUser = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
+    const poColId = colMap['PO #'];
     for (const rowId of rowIds) {
       try {
         const row = await this.smGet(`/sheets/${sheetId}/rows/${rowId}?include=attachments,discussions`);
+
+        const countBefore = summary.ordersCreated;
         await this.processRow(sheetId, row, getCell, systemUser, summary);
+        // If a new order was just created and the Smartsheet row had no PO#, write our PO back
+        if (summary.ordersCreated > countBefore && poColId) {
+          const created = summary.orders[summary.orders.length - 1];
+          if (created?.action === 'created' && !getCell(row, 'PO #')) {
+            await this.writePoToRow(sheetId, rowId, poColId, created.po);
+          }
+        }
       } catch (err) {
         summary.errors.push(`Row ${rowId}: ${err.message}`);
       }
@@ -159,7 +187,14 @@ export class SmartsheetImportService {
     const storeName  = getCell(row, 'Store Name') || '';
     const fullName   = getCell(row, 'Customer Full Name') || getCell(row, 'Customer Name') || '';
     const rawStatus  = (getCell(row, 'Status') || '').trim();
-    const status     = mapSmartsheetStatus(rawStatus) ?? OrderStatus.CAD_IN_PROGRESS;
+
+    // Skip rows with no meaningful data — blank Smartsheet rows
+    if (!smartsheetPo && !storeName && !fullName && !email) {
+      this.logger.debug(`Skipping empty Smartsheet row ${row.id} (rowNumber=${row.rowNumber})`);
+      summary.ordersSkipped++;
+      return;
+    }
+    const status     = mapSmartsheetStatus(rawStatus) ?? OrderStatus.NEW;
 
     const exists = await this.orderRepo.findOne({ where: { refCustomerPo: smartsheetPo } });
     if (exists && smartsheetPo) {
@@ -508,6 +543,9 @@ export class SmartsheetImportService {
             designerNotes: isCjFile ? 'Smartsheet import' : 'Reference image',
             status: CadFileStatus.UPLOADED,
           }));
+          if (isCjFile && order.status === OrderStatus.CAD_IN_PROGRESS) {
+            await this.orderRepo.update(order.id, { cadSubStatus: 'UPLOADED' });
+          }
           result.attachmentsImported++;
         }
 
@@ -540,6 +578,73 @@ export class SmartsheetImportService {
     }
 
     this.logger.log(`Media patch complete — attachments:${result.attachmentsImported} comments:${result.commentsImported} errors:${result.errors.length}`);
+    return result;
+  }
+
+  // ── Sync attachments + comments for an existing order from its Smartsheet row ──
+  async syncRowMedia(sheetId: string, rowId: string, orderId: string): Promise<{ attachmentsAdded: number; commentsAdded: number }> {
+    const result = { attachmentsAdded: 0, commentsAdded: 0 };
+    const systemUser = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
+    try {
+      const row = await this.smGet(`/sheets/${sheetId}/rows/${rowId}?include=attachments,discussions`);
+
+      for (const att of (row.attachments || [])) {
+        const existing = await this.cadRepo.findOne({ where: { orderId, originalName: att.name } });
+        if (existing) continue;
+        const dl = await this.downloadAttachment(sheetId, att.id);
+        if (!dl) continue;
+        const isCjFile = (att.name || '').toLowerCase().startsWith('cj');
+        await this.cadRepo.save(this.cadRepo.create({
+          orderId, originalName: dl.originalName, fileName: dl.fileName,
+          filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+          uploadedBy: att.createdBy?.name || 'Smartsheet', revisionNumber: 1,
+          designerNotes: isCjFile ? 'Smartsheet sync' : 'Reference image',
+          status: CadFileStatus.UPLOADED,
+        }));
+        result.attachmentsAdded++;
+      }
+
+      for (const disc of (row.discussions || [])) {
+        try {
+          const fullDisc = await this.smGet(`/sheets/${sheetId}/discussions/${disc.id}?include=attachments`);
+
+          // Sync comment-level attachments (e.g. WhatsApp images attached via comments)
+          for (const comment of (fullDisc.comments || [])) {
+            for (const att of (comment.attachments || [])) {
+              const existing = await this.cadRepo.findOne({ where: { orderId, originalName: att.name } });
+              if (existing) continue;
+              const dl = await this.downloadAttachment(sheetId, att.id);
+              if (!dl) continue;
+              const isCjFile = (att.name || '').toLowerCase().startsWith('cj');
+              await this.cadRepo.save(this.cadRepo.create({
+                orderId, originalName: dl.originalName, fileName: dl.fileName,
+                filePath: join(process.cwd(), 'uploads', 'cad', dl.fileName),
+                uploadedBy: att.createdBy?.name || comment.createdBy?.name || 'Smartsheet',
+                revisionNumber: 1,
+                designerNotes: isCjFile ? 'Smartsheet sync' : 'Reference image',
+                status: CadFileStatus.UPLOADED,
+              }));
+              result.attachmentsAdded++;
+            }
+
+            // Sync comment text
+            const text = (comment.text || '').trim();
+            if (!text) continue;
+            const content = `[Smartsheet] ${text}`;
+            const exists = await this.msgRepo.findOne({ where: { orderId, content } });
+            if (exists) continue;
+            await this.msgRepo.save(this.msgRepo.create({
+              orderId, authorId: systemUser?.id || 'system',
+              authorName: comment.createdBy?.name || 'Smartsheet',
+              authorRole: 'IMPORT', content, isInternal: true, mentions: [],
+            }));
+            result.commentsAdded++;
+          }
+        } catch { /* skip failed discussion fetch */ }
+      }
+    } catch (e) {
+      this.logger.warn(`syncRowMedia row=${rowId}: ${e.message}`);
+    }
     return result;
   }
 
@@ -603,8 +708,10 @@ export class SmartsheetImportService {
       .select('MAX(o.createdAt)', 'maxDate')
       .where('o.smartsheetRowId IS NOT NULL')
       .getRawOne();
-    const cutoff: Date | null = cutoffRow?.maxDate ? new Date(cutoffRow.maxDate) : null;
-    this.logger.log(`Smart sync — cutoff date: ${cutoff?.toISOString() ?? 'none (first run)'}`);
+    // If DB is empty (no prior imports), use "now" so historical Smartsheet rows are skipped —
+    // only future form submissions (created after this moment) will be imported.
+    const cutoff: Date = cutoffRow?.maxDate ? new Date(cutoffRow.maxDate) : new Date();
+    this.logger.log(`Smart sync — cutoff date: ${cutoff.toISOString()}`);
 
     // Fetch all rows (base + rich merged for attachments/discussions)
     const baseSheet = await this.smGet(`/sheets/${sheetId}`);
@@ -670,8 +777,12 @@ export class SmartsheetImportService {
 
         } else {
           // ── Decide: new (import) or old (skip) ────────────────────────
+
+          // Only import rows created today — old rows are updated frequently, skip them
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
           const rowDate = row.createdAt ? new Date(row.createdAt) : null;
-          if (cutoff && rowDate && rowDate <= cutoff) {
+          if (!rowDate || rowDate < startOfToday) {
             result.skipped++;
             result.orders.push({ po: smartsheetPo || rowId, action: 'skipped' });
             continue;
@@ -687,6 +798,10 @@ export class SmartsheetImportService {
           result.errors.push(...importSummary.errors);
           const newPo = importSummary.orders[0]?.po || smartsheetPo || rowId;
           result.orders.push({ po: newPo, action: 'added' });
+          // Write portal PO back to Smartsheet row so both systems match
+          if (importSummary.ordersCreated > 0 && colMap['PO #'] && !smartsheetPo) {
+            await this.writePoToRow(sheetId, rowId, colMap['PO #'], newPo).catch(() => {});
+          }
         }
 
       } catch (err: any) {

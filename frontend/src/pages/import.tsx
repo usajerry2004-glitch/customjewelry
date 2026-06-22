@@ -35,12 +35,11 @@ export default function ImportPage() {
     if (!file) return;
     setLoading(true); setError('');
     try {
-      const token = localStorage.getItem('jf_token');
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch(`${API}/import/upload?preview=true`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
         body: fd,
       });
       const data = await res.json();
@@ -55,12 +54,11 @@ export default function ImportPage() {
     if (!file) return;
     setLoading(true); setError('');
     try {
-      const token = localStorage.getItem('jf_token');
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch(`${API}/import/upload`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
         body: fd,
       });
       const data = await res.json();
@@ -74,8 +72,7 @@ export default function ImportPage() {
   const reset = () => { setFile(null); setPreview([]); setResult(null); setStep('upload'); setError(''); };
 
   const downloadTemplate = async () => {
-    const token = localStorage.getItem('jf_token');
-    const res = await fetch(`${API}/import/template`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(`${API}/import/template`, { credentials: 'include' });
     const data = await res.json();
     const csv = [data.headers.join(','), Object.values(data.example).join(',')].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

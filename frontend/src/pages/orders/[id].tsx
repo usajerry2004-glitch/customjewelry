@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { toast } from '../../utils/toast';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '../../components/layout/AppLayout';
@@ -53,6 +55,14 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
   const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(ext);
   const isJcd   = ext === 'jcd';
   const fileUrl = `/uploads/cad/${cad.fileName}`;
+  const companionForJcd = isJcd
+    ? list.find(f => {
+        const base = cad.originalName.replace(/\.jcd$/i, '');
+        const fBase = f.originalName.replace(/\.[^.]+$/, '');
+        const fExt = (f.originalName.split('.').pop() || '').toLowerCase();
+        return f.id !== cad.id && fBase === base && ['jpg','jpeg','png','webp'].includes(fExt);
+      })
+    : undefined;
   const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
   const canAct  = CAD_ACTION_ROLES.includes(userRole as UserRole) && cad.status !== 'APPROVED';
 
@@ -171,19 +181,29 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
         ) : ext === '3dm' ? (
           <ThreeDmViewer fileUrl={fileUrl} height={460} />
         ) : isJcd ? (
-          <div style={{ textAlign: 'center', padding: '48px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '10px' }}>💎</div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: '6px' }}>
-              JewelCAD Design File
+          companionForJcd ? (
+            <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src={`/uploads/cad/${companionForJcd.fileName}`}
+                alt={cad.originalName}
+                style={{ maxWidth: '100%', maxHeight: '460px', objectFit: 'contain', display: 'block' }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+              <div style={{ position: 'absolute', bottom: '12px', left: '12px', background: 'rgba(0,0,0,0.75)', color: '#c09b58', fontSize: '11px', fontWeight: 600, padding: '5px 12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                💎 JewelCAD Design File — Download to open source in JewelCAD or Matrix
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', marginBottom: '22px', lineHeight: 1.6, maxWidth: '280px', margin: '0 auto 22px' }}>
-              .jcd files require JewelCAD software to view.<br/>Download to open in JewelCAD or Matrix.
+          ) : (
+            <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+              <div style={{ fontSize: '64px', marginBottom: '10px' }}>💎</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: '8px' }}>
+                JewelCAD Design File
+              </div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
+                Use the Download button above to open in JewelCAD or Matrix.
+              </div>
             </div>
-            <a href={fileUrl} download={cad.originalName}
-              style={{ background: '#c09b58', color: '#fff', padding: '9px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              ↓ Download JCD File
-            </a>
-          </div>
+          )
         ) : (
           <div style={{ textAlign: 'center', padding: '48px 20px' }}>
             <div style={{ fontSize: '56px', marginBottom: '14px', opacity: 0.5 }}>📎</div>
@@ -359,6 +379,8 @@ export default function OrderDetail() {
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
+  const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; createdAt: string }[]>([]);
+  const [showAuditLog, setShowAuditLog] = useState(false);
 
   useEffect(() => {
     try {
@@ -374,6 +396,9 @@ export default function OrderDetail() {
 
     setCads([]);
     setLoading(true);
+
+    // Load audit events in parallel (non-blocking)
+    apiFetch(`${API}/orders/${id}/events`).then(r => r.ok ? r.json() : []).then(setEvents).catch(() => {});
 
     const fetchOrder = apiFetch(`${API}/orders/${id}`, { signal })
       .then(async (oRes) => {
@@ -669,13 +694,12 @@ export default function OrderDetail() {
                         onChange={async e => {
                           const files = Array.from(e.target.files || []);
                           if (!files.length || !order?.id) return;
-                          const token = localStorage.getItem('jf_token');
                           for (const file of files) {
                             const fd = new FormData();
                             fd.append('file', file);
                             await fetch(`${API}/cad/reference/${order.id}`, {
                               method: 'POST',
-                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                              credentials: 'include',
                               body: fd,
                             });
                           }
@@ -773,16 +797,15 @@ export default function OrderDetail() {
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
               <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}>
                 + Upload Files
-                <input type="file" accept="image/*,.pdf,.3dm,.obj,.stl,.dxf" multiple style={{ display: 'none' }}
+                <input type="file" accept="image/*,.pdf,.mp4,.mov,.webm,.avi,.3dm,.obj,.stl,.dxf" multiple style={{ display: 'none' }}
                   onChange={async e => {
                     const files = Array.from(e.target.files || []);
                     if (!files.length || !order?.id) return;
-                    const token = localStorage.getItem('jf_token');
                     const fd = new FormData();
                     files.forEach(f => fd.append('files', f));
                     await fetch(`${API}/cad/upload/${order.id}`, {
                       method: 'POST',
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      credentials: 'include',
                       body: fd,
                     });
                     const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
@@ -867,7 +890,7 @@ export default function OrderDetail() {
                           onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
                         />
                       ) : (
-                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{isPdf ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : '📎'}</span>
+                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{isPdf ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : ['mp4','mov','webm','avi','mkv','wmv'].includes(ext) ? '🎬' : '📎'}</span>
                       )}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -929,9 +952,9 @@ export default function OrderDetail() {
                       if (data.commentsImported > 0) {
                         window.location.reload();
                       } else if (data.errors?.length) {
-                        alert(`Sync failed: ${data.errors[0]}`);
+                        toast.error(data.errors[0], 'Sync failed');
                       } else {
-                        alert('Already up to date — no new Smartsheet conversations found.');
+                        toast.info('Already up to date — no new Smartsheet conversations found.');
                       }
                     }}
                     style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
@@ -1109,6 +1132,15 @@ export default function OrderDetail() {
             </div>
           )}
 
+          {/* Audit Log button */}
+          {events.length > 0 && (
+            <button onClick={() => setShowAuditLog(true)}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
+              📋 Audit Log <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({events.length})</span>
+            </button>
+          )}
+
+
           {/* Timeline */}
           <div style={cardStyle}>
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Timeline</div>
@@ -1204,6 +1236,38 @@ export default function OrderDetail() {
       )}
 
     </AppLayout>
+
+      {/* Audit Log Modal — portal to body so it's always centered on viewport */}
+      {showAuditLog && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowAuditLog(false)}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', width: '520px', maxWidth: '94vw', maxHeight: '80vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Audit Log</h3>
+              <button onClick={() => setShowAuditLog(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px' }}>✕</button>
+            </div>
+            {events.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0', textAlign: 'center' }}>No events recorded yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {events.map(ev => (
+                  <div key={ev.id} style={{ borderLeft: '3px solid var(--accent)', paddingLeft: '12px', paddingBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {ev.action.replace(/_/g, ' ')}
+                      {ev.fromStatus && ev.toStatus && ` · ${ev.fromStatus} → ${ev.toStatus}`}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {ev.userEmail} · {new Date(ev.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

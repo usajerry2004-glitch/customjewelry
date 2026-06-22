@@ -26,18 +26,21 @@ export default function LoginPage() {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
         const data = await res.json();
+        // Backend now sets httpOnly cookie; we only persist user info in localStorage
         setAuth(data.user, data.access_token);
         router.replace(data.user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
       } else {
         const err = await res.json();
         setError(err.message || 'Invalid credentials');
       }
-    } catch {
-      setError('Cannot connect to server. Make sure the backend is running.');
+    } catch (err: any) {
+      const detail = err?.message ? ` (${err.message})` : '';
+      setError(`Cannot connect to server. Make sure the backend is running.${detail}`);
     } finally {
       setLoading(false);
     }

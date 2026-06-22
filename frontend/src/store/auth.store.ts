@@ -10,22 +10,23 @@ interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;
-  token: string | null;
-  setAuth: (user: AuthUser, token: string) => void;
+  setAuth: (user: AuthUser, token?: string) => void;
   clearAuth: () => void;
   hydrate: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: null,
 
   setAuth: (user, token) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('jf_token', token);
+      // Store user info (non-sensitive) for UI display
       localStorage.setItem('jf_user', JSON.stringify(user));
+      // Legacy: if a token is provided (initial login), also store for backward compat
+      // until the httpOnly cookie fully replaces it on next login
+      if (token) localStorage.setItem('jf_token', token);
     }
-    set({ user, token });
+    set({ user });
   },
 
   clearAuth: () => {
@@ -33,15 +34,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem('jf_token');
       localStorage.removeItem('jf_user');
     }
-    set({ user: null, token: null });
+    set({ user: null });
   },
 
   hydrate: () => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('jf_token');
     const raw = localStorage.getItem('jf_user');
-    if (token && raw) {
-      try { set({ token, user: JSON.parse(raw) }); } catch {}
+    if (raw) {
+      try { set({ user: JSON.parse(raw) }); } catch {}
     }
   },
 }));
