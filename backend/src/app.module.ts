@@ -64,7 +64,7 @@ import { HealthController } from './health.controller';
           database: config.get<string>('DB_NAME') || 'jewelflow',
           ssl: isProduction ? { rejectUnauthorized: false } : false,
           entities,
-          synchronize: !isProduction,
+          synchronize: true,
           logging: false,
         };
       },
