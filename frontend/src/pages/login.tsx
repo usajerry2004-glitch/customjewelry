@@ -36,7 +36,13 @@ export default function LoginPage() {
         router.replace(data.user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
       } else {
         const err = await res.json();
-        setError(err.message || 'Invalid credentials');
+        const msg = err.message;
+        if (typeof msg === 'string') setError(msg);
+        else if (Array.isArray(msg)) setError(msg.join(', '));
+        else if (msg && typeof msg === 'object') {
+          const inner = (msg as any).message;
+          setError(Array.isArray(inner) ? inner.join(', ') : (inner || 'Invalid credentials'));
+        } else setError('Invalid credentials');
       }
     } catch (err: any) {
       const detail = err?.message ? ` (${err.message})` : '';
@@ -127,9 +133,12 @@ export default function LoginPage() {
           </form>
 
           <p style={{ marginTop: '28px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            <a href="/forgot-password" style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500 }}>
+            <span
+              onClick={() => router.push('/forgot-password')}
+              style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500, cursor: 'pointer' }}
+            >
               Forgot your password?
-            </a>
+            </span>
           </p>
         </div>
       </div>

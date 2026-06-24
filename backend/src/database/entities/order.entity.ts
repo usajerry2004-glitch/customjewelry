@@ -28,6 +28,8 @@ export enum StoneStatus {
 @Entity('orders')
 @Index(['poNumber'], { unique: true })
 @Index(['status'])
+@Index(['customerId'])
+@Index(['createdAt'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;

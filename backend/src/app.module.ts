@@ -34,6 +34,7 @@ import { RepairsModule } from './modules/repairs/repairs.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { AuthService } from './modules/auth/auth.service';
     TodosModule,
     RepairsModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },

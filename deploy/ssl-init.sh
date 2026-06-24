@@ -2,7 +2,7 @@
 set -e
 # Run this ONCE after deploy.sh, once DNS is pointed to this server.
 
-DOMAIN_FRONTEND="portal.kirajewels.one"
+DOMAIN_FRONTEND="dashboard.kirajewels.one"
 DOMAIN_API="api.kirajewels.one"
 EMAIL="dashboard@kirajewels.one"
 

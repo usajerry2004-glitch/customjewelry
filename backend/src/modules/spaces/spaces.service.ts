@@ -1,7 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import * as multerS3 from 'multer-s3';
 import { extname } from 'path';
+
+export interface S3MulterFile extends Express.Multer.File {
+  key: string;
+  location: string;
+  bucket: string;
+}
 
 @Injectable()
 export class SpacesService {
@@ -10,17 +17,19 @@ export class SpacesService {
   readonly client: S3Client;
   readonly bucket: string;
   readonly cdnUrl: string;
+  private readonly endpoint: string;
 
-  constructor() {
-    this.bucket  = process.env.DO_SPACES_BUCKET  || 'customjewelry';
-    this.cdnUrl  = (process.env.DO_SPACES_CDN_URL || '').replace(/\/$/, '');
+  constructor(private readonly config: ConfigService) {
+    this.bucket   = config.get<string>('DO_SPACES_BUCKET',   'customjewelry');
+    this.cdnUrl   = config.get<string>('DO_SPACES_CDN_URL',  '').replace(/\/$/, '');
+    this.endpoint = config.get<string>('DO_SPACES_ENDPOINT', 'https://nyc3.digitaloceanspaces.com');
 
     this.client = new S3Client({
-      endpoint: process.env.DO_SPACES_ENDPOINT || 'https://nyc3.digitaloceanspaces.com',
-      region:   process.env.DO_SPACES_REGION    || 'nyc3',
+      endpoint: this.endpoint,
+      region:   config.get<string>('DO_SPACES_REGION', 'nyc3'),
       credentials: {
-        accessKeyId:     process.env.DO_SPACES_KEY    || '',
-        secretAccessKey: process.env.DO_SPACES_SECRET || '',
+        accessKeyId:     config.get<string>('DO_SPACES_KEY',    ''),
+        secretAccessKey: config.get<string>('DO_SPACES_SECRET', ''),
       },
     });
   }
@@ -59,7 +68,7 @@ export class SpacesService {
 
   getPublicUrl(key: string): string {
     if (this.cdnUrl) return `${this.cdnUrl}/${key}`;
-    const endpoint = (process.env.DO_SPACES_ENDPOINT || 'https://nyc3.digitaloceanspaces.com').replace('https://', '');
-    return `https://${this.bucket}.${endpoint}/${key}`;
+    const host = this.endpoint.replace(/^https?:\/\//, '');
+    return `https://${this.bucket}.${host}/${key}`;
   }
 }

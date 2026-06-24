@@ -2,26 +2,15 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 import { Order, OrderStatus, StoneStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
+import { OrderFilterDto } from './dto/order-filter.dto';
 
-export class OrderFilterDto {
-  @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsString() status?: OrderStatus;
-  @IsOptional() @IsString() vendorName?: string;
-  @IsOptional() @IsString() dateFrom?: string;
-  @IsOptional() @IsString() dateTo?: string;
-  @IsOptional() @IsString() cadSubFilter?: string;
-  @IsOptional() @IsString() stoneSubFilter?: string;
-  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) offset?: number;
-  @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
-}
+export { OrderFilterDto };
 
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
@@ -157,9 +146,10 @@ export class OrdersService {
       qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
 
     if (filters.search) {
+      const escaped = filters.search.replace(/[%_\\]/g, c => `\\${c}`);
       qb.andWhere(
         '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s OR order.customerFullName LIKE :s OR order.customerEmail LIKE :s)',
-        { s: `%${filters.search}%` },
+        { s: `%${escaped}%` },
       );
     }
     if (filters.dateFrom) {

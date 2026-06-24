@@ -52,7 +52,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 
   proxyReq.on('error', (err) => {
-    console.error('[api/proxy] backend unreachable:', err.message, `→ ${backendBase}${targetPath}`);
+    // backend unreachable — logged server-side only
     if (!res.headersSent) {
       res.status(503).json({ message: 'Backend unreachable', detail: err.message });
     }

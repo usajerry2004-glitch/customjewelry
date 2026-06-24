@@ -3,12 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
-import { join } from 'path';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
+import { S3MulterFile } from '../spaces/spaces.service';
 
 export interface WebOrderDto {
   // Contact
@@ -129,8 +129,8 @@ export class PublicOrdersService {
         await this.cadRepo.save(this.cadRepo.create({
           orderId:      order.id,
           originalName: file.originalname,
-          fileName:     file.filename,
-          filePath:     join(process.cwd(), 'uploads', 'cad', file.filename),
+          fileName:     (file as S3MulterFile).key,
+          filePath:     (file as S3MulterFile).location,
           uploadedBy:   dto.email,
           revisionNumber: 1,
           designerNotes: 'Customer reference image',

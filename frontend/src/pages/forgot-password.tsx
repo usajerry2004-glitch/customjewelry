@@ -20,9 +20,9 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) { setError('Please enter your email address.'); return; }
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
     setError('');
     setLoading(true);
     try {
@@ -85,13 +85,14 @@ export default function ForgotPasswordPage() {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit}>
+              <div>
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Email Address</label>
                   <input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                     placeholder="your@email.com"
                     autoComplete="email"
                     style={inputStyle}
@@ -105,13 +106,14 @@ export default function ForgotPasswordPage() {
                 )}
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => handleSubmit()}
                   disabled={loading}
                   style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '14px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, letterSpacing: '0.5px' }}
                 >
                   {loading ? 'Sending…' : 'Send Reset Link'}
                 </button>
-              </form>
+              </div>
 
               <p style={{ marginTop: '24px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 <a href="/login" style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500 }}>← Back to Sign In</a>

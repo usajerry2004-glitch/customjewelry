@@ -1,7 +1,9 @@
 import {
   Controller, Get, Post, Delete, Query, Param, Body,
-  UseGuards, Headers, Res, HttpCode,
+  UseGuards, Headers, Res, HttpCode, UnauthorizedException, RawBodyRequest, Req,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -136,13 +138,26 @@ export class SmartsheetController {
   @ApiOperation({ summary: 'Smartsheet live-sync callback (public)' })
   async webhookCallback(
     @Headers('smartsheet-hook-challenge') challenge: string,
+    @Headers('smartsheet-hook-hmac') hmacHeader: string,
     @Body() body: any,
+    @Req() req: RawBodyRequest<Request>,
     @Res({ passthrough: true }) res: Response,
   ) {
+    // Challenge handshake — no HMAC on these
     if (challenge) {
       res.setHeader('Smartsheet-Hook-Response', challenge);
       return { ok: true };
     }
+
+    // Verify HMAC signature when secret is configured
+    const secret = this.config.get<string>('SMARTSHEET_WEBHOOK_SECRET');
+    if (secret && hmacHeader) {
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
+      const expected = createHmac('sha256', secret).update(rawBody).digest('base64');
+      const valid = timingSafeEqual(Buffer.from(hmacHeader), Buffer.from(expected));
+      if (!valid) throw new UnauthorizedException('Invalid webhook signature');
+    }
+
     return this.webhookService.processWebhookEvent(body);
   }
 

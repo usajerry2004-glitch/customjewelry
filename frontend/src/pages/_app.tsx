@@ -7,7 +7,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Toaster } from '../components/Toaster';
 import '../styles/globals.css';
 
-const PUBLIC_ROUTES = ['/login'];
+const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 const PUBLIC_PREFIXES = ['/track/'];
 
 export default function App({ Component, pageProps }: AppProps) {

@@ -12,34 +12,33 @@ export interface EmailPayload {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly frontendUrl: string;
+  private readonly transporter: nodemailer.Transporter | null;
 
   constructor(private readonly config: ConfigService) {
     this.frontendUrl = (this.config.get('FRONTEND_URL', 'http://localhost:3000')).split(',')[0].trim();
+    const gmailUser = this.config.get<string>('GMAIL_USER');
+    const gmailPass = this.config.get<string>('GMAIL_APP_PASSWORD');
+    this.transporter = gmailUser && gmailPass
+      ? nodemailer.createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: gmailUser, pass: gmailPass } })
+      : null;
   }
 
   async send(payload: EmailPayload): Promise<boolean> {
     const gmailUser = this.config.get<string>('GMAIL_USER');
-    const gmailPass = this.config.get<string>('GMAIL_APP_PASSWORD');
 
-    if (!gmailUser || !gmailPass) {
+    if (!this.transporter) {
       this.logger.warn(`Email skipped (GMAIL_USER or GMAIL_APP_PASSWORD not set): ${payload.subject}`);
       return false;
     }
 
     try {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: { user: gmailUser, pass: gmailPass },
-      });
 
       const override = this.config.get<string>('TEST_EMAIL_OVERRIDE');
       const to = override
         ? override
         : (Array.isArray(payload.to) ? payload.to.join(', ') : payload.to);
 
-      await transporter.sendMail({
+      await this.transporter.sendMail({
         from: `Kira Custom Jewelry <${gmailUser}>`,
         to,
         subject: payload.subject,
@@ -385,7 +384,7 @@ export class EmailService {
         </p>
         <div style="display:flex;gap:12px;flex-wrap:wrap">
           <a href="${this.frontendUrl}/login" style="${btnStyle('#1A2740')}">Log In Now →</a>
-          <a href="${this.frontendUrl}/reset-password-request" style="${btnStyle('#C09B58')}">Set My Password →</a>
+          <a href="${this.frontendUrl}/forgot-password" style="${btnStyle('#C09B58')}">Set My Password →</a>
         </div>
       `),
     });

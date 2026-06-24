@@ -6,6 +6,7 @@ import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
+import { S3MulterFile } from '../spaces/spaces.service';
 
 @Injectable()
 export class CadService {
@@ -53,7 +54,7 @@ export class CadService {
     const existing = await this.cadRepo.find({ where: { orderId } });
     const revisionNumber = existing.length + 1;
 
-    const s3File = file as any;
+    const s3File = file as S3MulterFile;
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,
@@ -126,7 +127,7 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     const existing = await this.cadRepo.find({ where: { orderId } });
-    const s3File = file as any;
+    const s3File = file as S3MulterFile;
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,

@@ -809,6 +809,34 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   input[type="checkbox"], input[type="radio"] { min-height: auto; }
 }
 
+/* Kanban board — horizontal scroll with touch momentum on mobile */
+@media (max-width: 768px) {
+  .kanban-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .kanban-scroll-container::-webkit-scrollbar { display: none; }
+  .kanban-phase-col { scroll-snap-align: start; min-width: 280px; }
+}
+
+/* Modals — prevent content from overflowing viewport height on small phones */
+@media (max-width: 480px) {
+  [role="dialog"],
+  .modal-box,
+  .modal-overlay > div {
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* 3D viewer — shrink to viewport on mobile */
+@media (max-width: 640px) {
+  .threedm-viewer-wrap { height: 260px !important; }
+}
+
 /* ── Animations ───────────────────────────────────────────────────────── */
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translate(-50%, 12px); }

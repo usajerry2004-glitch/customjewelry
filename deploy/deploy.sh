@@ -22,6 +22,6 @@ docker compose -f docker-compose.prod.yml exec -T db pg_isready -U jewelflow
 echo "=== Status ==="
 docker compose -f docker-compose.prod.yml ps
 echo ""
-echo "Frontend: http://portal.kirajewels.one"
+echo "Frontend: http://dashboard.kirajewels.one"
 echo "Backend:  http://api.kirajewels.one"
 echo "Swagger:  http://api.kirajewels.one/api/docs"

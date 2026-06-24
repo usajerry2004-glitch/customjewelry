@@ -30,7 +30,7 @@ export class AuthController {
    * This stops brute-force password attacks.
    */
   @Public()
-  @Throttle({ default: { limit: 300, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login')
   @ApiOperation({ summary: 'Login and receive JWT (also sets httpOnly cookie)' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {

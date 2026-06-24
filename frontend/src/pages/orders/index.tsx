@@ -213,7 +213,7 @@ export default function OrdersPage() {
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
   useEffect(() => { setPage(0); load(0); }, [search, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
-  useEffect(() => { if (page > 0) load(page); }, [page]);
+  useEffect(() => { load(page); }, [page]);
 
   const openNewOrderModal = async () => {
     setShowNew(true);
