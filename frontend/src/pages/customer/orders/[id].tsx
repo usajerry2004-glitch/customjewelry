@@ -34,7 +34,7 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
   const isVideo  = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
   const is3dm    = ext === '3dm';
   const isJcd    = ext === 'jcd';
-  const fileUrl  = `${cad.filePath || '/uploads/cad/' + cad.fileName}`;
+  const fileUrl  = `/uploads/cad/${cad.fileName}`;
   const companionForJcd = isJcd
     ? cads.find(f => {
         const base = cad.originalName.replace(/\.jcd$/i, '');
@@ -410,7 +410,7 @@ export default function CustomerOrderDetail() {
               const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
               const isVid = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
-              const fileUrl = `${cad.filePath || '/uploads/cad/' + cad.fileName}`;
+              const fileUrl = `/uploads/cad/${cad.fileName}`;
               const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : '📎';
               return (
                 <div key={cad.id}
