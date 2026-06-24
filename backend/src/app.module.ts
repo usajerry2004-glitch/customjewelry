@@ -62,6 +62,7 @@ import { HealthController } from './health.controller';
           username: config.get<string>('DB_USERNAME') || 'jewelflow',
           password: config.get<string>('DB_PASSWORD') || 'jewelflow123',
           database: config.get<string>('DB_NAME') || 'jewelflow',
+          ssl: isProduction ? { rejectUnauthorized: false } : false,
           entities,
           synchronize: !isProduction,
           logging: false,
