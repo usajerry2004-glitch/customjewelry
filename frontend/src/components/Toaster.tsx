@@ -17,10 +17,12 @@ export function Toaster() {
   const [items, setItems] = useState<ToastItem[]>([]);
   const counter = useRef(0);
 
-  useEffect(() => toastUtil._subscribe(opts => {
-    const id = String(++counter.current);
-    setItems(prev => [...prev, { id, variant: 'info', ...opts }]);
-  }), []);
+  useEffect(() => {
+    toastUtil._subscribe(opts => {
+      const id = String(++counter.current);
+      setItems(prev => [...prev, { id, variant: 'info', ...opts }]);
+    });
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
