@@ -8,7 +8,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # NEXT_PUBLIC_ vars are baked into the bundle at build time
-ARG NEXT_PUBLIC_API_URL=https://api.kirajewels.one/api/v1
+ARG NEXT_PUBLIC_API_URL=https://dashboardapi.kirajewels.one/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
