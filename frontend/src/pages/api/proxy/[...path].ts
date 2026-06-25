@@ -1,6 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import http from 'http';
-import https from 'https';
 
 export const config = {
   api: { bodyParser: false, externalResolver: true },
@@ -11,52 +9,53 @@ const HOP_BY_HOP = new Set([
   'proxy-authorization', 'proxy-authenticate', 'te', 'trailer',
 ]);
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+function readBody(req: NextApiRequest): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer | string) =>
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const backendBase = process.env.BACKEND_URL || 'http://localhost:4000';
   const segments = (req.query.path as string[]) ?? [];
   const qs = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  const targetPath = `/api/v1/${segments.join('/')}${qs}`;
+  const targetUrl = `${backendBase}/api/v1/${segments.join('/')}${qs}`;
 
-  let parsedUrl: URL;
-  try { parsedUrl = new URL(backendBase); } catch {
-    return res.status(500).json({ message: 'Invalid BACKEND_URL', backendBase });
-  }
-
-  const isHttps = parsedUrl.protocol === 'https:';
-  const hostname = parsedUrl.hostname;
-  const port = parsedUrl.port ? parseInt(parsedUrl.port, 10) : (isHttps ? 443 : 80);
-
-  // Forward headers, dropping hop-by-hop and rewriting host
-  const fwdHeaders: http.OutgoingHttpHeaders = {};
+  const fwdHeaders: Record<string, string> = {};
   for (const [k, v] of Object.entries(req.headers)) {
-    if (!HOP_BY_HOP.has(k.toLowerCase())) fwdHeaders[k] = v;
+    if (!HOP_BY_HOP.has(k.toLowerCase()) && typeof v === 'string') {
+      fwdHeaders[k] = v;
+    }
   }
-  fwdHeaders['host'] = port === 80 || port === 443 ? hostname : `${hostname}:${port}`;
+  try { fwdHeaders['host'] = new URL(backendBase).host; } catch { /* invalid URL handled below */ }
 
-  const options: http.RequestOptions = {
-    hostname, port,
-    path: targetPath,
-    method: req.method,
-    headers: fwdHeaders,
-  };
+  try {
+    const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+    const bodyBuf = hasBody ? await readBody(req) : undefined;
 
-  const transport: typeof http | typeof https = isHttps ? https : http;
+    const backendRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: fwdHeaders,
+      body: bodyBuf,
+    });
 
-  const proxyReq = transport.request(options, (proxyRes) => {
-    const respHeaders: http.IncomingHttpHeaders = {};
-    for (const [k, v] of Object.entries(proxyRes.headers)) {
-      if (!HOP_BY_HOP.has(k.toLowerCase()) && v !== undefined) respHeaders[k] = v;
+    for (const [k, v] of backendRes.headers.entries()) {
+      if (!HOP_BY_HOP.has(k.toLowerCase())) {
+        try { res.setHeader(k, v); } catch { /* skip any header that causes issues */ }
+      }
     }
-    res.writeHead(proxyRes.statusCode ?? 500, respHeaders);
-    proxyRes.pipe(res, { end: true });
-  });
 
-  proxyReq.on('error', (err) => {
-    // backend unreachable — logged server-side only
+    const responseBody = await backendRes.arrayBuffer();
+    res.status(backendRes.status).send(Buffer.from(responseBody));
+  } catch (err: unknown) {
     if (!res.headersSent) {
-      res.status(503).json({ message: 'Backend unreachable', detail: err.message });
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(503).json({ message: 'Backend unreachable', detail: message });
     }
-  });
-
-  req.pipe(proxyReq, { end: true });
+  }
 }
