@@ -53,7 +53,7 @@ import { HealthController } from './health.controller';
         const isProduction = config.get<string>('NODE_ENV') === 'production';
         const entities = [Order, User, CadFile, Sku, Notification, OrderMessage, Todo, OrderEvent];
         if (databaseUrl) {
-          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: !isProduction, logging: false };
+          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: true, logging: false };
         }
         return {
           type: 'postgres',
@@ -64,7 +64,7 @@ import { HealthController } from './health.controller';
           database: config.get<string>('DB_NAME') || 'jewelflow',
           ssl: isProduction ? { rejectUnauthorized: false } : false,
           entities,
-          synchronize: !isProduction,
+          synchronize: true,
           logging: false,
         };
       },
