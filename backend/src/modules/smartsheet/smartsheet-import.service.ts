@@ -137,7 +137,7 @@ export class SmartsheetImportService {
 
       return { fileName: key, originalName, mimeType, filePath: location };
     } catch (e) {
-      this.logger.warn(`Attachment ${attachmentId} download failed: ${e.message}`);
+      this.logger.warn(`Attachment ${attachmentId} download failed: ${e.message}`, e.stack);
       return null;
     }
   }
@@ -531,7 +531,7 @@ export class SmartsheetImportService {
           const existing = await this.cadRepo.findOne({ where: { orderId: order.id, originalName: att.name } });
           if (existing) continue;
           const dl = await this.downloadAttachment(sheetId, att.id);
-          if (!dl) continue;
+          if (!dl) { result.errors.push(`Download failed for attachment "${att.name}" on order ${order.refCustomerPo}`); continue; }
           const isCjFile = (att.name || '').toLowerCase().startsWith('cj');
           await this.cadRepo.save(this.cadRepo.create({
             orderId: order.id,
