@@ -159,10 +159,10 @@ export class SmartsheetSyncService {
     }
   }
 
-  // Runs every 10 minutes — syncs attachments + comments for orders in CAD_IN_PROGRESS.
+  // Runs every minute — syncs attachments + comments for orders in CAD_IN_PROGRESS.
   // pollUpdates only fires on cell changes (Smartsheet modifiedAt); attachments and
   // discussions don't update modifiedAt, so this cron catches those separately.
-  @Cron('*/10 * * * *')
+  @Cron('* * * * *')
   async pollCadMedia() {
     if (this.runningCadMedia) return;
     this.runningCadMedia = true;
