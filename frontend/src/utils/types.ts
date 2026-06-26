@@ -122,6 +122,7 @@ export function needsActionFromRole(order: Partial<Order> & { cadSubStatus?: str
 export function getCadSubLabel(order: { cadSubStatus?: string | null; sentToCustomer?: boolean; quotedCost?: number | null }): string | null {
   if (!order.cadSubStatus) return 'Pending CAD';
   if (order.cadSubStatus === 'REVISION') return 'Revision';
+  if (order.cadSubStatus === 'REJECTED') return 'Rejected';
   if (order.cadSubStatus === 'UPLOADED') {
     if (order.sentToCustomer) return 'Awaiting Approval';
     return 'Awaiting Quote';
