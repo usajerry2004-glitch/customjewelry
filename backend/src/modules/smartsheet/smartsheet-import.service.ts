@@ -589,6 +589,7 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
     try {
       const row = await this.smGet(`/sheets/${sheetId}/rows/${rowId}?include=attachments,discussions`);
 
+      let newCjFile = false;
       for (const att of (row.attachments || [])) {
         const existing = await this.cadRepo.findOne({ where: { orderId, originalName: att.name } });
         if (existing) continue;
@@ -602,7 +603,14 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
           designerNotes: isCjFile ? 'Smartsheet sync' : 'Reference image',
           status: CadFileStatus.UPLOADED,
         }));
+        if (isCjFile) newCjFile = true;
         result.attachmentsAdded++;
+      }
+      if (newCjFile) {
+        const order = await this.orderRepo.findOne({ where: { id: orderId } });
+        if (order?.status === OrderStatus.CAD_IN_PROGRESS && order.cadSubStatus !== 'UPLOADED') {
+          await this.orderRepo.update(orderId, { cadSubStatus: 'UPLOADED' });
+        }
       }
 
       for (const disc of (row.discussions || [])) {
@@ -650,8 +658,9 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
+    // 1. Dedup: remove duplicate cad_files, keep oldest per (orderId, originalName)
     try {
-      const deleted = await this.cadRepo.query(`
+      await this.cadRepo.query(`
         DELETE FROM cad_files
         WHERE id NOT IN (
           SELECT DISTINCT ON ("orderId", "originalName") id
@@ -659,10 +668,29 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
           ORDER BY "orderId", "originalName", "createdAt" ASC
         )
       `);
-      if (deleted.length > 0 || (Array.isArray(deleted) && deleted.length))
-        this.logger.log(`Startup dedup: removed duplicate CAD file records`);
+      this.logger.log('Startup: CAD file dedup complete');
     } catch (e: any) {
       this.logger.warn(`Startup CAD dedup failed: ${e?.message}`);
+    }
+
+    // 2. Fix cadSubStatus: any CAD_IN_PROGRESS order that has CJ design files
+    //    but cadSubStatus is still null should show "Awaiting Quote", not "Pending CAD"
+    try {
+      await this.orderRepo.query(`
+        UPDATE orders
+        SET "cadSubStatus" = 'UPLOADED'
+        WHERE status = 'CAD_IN_PROGRESS'
+          AND "cadSubStatus" IS NULL
+          AND id IN (
+            SELECT DISTINCT "orderId"
+            FROM cad_files
+            WHERE ("originalName" ILIKE 'cj%' OR "designerNotes" IN ('Smartsheet sync', 'Smartsheet import'))
+              AND status != 'REJECTED'
+          )
+      `);
+      this.logger.log('Startup: cadSubStatus backfill complete');
+    } catch (e: any) {
+      this.logger.warn(`Startup cadSubStatus backfill failed: ${e?.message}`);
     }
   }
 
