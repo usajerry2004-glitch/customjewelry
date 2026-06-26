@@ -794,6 +794,24 @@ export default function OrderDetail() {
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
               Design Files {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length > 0 && `(${cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length})`}
             </h3>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {order.smartsheetRowId && [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole) && (
+              <button
+                onClick={async () => {
+                  const res = await apiFetch(`${API}/smartsheet/sync-row-media/${order.id}`, { method: 'POST' });
+                  const data = await res.json();
+                  if (data.error) { toast.error(data.error, 'Sync failed'); return; }
+                  if (data.attachmentsAdded > 0 || data.commentsAdded > 0) {
+                    window.location.reload();
+                  } else {
+                    toast.info('Already up to date — no new Smartsheet files or conversations found.');
+                  }
+                }}
+                style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                Sync from Smartsheet
+              </button>
+            )}
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
               <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}>
                 + Upload Files
@@ -817,6 +835,7 @@ export default function OrderDetail() {
                 />
               </label>
             )}
+            </div>
           </div>
 
           {(() => {

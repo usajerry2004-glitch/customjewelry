@@ -649,6 +649,10 @@ export class SmartsheetImportService {
     return result;
   }
 
+  async getOrderById(orderId: string) {
+    return this.orderRepo.findOne({ where: { id: orderId } });
+  }
+
   // ── Sync Smartsheet conversations for one specific order ──────────────
   async syncCommentsForOrder(orderId: string, sheetId: string): Promise<{ commentsImported: number; errors: string[] }> {
     const result = { commentsImported: 0, errors: [] as string[] };

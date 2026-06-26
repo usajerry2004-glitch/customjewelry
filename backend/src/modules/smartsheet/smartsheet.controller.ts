@@ -74,6 +74,18 @@ export class SmartsheetController {
     return this.importService.syncCommentsForOrder(orderId, sheetId);
   }
 
+  @Post('sync-row-media/:orderId')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Sync Smartsheet attachments + conversations for a specific portal order' })
+  async syncRowMedia(@Param('orderId') orderId: string) {
+    const sheetId = this.config.get('SMARTSHEET_SHEET_ID', '2085580205674372');
+    const order = await this.importService.getOrderById(orderId);
+    if (!order) return { error: 'Order not found' };
+    if (!order.smartsheetRowId) return { error: 'Order has no linked Smartsheet row' };
+    return this.importService.syncRowMedia(sheetId, order.smartsheetRowId, orderId);
+  }
+
   // ── Smart sync: update existing + import only new rows ───────────────────
 
   @Post('smart-sync')
