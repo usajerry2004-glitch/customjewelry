@@ -205,13 +205,8 @@ export class CadService {
     cad.customerFeedback = feedback;
     const saved = await this.cadRepo.save(cad);
 
-    // Customer rejection — stay in CAD_IN_PROGRESS with label "Rejected"
-    await this.orderRepo.update(cad.orderId, {
-      status: OrderStatus.CAD_IN_PROGRESS,
-      cadSubStatus: 'REJECTED',
-      sentToCustomer: false,
-      customerEmailApproval: false,
-    });
+    // Customer rejection = order cancelled and deactivated
+    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CANCELLED, isArchived: true });
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
