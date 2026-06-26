@@ -172,6 +172,9 @@ export class SmartsheetSyncService {
         select: ['id', 'smartsheetRowId', 'poNumber'] as any,
       });
 
+      // Fix any orders that have CJ design files but cadSubStatus still null
+      await this.importService.backfillCadSubStatus();
+
       let synced = 0;
       for (const order of activeOrders) {
         if (!order.smartsheetRowId) continue;

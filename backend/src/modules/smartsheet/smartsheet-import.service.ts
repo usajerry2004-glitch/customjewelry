@@ -698,6 +698,22 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
     return this.orderRepo.findOne({ where: { id: orderId } });
   }
 
+  async backfillCadSubStatus() {
+    await this.orderRepo.query(`
+      UPDATE orders
+      SET "cadSubStatus" = 'UPLOADED'
+      WHERE status = 'CAD_IN_PROGRESS'
+        AND "cadSubStatus" IS NULL
+        AND id IN (
+          SELECT DISTINCT "orderId"
+          FROM cad_files
+          WHERE ("originalName" ILIKE 'cj%'
+                 OR "designerNotes" IN ('Smartsheet sync', 'Smartsheet import'))
+            AND status != 'REJECTED'
+        )
+    `);
+  }
+
   // ── Sync Smartsheet conversations for one specific order ──────────────
   async syncCommentsForOrder(orderId: string, sheetId: string): Promise<{ commentsImported: number; errors: string[] }> {
     const result = { commentsImported: 0, errors: [] as string[] };
