@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Order } from '../../database/entities/order.entity';
+import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
@@ -16,6 +16,7 @@ export class SmartsheetSyncService {
   private readonly base = 'https://api.smartsheet.com/2.0';
   private running = false;
   private runningUpdates = false;
+  private runningCadMedia = false;
   private lastUpdatePollAt = new Date(0); // epoch = sync everything on first run
 
   constructor(
@@ -155,6 +156,37 @@ export class SmartsheetSyncService {
       this.logger.error(`pollUpdates failed: ${err.message}`);
     } finally {
       this.runningUpdates = false;
+    }
+  }
+
+  // Runs every 10 minutes — syncs attachments + comments for orders in CAD_IN_PROGRESS.
+  // pollUpdates only fires on cell changes (Smartsheet modifiedAt); attachments and
+  // discussions don't update modifiedAt, so this cron catches those separately.
+  @Cron('*/10 * * * *')
+  async pollCadMedia() {
+    if (this.runningCadMedia) return;
+    this.runningCadMedia = true;
+    try {
+      const activeOrders = await this.orderRepo.find({
+        where: { status: OrderStatus.CAD_IN_PROGRESS },
+        select: ['id', 'smartsheetRowId', 'poNumber'] as any,
+      });
+
+      let synced = 0;
+      for (const order of activeOrders) {
+        if (!order.smartsheetRowId) continue;
+        const media = await this.importService.syncRowMedia(this.sheetId, order.smartsheetRowId, order.id);
+        if (media.attachmentsAdded || media.commentsAdded) {
+          this.logger.log(`pollCadMedia: ${order.poNumber} +${media.attachmentsAdded} files, +${media.commentsAdded} msgs`);
+          synced++;
+        }
+      }
+      if (synced) this.logger.log(`pollCadMedia: synced media for ${synced} order(s)`);
+      else this.logger.debug('pollCadMedia: no new media');
+    } catch (err: any) {
+      this.logger.error(`pollCadMedia failed: ${err.message}`);
+    } finally {
+      this.runningCadMedia = false;
     }
   }
 

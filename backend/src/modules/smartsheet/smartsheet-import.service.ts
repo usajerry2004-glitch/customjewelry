@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -23,7 +23,7 @@ export interface ImportSummary {
 }
 
 @Injectable()
-export class SmartsheetImportService {
+export class SmartsheetImportService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SmartsheetImportService.name);
   private readonly base = 'https://api.smartsheet.com/2.0';
 
@@ -647,6 +647,23 @@ export class SmartsheetImportService {
       this.logger.warn(`syncRowMedia row=${rowId}: ${e.message}`);
     }
     return result;
+  }
+
+  async onApplicationBootstrap() {
+    try {
+      const deleted = await this.cadRepo.query(`
+        DELETE FROM cad_files
+        WHERE id NOT IN (
+          SELECT DISTINCT ON ("orderId", "originalName") id
+          FROM cad_files
+          ORDER BY "orderId", "originalName", "createdAt" ASC
+        )
+      `);
+      if (deleted.length > 0 || (Array.isArray(deleted) && deleted.length))
+        this.logger.log(`Startup dedup: removed duplicate CAD file records`);
+    } catch (e: any) {
+      this.logger.warn(`Startup CAD dedup failed: ${e?.message}`);
+    }
   }
 
   async getOrderById(orderId: string) {
