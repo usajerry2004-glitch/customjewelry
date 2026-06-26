@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike, In } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { SpacesService } from '../spaces/spaces.service';
@@ -699,19 +699,29 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
   }
 
   async backfillCadSubStatus() {
-    await this.orderRepo.query(`
-      UPDATE orders
-      SET "cadSubStatus" = 'UPLOADED'
-      WHERE status = 'CAD_IN_PROGRESS'
-        AND "cadSubStatus" IS NULL
-        AND id IN (
-          SELECT DISTINCT "orderId"
-          FROM cad_files
-          WHERE ("originalName" ILIKE 'cj%'
-                 OR "designerNotes" IN ('Smartsheet sync', 'Smartsheet import'))
-            AND status != 'REJECTED'
-        )
-    `);
+    // Find all CAD_IN_PROGRESS orders with no cadSubStatus yet
+    const orders = await this.orderRepo.find({
+      where: { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: null as any },
+      select: ['id'] as any,
+    });
+    if (!orders.length) return;
+
+    const orderIds = orders.map(o => o.id);
+
+    // Among those, find which ones have at least one CJ design file
+    const designFiles = await this.cadRepo.find({
+      where: [
+        { orderId: In(orderIds), originalName: ILike('cj%') },
+        { orderId: In(orderIds), designerNotes: In(['Smartsheet sync', 'Smartsheet import']) },
+      ],
+      select: ['orderId'] as any,
+    });
+
+    const idsToFix = [...new Set(designFiles.map(f => f.orderId))];
+    for (const id of idsToFix) {
+      await this.orderRepo.update(id, { cadSubStatus: 'UPLOADED' });
+    }
+    if (idsToFix.length) this.logger.log(`backfillCadSubStatus: fixed ${idsToFix.length} order(s)`);
   }
 
   // ── Sync Smartsheet conversations for one specific order ──────────────
@@ -812,12 +822,8 @@ export class SmartsheetImportService implements OnApplicationBootstrap {
 
         if (existing) {
           // ── UPDATE existing order with latest Smartsheet data ──────────
-          const rawStatus = (getCell(row, 'Status') || '').trim();
-          const mappedStatus = mapSmartsheetStatus(rawStatus);
-
           const update: Partial<Order> = {
             smartsheetRowId: rowId,
-            ...(mappedStatus ? { status: mappedStatus } : {}),
             ...(getCell(row, 'Kira Sku #')                                              ? { kiraSkuNumber:   getCell(row, 'Kira Sku #')! }                                           : {}),
             ...(getCell(row, 'Tracking') || getCell(row, 'Tracking #')                  ? { trackingNumber:  (getCell(row, 'Tracking') || getCell(row, 'Tracking #'))! }             : {}),
             ...(getCell(row, 'Invoice #')                                                ? { invoiceNumber:   getCell(row, 'Invoice #')! }                                            : {}),

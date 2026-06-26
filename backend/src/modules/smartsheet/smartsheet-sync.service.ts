@@ -8,7 +8,7 @@ import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
 import { SmartsheetImportService } from './smartsheet-import.service';
-import { mapSmartsheetStatus, FIELD_MAP } from './smartsheet-constants';
+import { FIELD_MAP } from './smartsheet-constants';
 
 @Injectable()
 export class SmartsheetSyncService {
@@ -126,9 +126,6 @@ export class SmartsheetSyncService {
         if (!order) continue;
 
         const updates: Partial<Order> = { smartsheetRowId: rowId };
-        const rawStatus = (getCell('Status') || '').trim();
-        const newStatus = mapSmartsheetStatus(rawStatus);
-        if (newStatus) updates.status = newStatus;
 
         for (const [colTitle, field] of FIELD_MAP) {
           const val = getCell(colTitle);
@@ -144,7 +141,7 @@ export class SmartsheetSyncService {
         await this.orderRepo.update(order.id, updates);
         const media = await this.importService.syncRowMedia(this.sheetId, rowId, order.id);
         this.logger.log(
-          `pollUpdates: ${order.poNumber}${newStatus ? ` → ${newStatus}` : ''}` +
+          `pollUpdates: ${order.poNumber}` +
           `${media.attachmentsAdded || media.commentsAdded ? ` (+${media.attachmentsAdded} files, +${media.commentsAdded} msgs)` : ''}`,
         );
         synced++;

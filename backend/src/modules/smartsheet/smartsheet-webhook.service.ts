@@ -228,9 +228,6 @@ export class SmartsheetWebhookService {
     }
 
     const updates: Partial<Order> = { smartsheetRowId: rowId };
-    const rawStatus = (getCell('Status') || '').trim();
-    const newStatus = mapSmartsheetStatus(rawStatus);
-    if (newStatus) updates.status = newStatus;
 
     for (const [colTitle, field] of FIELD_MAP) {
       const val = getCell(colTitle);
@@ -247,7 +244,7 @@ export class SmartsheetWebhookService {
 
     // Sync any new attachments and comments from Smartsheet
     const media = await this.importService.syncRowMedia(this.sheetId, rowId, order.id);
-    this.logger.log(`Synced ${order.poNumber} ← rowId ${rowId}${newStatus ? ` → ${newStatus}` : ''}${media.attachmentsAdded || media.commentsAdded ? ` (+${media.attachmentsAdded} files, +${media.commentsAdded} comments)` : ''}`);
+    this.logger.log(`Synced ${order.poNumber} ← rowId ${rowId}${media.attachmentsAdded || media.commentsAdded ? ` (+${media.attachmentsAdded} files, +${media.commentsAdded} comments)` : ''}`);
     return true;
   }
 
@@ -286,9 +283,6 @@ export class SmartsheetWebhookService {
         if (!order) { result.skipped++; continue; }
 
         const updates: Partial<Order> = { smartsheetRowId: String(row.id) };
-        const rawStatus = (getCell('Status') || '').trim();
-        const newStatus = mapSmartsheetStatus(rawStatus);
-        if (newStatus) { updates.status = newStatus; } else if (rawStatus) { result.unmapped.push(`${smartsheetPo}: "${rawStatus}"`); }
         for (const [colTitle, field] of FIELD_MAP) { const val = getCell(colTitle); if (val !== null && val !== '') (updates as any)[field] = val; }
         const costRaw = getCell('Kira Quoted Cost') || getCell('Cost');
         if (costRaw) { const n = parseFloat(String(costRaw).replace(/[$,\s]/g, '')); if (!isNaN(n)) updates.quotedCost = n; }
