@@ -59,7 +59,6 @@ export default function CustomersPage() {
   const [filterSalesRep, setFilterSalesRep] = useState('');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
-  const [showCreate, setShowCreate] = useState(false);
   const [showOrder, setShowOrder] = useState<Customer | null>(null);
   const [showOrders, setShowOrders] = useState<{ customer: Customer; orders: Order[] } | null>(null);
   const [showOrdersTop, setShowOrdersTop] = useState(200);
@@ -82,7 +81,6 @@ export default function CustomersPage() {
     } catch {}
   }, []);
 
-  const [newUser, setNewUser] = useState({ firstName: '', lastName: '', email: '', password: '', storeName: '' });
   const [newOrder, setNewOrder] = useState<Record<string, string>>({
     orderType: '', metalType: '', metalColor: '', size: '', diamondType: '',
     diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '',
@@ -129,27 +127,6 @@ export default function CustomersPage() {
   const filtered = allFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const resetPage = () => setPage(1);
-
-  const createCustomer = async () => {
-    if (!newUser.firstName || !newUser.email || !newUser.password) {
-      setError('First name, email, and password are required.');
-      return;
-    }
-    setSaving(true); setError('');
-    const res = await apiFetch(`${API}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ ...newUser, role: 'CUSTOMER', lastName: newUser.lastName || '—' }),
-    });
-    if (res.ok) {
-      setShowCreate(false);
-      setNewUser({ firstName: '', lastName: '', email: '', password: '', storeName: '' });
-      await load();
-    } else {
-      const d = await res.json();
-      setError(d.message || 'Failed to create customer.');
-    }
-    setSaving(false);
-  };
 
   const placeOrder = async () => {
     if (!showOrder || !newOrder.orderType || !newOrder.metalType || !newOrder.metalColor) {
@@ -231,14 +208,6 @@ export default function CustomersPage() {
     <AppLayout
       title="Customers"
       subtitle={stats ? `${stats.totalCustomers} customers · ${stats.activeCustomers} active` : 'Loading…'}
-      actions={
-        <button
-          onClick={() => { setShowCreate(true); setError(''); }}
-          style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
-        >
-          + Add Customer
-        </button>
-      }
     >
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -309,7 +278,7 @@ export default function CustomersPage() {
                 <td colSpan={7} style={{ padding: '48px', textAlign: 'center' }}>
                   <div style={{ fontSize: '32px', marginBottom: '10px', opacity: 0.3 }}>👥</div>
                   <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No customers yet</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Click "+ Add Customer" to create the first account.</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Invite customers via Settings → Invite a New Team Member.</div>
                 </td>
               </tr>
             ) : filtered.map(c => (
@@ -436,47 +405,6 @@ export default function CustomersPage() {
             >
               Next ›
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Create Customer Modal ── */}
-      {showCreate && (
-        <div className="modal-bg" style={modalBg} onClick={() => setShowCreate(false)}>
-          <div className="modal-box" style={modalBox} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px', margin: '0 0 20px' }}>Add New Customer</h2>
-
-            <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              {[['First Name *', 'firstName', 'text'], ['Last Name', 'lastName', 'text']].map(([label, key, type]) => (
-                <div key={key}>
-                  <label style={LABEL}>{label}</label>
-                  <input type={type} value={(newUser as any)[key]} onChange={e => setNewUser(p => ({ ...p, [key]: e.target.value }))} style={INPUT} />
-                </div>
-              ))}
-            </div>
-
-            {[['Email *', 'email', 'email'], ['Password *', 'password', 'password']].map(([label, key, type]) => (
-              <div key={key} style={{ marginBottom: '12px' }}>
-                <label style={LABEL}>{label}</label>
-                <input type={type} value={(newUser as any)[key]} onChange={e => setNewUser(p => ({ ...p, [key]: e.target.value }))} style={INPUT} placeholder={key === 'password' ? 'Min 6 characters' : ''} />
-              </div>
-            ))}
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={LABEL}>Store / Business Name</label>
-              <input value={newUser.storeName} onChange={e => setNewUser(p => ({ ...p, storeName: e.target.value }))} style={INPUT} placeholder="Optional" />
-            </div>
-
-            {error && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={createCustomer} disabled={saving} style={{ flex: 1, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? 'Creating…' : 'Create Customer'}
-              </button>
-              <button onClick={() => setShowCreate(false)} style={{ padding: '11px 20px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}
