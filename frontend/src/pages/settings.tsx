@@ -24,6 +24,7 @@ const STAFF_ROLES = [
   UserRole.FACTORY_MANAGER,
   UserRole.STONE_MANAGER,
   UserRole.ADMIN,
+  UserRole.CUSTOMER,
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
   [UserRole.SKU_MANAGER]:     'SKU Manager',
   [UserRole.FACTORY_MANAGER]: 'Factory Manager',
   [UserRole.STONE_MANAGER]:   'Stone Manager',
+  [UserRole.CUSTOMER]:        'Customer',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -44,6 +46,7 @@ const ROLE_COLORS: Record<string, string> = {
   [UserRole.SKU_MANAGER]:     '#059669',
   [UserRole.FACTORY_MANAGER]: '#D97706',
   [UserRole.STONE_MANAGER]:   '#9333EA',
+  [UserRole.CUSTOMER]:        '#BE185D',
 };
 
 const card: React.CSSProperties = {
