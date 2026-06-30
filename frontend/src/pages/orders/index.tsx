@@ -63,10 +63,36 @@ const inputStyle: React.CSSProperties = {
 
 const fieldStyle: React.CSSProperties = { marginBottom: '14px' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px', letterSpacing: '0.8px', textTransform: 'uppercase' };
+const modalSectionTitle: React.CSSProperties = {
+  fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '15px', fontWeight: 600,
+  color: 'var(--text-primary)', marginBottom: '14px', marginTop: '6px',
+  paddingBottom: '8px', borderBottom: '1px solid var(--border)',
+  letterSpacing: '1px', textTransform: 'uppercase' as const,
+};
 
-interface Customer { id: string; firstName: string; lastName: string; email: string; storeName?: string; }
+interface Customer { id: string; firstName: string; lastName: string; email: string; storeName?: string; phoneNumber?: string; }
 
 const ROLES_NEED_CUSTOMER = ['SALES_REP', 'AUTHORIZER', 'ADMIN'];
+
+const ORDER_TYPES_MODAL = ['Earring', 'Ring', 'Pendant', 'Bracelet', 'Other'];
+const RING_SIZES_MODAL   = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
+const PENDANT_SIZES_MODAL = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
+const BRACELET_SIZES_MODAL = ['5 inches', '5.5 inches', '6 inches', '6.5 inches', '7 inches', '7.5 inches', '8 inches', '8.5 inches'];
+const METAL_TYPES_MODAL   = ['10K', '14K', '18K', 'Platinum'];
+const DIAMOND_TYPES_MODAL = ['Lab grown', 'Gemstone lab grown'];
+const DIAMOND_QUALITY_MODAL = ['F+VS+', 'F+VVS+'];
+
+function getModalAutoSize(orderType: string): string {
+  if (orderType === 'Earring') return 'Earring';
+  if (orderType === 'Other') return 'See in comment';
+  return '';
+}
+function getModalSizeOptions(orderType: string): string[] | null {
+  if (orderType === 'Ring') return RING_SIZES_MODAL;
+  if (orderType === 'Pendant') return PENDANT_SIZES_MODAL;
+  if (orderType === 'Bracelet') return BRACELET_SIZES_MODAL;
+  return null;
+}
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -87,7 +113,13 @@ export default function OrdersPage() {
   const [dateTo, setDateTo] = useState('');
   const [activeMonth, setActiveMonth] = useState('');
   const [showNew, setShowNew] = useState(false);
-  const [newOrder, setNewOrder] = useState({ storeName: '', orderType: '', metalType: '', metalColor: '' });
+  const [newOrder, setNewOrder] = useState({
+    orderType: '', size: '', metalType: '', metalColor: '',
+    diamondType: '', diamondQuality: '', customerNotes: '',
+  });
+  // Contact info for admin/sales rep placing order
+  const [contact, setContact] = useState({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
+  const [companyDropOpen, setCompanyDropOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -227,21 +259,42 @@ export default function OrdersPage() {
     setSelectedCustomer(c);
     setCustomerSearch(c.storeName || `${c.firstName} ${c.lastName}`);
     setShowCustomerDrop(false);
-    setNewOrder(p => ({ ...p, storeName: c.storeName || `${c.firstName} ${c.lastName}` }));
+    // Auto-fill contact info from selected customer
+    setContact(p => ({
+      ...p,
+      firstName: c.firstName || '',
+      lastName: c.lastName || '',
+      companyName: c.storeName ? c.storeName : 'Other',
+      companyNameOther: c.storeName ? '' : `${c.firstName} ${c.lastName}`,
+      email: c.email || '',
+    }));
   };
 
   const createOrder = async () => {
-    if (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer) return;
+    const resolvedCompany = contact.companyName === 'Other' ? contact.companyNameOther : contact.companyName;
+    if (ROLES_NEED_CUSTOMER.includes(userRole) && !contact.firstName && !selectedCustomer) return;
     setSaving(true);
     try {
       const customerFields = selectedCustomer ? {
         customerId: selectedCustomer.id,
-        customerEmail: selectedCustomer.email,
-        customerFullName: `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
-      } : {};
+        customerEmail: contact.email || selectedCustomer.email,
+        customerFullName: (contact.firstName || contact.lastName)
+          ? `${contact.firstName} ${contact.lastName}`.trim()
+          : `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
+      } : {
+        customerFullName: `${contact.firstName} ${contact.lastName}`.trim() || undefined,
+        customerEmail: contact.email || undefined,
+      };
       const res = await apiFetch(`${API}/orders`, {
         method: 'POST',
-        body: JSON.stringify({ ...newOrder, ...customerFields, manufacturingPath: 'STANDARD', referenceWeblink: refLink || undefined }),
+        body: JSON.stringify({
+          ...newOrder,
+          ...customerFields,
+          storeName: resolvedCompany || undefined,
+          phoneNumber: contact.phone || undefined,
+          manufacturingPath: 'STANDARD',
+          referenceWeblink: refLink || undefined,
+        }),
       });
       if (res.ok) {
         const order = await res.json();
@@ -265,7 +318,8 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ storeName: '', orderType: '', metalType: '', metalColor: '' });
+        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '' });
+        setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
         setRefFiles([]);
@@ -275,7 +329,12 @@ export default function OrdersPage() {
     } finally { setSaving(false); }
   };
 
-  const closeModal = () => { setShowNew(false); setRefFiles([]); setRefLink(''); setSelectedCustomer(null); setCustomerSearch(''); };
+  const closeModal = () => {
+    setShowNew(false); setRefFiles([]); setRefLink('');
+    setSelectedCustomer(null); setCustomerSearch('');
+    setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
+    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '' });
+  };
 
   return (
     <AppLayout
@@ -317,9 +376,25 @@ export default function OrdersPage() {
       }
     >
       {/* New Order Modal */}
-      {showNew && (
+      {showNew && (() => {
+        const setC = (k: string, v: string) => setContact(p => ({ ...p, [k]: v }));
+        const setO = (k: string, v: string) => setNewOrder(p => ({ ...p, [k]: v }));
+        const handleOrderType = (val: string) => {
+          const auto = getModalAutoSize(val);
+          setNewOrder(p => ({ ...p, orderType: val, size: auto }));
+        };
+        const sizeOpts = getModalSizeOptions(newOrder.orderType);
+        const isAutoSize = newOrder.orderType === 'Earring' || newOrder.orderType === 'Other';
+        const resolvedCompany = contact.companyName === 'Other' ? contact.companyNameOther : contact.companyName;
+        const canSubmit = !saving && newOrder.orderType && newOrder.metalType && newOrder.size &&
+          contact.firstName && contact.lastName && (resolvedCompany) && contact.email;
+
+        // All unique store names from the loaded customers list
+        const storeNames = Array.from(new Set(customers.map(c => c.storeName).filter(Boolean))) as string[];
+
+        return (
         <div className="modal-bg" style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.5)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', width: '500px', maxWidth: '94vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', width: '540px', maxWidth: '96vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 New Order
@@ -336,79 +411,191 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            {/* Customer picker — dropdown of existing customers */}
-            {ROLES_NEED_CUSTOMER.includes(userRole) && (
-              <div style={{ ...fieldStyle, position: 'relative' }}>
-                <label style={labelStyle}>Customer *</label>
+            {/* ── CONTACT INFORMATION ── */}
+            <div style={modalSectionTitle}>Contact Information</div>
+
+            {/* First Name + Last Name */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>First Name *</label>
+                <input value={contact.firstName} onChange={e => setC('firstName', e.target.value)}
+                  placeholder="Jane" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Last Name *</label>
+                <input value={contact.lastName} onChange={e => setC('lastName', e.target.value)}
+                  placeholder="Smith" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+            </div>
+
+            {/* Company Name — dropdown + Other */}
+            <div style={{ ...fieldStyle, position: 'relative' }}>
+              <label style={labelStyle}>Company Name *</label>
+              <select
+                value={contact.companyName}
+                onChange={e => { setC('companyName', e.target.value); if (e.target.value !== 'Other') setC('companyNameOther', ''); }}
+                style={{ ...inputStyle, width: '100%' }}
+              >
+                <option value="">Select company…</option>
+                {storeNames.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="Other">Other (enter below)</option>
+              </select>
+              {contact.companyName === 'Other' && (
                 <input
-                  value={customerSearch}
-                  onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); setSelectedCustomer(null); }}
-                  onFocus={() => setShowCustomerDrop(true)}
-                  placeholder="Search by name or email…"
-                  style={{ ...inputStyle, width: '100%', borderColor: selectedCustomer ? 'var(--accent)' : undefined }}
-                  autoComplete="off"
+                  value={contact.companyNameOther}
+                  onChange={e => setC('companyNameOther', e.target.value)}
+                  placeholder="Enter customer or company name"
+                  style={{ ...inputStyle, width: '100%', marginTop: '8px' }}
                 />
-                {showCustomerDrop && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', zIndex: 100, maxHeight: '200px', overflowY: 'auto', boxShadow: 'var(--shadow-lg)', marginTop: '4px' }}>
-                    {customers
-                      .filter(c => {
-                        const q = customerSearch.toLowerCase();
-                        const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
-                        return !q || name.includes(q) || c.email.toLowerCase().includes(q);
-                      })
-                      .map(c => (
-                        <div key={c.id}
-                          onMouseDown={() => selectCustomer(c)}
-                          style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '13px' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-input)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {c.storeName || `${c.firstName} ${c.lastName}`}
+              )}
+              {/* Quick-link: also allow searching existing customer accounts */}
+              {ROLES_NEED_CUSTOMER.includes(userRole) && (
+                <div style={{ marginTop: '6px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Or link to a customer account: </span>
+                  <div style={{ position: 'relative', display: 'inline-block', width: '100%', marginTop: '6px' }}>
+                    <input
+                      value={customerSearch}
+                      onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); setSelectedCustomer(null); }}
+                      onFocus={() => setShowCustomerDrop(true)}
+                      placeholder="Search customer by name or email…"
+                      style={{ ...inputStyle, width: '100%', fontSize: '12px', borderColor: selectedCustomer ? 'var(--accent)' : undefined }}
+                      autoComplete="off"
+                    />
+                    {showCustomerDrop && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', zIndex: 100, maxHeight: '180px', overflowY: 'auto', boxShadow: 'var(--shadow-lg)', marginTop: '4px' }}>
+                        {customers
+                          .filter(c => {
+                            const q = customerSearch.toLowerCase();
+                            const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
+                            return !q || name.includes(q) || c.email.toLowerCase().includes(q);
+                          })
+                          .map(c => (
+                            <div key={c.id}
+                              onMouseDown={() => selectCustomer(c)}
+                              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '12px' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-input)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.storeName || `${c.firstName} ${c.lastName}`}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
+                            </div>
+                          ))}
+                        {customers.filter(c => {
+                          const q = customerSearch.toLowerCase();
+                          const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
+                          return !q || name.includes(q) || c.email.toLowerCase().includes(q);
+                        }).length === 0 && (
+                          <div style={{ padding: '12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            No customer found.
                           </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
-                        </div>
-                      ))}
-                    {customers.filter(c => {
-                      const q = customerSearch.toLowerCase();
-                      const name = (c.storeName || `${c.firstName} ${c.lastName}`).toLowerCase();
-                      return !q || name.includes(q) || c.email.toLowerCase().includes(q);
-                    }).length === 0 && (
-                      <div style={{ padding: '14px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                        No customer found. Add them first via the Customers page.
+                        )}
+                      </div>
+                    )}
+                    {selectedCustomer && (
+                      <div style={{ marginTop: '4px', fontSize: '11px', color: '#10B981', fontWeight: 600 }}>
+                        ✓ Linked: {selectedCustomer.storeName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`}
                       </div>
                     )}
                   </div>
-                )}
-                {selectedCustomer && (
-                  <div style={{ marginTop: '6px', fontSize: '11px', color: '#10B981', fontWeight: 600 }}>
-                    ✓ {selectedCustomer.storeName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`} · {selectedCustomer.email}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Store Name */}
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Store / Company Name</label>
-              <input value={newOrder.storeName} onChange={e => setNewOrder(p => ({ ...p, storeName: e.target.value }))}
-                placeholder="e.g. Diamond Collection NYC" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+              )}
             </div>
 
-            {/* Order details */}
-            {[
-              { label: 'Order Type',  key: 'orderType',  placeholder: 'e.g. Engagement Ring' },
-              { label: 'Metal Type',  key: 'metalType',  placeholder: 'e.g. 18K' },
-              { label: 'Metal Color', key: 'metalColor', placeholder: 'e.g. White Gold' },
-            ].map(({ label, key, placeholder }) => (
-              <div key={key} style={fieldStyle}>
-                <label style={labelStyle}>{label}</label>
-                <input value={(newOrder as any)[key]} onChange={e => setNewOrder(p => ({ ...p, [key]: e.target.value }))}
-                  placeholder={placeholder} style={{ ...inputStyle, width: '100%' }} />
+            {/* Email + Phone */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Email *</label>
+                <input value={contact.email} onChange={e => setC('email', e.target.value)}
+                  placeholder="you@example.com" type="email" style={{ ...inputStyle, width: '100%' }} />
               </div>
-            ))}
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Phone Number *</label>
+                <input value={contact.phone} onChange={e => setC('phone', e.target.value)}
+                  placeholder="+1 (555) 000-0000" type="tel" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+            </div>
 
-            {/* Reference Link */}
+            {/* ── JEWELRY DETAILS ── */}
+            <div style={modalSectionTitle}>Jewelry Details</div>
+
+            {/* Order Type */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Order Type *</label>
+              <select value={newOrder.orderType} onChange={e => handleOrderType(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">Select type…</option>
+                {ORDER_TYPES_MODAL.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+
+            {/* Size — dynamic based on order type */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Size *</label>
+              {!newOrder.orderType ? (
+                <input value="" disabled placeholder="Select an order type first" style={{ ...inputStyle, width: '100%', opacity: 0.5, cursor: 'not-allowed' }} />
+              ) : isAutoSize ? (
+                <input value={newOrder.size} readOnly style={{ ...inputStyle, width: '100%', opacity: 0.75 }} />
+              ) : (
+                <select value={newOrder.size} onChange={e => setO('size', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select size…</option>
+                  {sizeOpts!.map(s => <option key={s}>{s}</option>)}
+                </select>
+              )}
+              {newOrder.orderType === 'Other' && (
+                <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>Please describe in Special Instructions.</div>
+              )}
+            </div>
+
+            {/* Metal Type + Metal Color */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Metal Type *</label>
+                <select value={newOrder.metalType} onChange={e => setO('metalType', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select…</option>
+                  {METAL_TYPES_MODAL.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Metal Color</label>
+                <select value={newOrder.metalColor} onChange={e => setO('metalColor', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select…</option>
+                  {['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* ── STONE DETAILS ── */}
+            <div style={modalSectionTitle}>Stone Details</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Diamond Type</label>
+                <select value={newOrder.diamondType} onChange={e => setO('diamondType', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select…</option>
+                  {DIAMOND_TYPES_MODAL.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Diamond Quality</label>
+                <select value={newOrder.diamondQuality} onChange={e => setO('diamondQuality', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="">Select…</option>
+                  {DIAMOND_QUALITY_MODAL.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Special Instructions */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Special Instructions</label>
+              <textarea
+                value={newOrder.customerNotes}
+                onChange={e => setO('customerNotes', e.target.value)}
+                placeholder="Any special requests, engraving details, design notes, or size info for 'Other'…"
+                rows={3}
+                style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
+              />
+            </div>
+
+            {/* ── REFERENCES ── */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Reference Link (optional)</label>
               <input
@@ -419,33 +606,23 @@ export default function OrdersPage() {
               />
             </div>
 
-            {/* Reference Files — images + videos, multiple (max 10) */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Reference Photos / Videos (optional) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— max 10</span></label>
               <div
                 onClick={() => refFiles.length < 10 && fileRef.current?.click()}
                 style={{
                   border: `2px dashed ${refFiles.length ? 'var(--accent)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius)',
-                  padding: '14px',
-                  textAlign: 'center',
+                  borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center',
                   cursor: refFiles.length >= 10 ? 'not-allowed' : 'pointer',
                   background: refFiles.length ? 'rgba(192,155,88,0.04)' : 'var(--bg-input)',
-                  opacity: refFiles.length >= 10 ? 0.6 : 1,
-                  transition: 'all 0.15s',
+                  opacity: refFiles.length >= 10 ? 0.6 : 1, transition: 'all 0.15s',
                 }}
               >
                 <input
-                  ref={fileRef} type="file"
-                  accept="image/*,video/*,.pdf"
-                  multiple
-                  style={{ display: 'none' }}
+                  ref={fileRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }}
                   onChange={e => {
                     const picked = Array.from(e.target.files || []);
-                    setRefFiles(prev => {
-                      const combined = [...prev, ...picked];
-                      return combined.slice(0, 10);
-                    });
+                    setRefFiles(prev => [...prev, ...picked].slice(0, 10));
                     e.target.value = '';
                   }}
                 />
@@ -474,15 +651,16 @@ export default function OrdersPage() {
               </button>
               <button
                 onClick={createOrder}
-                disabled={saving || (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer)}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (saving || (ROLES_NEED_CUSTOMER.includes(userRole) && !selectedCustomer)) ? 0.6 : 1, letterSpacing: '0.3px' }}
+                disabled={!canSubmit}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed', fontSize: '13px', opacity: canSubmit ? 1 : 0.6, letterSpacing: '0.3px' }}
               >
                 {saving ? 'Creating…' : 'Create Order'}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
