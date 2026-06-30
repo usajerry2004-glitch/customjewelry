@@ -679,7 +679,7 @@ export default function OrderDetail() {
 
           {/* ── Col 2: Reference Images & Videos ── */}
           {(() => {
-            const refs = cads.filter(c => (c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image') && !c.originalName.toUpperCase().startsWith('CJ'));
+            const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
             const canUploadRef = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(userRole as UserRole);
             return (
               <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -792,7 +792,7 @@ export default function OrderDetail() {
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
-              Design Files {cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length > 0 && `(${cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ')).length})`}
+              Design Files {cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image').length})`}
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
@@ -823,7 +823,7 @@ export default function OrderDetail() {
 
           {(() => {
             const isAuthAdmin = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
-            const designFiles = cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ'));
+            const designFiles = cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image');
             const filesUploaded = designFiles.length > 0;
             const alreadySent = (order as any).sentToCustomer;
 
@@ -867,7 +867,7 @@ export default function OrderDetail() {
             return null;
           })()}
           {(() => {
-            const designList = cads.filter(c => (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') || c.originalName.toUpperCase().startsWith('CJ'));
+            const designList = cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image');
             if (designList.length === 0) return (
               <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>
                 No CAD files uploaded yet for this order.

@@ -373,7 +373,7 @@ export default function CustomerOrderDetail() {
 
       {/* Reference Images — always visible, customers can upload */}
       {(() => {
-        const refs = cads.filter(c => c.designerNotes === 'Reference image' && !c.originalName.toUpperCase().startsWith('CJ'));
+        const refs = cads.filter(c => c.designerNotes === 'Reference image');
         return (
         <div style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -448,8 +448,7 @@ export default function CustomerOrderDetail() {
       {/* CAD Design Files */}
       {(() => {
         const designFiles = cads.filter(c =>
-          (c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image') ||
-          c.originalName.toUpperCase().startsWith('CJ')
+          c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image'
         );
         const pendingBatch = designFiles.filter(c => c.status === 'SENT_FOR_APPROVAL');
         const otherFiles   = designFiles.filter(c => c.status !== 'SENT_FOR_APPROVAL');
