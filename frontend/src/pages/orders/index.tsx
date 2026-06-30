@@ -509,7 +509,7 @@ export default function OrdersPage() {
                   placeholder="you@example.com" type="email" style={{ ...inputStyle, width: '100%' }} />
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Phone Number *</label>
+                <label style={labelStyle}>Phone Number</label>
                 <input value={contact.phone} onChange={e => setC('phone', e.target.value)}
                   placeholder="+1 (555) 000-0000" type="tel" style={{ ...inputStyle, width: '100%' }} />
               </div>
