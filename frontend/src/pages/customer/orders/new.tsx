@@ -28,7 +28,7 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   </div>
 );
 
-const ORDER_TYPES = ['Earring', 'Ring', 'Pendant', 'Bracelet', 'Other'];
+const ORDER_TYPES = ['Earring', 'Ring', 'Pendant', 'Necklace', 'Bracelet', 'Other'];
 
 const RING_SIZES = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
 const PENDANT_SIZES = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
@@ -45,7 +45,7 @@ function getAutoSize(orderType: string): string {
 
 function getSizeOptions(orderType: string): string[] | null {
   if (orderType === 'Ring') return RING_SIZES;
-  if (orderType === 'Pendant') return PENDANT_SIZES;
+  if (orderType === 'Pendant' || orderType === 'Necklace') return PENDANT_SIZES;
   if (orderType === 'Bracelet') return BRACELET_SIZES;
   return null;
 }

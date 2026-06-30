@@ -74,7 +74,7 @@ interface Customer { id: string; firstName: string; lastName: string; email: str
 
 const ROLES_NEED_CUSTOMER = ['SALES_REP', 'AUTHORIZER', 'ADMIN'];
 
-const ORDER_TYPES_MODAL = ['Earring', 'Ring', 'Pendant', 'Bracelet', 'Other'];
+const ORDER_TYPES_MODAL = ['Earring', 'Ring', 'Pendant', 'Necklace', 'Bracelet', 'Other'];
 const RING_SIZES_MODAL   = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
 const PENDANT_SIZES_MODAL = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
 const BRACELET_SIZES_MODAL = ['5 inches', '5.5 inches', '6 inches', '6.5 inches', '7 inches', '7.5 inches', '8 inches', '8.5 inches'];
@@ -89,7 +89,7 @@ function getModalAutoSize(orderType: string): string {
 }
 function getModalSizeOptions(orderType: string): string[] | null {
   if (orderType === 'Ring') return RING_SIZES_MODAL;
-  if (orderType === 'Pendant') return PENDANT_SIZES_MODAL;
+  if (orderType === 'Pendant' || orderType === 'Necklace') return PENDANT_SIZES_MODAL;
   if (orderType === 'Bracelet') return BRACELET_SIZES_MODAL;
   return null;
 }
