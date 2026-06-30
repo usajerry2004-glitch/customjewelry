@@ -202,7 +202,7 @@ export class OrdersService {
       .select('o.poNumber')
       .where("o.poNumber LIKE 'CO%' OR o.poNumber LIKE '%(CO%'")
       .getMany();
-    let maxSeq = 10612; // floor = current Smartsheet max; next will be CO10613
+    let maxSeq = 10612; // PO sequence floor
     for (const row of rows) {
       const po = row.poNumber;
       const m1 = po.match(/^CO(\d+)$/);

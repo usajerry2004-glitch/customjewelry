@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Sku } from '../../database/entities/sku.entity';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 
-// First digit of SKU suffix = karat code (matches Smartsheet pattern)
+// First digit of SKU suffix = karat code
 function karatCode(metalType?: string | null): string {
   if (!metalType) return 'X';
   const m = metalType.toLowerCase().trim();

@@ -53,7 +53,6 @@ export interface Order {
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
-  smartsheetRowId?: string;
   createdAt: string;
   updatedAt: string;
 }

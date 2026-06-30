@@ -4,10 +4,6 @@ import { Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 
-// Smartsheet → portal status mapping (status string is the primary signal)
-// Smartsheet assigns a "Kira Sku #" reference code to every order at creation,
-// so SKU presence alone cannot be used to infer portal status.
-
 const SS_CANCELLED  = new Set(['cancelled', 'customer rejected']);
 
 const SS_MANUFACTURED = new Set([

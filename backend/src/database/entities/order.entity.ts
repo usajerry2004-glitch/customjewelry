@@ -190,9 +190,6 @@ export class Order {
   @Column({ nullable: true })
   refCustomerPo: string;
 
-  @Column({ nullable: true })
-  smartsheetRowId: string;
-
   @CreateDateColumn()
   createdAt: Date;
 

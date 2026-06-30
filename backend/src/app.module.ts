@@ -28,7 +28,6 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { ImportModule } from './modules/import/import.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { EmailModule } from './modules/email/email.module';
-import { SmartsheetModule } from './modules/smartsheet/smartsheet.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { RepairsModule } from './modules/repairs/repairs.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
@@ -83,7 +82,6 @@ import { HealthController } from './health.controller';
     ImportModule,
     SlaModule,
     EmailModule,
-    SmartsheetModule,
     TodosModule,
     RepairsModule,
   ],
