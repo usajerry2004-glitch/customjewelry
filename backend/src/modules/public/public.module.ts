@@ -13,6 +13,7 @@ import { SpacesService } from '../spaces/spaces.service';
 const ALLOWED_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
   '.pdf', '.3dm', '.dwg', '.dxf', '.obj', '.stl',
+  '.ai', '.psd', '.eps',
 ]);
 
 @Module({
