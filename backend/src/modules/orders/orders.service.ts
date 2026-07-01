@@ -545,99 +545,108 @@ export class OrdersService {
       return q;
     };
 
-    // 0. CAD revision requested — always CRITICAL
-    const revisionOrders = await qb()
-      .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
-      .andWhere('o."cadSubStatus" = :r', { r: 'REVISION' })
-      .getMany();
-    revisionOrders.forEach(o => results.push({ ...o, priorityReason: 'Customer requested CAD revision', priorityLevel: 'CRITICAL' }));
+    // Fire every role-relevant query concurrently instead of one-at-a-time —
+    // each round trip to the DB was adding its own latency in series.
+    const none = Promise.resolve([] as Order[]);
+    const [
+      revisionOrders,
+      priorityCustomers,
+      stoneOverdue,
+      overdue10,
+      cadOverdue,
+      quotePending,
+      factoryOverdue,
+      repairOverdue,
+    ] = await Promise.all([
+      // 0. CAD revision requested — always CRITICAL
+      qb()
+        .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
+        .andWhere('o."cadSubStatus" = :r', { r: 'REVISION' })
+        .getMany(),
+      // 1. Priority customer orders — scoped to role's status domain
+      qb()
+        .andWhere('o.isPriorityCustomer = true')
+        .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
+        .getMany(),
+      // Stone Manager: stone pending > 1 day — run FIRST so it wins over generic overdue
+      [UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)
+        ? this.orderRepo.createQueryBuilder('o')
+            .where('o.isArchived = false')
+            .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+            .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
+            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+            .getMany()
+        : none,
+      // 2. Overall SLA: orders > 10 days old — skip Stone Manager (they only care about stone status)
+      role !== UserRole.STONE_MANAGER
+        ? qb()
+            .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
+            .andWhere('o."createdAt" < :d', { d: daysAgo(10) })
+            .getMany()
+        : none,
+      // CAD: in CAD_IN_PROGRESS > 1 day with no file uploaded
+      [UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)
+        ? qb()
+            .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
+            .andWhere('(o."cadSubStatus" IS NULL OR o."cadSubStatus" = :u)', { u: 'PENDING' })
+            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+            .getMany()
+        : none,
+      // Authorizer: awaiting quote price (cadSubStatus=APPROVED) > 1 day
+      [UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)
+        ? qb()
+            .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
+            .andWhere('o."cadSubStatus" = :cs', { cs: 'APPROVED' })
+            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+            .getMany()
+        : none,
+      // Factory: in VPO_ISSUED > 4 days
+      [UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)
+        ? qb()
+            .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+            .andWhere('o."updatedAt" < :d', { d: daysAgo(4) })
+            .getMany()
+        : none,
+      // Repair: in REPAIR > 1 day — needs follow-up
+      [UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)
+        ? this.orderRepo.createQueryBuilder('o')
+            .where('o.isArchived = false')
+            .andWhere('o.status = :s', { s: OrderStatus.REPAIR })
+            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
+            .getMany()
+        : none,
+    ]);
 
-    // 1. Priority customer orders — scoped to role's status domain
-    const priorityCustomers = await qb()
-      .andWhere('o.isPriorityCustomer = true')
-      .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
-      .getMany();
+    // Same precedence as before: earlier blocks win when an order matches more than one rule.
+    revisionOrders.forEach(o => results.push({ ...o, priorityReason: 'Customer requested CAD revision', priorityLevel: 'CRITICAL' }));
     priorityCustomers.forEach(o => {
       if (!results.find(r => r.id === o.id))
         results.push({ ...o, priorityReason: 'Priority Customer', priorityLevel: 'HIGH' });
     });
-
-    // Stone Manager: stone pending > 1 day — run FIRST so it wins over generic overdue
-    if ([UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      const stoneOverdue = await this.orderRepo.createQueryBuilder('o')
-        .where('o.isArchived = false')
-        .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-        .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      stoneOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
-      });
-    }
-
-    // 2. Overall SLA: orders > 10 days old — skip Stone Manager (they only care about stone status)
-    if (role !== UserRole.STONE_MANAGER) {
-      const overdue10 = await qb()
-        .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
-        .andWhere('o."createdAt" < :d', { d: daysAgo(10) })
-        .getMany();
-      overdue10.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Order older than 10 days — not completed', priorityLevel: 'HIGH' });
-      });
-    }
-
-    if ([UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)) {
-      // CAD: in CAD_IN_PROGRESS > 1 day with no file uploaded
-      const cadOverdue = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
-        .andWhere('(o."cadSubStatus" IS NULL OR o."cadSubStatus" = :u)', { u: 'PENDING' })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      cadOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'CAD file not uploaded — over 1 day', priorityLevel: 'HIGH' });
-      });
-    }
-
-    if ([UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Authorizer: awaiting quote price (cadSubStatus=APPROVED) > 1 day
-      const quotePending = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
-        .andWhere('o."cadSubStatus" = :cs', { cs: 'APPROVED' })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      quotePending.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'Quote price pending — over 1 day', priorityLevel: 'HIGH' });
-      });
-    }
-
-    if ([UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Factory: in VPO_ISSUED > 4 days
-      const factoryOverdue = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(4) })
-        .getMany();
-      factoryOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'In VPO stage — over 4 days', priorityLevel: 'MEDIUM' });
-      });
-    }
-
-    if ([UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)) {
-      // Repair: in REPAIR > 1 day — needs follow-up
-      const repairOverdue = await this.orderRepo.createQueryBuilder('o')
-        .where('o.isArchived = false')
-        .andWhere('o.status = :s', { s: OrderStatus.REPAIR })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      repairOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: `With repair contractor${o.repairContractor ? ` (${o.repairContractor})` : ''} — over 1 day`, priorityLevel: 'HIGH' });
-      });
-    }
+    stoneOverdue.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
+    });
+    overdue10.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: 'Order older than 10 days — not completed', priorityLevel: 'HIGH' });
+    });
+    cadOverdue.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: 'CAD file not uploaded — over 1 day', priorityLevel: 'HIGH' });
+    });
+    quotePending.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: 'Quote price pending — over 1 day', priorityLevel: 'HIGH' });
+    });
+    factoryOverdue.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: 'In VPO stage — over 4 days', priorityLevel: 'MEDIUM' });
+    });
+    repairOverdue.forEach(o => {
+      if (!results.find(r => r.id === o.id))
+        results.push({ ...o, priorityReason: `With repair contractor${o.repairContractor ? ` (${o.repairContractor})` : ''} — over 1 day`, priorityLevel: 'HIGH' });
+    });
 
 
     const LEVEL_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2 };
@@ -657,26 +666,39 @@ export class OrdersService {
 
   async getKanbanBoard(user?: { id: string; role: string }) {
     const statuses = Object.values(OrderStatus);
-    return Promise.all(
-      statuses.map(async (status) => {
-        const qb = this.orderRepo.createQueryBuilder('o')
-          .where('o.status = :status', { status })
-          .andWhere('o.isArchived = false');
 
-        if (user?.role === 'SALES_REP') {
-          qb.andWhere('o.salesRepId = :salesRepId', { salesRepId: user.id });
-        } else if (user?.role === 'CAD_DESIGNER') {
-          if (!CAD_STATUSES.includes(status as OrderStatus)) {
-            return { status, orders: [], count: 0 };
-          }
-        } else if (user?.role === 'FACTORY_MANAGER') {
-          qb.andWhere('o.kiraSkuNumber IS NOT NULL');
-        }
+    const buildBase = () => {
+      const q = this.orderRepo.createQueryBuilder('o').where('o.isArchived = false');
+      if (user?.role === 'SALES_REP') {
+        q.andWhere('o.salesRepId = :salesRepId', { salesRepId: user.id });
+      } else if (user?.role === 'CAD_DESIGNER') {
+        q.andWhere('o.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
+      } else if (user?.role === 'FACTORY_MANAGER') {
+        q.andWhere('o.kiraSkuNumber IS NOT NULL');
+      }
+      return q;
+    };
 
-        const [orders, count] = await qb.orderBy('o.updatedAt', 'DESC').take(500).getManyAndCount();
-        return { status, orders, count };
-      }),
-    );
+    // One query for the rows (most-recent-first, capped) + one lightweight
+    // grouped count — replaces the previous 8 separate per-status queries.
+    const [allOrders, rawCounts] = await Promise.all([
+      buildBase().orderBy('o.updatedAt', 'DESC').take(3000).getMany(),
+      buildBase().select('o.status', 'status').addSelect('COUNT(*)', 'count').groupBy('o.status').getRawMany(),
+    ]);
+
+    const countByStatus = new Map<string, number>(rawCounts.map((r: any) => [r.status, parseInt(r.count, 10)]));
+    const ordersByStatus = new Map<string, Order[]>();
+    for (const o of allOrders) {
+      const list = ordersByStatus.get(o.status) || [];
+      list.push(o);
+      ordersByStatus.set(o.status, list);
+    }
+
+    return statuses.map(status => ({
+      status,
+      orders: (ordersByStatus.get(status) || []).slice(0, 500),
+      count: countByStatus.get(status) || 0,
+    }));
   }
 
   async getMetrics() {

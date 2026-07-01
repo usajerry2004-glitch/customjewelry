@@ -13,6 +13,23 @@ import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Frontend (dashboard.kirajewels.one) and API (dashboardapi.kirajewels.one) are
+// sibling subdomains — without an explicit `domain`, the cookie defaults to the
+// exact API host and is never visible outside it. `sameSite: 'strict'` also has
+// no benefit here (both hosts share the same registrable domain) and only adds
+// edge cases where the cookie fails to attach. `logout` must use the exact same
+// options or `clearCookie` won't match the cookie it's trying to remove.
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: isProduction,
+  domain: isProduction ? '.kirajewels.one' : undefined,
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -35,14 +52,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login and receive JWT (also sets httpOnly cookie)' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('jf_token', result.access_token, {
-      httpOnly: true,
-      sameSite: isProduction ? 'strict' : 'lax',
-      secure: isProduction,
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie('jf_token', result.access_token, COOKIE_OPTIONS);
     return result;
   }
 
@@ -50,7 +60,7 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Clear auth cookie' })
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('jf_token', { path: '/', httpOnly: true });
+    res.clearCookie('jf_token', COOKIE_OPTIONS);
     return { ok: true };
   }
 

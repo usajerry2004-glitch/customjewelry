@@ -52,32 +52,28 @@ export default function Dashboard() {
   useEffect(() => {
     const sevenAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const load = async () => {
-      const [mRes, slaRes, priRes, rRes] = await Promise.all([
+      // Fetch role-filtered total (used by Sales Rep and other roles) alongside
+      // everything else — it was a separate sequential round trip before.
+      const [mRes, slaRes, priRes, rRes, myRes] = await Promise.all([
         apiFetch(`${API}/orders/metrics`),
         apiFetch(`${API}/sla/overdue`),
         apiFetch(`${API}/orders/priority`),
         apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
+        apiFetch(`${API}/orders?limit=1`),
       ]);
-      if (mRes.ok)   setMetrics(await mRes.json());
+      if (mRes.ok)  setMetrics(await mRes.json());
       if (slaRes.ok) setOverdue(await slaRes.json());
-      // Fetch role-filtered total (used by Sales Rep and other roles)
-      const myRes = await apiFetch(`${API}/orders?limit=1`);
       if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
       let ids: string[] = [];
       if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
       if (rRes.ok)   { const d = await rRes.json(); const l = d.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
-      if (ids.length) {
-        const map: Record<string, string> = {};
-        await Promise.all([...new Set(ids)].map(async id => {
-          try {
-            const r = await apiFetch(`${API}/cad/order/${id}`);
-            if (!r.ok) return;
-            const cads = await r.json();
-            const ref = cads.find((c: any) => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
-            if (ref) map[id] = ref.filePath || `/uploads/cad/${ref.fileName}`;
-          } catch {}
-        }));
-        setRefImages(map);
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length) {
+        // Single batched lookup instead of one /cad/order/:id call per order.
+        try {
+          const tRes = await apiFetch(`${API}/cad/thumbnails?orderIds=${uniqueIds.join(',')}`);
+          if (tRes.ok) setRefImages(await tRes.json());
+        } catch {}
       }
       setLoading(false);
     };
