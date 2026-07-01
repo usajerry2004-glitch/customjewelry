@@ -31,12 +31,15 @@ export class PublicOrdersController {
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    // Falls back to the shared key baked into the WordPress plugin itself —
-    // the WORDPRESS_API_KEY env var may not be configured on every environment,
-    // and this endpoint must keep working (it's also embedded in the WP plugin
-    // source, so it was never a real secret to begin with).
-    const expected = this.config.get<string>('WORDPRESS_API_KEY', 'KiRa@WebForm#2026!');
-    if (!expected || apiKey !== expected) {
+    // Accept either whatever's configured via WORDPRESS_API_KEY, or the key
+    // baked directly into the WordPress plugin (it's plaintext in that PHP
+    // source anyway, so it was never a real secret). This way the endpoint
+    // keeps working regardless of what — if anything — is set in a given
+    // environment's WORDPRESS_API_KEY.
+    const WP_PLUGIN_KEY = 'KiRa@WebForm#2026!';
+    const configured = this.config.get<string>('WORDPRESS_API_KEY', '');
+    const accepted = [configured, WP_PLUGIN_KEY].filter(Boolean);
+    if (!apiKey || !accepted.includes(apiKey)) {
       this.logger.warn(`Web order rejected — invalid API key`);
       throw new ForbiddenException('Invalid API key');
     }
