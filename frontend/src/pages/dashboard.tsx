@@ -24,7 +24,7 @@ const card: React.CSSProperties = {
 };
 
 const PIPELINE_ORDER: OrderStatus[] = [
-  OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED,
+  OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED,
   OrderStatus.MANUFACTURED, OrderStatus.SHIPPED,
   OrderStatus.REPAIR, OrderStatus.COMPLETED,
 ];
@@ -250,7 +250,6 @@ export default function Dashboard() {
   const roleConfigs: Record<string, any> = {
     SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: myOrderTotal, color: NAVY, sub: 'my customers only', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     CAD_DESIGNER:    { subtitle: 'CAD Queue',         kpis: [{ label: 'In CAD Queue', value: sc('CAD_IN_PROGRESS'), color: '#6366F1', sub: 'awaiting design', link: '/orders?status=CAD_IN_PROGRESS' }, { label: 'Revision Needed', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('revision')).length, color: '#DC2626', sub: 'customer requested', link: '/todos' }, { label: 'Awaiting Quote', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('quote')).length, color: GOLD_DARK, sub: 'approved, needs price', link: '/todos' }] },
-    SKU_MANAGER:     { subtitle: 'SKU Queue',         kpis: [{ label: 'Pending SKU', value: sc('SKU_CREATION'), color: '#F97316', sub: 'ready for generation', link: '/orders?status=SKU_CREATION' }, { label: 'Priority Tasks', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'Manufactured', value: sc('MANUFACTURED'), color: '#8B5CF6', sub: 'done, en route to US', link: '/orders?status=MANUFACTURED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
     STONE_MANAGER:   { subtitle: 'Stone Queue',       kpis: [{ label: 'Pending Stone', value: sc('VPO_ISSUED'), color: '#7C3AED', sub: 'awaiting dispatch', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#DC2626', sub: '> 1 day overdue', link: '/todos' }] },
     CUSTOMER:        { subtitle: 'My Orders',         kpis: [{ label: 'Active Orders', value: activeOrders, color: NAVY, sub: 'in progress', link: '/orders' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#3B82F6', sub: 'on the way', link: '/orders?status=SHIPPED' }, { label: 'Completed', value: sc('COMPLETED'), color: '#10B981', sub: 'delivered', link: '/orders?status=COMPLETED' }] },

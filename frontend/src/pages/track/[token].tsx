@@ -8,9 +8,9 @@ const API = '/api/proxy';
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { key: 'received',   label: 'Order Received',      statuses: ['NEW', 'CAD_IN_PROGRESS', 'SKU_CREATION', 'VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
-  { key: 'design',     label: 'Design in Progress',  statuses: ['CAD_IN_PROGRESS', 'SKU_CREATION', 'VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
-  { key: 'production', label: 'In Production',       statuses: ['SKU_CREATION', 'VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
+  { key: 'received',   label: 'Order Received',      statuses: ['NEW', 'CAD_IN_PROGRESS', 'VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
+  { key: 'design',     label: 'Design in Progress',  statuses: ['CAD_IN_PROGRESS', 'VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
+  { key: 'production', label: 'In Production',       statuses: ['VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'COMPLETED'] },
   { key: 'shipped',    label: 'Shipped',             statuses: ['SHIPPED', 'COMPLETED'] },
   { key: 'completed',  label: 'Completed',           statuses: ['COMPLETED'] },
 ];
@@ -18,7 +18,6 @@ const STEPS = [
 const STATUS_LABELS: Record<string, string> = {
   NEW:             'Order Received',
   CAD_IN_PROGRESS: 'Design in Progress',
-  SKU_CREATION:    'In Production',
   VPO_ISSUED:      'In Production',
   MANUFACTURED:    'In Production',
   SHIPPED:         'Shipped',
@@ -29,7 +28,6 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   NEW:             '#EC4899',
   CAD_IN_PROGRESS: '#6366F1',
-  SKU_CREATION:    '#8B5CF6',
   VPO_ISSUED:      '#8B5CF6',
   MANUFACTURED:    '#8B5CF6',
   SHIPPED:         '#3B82F6',

@@ -7,6 +7,7 @@ import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
 import { S3MulterFile } from '../spaces/spaces.service';
+import { SkuService } from '../sku/sku.service';
 
 @Injectable()
 export class CadService {
@@ -16,6 +17,7 @@ export class CadService {
     @InjectRepository(User)       private readonly userRepo: Repository<User>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
+    private readonly skuService: SkuService,
   ) {}
 
   private async getTeamEmails(roles: UserRole[]): Promise<{ emails: string[]; users: User[] }> {
@@ -186,12 +188,15 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      await this.orderRepo.update(order.id, { status: OrderStatus.SKU_CREATION });
-      const { users: skuUsers } = await this.getTeamEmails([UserRole.SKU_MANAGER, UserRole.AUTHORIZER, UserRole.ADMIN]);
-      if (skuUsers.length) {
-        await this.notifyTeam(skuUsers, NotificationType.STATUS_CHANGED,
-          `SKU Creation — ${order.poNumber}`,
-          `Customer approved the CAD for order ${order.poNumber}. Please proceed with SKU creation.`,
+      // Customer approval auto-generates the SKU and issues the VPO immediately — no manual SKU step.
+      const sku = await this.skuService.generate(order.id, approvedBy);
+      await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED });
+
+      const { users: vpoUsers } = await this.getTeamEmails([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]);
+      if (vpoUsers.length) {
+        await this.notifyTeam(vpoUsers, NotificationType.STATUS_CHANGED,
+          `VPO Issued — ${order.poNumber}`,
+          `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated and the order has been issued to the factory.`,
           order.id);
       }
     }

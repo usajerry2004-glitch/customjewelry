@@ -20,7 +20,9 @@
     "migration:generate": "typeorm migration:generate -d src/database/data-source.ts",
     "migration:run": "typeorm migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm migration:revert -d src/database/data-source.ts",
-    "seed": "ts-node src/database/seeds/run-seeds.ts"
+    "seed": "ts-node src/database/seeds/run-seeds.ts",
+    "cleanup:sku-role": "ts-node src/database/seeds/cleanup-sku-role-removal.ts",
+    "clear:orders": "ts-node src/database/seeds/clear-all-orders.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",

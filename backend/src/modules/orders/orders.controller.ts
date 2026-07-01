@@ -37,7 +37,7 @@ export class OrdersController {
   }
 
   @Get('kanban')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Kanban board' })
   kanban(@Request() req: any) {
@@ -45,7 +45,7 @@ export class OrdersController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Order metrics' })
   metrics() {
@@ -89,9 +89,9 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SKU_MANAGER, UserRole.FACTORY_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update order status (quotedCost required when moving to SKU_CREATION)' })
+  @ApiOperation({ summary: 'Update order status (quotedCost required when issuing the VPO)' })
   updateStatus(
     @Param('id') id: string,
     @Body() body: UpdateStatusDto,

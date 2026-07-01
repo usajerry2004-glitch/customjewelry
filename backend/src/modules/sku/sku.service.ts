@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sku } from '../../database/entities/sku.entity';
-import { Order, OrderStatus } from '../../database/entities/order.entity';
+import { Order } from '../../database/entities/order.entity';
 
 // First digit of SKU suffix = karat code
 function karatCode(metalType?: string | null): string {
@@ -63,10 +63,10 @@ export class SkuService {
       metalColor: order.metalColor,
       centerStoneShape: order.centerStoneShape,
       approximateCaratWeight: order.approximateCaratWeight,
-      generatedBy: generatedBy || 'sku-manager@kirajewels.one',
+      generatedBy: generatedBy || 'system',
     });
     const saved = await this.skuRepo.save(sku);
-    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber, status: OrderStatus.VPO_ISSUED });
+    await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber });
     return saved;
   }
 

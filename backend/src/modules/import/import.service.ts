@@ -13,10 +13,8 @@ const SS_MANUFACTURED = new Set([
 
 const SS_VPO = new Set([
   'vpo issued to cj', 'order & job bag created', 'order & job bag crea',
-  'dia added to job bag',
+  'dia added to job bag', 'kira sku issued',
 ]);
-
-const SS_SKU_CREATION = new Set(['kira sku issued']);
 
 // Customer has approved the CAD — awaiting approval label
 const SS_CUSTOMER_APPROVED = new Set(['customer approved']);
@@ -43,14 +41,11 @@ function resolveImportedStatus(statusRaw: string, quotedCost: number | null, _sk
   if (SS_VPO.has(s))
     return { status: OrderStatus.VPO_ISSUED, cadSubStatus: null, sentToCustomer: false };
 
-  if (SS_SKU_CREATION.has(s))
-    return { status: OrderStatus.SKU_CREATION, cadSubStatus: null, sentToCustomer: false };
-
   if (SS_CUSTOMER_APPROVED.has(s)) {
-    // If a quote is present the CAD was sent for approval; otherwise move to SKU_CREATION
+    // If a quote is present the CAD was sent for approval; otherwise the order already went to VPO
     if (quotedCost && quotedCost > 0)
       return { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED', sentToCustomer: true };
-    return { status: OrderStatus.SKU_CREATION, cadSubStatus: null, sentToCustomer: false };
+    return { status: OrderStatus.VPO_ISSUED, cadSubStatus: null, sentToCustomer: false };
   }
 
   if (SS_CAD.has(s)) {

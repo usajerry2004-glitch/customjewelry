@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
-import { Order, STATUS_CONFIG } from '../../../utils/types';
+import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
 
 const STATUS_ORDER = [
   'WAITING_CONFIRMATION','PENDING_CAD','CAD_IN_PROGRESS','CUSTOMER_APPROVED',
-  'CUSTOMER_REJECTED','SKU_CREATION','VPO_ISSUED','PENDING_CONTRACTOR',
+  'CUSTOMER_REJECTED','VPO_ISSUED','PENDING_CONTRACTOR',
   'ORDER_JOB_BAG_CREATED','READY_TO_INVOICE','READY_TO_SHIP','SHIPPED','DELIVERED',
 ];
 
@@ -56,6 +56,7 @@ export default function CustomerOrdersPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {orders.map(order => {
             const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
+            const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
             const statusIdx = STATUS_ORDER.indexOf(order.status!);
             const progress = statusIdx >= 0 ? Math.round((statusIdx / (STATUS_ORDER.length - 1)) * 100) : 0;
             return (
@@ -82,7 +83,7 @@ export default function CustomerOrdersPage() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
                     <div style={{ display: 'inline-block', background: cfg.bg, color: cfg.color, padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
-                      {cfg.label}
+                      {cadSubLabel || cfg.label}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}

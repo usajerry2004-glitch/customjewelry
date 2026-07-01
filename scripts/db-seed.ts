@@ -10,7 +10,6 @@ const ROLES = [
   { firstName: 'System', lastName: 'Admin', email: 'admin@jewelflow.com', role: 'ADMIN', passwordHash: 'Admin@1234' },
   { firstName: 'Sales', lastName: 'Rep', email: 'sales@jewelflow.com', role: 'SALES_REP', passwordHash: 'Sales@1234' },
   { firstName: 'CAD', lastName: 'Designer', email: 'cad@jewelflow.com', role: 'CAD_DESIGNER', passwordHash: 'CAD@1234' },
-  { firstName: 'SKU', lastName: 'Manager', email: 'sku@jewelflow.com', role: 'SKU_MANAGER', passwordHash: 'SKU@1234' },
   { firstName: 'Factory', lastName: 'Manager', email: 'factory@jewelflow.com', role: 'FACTORY_MANAGER', passwordHash: 'Factory@1234' },
   { firstName: 'Stone', lastName: 'Manager', email: 'stone@jewelflow.com', role: 'STONE_MANAGER', passwordHash: 'Stone@1234' },
   { firstName: 'Shipping', lastName: 'Manager', email: 'shipping@jewelflow.com', role: 'SHIPPING_MANAGER', passwordHash: 'Ship@1234' },

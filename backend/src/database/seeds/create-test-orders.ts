@@ -103,7 +103,7 @@ const testOrders = [
     approximateCaratWeight: '2.2 ct',
     customerNotes: 'Oval stone with halo setting',
     quotedCost: 8900,
-    status: OrderStatus.SKU_CREATION,
+    status: OrderStatus.VPO_ISSUED,
   },
   {
     poNumber: 'KJ-SALES2-003',

@@ -286,8 +286,7 @@ export async function getServerSideProps() {
 // Valid next statuses from each current status (workflow transitions)
 const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED],
-  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.SKU_CREATION, OrderStatus.CANCELLED],
-  [OrderStatus.SKU_CREATION]:    [OrderStatus.VPO_ISSUED, OrderStatus.CANCELLED],
+  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED, OrderStatus.CANCELLED],
   [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CANCELLED],
   [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.CANCELLED],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
@@ -301,7 +300,6 @@ const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
   [UserRole.AUTHORIZER]:      [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED, OrderStatus.REPAIR, OrderStatus.COMPLETED],
   [UserRole.SALES_REP]:       [OrderStatus.CANCELLED],
   [UserRole.CAD_DESIGNER]:    [],
-  [UserRole.SKU_MANAGER]:     [OrderStatus.VPO_ISSUED],
   [UserRole.FACTORY_MANAGER]: [OrderStatus.MANUFACTURED],
   [UserRole.STONE_MANAGER]:   [],
   [UserRole.CUSTOMER]:        [],
@@ -467,8 +465,8 @@ export default function OrderDetail() {
 
   const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
     if (!order?.id) return;
-    // SKU_CREATION requires a price — show modal if not provided
-    if (newStatus === 'SKU_CREATION' as OrderStatus && !quotedCost) {
+    // Issuing the VPO requires a price — show modal if not provided
+    if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
       setPendingPrice(order.quotedCost ? String(order.quotedCost) : '');
       setPriceModal(true);
       return;
@@ -517,7 +515,7 @@ export default function OrderDetail() {
     const price = parseFloat(pendingPrice);
     if (!price || price <= 0) return;
     setPriceModal(false);
-    await moveStatus('SKU_CREATION' as OrderStatus, price);
+    await moveStatus(OrderStatus.VPO_ISSUED, price);
   };
 
   const confirmRepair = async () => {
@@ -601,7 +599,7 @@ export default function OrderDetail() {
           >
             🖨 Print
           </button>
-          {['SKU_CREATION','VPO_ISSUED','MANUFACTURED','SHIPPED','COMPLETED'].includes(order.status!) && (
+          {['VPO_ISSUED','MANUFACTURED','SHIPPED','COMPLETED'].includes(order.status!) && (
             <button
               onClick={() => router.push(`/orders/${id}/jobbag`)}
               style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#0369a1', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
@@ -1080,7 +1078,7 @@ export default function OrderDetail() {
             (userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) && (
             <div style={{ ...cardStyle, borderLeft: '3px solid #F59E0B' }}>
               <div style={{ fontSize: '10px', color: '#F59E0B', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700 }}>CAD Approved — Price Required</div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>Add a quote price above to move this order to SKU Creation.</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>Add a quote price above to issue the VPO.</p>
             </div>
           )}
 
@@ -1139,7 +1137,7 @@ export default function OrderDetail() {
 
       </div>{/* ── end outer grid ── */}
 
-      {/* ── Price Required Modal (SKU Creation) ── */}
+      {/* ── Price Required Modal (VPO Issuance) ── */}
       {priceModal && (
         <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '380px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
@@ -1147,7 +1145,7 @@ export default function OrderDetail() {
               Set Quoted Price
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
-              The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before moving this order to SKU Creation. The customer will be notified.
+              The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before issuing the VPO — the SKU will be generated automatically. The customer will be notified.
             </p>
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               Approximate Price ($)
@@ -1172,7 +1170,7 @@ export default function OrderDetail() {
                 onClick={confirmPriceAndMove}
                 disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
                 style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
-                Confirm & Move to SKU Creation
+                Confirm & Issue VPO
               </button>
             </div>
           </div>

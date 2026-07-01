@@ -8,7 +8,7 @@ import { apiFetch, API } from '../../utils/apiFetch';
 interface KanbanColumn { status: string; orders: Partial<Order>[]; count: number; }
 
 const COLUMN_ORDER = [
-  'NEW', 'CAD_IN_PROGRESS', 'SKU_CREATION',
+  'NEW', 'CAD_IN_PROGRESS',
   'VPO_ISSUED', 'MANUFACTURED', 'COMPLETED',
   'REPAIR', 'CANCELLED', 'SHIPPED',
 ];
@@ -23,7 +23,7 @@ const PHASES = [
   {
     label: 'Design',
     icon: '✏️',
-    statuses: ['CAD_IN_PROGRESS', 'SKU_CREATION'],
+    statuses: ['CAD_IN_PROGRESS'],
     color: '#6366F1',
   },
   {

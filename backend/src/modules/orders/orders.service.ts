@@ -9,6 +9,7 @@ import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity'
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
+import { SkuService } from '../sku/sku.service';
 
 export { OrderFilterDto };
 
@@ -16,8 +17,7 @@ const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
-  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.SKU_CREATION],
-  [OrderStatus.SKU_CREATION]:    [OrderStatus.VPO_ISSUED],
+  [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
   [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED],
   [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED],
@@ -37,6 +37,7 @@ export class OrdersService {
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(OrderEvent)   private readonly eventRepo: Repository<OrderEvent>,
     private readonly emailService: EmailService,
+    private readonly skuService: SkuService,
   ) {}
 
   private logEvent(
@@ -112,10 +113,6 @@ export class OrdersService {
       qb.andWhere('order.salesRepId = :salesRepId', { salesRepId: user.id });
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
-    } else if (user?.role === 'SKU_MANAGER') {
-      qb.andWhere('order.status IN (:...skuStatuses)', {
-        skuStatuses: [OrderStatus.SKU_CREATION],
-      });
     } else if (user?.role === 'FACTORY_MANAGER') {
       qb.andWhere('order.status IN (:...factoryStatuses)', {
         factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED],
@@ -183,10 +180,6 @@ export class OrdersService {
     if (user?.role === 'FACTORY_MANAGER' &&
         order.status !== OrderStatus.VPO_ISSUED &&
         order.status !== OrderStatus.MANUFACTURED) {
-      throw new NotFoundException(`Order ${id} not found`);
-    }
-
-    if (user?.role === 'SKU_MANAGER' && order.status !== OrderStatus.SKU_CREATION) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
@@ -358,26 +351,48 @@ export class OrdersService {
       );
     }
 
-    // Require quoted price before moving to SKU Creation
-    if (status === OrderStatus.SKU_CREATION) {
+    // Require quoted price, auto-generate the SKU, and issue the VPO in one step
+    if (status === OrderStatus.VPO_ISSUED) {
       const order = await this.findOne(id);
       const finalPrice = quotedCost ?? order.quotedCost;
       if (!finalPrice || Number(finalPrice) <= 0) {
-        throw new BadRequestException('Approximate quoted price is required before moving to SKU Creation.');
+        throw new BadRequestException('Approximate quoted price is required before issuing the VPO.');
       }
-      const skuOrder = await this.update(id, { status, quotedCost: finalPrice }, user);
+      if (!order.kiraSkuNumber) {
+        await this.skuService.generate(id, user?.email);
+      }
+      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice }, user);
+      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
+
       // Email customer: design approved, in production
-      if (skuOrder.customerEmail) {
+      if (vpoOrder.customerEmail) {
         await this.emailService.sendOrderInProduction({
-          to: skuOrder.customerEmail,
-          poNumber: skuOrder.poNumber,
-          customerName: skuOrder.customerFullName || skuOrder.storeName || 'Valued Customer',
-          orderType: skuOrder.orderType || '—',
-          quotedCost: skuOrder.quotedCost ? Number(skuOrder.quotedCost) : undefined,
-          orderId: skuOrder.id,
+          to: vpoOrder.customerEmail,
+          poNumber: vpoOrder.poNumber,
+          customerName: vpoOrder.customerFullName || vpoOrder.storeName || 'Valued Customer',
+          orderType: vpoOrder.orderType || '—',
+          quotedCost: vpoOrder.quotedCost ? Number(vpoOrder.quotedCost) : undefined,
+          orderId: vpoOrder.id,
         });
       }
-      return skuOrder;
+
+      // Notify Factory Manager and Stone Manager simultaneously
+      const vpoUsers = await this.userRepo.find({
+        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]) },
+      });
+      await Promise.all(vpoUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `VPO Issued — ${vpoOrder.poNumber}`,
+          message: u.role === UserRole.STONE_MANAGER
+            ? `Order ${vpoOrder.poNumber} is ready — please arrange stones.`
+            : `Order ${vpoOrder.poNumber} has been issued to the factory for manufacturing.`,
+          orderId: vpoOrder.id,
+          targetUserId: u.id,
+        })),
+      ));
+
+      return vpoOrder;
     }
 
     // Require contractor name when moving to REPAIR
@@ -432,24 +447,6 @@ export class OrdersService {
           orderId:      updated.id,
         }).catch(err => this.logger.warn('Order confirmed customer email failed:', err));
       }
-    }
-
-    // SKU_CREATION → VPO_ISSUED: notify Factory Manager and Stone Manager simultaneously
-    if (status === OrderStatus.VPO_ISSUED) {
-      const vpoUsers = await this.userRepo.find({
-        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]) },
-      });
-      await Promise.all(vpoUsers.map(u =>
-        this.notifRepo.save(this.notifRepo.create({
-          type: NotificationType.STATUS_CHANGED,
-          title: `VPO Issued — ${updated.poNumber}`,
-          message: u.role === UserRole.STONE_MANAGER
-            ? `Order ${updated.poNumber} is ready — please arrange stones.`
-            : `Order ${updated.poNumber} has been issued to the factory for manufacturing.`,
-          orderId: updated.id,
-          targetUserId: u.id,
-        })),
-      ));
     }
 
     // MANUFACTURED — notify authorizers/admins (US team to receive)
@@ -535,8 +532,7 @@ export class OrdersService {
     // Base query scoped to what this role is responsible for
     const ROLE_STATUSES: Partial<Record<string, OrderStatus[]>> = {
       [UserRole.CAD_DESIGNER]:    [OrderStatus.CAD_IN_PROGRESS],
-      [UserRole.AUTHORIZER]:      [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.SKU_CREATION, OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.SHIPPED],
-      [UserRole.SKU_MANAGER]:     [OrderStatus.SKU_CREATION],
+      [UserRole.AUTHORIZER]:      [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.SHIPPED],
       [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED],
       [UserRole.STONE_MANAGER]:   [OrderStatus.VPO_ISSUED],
     };
@@ -615,18 +611,6 @@ export class OrdersService {
       quotePending.forEach(o => {
         if (!results.find(r => r.id === o.id))
           results.push({ ...o, priorityReason: 'Quote price pending — over 1 day', priorityLevel: 'HIGH' });
-      });
-    }
-
-    if ([UserRole.SKU_MANAGER, UserRole.ADMIN].includes(role as UserRole)) {
-      // SKU: in SKU_CREATION > 1 day
-      const skuOverdue = await qb()
-        .andWhere('o.status = :s', { s: OrderStatus.SKU_CREATION })
-        .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-        .getMany();
-      skuOverdue.forEach(o => {
-        if (!results.find(r => r.id === o.id))
-          results.push({ ...o, priorityReason: 'SKU not generated — over 1 day', priorityLevel: 'MEDIUM' });
       });
     }
 

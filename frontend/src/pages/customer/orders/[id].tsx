@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
-import { Order, STATUS_CONFIG } from '../../../utils/types';
+import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
 import { OrderConversation } from '../../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
@@ -189,7 +189,6 @@ const CAD_STATUS: Record<string, { label: string; color: string }> = {
 const TIMELINE = [
   { status: 'NEW',            label: 'Order Received' },
   { status: 'CAD_IN_PROGRESS', label: 'CAD Design' },
-  { status: 'SKU_CREATION',   label: 'Design Approved' },
   { status: 'VPO_ISSUED',     label: 'In Production' },
   { status: 'MANUFACTURED',   label: 'Manufactured' },
   { status: 'COMPLETED',      label: 'Completed' },
@@ -275,6 +274,7 @@ export default function CustomerOrderDetail() {
   }
 
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#64748B' };
+  const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
   const currentIdx = TIMELINE.findIndex(t => t.status === order.status);
 
   return (
@@ -293,7 +293,7 @@ export default function CustomerOrderDetail() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Current Status</div>
           <div style={{ background: `${cfg.color}18`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
-            {cfg.label}
+            {cadSubLabel || cfg.label}
           </div>
         </div>
         {/* Timeline dots */}

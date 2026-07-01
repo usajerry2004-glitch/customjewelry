@@ -9,6 +9,7 @@ import { Notification } from '../../database/entities/notification.entity';
 import { CadService } from './cad.service';
 import { CadController } from './cad.controller';
 import { SpacesService } from '../spaces/spaces.service';
+import { SkuModule } from '../sku/sku.module';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -25,6 +26,7 @@ const ALLOWED_EXTENSIONS = new Set([
 @Module({
   imports: [
     TypeOrmModule.forFeature([CadFile, Order, User, Notification]),
+    SkuModule,
     MulterModule.registerAsync({
       inject: [SpacesService],
       useFactory: (spaces: SpacesService) => ({

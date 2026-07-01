@@ -27,17 +27,6 @@ export class ManufacturingController {
     return this.manufacturingService.getMetrics();
   }
 
-  @Patch(':id/start')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
-  @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Issue VPO and start production' })
-  startProduction(
-    @Param('id') id: string,
-    @Body() body: { vpoNumber?: string; jobBagNumber?: string; notes?: string },
-  ) {
-    return this.manufacturingService.startProduction(id, body);
-  }
-
   @Patch(':id/stone-sent')
   @Roles(UserRole.ADMIN, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)

@@ -11,7 +11,6 @@ const ALL_STATUS_FILTERS = [
   { label: 'All',             value: '' },
   { label: 'New',             value: OrderStatus.NEW },
   { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
-  { label: 'SKU Creation',    value: OrderStatus.SKU_CREATION },
   { label: 'VPO Issued',      value: OrderStatus.VPO_ISSUED },
   { label: 'Manufactured',    value: OrderStatus.MANUFACTURED },
   { label: 'Repair',          value: OrderStatus.REPAIR },
@@ -24,10 +23,6 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'All',      value: '' },
     { label: 'Pending',  value: 'cad_pending' },
     { label: 'Revision', value: 'cad_revision' },
-  ],
-  SKU_MANAGER: [
-    { label: 'All',          value: '' },
-    { label: 'SKU Creation', value: OrderStatus.SKU_CREATION },
   ],
   STONE_MANAGER: [
     { label: 'All',        value: '' },
@@ -47,7 +42,6 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'All',             value: '' },
     { label: 'New',             value: OrderStatus.NEW },
     { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
-    { label: 'SKU Creation',    value: OrderStatus.SKU_CREATION },
     { label: 'VPO Issued',      value: OrderStatus.VPO_ISSUED },
     { label: 'Manufactured',    value: OrderStatus.MANUFACTURED },
     { label: 'Completed',       value: OrderStatus.COMPLETED },

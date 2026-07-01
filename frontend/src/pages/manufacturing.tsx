@@ -15,7 +15,6 @@ export default function ManufacturingPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [vpoInputs, setVpoInputs] = useState<Record<string, { vpo: string; jobBag: string; vendor: string }>>({});
 
   const reload = async () => {
     const [qRes, mRes] = await Promise.all([apiFetch(`${API}/manufacturing/queue`), apiFetch(`${API}/manufacturing/metrics`)]);
@@ -25,10 +24,6 @@ export default function ManufacturingPage() {
   };
 
   useEffect(() => { reload(); }, []);
-
-  const getVpo = (id: string) => vpoInputs[id] || { vpo: '', jobBag: '', vendor: '' };
-  const setVpo = (id: string, field: string, val: string) =>
-    setVpoInputs(p => ({ ...p, [id]: { ...getVpo(id), [field]: val } }));
 
   const action = async (id: string, endpoint: string, body?: object) => {
     setActionLoading(id + endpoint);
@@ -84,7 +79,6 @@ export default function ManufacturingPage() {
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {queue.map(order => {
               const cfg = STATUS_CONFIG[order.status] || { label: order.status, color: '#6B7280' };
-              const inputs = getVpo(order.id);
               const busy = !!actionLoading;
 
               return (

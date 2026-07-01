@@ -32,37 +32,6 @@ export class ManufacturingService {
     });
   }
 
-  async startProduction(id: string, details: { vpoNumber?: string; jobBagNumber?: string; notes?: string }) {
-    const order = await this.orderRepo.findOne({ where: { id } });
-    if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.SKU_CREATION) {
-      throw new BadRequestException('Order must be in SKU_CREATION status to start production');
-    }
-
-    order.status = OrderStatus.VPO_ISSUED;
-    order.stoneStatus = StoneStatus.PENDING_STONE;
-    if (details.vpoNumber)  order.rcVpoNumber    = details.vpoNumber;
-    if (details.jobBagNumber) order.rcJobBagNumber = details.jobBagNumber;
-    if (details.notes)      order.vpoOrderDetails = details.notes;
-    const saved = await this.orderRepo.save(order);
-
-    // Notify all Stone Managers
-    const stoneManagers = await this.userRepo.find({ where: { role: UserRole.STONE_MANAGER } });
-    await Promise.all(
-      stoneManagers.map(u =>
-        this.notificationsService.create(
-          NotificationType.STONE_PENDING,
-          `Stone Required — ${order.poNumber}`,
-          `Order ${order.poNumber} has been issued a VPO and is waiting for stone confirmation. Please review and mark the stone as received once it arrives.`,
-          order.id,
-          u.id,
-        ),
-      ),
-    );
-
-    return saved;
-  }
-
   async markStoneSent(id: string) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);

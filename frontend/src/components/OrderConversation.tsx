@@ -6,7 +6,6 @@ const ROLE_COLORS: Record<string, string> = {
   ADMIN:          '#C09B58',
   AUTHORIZER:     '#F59E0B',
   CAD_DESIGNER:   '#6366F1',
-  SKU_MANAGER:    '#F97316',
   FACTORY_MANAGER:'#0D9488',
   STONE_MANAGER:  '#9333EA',
   SALES_REP:      '#8B5CF6',
@@ -14,7 +13,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const MENTION_ROLES = [
-  '@ADMIN', '@AUTHORIZER', '@CAD_DESIGNER', '@SKU_MANAGER',
+  '@ADMIN', '@AUTHORIZER', '@CAD_DESIGNER',
   '@FACTORY_MANAGER', '@STONE_MANAGER', '@SALES_REP',
 ];
 

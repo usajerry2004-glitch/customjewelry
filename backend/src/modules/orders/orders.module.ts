@@ -7,9 +7,10 @@ import { CadFile } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { SkuModule } from '../sku/sku.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent])],
+  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent]), SkuModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

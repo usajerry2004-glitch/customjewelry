@@ -6,7 +6,6 @@ import {
 export enum OrderStatus {
   NEW             = 'NEW',
   CAD_IN_PROGRESS = 'CAD_IN_PROGRESS',
-  SKU_CREATION    = 'SKU_CREATION',
   VPO_ISSUED      = 'VPO_ISSUED',
   MANUFACTURED    = 'MANUFACTURED',
   SHIPPED         = 'SHIPPED',

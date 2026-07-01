@@ -82,7 +82,6 @@ export class AuthService {
       { firstName: 'Sarah',    lastName: 'Chen',     email: 'sales@kirajewels.one',       password: process.env.SEED_SALES_PASSWORD    || 'KiRa@Sales#2025!',    role: UserRole.SALES_REP },
       { firstName: 'Raj',      lastName: 'Sharma',   email: 'authorizer@kirajewels.one',  password: process.env.SEED_AUTH_PASSWORD     || 'KiRa@Auth#2025!',     role: UserRole.AUTHORIZER },
       { firstName: 'Maya',     lastName: 'Patel',    email: 'cad@kirajewels.one',         password: process.env.SEED_CAD_PASSWORD      || 'KiRa@CadDesign#2025!', role: UserRole.CAD_DESIGNER },
-      { firstName: 'Jake',     lastName: 'Morris',   email: 'sku@kirajewels.one',         password: process.env.SEED_SKU_PASSWORD      || 'KiRa@SkuMgr#2025!',   role: UserRole.SKU_MANAGER },
       { firstName: 'Arjun',   lastName: 'Singh',    email: 'factory@kirajewels.one',     password: process.env.SEED_FACTORY_PASSWORD  || 'KiRa@Factory#2025!',  role: UserRole.FACTORY_MANAGER },
       { firstName: 'Priya',    lastName: 'Mehta',    email: 'stone@kirajewels.one',       password: process.env.SEED_STONE_PASSWORD    || 'KiRa@Stone#2025!',    role: UserRole.STONE_MANAGER },
       { firstName: 'Emma',     lastName: 'Thompson', email: 'customer@example.com',       password: process.env.SEED_CUSTOMER_PASSWORD || 'KiRa@Customer#2025!', role: UserRole.CUSTOMER },
