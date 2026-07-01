@@ -586,6 +586,9 @@ export default function OrderDetail() {
         .order-detail-grid  { grid-template-columns: 1fr !important; }
         /* Fit media */
         img, iframe, video { max-width: 100% !important; break-inside: avoid; }
+        /* Reference file thumbnails are cropped to 110px on screen — show them
+           fully uncropped when printing */
+        .ref-thumb-img { height: auto !important; max-height: none !important; object-fit: contain !important; }
       }
     `}</style>
     <AppLayout
@@ -736,12 +739,12 @@ export default function OrderDetail() {
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                         >
                           {isImg ? (
-                            <img src={fileUrl} alt={cad.originalName}
+                            <img src={fileUrl} alt={cad.originalName} className="ref-thumb-img"
                               style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
                               onError={e => { const img = e.target as HTMLImageElement; img.style.display = 'none'; const fb = img.nextElementSibling as HTMLElement; if (fb) fb.style.display = 'flex'; }}
                             />
                           ) : isVid ? (
-                            <video src={fileUrl} style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                            <video src={fileUrl} className="ref-thumb-img" style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                           ) : null}
                           <div style={{ width: '100%', height: '110px', display: (isImg || isVid) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>
                             📎
