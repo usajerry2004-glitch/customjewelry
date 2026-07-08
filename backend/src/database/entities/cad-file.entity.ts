@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum CadFileStatus {
   UPLOADED = 'UPLOADED',
@@ -9,6 +9,7 @@ export enum CadFileStatus {
 }
 
 @Entity('cad_files')
+@Index(['orderId'])
 export class CadFile {
   @PrimaryGeneratedColumn('uuid')
   id: string;

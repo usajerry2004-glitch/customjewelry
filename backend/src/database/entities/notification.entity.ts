@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 export enum NotificationType {
   ORDER_CREATED = 'ORDER_CREATED',
@@ -20,6 +20,8 @@ export enum NotificationType {
 }
 
 @Entity('notifications')
+@Index(['targetUserId'])
+@Index(['targetUserId', 'isRead'])
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
   id: string;

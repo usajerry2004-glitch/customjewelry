@@ -34,6 +34,9 @@ export enum StoneStatus {
 @Index(['stoneStatus'])
 @Index(['isPriorityCustomer'])
 @Index(['status', 'isArchived'])
+@Index(['isArchived'])
+@Index(['salesRepId'])
+@Index(['customerEmail'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;

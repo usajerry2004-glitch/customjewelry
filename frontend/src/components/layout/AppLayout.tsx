@@ -30,7 +30,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
       } catch {}
     };
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 60000);
     return () => clearInterval(t);
   }, []);
 

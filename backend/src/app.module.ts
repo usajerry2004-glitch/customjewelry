@@ -51,8 +51,9 @@ import { HealthController } from './health.controller';
         const databaseUrl = config.get<string>('DATABASE_URL');
         const isProduction = config.get<string>('NODE_ENV') === 'production';
         const entities = [Order, User, CadFile, Sku, Notification, OrderMessage, Todo, OrderEvent];
+        const pool = { extra: { max: 20, min: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 } };
         if (databaseUrl) {
-          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: true, logging: false };
+          return { type: 'postgres', url: databaseUrl, ssl: isProduction ? { rejectUnauthorized: false } : false, entities, synchronize: true, logging: false, ...pool };
         }
         return {
           type: 'postgres',
@@ -65,6 +66,7 @@ import { HealthController } from './health.controller';
           entities,
           synchronize: true,
           logging: false,
+          ...pool,
         };
       },
       inject: [ConfigService],
