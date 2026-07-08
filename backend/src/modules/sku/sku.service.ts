@@ -69,18 +69,4 @@ export class SkuService {
     await this.orderRepo.update(orderId, { kiraSkuNumber: skuNumber });
     return saved;
   }
-
-  async findAll(search?: string): Promise<Sku[]> {
-    const qb = this.skuRepo.createQueryBuilder('s').where('s.isActive = :a', { a: true });
-    if (search) {
-      qb.andWhere('(s.skuNumber LIKE :q OR s.orderType LIKE :q)', { q: `%${search}%` });
-    }
-    return qb.orderBy('s.createdAt', 'DESC').getMany();
-  }
-
-  async findOne(id: string): Promise<Sku> {
-    const sku = await this.skuRepo.findOne({ where: { id } });
-    if (!sku) throw new NotFoundException(`SKU ${id} not found`);
-    return sku;
-  }
 }
