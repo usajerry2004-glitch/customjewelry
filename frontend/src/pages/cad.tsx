@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
+import { toast } from '../utils/toast';
 
 interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; status?: string; cadSubStatus?: string | null; }
 
@@ -43,11 +44,17 @@ export default function CADPage() {
       if (notes) fd.append('designerNotes', notes);
       const res = await apiFetch(`${API}/cad/upload/${selectedOrderId}`, { method: 'POST', body: fd });
       if (res.ok) {
+        toast.success('CAD file uploaded.');
         setNotes('');
         setSelectedOrderId('');
         setSelectedFileCount(0);
         if (fileRef.current) fileRef.current.value = '';
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.message || `Upload failed (${res.status}). Please try again.`);
       }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
     } finally { setUploading(false); }
   };
 

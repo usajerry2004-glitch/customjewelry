@@ -451,6 +451,8 @@ export default function OrdersPage() {
                       value={customerSearch}
                       onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDrop(true); setSelectedCustomer(null); }}
                       onFocus={() => setShowCustomerDrop(true)}
+                      onBlur={() => setShowCustomerDrop(false)}
+                      onKeyDown={e => { if (e.key === 'Escape') { setShowCustomerDrop(false); e.currentTarget.blur(); } }}
                       placeholder="Search customer by name or email…"
                       style={{ ...inputStyle, width: '100%', fontSize: '12px', borderColor: selectedCustomer ? 'var(--accent)' : undefined }}
                       autoComplete="off"
