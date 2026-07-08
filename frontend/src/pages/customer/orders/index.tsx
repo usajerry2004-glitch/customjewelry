@@ -74,7 +74,14 @@ export default function CustomerOrdersPage() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>{order.poNumber}</div>
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      {order.poNumber}
+                      {order.refCustomerPo && (
+                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '8px' }}>
+                          (Your PO: {order.refCustomerPo})
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {order.orderType && <span>{order.orderType}</span>}
                       {order.metalType && <span>{order.metalType} {order.metalColor}</span>}
