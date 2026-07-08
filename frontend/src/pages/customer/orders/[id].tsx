@@ -364,6 +364,14 @@ export default function CustomerOrderDetail() {
         </div>
       </div>
 
+      {/* Quote */}
+      {order.quotedCost != null && order.quotedCost > 0 && (
+        <div style={{ ...card, marginBottom: '16px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#059669', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>Quoted Price</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>${Number(order.quotedCost).toLocaleString()}</div>
+        </div>
+      )}
+
       {/* Customer notes */}
       {order.customerNotes && (
         <div style={card}>
