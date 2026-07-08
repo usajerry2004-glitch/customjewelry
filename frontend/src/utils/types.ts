@@ -45,6 +45,7 @@ export interface Order {
   centerStoneShape?: string;
   approximateCaratWeight?: string;
   customerNotes?: string;
+  refCustomerPo?: string;
   quotedCost?: number;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;

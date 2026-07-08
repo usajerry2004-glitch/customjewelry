@@ -271,7 +271,7 @@ export default function NewOrderPage() {
               }}
             >
               <input
-                ref={fileRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }}
+                ref={fileRef} type="file" accept="image/*,video/*,.pdf,.3dm,.stl" multiple style={{ display: 'none' }}
                 onChange={e => {
                   const picked = Array.from(e.target.files || []);
                   setRefFiles(prev => [...prev, ...picked].slice(0, 10));
@@ -280,7 +280,7 @@ export default function NewOrderPage() {
               />
               <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.5 }}>🖼</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Click to add inspiration photos or videos</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>JPG, PNG, PDF, MP4, MOV — multiple files allowed</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>JPG, PNG, PDF, MP4, MOV, 3DM, STL — multiple files allowed</div>
             </div>
             {refFiles.length > 0 && (
               <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>

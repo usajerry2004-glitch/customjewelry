@@ -212,6 +212,7 @@ export class PublicOrdersService {
       centerStoneShape: order.centerStoneShape,
       approximateCaratWeight: order.approximateCaratWeight,
       customerNotes:  order.customerNotes,
+      refCustomerPo:  order.refCustomerPo ?? null,
       createdAt:      order.createdAt,
       updatedAt:      order.updatedAt,
       trackingNumber: order.trackingNumber,

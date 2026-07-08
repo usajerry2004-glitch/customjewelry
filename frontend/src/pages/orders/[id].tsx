@@ -310,6 +310,7 @@ const FIELD_GROUPS = [
     title: 'Order Details',
     fields: [
       { key: 'poNumber', label: 'PO Number' },
+      { key: 'refCustomerPo', label: 'Customer PO#' },
       { key: 'kiraSkuNumber', label: 'Kira SKU' },
       { key: 'orderType', label: 'Order Type' },
       { key: 'manufacturingPath', label: 'Manufacturing Path' },
@@ -374,6 +375,8 @@ export default function OrderDetail() {
   const [pendingPrice, setPendingPrice] = useState('');
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+  const [customerPoInput, setCustomerPoInput] = useState('');
+  const [savingPo, setSavingPo] = useState(false);
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
@@ -405,6 +408,7 @@ export default function OrderDetail() {
           const o = await oRes.json();
           setOrder(o);
           setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
+          setCustomerPoInput(o.refCustomerPo || '');
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -509,6 +513,20 @@ export default function OrderDetail() {
       if (fresh.ok) setOrder(await fresh.json());
     }
     setSavingPrice(false);
+  };
+
+  const saveCustomerPo = async () => {
+    if (!order?.id) return;
+    setSavingPo(true);
+    const res = await apiFetch(`${API}/orders/${order.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ refCustomerPo: customerPoInput.trim() || null }),
+    });
+    if (res.ok) {
+      const fresh = await apiFetch(`${API}/orders/${order.id}`);
+      if (fresh.ok) setOrder(await fresh.json());
+    }
+    setSavingPo(false);
   };
 
   const confirmPriceAndMove = async () => {
@@ -645,12 +663,32 @@ export default function OrderDetail() {
                     const raw = (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');
                     const isLink = key === 'referenceWeblink' && raw;
+                    const canEditPo = key === 'refCustomerPo' &&
+                      [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER].includes(userRole as UserRole);
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                           {label}
                         </div>
-                        {isLink ? (
+                        {canEditPo ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              value={customerPoInput}
+                              onChange={e => setCustomerPoInput(e.target.value)}
+                              placeholder="Add customer PO#"
+                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
+                            />
+                            {customerPoInput !== (order.refCustomerPo || '') && (
+                              <button
+                                onClick={saveCustomerPo}
+                                disabled={savingPo}
+                                style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingPo ? 0.5 : 1 }}
+                              >
+                                {savingPo ? '…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        ) : isLink ? (
                           <a href={raw} target="_blank" rel="noopener noreferrer"
                             style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 500, wordBreak: 'break-all', textDecoration: 'underline' }}>
                             {raw}
@@ -691,7 +729,7 @@ export default function OrderDetail() {
                   {canUploadRef && (
                     <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '3px 10px', background: 'transparent', whiteSpace: 'nowrap' }}>
                       + Add Reference
-                      <input type="file" accept="image/*,.pdf,.mp4,.mov" multiple style={{ display: 'none' }}
+                      <input type="file" accept="image/*,.pdf,.mp4,.mov,.3dm,.stl" multiple style={{ display: 'none' }}
                         onChange={async e => {
                           const files = Array.from(e.target.files || []);
                           if (!files.length || !order?.id) return;

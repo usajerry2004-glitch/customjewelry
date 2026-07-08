@@ -68,6 +68,7 @@ interface OrderData {
   centerStoneShape: string | null;
   approximateCaratWeight: string | null;
   customerNotes: string | null;
+  refCustomerPo: string | null;
   createdAt: string;
   trackingNumber: string | null;
   shipMethod: string | null;
@@ -220,6 +221,7 @@ export default function TrackPage() {
                     { label: 'Stone Shape',     value: order.centerStoneShape },
                     { label: 'Carat Weight',    value: order.approximateCaratWeight },
                     { label: 'Diamond Quality', value: order.diamondQuality },
+                    { label: 'Your PO #',       value: order.refCustomerPo },
                   ].filter(r => r.value).map(row => (
                     <div key={row.label}>
                       <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8 }}>{row.label}</div>

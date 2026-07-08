@@ -109,7 +109,7 @@ export default function OrdersPage() {
   const [showNew, setShowNew] = useState(false);
   const [newOrder, setNewOrder] = useState({
     orderType: '', size: '', metalType: '', metalColor: '',
-    diamondType: '', diamondQuality: '', customerNotes: '',
+    diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '',
   });
   // Contact info for admin/sales rep placing order
   const [contact, setContact] = useState({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
@@ -312,7 +312,7 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '' });
+        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
         setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
@@ -327,7 +327,7 @@ export default function OrdersPage() {
     setShowNew(false); setRefFiles([]); setRefLink('');
     setSelectedCustomer(null); setCustomerSearch('');
     setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
-    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '' });
+    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
   };
 
   return (
@@ -577,6 +577,17 @@ export default function OrdersPage() {
               </div>
             </div>
 
+            {/* Customer PO# */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Customer PO# (optional)</label>
+              <input
+                value={newOrder.refCustomerPo}
+                onChange={e => setO('refCustomerPo', e.target.value)}
+                placeholder="Customer's own PO / reference number"
+                style={{ ...inputStyle, width: '100%' }}
+              />
+            </div>
+
             {/* Special Instructions */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Special Instructions</label>
@@ -613,7 +624,7 @@ export default function OrdersPage() {
                 }}
               >
                 <input
-                  ref={fileRef} type="file" accept="image/*,video/*,.pdf" multiple style={{ display: 'none' }}
+                  ref={fileRef} type="file" accept="image/*,video/*,.pdf,.3dm,.stl" multiple style={{ display: 'none' }}
                   onChange={e => {
                     const picked = Array.from(e.target.files || []);
                     setRefFiles(prev => [...prev, ...picked].slice(0, 10));
@@ -621,7 +632,7 @@ export default function OrdersPage() {
                   }}
                 />
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  🖼 Click to add photos or videos · JPG, PNG, MP4, MOV, PDF
+                  🖼 Click to add photos or videos · JPG, PNG, MP4, MOV, PDF, 3DM, STL
                 </div>
               </div>
               {refFiles.length > 0 && (

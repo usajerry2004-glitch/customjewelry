@@ -350,6 +350,7 @@ export default function CustomerOrderDetail() {
           <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '14px', margin: '0 0 14px' }}>Order Info</h3>
           {[
             { label: 'Order #', value: order.poNumber },
+            { label: 'Your PO #', value: order.refCustomerPo },
             { label: 'SKU', value: order.kiraSkuNumber },
             { label: 'Tracking', value: order.trackingNumber },
             { label: 'Placed', value: order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null },
@@ -382,7 +383,7 @@ export default function CustomerOrderDetail() {
             </h3>
             <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 10px', background: 'transparent' }}>
               + Add Image
-              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }}
+              <input type="file" accept="image/*,.pdf,.3dm,.stl" style={{ display: 'none' }}
                 onChange={async e => {
                   const file = e.target.files?.[0];
                   if (!file || !order?.id) return;
