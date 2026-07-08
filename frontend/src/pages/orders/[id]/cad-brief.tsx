@@ -148,15 +148,15 @@ export default function CadBriefPage() {
             {refs.length === 0 ? (
               <div style={{ fontSize: '12px', color: '#9ca3af' }}>No reference images on file.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
                 {refs.map(ref => {
                   const url = ref.filePath || `/uploads/cad/${ref.fileName}`;
                   const ext = (ref.originalName.split('.').pop() || '').toLowerCase();
                   const isImage = IMAGE_EXT.includes(ext);
                   return (
-                    <div key={ref.id} style={{ border: '1px solid #e5e0d8', borderRadius: '6px', overflow: 'hidden', background: '#f9f8f5' }}>
+                    <div key={ref.id} style={{ border: '1px solid #e5e0d8', borderRadius: '6px', overflow: 'hidden', background: '#f9f8f5', breakInside: 'avoid' }}>
                       {isImage ? (
-                        <img src={url} alt={ref.originalName} style={{ width: '100%', height: '110px', objectFit: 'contain', display: 'block', background: '#fff' }} />
+                        <img src={url} alt={ref.originalName} style={{ width: '100%', height: 'auto', maxHeight: '420px', objectFit: 'contain', display: 'block', background: '#fff' }} />
                       ) : (
                         <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#9ca3af', padding: '8px', textAlign: 'center' }}>
                           📎 {ref.originalName}
