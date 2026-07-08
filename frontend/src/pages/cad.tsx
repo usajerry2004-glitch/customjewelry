@@ -71,6 +71,16 @@ export default function CADPage() {
                     </option>
                   ))}
               </select>
+              {selectedOrderId && (
+                <a
+                  href={`/orders/${selectedOrderId}/cad-brief`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', color: 'var(--accent-dark)', fontWeight: 600, textDecoration: 'none' }}
+                >
+                  🖨 View CAD Brief (specs, refs, notes)
+                </a>
+              )}
             </div>
             <div>
               <label style={lbl}>Files * {selectedFileCount > 1 && <span style={{ color: 'var(--accent-dark)', fontWeight: 700 }}>({selectedFileCount} selected)</span>}</label>

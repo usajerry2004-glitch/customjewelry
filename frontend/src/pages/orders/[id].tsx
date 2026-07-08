@@ -620,6 +620,12 @@ export default function OrderDetail() {
           >
             🖨 Print
           </button>
+          <button
+            onClick={() => router.push(`/orders/${id}/cad-brief`)}
+            style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#7C3AED', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+          >
+            🖨 CAD Brief
+          </button>
           {['VPO_ISSUED','MANUFACTURED','SHIPPED','COMPLETED'].includes(order.status!) && (
             <button
               onClick={() => router.push(`/orders/${id}/jobbag`)}
