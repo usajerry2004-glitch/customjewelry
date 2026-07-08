@@ -78,7 +78,7 @@ export default function CustomerOrdersPage() {
                       {order.poNumber}
                       {order.refCustomerPo && (
                         <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '8px' }}>
-                          (Your PO: {order.refCustomerPo})
+                          (PO: {order.refCustomerPo})
                         </span>
                       )}
                     </div>
