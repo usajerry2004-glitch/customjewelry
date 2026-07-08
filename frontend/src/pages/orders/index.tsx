@@ -401,7 +401,7 @@ export default function OrdersPage() {
               <span style={{ fontSize: '16px' }}>🔖</span>
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>PO Number</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Auto-generated on save — format: <strong>KJ-{new Date().getFullYear()}-XXXX</strong></div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Auto-generated on save — format: <strong>CO#####</strong></div>
               </div>
             </div>
 
