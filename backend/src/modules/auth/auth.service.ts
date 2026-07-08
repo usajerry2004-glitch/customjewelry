@@ -4,8 +4,12 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+
+const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const OTP_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
@@ -41,6 +45,48 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    return this.signToken(user);
+  }
+
+  async requestOtp(email: string): Promise<{ found: boolean; otp?: string; firstName?: string }> {
+    const user = await this.userRepo.findOne({ where: { email, role: UserRole.CUSTOMER } });
+    if (!user) return { found: false };
+
+    const otp = String(randomInt(100000, 1000000));
+    user.otpCodeHash = await bcrypt.hash(otp, 10);
+    user.otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+    user.otpAttempts = 0;
+    await this.userRepo.save(user);
+
+    return { found: true, otp, firstName: user.firstName };
+  }
+
+  async verifyOtp(email: string, otp: string) {
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .addSelect('u.otpCodeHash')
+      .where('u.email = :email', { email })
+      .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
+      .getOne();
+
+    const invalid = () => new UnauthorizedException('Invalid or expired code');
+    if (!user || !user.otpCodeHash || !user.otpExpiresAt) throw invalid();
+    if (user.otpExpiresAt.getTime() < Date.now()) throw invalid();
+    if (user.otpAttempts >= OTP_MAX_ATTEMPTS) throw invalid();
+
+    const valid = await bcrypt.compare(otp, user.otpCodeHash);
+    if (!valid) {
+      user.otpAttempts += 1;
+      await this.userRepo.save(user);
+      throw invalid();
+    }
+
+    user.otpCodeHash = null as any;
+    user.otpExpiresAt = null as any;
+    user.otpAttempts = 0;
+    user.lastLoginAt = new Date();
+    await this.userRepo.save(user);
 
     return this.signToken(user);
   }

@@ -55,6 +55,15 @@ export class User {
   @Column({ nullable: true })
   lastLoginAt: Date;
 
+  @Column({ nullable: true, select: false })
+  otpCodeHash: string;
+
+  @Column({ nullable: true })
+  otpExpiresAt: Date;
+
+  @Column({ default: 0 })
+  otpAttempts: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

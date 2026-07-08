@@ -63,6 +63,13 @@ export class EmailService {
     return `${this.frontendUrl}/track/${token}`;
   }
 
+  // Passwordless entry point: prefills the customer's email and OTP mode on
+  // the login page, and deep-links back to the specific order after verify.
+  loginUrl(email: string, orderId: string) {
+    const redirect = encodeURIComponent(`/customer/orders/${orderId}`);
+    return `${this.frontendUrl}/login?email=${encodeURIComponent(email)}&mode=otp&redirect=${redirect}`;
+  }
+
   async sendNewOrderToAuthorizers(opts: {
     to: string[];
     poNumber: string;
@@ -235,7 +242,7 @@ export class EmailService {
     orderId: string;
     trackingToken?: string;
   }) {
-    const trackLink = opts.trackingToken ? this.trackUrl(opts.trackingToken) : null;
+    const trackLink = this.loginUrl(opts.to, opts.orderId);
     return this.send({
       to: opts.to,
       subject: `We received your order — ${opts.poNumber}`,
@@ -244,7 +251,7 @@ export class EmailService {
         <p>Hi ${opts.customerName},</p>
         <p>Thank you for placing your custom jewelry order with Kira Custom Jewelry. Our team has received it and will review it shortly. You'll receive another email once it's confirmed and our design team begins work.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
-        ${trackLink ? `<a href="${trackLink}" style="${btnStyle('#C09B58')}">Track Your Order →</a>` : ''}
+        <a href="${trackLink}" style="${btnStyle('#C09B58')}">Track Your Order →</a>
         <p style="margin-top:20px;font-size:12px;color:#9CA3AF">If you have any questions, please contact your sales representative.</p>
       `),
     });
@@ -278,7 +285,7 @@ export class EmailService {
     orderId: string;
     trackingToken?: string;
   }) {
-    const reviewLink = opts.trackingToken ? this.trackUrl(opts.trackingToken) : this.orderUrl(opts.orderId);
+    const reviewLink = this.loginUrl(opts.to, opts.orderId);
     return this.send({
       to: opts.to,
       subject: `Your CAD design is ready to review — ${opts.poNumber}`,
@@ -288,7 +295,7 @@ export class EmailService {
         <p>Our design team has completed the CAD for your order. Click the button below to review the design and either approve it or request changes.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${reviewLink}" style="${btnStyle('#6366F1')}">Review & Approve Design →</a>
-        <p style="margin-top:16px;font-size:12px;color:#9CA3AF">No login required — the link above takes you directly to your order.</p>
+        <p style="margin-top:16px;font-size:12px;color:#9CA3AF">We'll email you a one-time code — no password needed.</p>
       `),
     });
   }
@@ -356,6 +363,22 @@ export class EmailService {
         <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
         <a href="${resetUrl}" style="${btnStyle('#C09B58')}">Reset Password →</a>
         <p style="margin-top:24px;font-size:12px;color:#9CA3AF">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+      `),
+    });
+  }
+
+  async sendOtpCode(opts: { to: string; firstName: string; otp: string }) {
+    return this.send({
+      to: opts.to,
+      subject: `Your Kira Custom Jewelry login code: ${opts.otp}`,
+      html: emailLayout(`
+        <h2 style="color:#1A2740;margin:0 0 16px">Your Login Code</h2>
+        <p>Hi ${opts.firstName},</p>
+        <p>Use this code to sign in to your account. It expires in <strong>10 minutes</strong>.</p>
+        <div style="text-align:center;margin:24px 0">
+          <span style="display:inline-block;background:#F9F8F6;border:1px solid #E8E4DC;border-radius:8px;padding:16px 32px;font-family:monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#1A2740">${opts.otp}</span>
+        </div>
+        <p style="margin-top:24px;font-size:12px;color:#9CA3AF">If you didn't request this, you can safely ignore this email — your account is still secure.</p>
       `),
     });
   }

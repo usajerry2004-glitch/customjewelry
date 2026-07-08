@@ -4,6 +4,17 @@ import { useAuthStore } from '../store/auth.store';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
+function parseErrorMessage(err: any, fallback: string): string {
+  const msg = err?.message;
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg)) return msg.join(', ');
+  if (msg && typeof msg === 'object') {
+    const inner = (msg as any).message;
+    return Array.isArray(inner) ? inner.join(', ') : (inner || fallback);
+  }
+  return fallback;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth, hydrate, user } = useAuthStore();
@@ -12,10 +23,32 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [mode, setMode] = useState<'password' | 'otp'>('password');
+  const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
+  const [otp, setOtp] = useState('');
+  const [otpMessage, setOtpMessage] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [redirectTo, setRedirectTo] = useState('');
+
   useEffect(() => { hydrate(); }, []);
   useEffect(() => {
-    if (user) router.replace(user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
+    if (user) router.replace(redirectTo || (user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard'));
   }, [user]);
+
+  // Support email links that prefill the address and jump straight into OTP mode
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { email: qEmail, mode: qMode, redirect: qRedirect } = router.query;
+    if (typeof qEmail === 'string') setEmail(qEmail);
+    if (qMode === 'otp') setMode('otp');
+    if (typeof qRedirect === 'string' && qRedirect.startsWith('/customer/')) setRedirectTo(qRedirect);
+  }, [router.isReady]);
+
+  const afterLogin = (data: { user: any; access_token: string }) => {
+    setAuth(data.user, data.access_token);
+    const target = redirectTo || (data.user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
+    router.replace(target);
+  };
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -30,25 +63,60 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        const data = await res.json();
-        // Backend now sets httpOnly cookie; we only persist user info in localStorage
-        setAuth(data.user, data.access_token);
-        router.replace(data.user.role === 'CUSTOMER' ? '/customer/orders' : '/dashboard');
+        afterLogin(await res.json());
       } else {
-        const err = await res.json();
-        const msg = err.message;
-        if (typeof msg === 'string') setError(msg);
-        else if (Array.isArray(msg)) setError(msg.join(', '));
-        else if (msg && typeof msg === 'object') {
-          const inner = (msg as any).message;
-          setError(Array.isArray(inner) ? inner.join(', ') : (inner || 'Invalid credentials'));
-        } else setError('Invalid credentials');
+        setError(parseErrorMessage(await res.json(), 'Invalid credentials'));
       }
     } catch (err: any) {
       const detail = err?.message ? ` (${err.message})` : '';
       setError(`Cannot connect to server. Make sure the backend is running.${detail}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!email) { setOtpMessage('Please enter your email.'); return; }
+    setOtpMessage('');
+    setOtpLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/otp/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setOtpMessage(data.message || '');
+      if (data.found) setOtpStep('verify');
+    } catch (err: any) {
+      setOtpMessage('Cannot connect to server. Make sure the backend is running.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!otp) { setOtpMessage('Please enter the code from your email.'); return; }
+    setOtpMessage('');
+    setOtpLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, otp }),
+      });
+      if (res.ok) {
+        afterLogin(await res.json());
+      } else {
+        setOtpMessage(parseErrorMessage(await res.json(), 'Invalid or expired code'));
+      }
+    } catch (err: any) {
+      setOtpMessage('Cannot connect to server. Make sure the backend is running.');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -92,53 +160,124 @@ export default function LoginPage() {
             <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
               Sign in
             </h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Enter your credentials to continue</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              {mode === 'password' ? 'Enter your credentials to continue' : 'We\'ll email you a one-time code'}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                autoComplete="email"
-                style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-            {error && (
-              <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '8px', padding: '10px 14px', color: 'var(--danger)', fontSize: '13px', marginBottom: '16px' }}>
-                {error}
+          {mode === 'password' ? (
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                  style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                />
               </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '14px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, letterSpacing: '0.5px' }}
-            >
-              {loading ? 'Signing in…' : 'Sign In'}
-            </button>
-          </form>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              {error && (
+                <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '8px', padding: '10px 14px', color: 'var(--danger)', fontSize: '13px', marginBottom: '16px' }}>
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '14px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, letterSpacing: '0.5px' }}
+              >
+                {loading ? 'Signing in…' : 'Sign In'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={otpStep === 'request' ? handleRequestOtp : handleVerifyOtp}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                  disabled={otpStep === 'verify'}
+                  style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', boxSizing: 'border-box', opacity: otpStep === 'verify' ? 0.6 : 1 }}
+                />
+              </div>
+              {otpStep === 'verify' && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>6-digit code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    autoComplete="one-time-code"
+                    style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '11px 14px', color: 'var(--text-primary)', fontSize: '18px', letterSpacing: '4px', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+              {otpMessage && (
+                <div style={{ background: 'rgba(192,155,88,0.08)', border: '1px solid rgba(192,155,88,0.25)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
+                  {otpMessage}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={otpLoading}
+                style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '14px', fontWeight: 600, cursor: otpLoading ? 'not-allowed' : 'pointer', opacity: otpLoading ? 0.7 : 1, letterSpacing: '0.5px' }}
+              >
+                {otpStep === 'request'
+                  ? (otpLoading ? 'Sending…' : 'Send Code')
+                  : (otpLoading ? 'Verifying…' : 'Verify & Sign In')}
+              </button>
+              {otpStep === 'verify' && (
+                <p style={{ marginTop: '14px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  <span onClick={handleRequestOtp} style={{ color: 'var(--accent-dark)', fontWeight: 500, cursor: 'pointer' }}>Resend code</span>
+                </p>
+              )}
+            </form>
+          )}
 
           <p style={{ marginTop: '28px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            <span
-              onClick={() => router.push('/forgot-password')}
-              style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500, cursor: 'pointer' }}
-            >
-              Forgot your password?
-            </span>
+            {mode === 'password' ? (
+              <>
+                <span
+                  onClick={() => router.push('/forgot-password')}
+                  style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500, cursor: 'pointer' }}
+                >
+                  Forgot your password?
+                </span>
+                <br />
+                <span
+                  onClick={() => { setMode('otp'); setOtpStep('request'); setOtpMessage(''); setError(''); }}
+                  style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500, cursor: 'pointer', display: 'inline-block', marginTop: '6px' }}
+                >
+                  Or log in with an email code instead →
+                </span>
+              </>
+            ) : (
+              <span
+                onClick={() => { setMode('password'); setOtpMessage(''); setOtpStep('request'); setOtp(''); }}
+                style={{ color: 'var(--accent-dark)', textDecoration: 'none', fontWeight: 500, cursor: 'pointer' }}
+              >
+                Use password instead
+              </span>
+            )}
           </p>
         </div>
       </div>

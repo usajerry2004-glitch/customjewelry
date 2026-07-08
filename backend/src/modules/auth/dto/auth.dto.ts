@@ -1,9 +1,23 @@
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, Length, IsEnum, IsOptional } from 'class-validator';
 import { UserRole } from '../../../database/entities/user.entity';
 
 export class ForgotPasswordDto {
   @IsEmail()
   email: string;
+}
+
+export class RequestOtpDto {
+  @IsEmail()
+  email: string;
+}
+
+export class VerifyOtpDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @Length(6, 6)
+  otp: string;
 }
 
 export class ResetPasswordDto {

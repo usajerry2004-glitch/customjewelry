@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, RequestOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { EmailService } from '../email/email.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -52,7 +52,46 @@ export class AuthController {
   @ApiOperation({ summary: 'Login and receive JWT (also sets httpOnly cookie)' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
-    res.cookie('jf_token', result.access_token, COOKIE_OPTIONS);
+    this.setAuthCookie(res, result.access_token);
+    return result;
+  }
+
+  private setAuthCookie(res: Response, token: string) {
+    res.cookie('jf_token', token, COOKIE_OPTIONS);
+  }
+
+  /**
+   * POST /auth/otp/request
+   * Customer-only passwordless login: emails a 6-digit code, valid 10 minutes.
+   * Rate-limited hard to stop email-bombing.
+   */
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('otp/request')
+  @ApiOperation({ summary: 'Email a one-time login code to a customer' })
+  async requestOtp(@Body() dto: RequestOtpDto) {
+    const result = await this.authService.requestOtp(dto.email);
+    if (!result.found) {
+      this.logger.warn(`OTP requested for unknown/non-customer email: ${dto.email}`);
+      return { found: false, message: 'No customer account found with that email address.' };
+    }
+    this.logger.log(`\n\n🔑 OTP LOGIN CODE for ${dto.email}: ${result.otp}\n`);
+    const sent = await this.emailService.sendOtpCode({ to: dto.email, firstName: result.firstName!, otp: result.otp! });
+    this.logger.log(`OTP email delivery for ${dto.email}: ${sent ? 'SUCCESS' : 'FAILED — use the code above'}`);
+    return { found: true, message: 'A one-time code has been sent to your email.' };
+  }
+
+  /**
+   * POST /auth/otp/verify
+   * Verifies the code and logs the customer in exactly like password login.
+   */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('otp/verify')
+  @ApiOperation({ summary: 'Verify a one-time code and receive JWT (also sets httpOnly cookie)' })
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.verifyOtp(dto.email, dto.otp);
+    this.setAuthCookie(res, result.access_token);
     return result;
   }
 
