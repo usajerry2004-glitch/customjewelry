@@ -227,11 +227,11 @@ export class EmailService {
   }) {
     return this.send({
       to: opts.to,
-      subject: `Your order ${opts.poNumber} has been confirmed`,
+      subject: `Your design is being generated — ${opts.poNumber}`,
       html: emailLayout(`
-        <h2 style="color:#1A2740;margin:0 0 16px">Your Order is Confirmed ✓</h2>
+        <h2 style="color:#1A2740;margin:0 0 16px">Your design is being generated 🔜</h2>
         <p>Hi ${opts.customerName},</p>
-        <p>Great news — your order has been authorized and our CAD design team has started working on it. We'll notify you as soon as the design is ready for your review.</p>
+        <p>Great news — we received your order request and our CAD design team couldn't be more excited! We'll notify you as soon as the design is ready for your review.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#1A2740')}">View Order →</a>
       `),
