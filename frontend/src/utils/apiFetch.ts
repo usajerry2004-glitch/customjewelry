@@ -10,6 +10,20 @@ function isPublicPage() {
   return PUBLIC_PATHS.some(prefix => p.startsWith(prefix));
 }
 
+// Safely extract a display-ready string from an API error response body.
+// Backend errors should always be { message: string | string[] }, but this
+// defends against any unexpected shape (nested object, null, etc.) so the UI
+// never tries to render a raw object as a React child and crash the page.
+export function getErrorMessage(data: any, fallback = 'Something went wrong. Please try again.'): string {
+  const msg = data?.message ?? data?.error;
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg)) {
+    const strs = msg.filter((m: any) => typeof m === 'string');
+    if (strs.length) return strs.join(', ');
+  }
+  return fallback;
+}
+
 export function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> || {}) };

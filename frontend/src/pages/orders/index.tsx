@@ -4,7 +4,7 @@ import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
 import { Order, OrderStatus, StoneStatus } from '../../utils/types';
-import { apiFetch, API } from '../../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 
 const ALL_STATUS_FILTERS = [
@@ -208,7 +208,7 @@ export default function OrdersPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data?.message || `Request failed (${res.status}). Please try again.`);
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
         return;
       }
       if (data.succeeded === 0) {

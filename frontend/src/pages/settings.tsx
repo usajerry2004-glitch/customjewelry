@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-import { apiFetch, API } from '../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { UserRole } from '../utils/types';
 import { toast } from '../utils/toast';
 
@@ -108,7 +108,7 @@ export default function SettingsPage() {
       await reload();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data?.message || 'Failed to send invite. Please try again.');
+      setError(getErrorMessage(data, 'Failed to send invite. Please try again.'));
     }
     setSubmitting(false);
   };
@@ -121,7 +121,7 @@ export default function SettingsPage() {
       await reload();
     } else {
       const data = await res.json().catch(() => ({}));
-      toast.error(data?.message || 'Failed to remove user.');
+      toast.error(getErrorMessage(data, 'Failed to remove user.'));
     }
     setRemovingId(null);
   };

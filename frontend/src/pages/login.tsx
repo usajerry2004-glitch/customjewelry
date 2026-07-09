@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '../store/auth.store';
+import { getErrorMessage } from '../utils/apiFetch';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -87,7 +88,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      setOtpMessage(data.message || '');
+      setOtpMessage(getErrorMessage(data, ''));
       if (data.found) setOtpStep('verify');
     } catch (err: any) {
       setOtpMessage('Cannot connect to server. Make sure the backend is running.');

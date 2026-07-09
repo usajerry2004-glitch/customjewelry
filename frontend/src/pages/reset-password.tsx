@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { getErrorMessage } from '../utils/apiFetch';
 
 const API = '/api/proxy';
 
@@ -49,7 +50,7 @@ export default function ResetPasswordPage() {
         setTimeout(() => router.replace('/login'), 3000);
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data?.message || 'Reset link is invalid or has expired. Please request a new one.');
+        setError(getErrorMessage(data, 'Reset link is invalid or has expired. Please request a new one.'));
       }
     } catch {
       setError('Cannot connect to server.');

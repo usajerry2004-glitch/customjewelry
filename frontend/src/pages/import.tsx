@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-import { API } from '../utils/apiFetch';
+import { API, getErrorMessage } from '../utils/apiFetch';
 
 interface PreviewRow {
   poNumber: string; storeName: string; customerFullName: string;
@@ -43,7 +43,7 @@ export default function ImportPage() {
         body: fd,
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message || 'Preview failed'); return; }
+      if (!res.ok) { setError(getErrorMessage(data, 'Preview failed')); return; }
       setPreview(data.preview || []);
       setStep('preview');
     } catch { setError('Cannot connect to server.'); }
@@ -62,7 +62,7 @@ export default function ImportPage() {
         body: fd,
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.message || 'Import failed'); return; }
+      if (!res.ok) { setError(getErrorMessage(data, 'Import failed')); return; }
       setResult({ imported: data.imported, skipped: data.skipped, errors: data.errors || [] });
       setStep('result');
     } catch { setError('Cannot connect to server.'); }
