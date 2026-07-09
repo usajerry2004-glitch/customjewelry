@@ -107,6 +107,10 @@ export class PublicOrdersService {
         stockNumber:      dto.stockNumber,
         customerNotes:    dto.customerNotes,
         salesRepName:     'Web Order',
+        // If this customer is already assigned to a sales rep, attribute the
+        // order to them so it shows up in that rep's view even though the
+        // customer submitted it directly through the website.
+        salesRepId:       customer.salesRepId || undefined,
       }));
 
       // Save uploaded reference images — upload + thumbnail + DB insert run

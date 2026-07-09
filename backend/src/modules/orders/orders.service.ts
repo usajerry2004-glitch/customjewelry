@@ -250,10 +250,15 @@ export class OrdersService {
       }
     }
 
-    // Mark order with customer's priority status
+    // Mark order with customer's priority status, and — if no sales rep is
+    // already attributed (i.e. the customer placed this order themselves,
+    // not their rep) — inherit the sales rep assigned to that customer
+    // account, so the order shows up in that rep's view even though they
+    // didn't personally create it.
     if (data.customerId) {
       const customer = await this.userRepo.findOne({ where: { id: data.customerId } });
       if (customer?.isPriority) data.isPriorityCustomer = true;
+      if (!data.salesRepId && customer?.salesRepId) data.salesRepId = customer.salesRepId;
     }
 
     // New orders start in NEW status — auth/admin reviews and moves to CAD_IN_PROGRESS

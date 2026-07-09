@@ -61,12 +61,16 @@ export class UsersService {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
     const passwordHash = await bcrypt.hash(dto.password, 10);
+    // A Sales Rep can only ever create Customer accounts — the role they
+    // request is ignored, not just hidden by the UI, so this can't be
+    // bypassed by calling the API directly.
+    const role = caller?.role === UserRole.SALES_REP ? UserRole.CUSTOMER : (dto.role || UserRole.CUSTOMER);
     const user = this.userRepo.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
       email: dto.email,
       passwordHash,
-      role: dto.role || UserRole.CUSTOMER,
+      role,
       salesRepId: caller?.role === UserRole.SALES_REP ? caller.id : undefined,
       storeName: dto.storeName,
     });
