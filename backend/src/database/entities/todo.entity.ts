@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 export enum TodoPriority {
   LOW    = 'LOW',
@@ -7,6 +7,7 @@ export enum TodoPriority {
 }
 
 @Entity('todos')
+@Index(['userId', 'createdAt'])
 export class Todo {
   @PrimaryGeneratedColumn('uuid')
   id: string;

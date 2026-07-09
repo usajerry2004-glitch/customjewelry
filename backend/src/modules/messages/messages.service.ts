@@ -57,31 +57,29 @@ export class MessagesService {
 
     if (isCustomer) {
       const authorizers = await this.userRepo.find({ where: { role: 'AUTHORIZER' as any } });
-      for (const auth of authorizers) {
-        await this.notificationsService.create(
+      await Promise.all(authorizers.map(auth =>
+        this.notificationsService.create(
           NotificationType.CUSTOMER_MESSAGE,
           'Customer message — action required',
           `${authorName} left a message on an order and may need a response.`,
           orderId,
           auth.id,
-        );
-      }
+        ),
+      ));
     } else if (dto.mentions?.length) {
-      for (const mention of dto.mentions) {
+      await Promise.all(dto.mentions.map(async mention => {
         const role = mention.replace('@', '');
         const users = await this.userRepo.find({ where: { role: role as any } });
-        for (const u of users) {
-          if (u.id !== user.id) {
-            await this.notificationsService.create(
-              NotificationType.MENTION,
-              `You were mentioned on an order`,
-              `${authorName} mentioned ${mention}: "${dto.content.substring(0, 100)}"`,
-              orderId,
-              u.id,
-            );
-          }
-        }
-      }
+        await Promise.all(users.filter(u => u.id !== user.id).map(u =>
+          this.notificationsService.create(
+            NotificationType.MENTION,
+            `You were mentioned on an order`,
+            `${authorName} mentioned ${mention}: "${dto.content.substring(0, 100)}"`,
+            orderId,
+            u.id,
+          ),
+        ));
+      }));
     }
 
     return saved;

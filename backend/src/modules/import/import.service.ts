@@ -106,12 +106,17 @@ export class ImportService {
     let skipped = 0;
     const errors: string[] = [];
 
+    // One query for every existing PO number instead of a findOne() per row —
+    // a spreadsheet import can be hundreds/thousands of rows.
+    const existingRows = await this.orderRepo.find({ select: ['poNumber'] });
+    const seenPoNumbers = new Set(existingRows.map(r => r.poNumber));
+
     for (const row of rows) {
       const poNumber = str(row['PO #']);
       if (!poNumber) { skipped++; continue; }
 
-      const exists = await this.orderRepo.findOne({ where: { poNumber } });
-      if (exists) { skipped++; continue; }
+      if (seenPoNumbers.has(poNumber)) { skipped++; continue; }
+      seenPoNumbers.add(poNumber); // also dedupe against earlier rows in this same file
 
       const statusRaw   = String(row['Status'] ?? '').trim();
       const quotedCostV = money(row['Kira Quoted Cost']);

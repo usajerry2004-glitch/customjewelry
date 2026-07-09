@@ -9,6 +9,7 @@ import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity'
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
+import { OrdersService } from '../orders/orders.service';
 
 export interface WebOrderDto {
   // Contact
@@ -52,25 +53,8 @@ export class PublicOrdersService {
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
     private readonly spacesService: SpacesService,
+    private readonly ordersService: OrdersService,
   ) {}
-
-  // ── Auto-generate next CO##### PO number ─────────────────────────────
-  private async nextPo(): Promise<string> {
-    const rows = await this.orderRepo
-      .createQueryBuilder('o')
-      .select('o.poNumber')
-      .where("o.poNumber LIKE 'CO%' OR o.poNumber LIKE '%(CO%'")
-      .getMany();
-    let maxSeq = 10612;
-    for (const row of rows) {
-      const po = row.poNumber;
-      const m1 = po.match(/^CO(\d+)$/);
-      if (m1) maxSeq = Math.max(maxSeq, parseInt(m1[1], 10));
-      const m2 = po.match(/\(CO(\d+)\)/);
-      if (m2) maxSeq = Math.max(maxSeq, parseInt(m2[1], 10));
-    }
-    return `CO${String(maxSeq + 1).padStart(5, '0')}`;
-  }
 
   // ── Find or create customer by email ─────────────────────────────────
   private async findOrCreateCustomer(dto: WebOrderDto): Promise<User> {
@@ -98,7 +82,7 @@ export class PublicOrdersService {
   ): Promise<WebOrderResult> {
     try {
       const customer  = await this.findOrCreateCustomer(dto);
-      const poNumber  = await this.nextPo();
+      const poNumber  = await this.ordersService.generatePoNumber();
       const trackingToken = randomBytes(32).toString('hex');
 
       const order = await this.orderRepo.save(this.orderRepo.create({
@@ -125,8 +109,9 @@ export class PublicOrdersService {
         salesRepName:     'Web Order',
       }));
 
-      // Save uploaded reference images
-      for (const file of files || []) {
+      // Save uploaded reference images — upload + thumbnail + DB insert run
+      // concurrently per file instead of one file at a time.
+      await Promise.all((files || []).map(async file => {
         const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'customer-uploads', file.originalname, file.mimetype);
         await this.cadRepo.save(this.cadRepo.create({
           orderId:      order.id,
@@ -139,7 +124,7 @@ export class PublicOrdersService {
           designerNotes: 'Customer reference image',
           status: CadFileStatus.UPLOADED,
         }));
-      }
+      }));
 
       // Notify CAD team + Authorizers
       const staff = await this.userRepo.find({

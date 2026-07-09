@@ -207,21 +207,16 @@ export class OrdersService {
     return order;
   }
 
-  private async generatePoNumber(): Promise<string> {
-    // New style: "C00001", "C00002", ... Legacy "CO#####" orders (and the
-    // embedded "KJ-2026-XXXX (CO#####)" format) are a separate, frozen
-    // sequence — this only continues the highest existing "C#####" number.
-    const rows = await this.orderRepo
-      .createQueryBuilder('o')
-      .select('o.poNumber')
-      .where("o.poNumber ~ '^C[0-9]+$'")
-      .getMany();
-    let maxSeq = 0;
-    for (const row of rows) {
-      const m = row.poNumber.match(/^C(\d+)$/);
-      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
-    }
-    return `C${String(maxSeq + 1).padStart(5, '0')}`;
+  // New style: "C00001", "C00002", ... Legacy "CO#####" orders (and the
+  // embedded "KJ-2026-XXXX (CO#####)" format) are a separate, frozen
+  // sequence — this only continues the highest existing "C#####" number.
+  // Public so other order-creation entry points (e.g. the public web-form
+  // intake) share the same sequence instead of keeping their own.
+  async generatePoNumber(): Promise<string> {
+    const [{ maxSeq }]: { maxSeq: number | null }[] = await this.orderRepo.query(
+      `SELECT MAX(CAST(SUBSTRING("poNumber" FROM 2) AS INTEGER)) AS "maxSeq" FROM orders WHERE "poNumber" ~ '^C[0-9]+$'`,
+    );
+    return `C${String((maxSeq ?? 0) + 1).padStart(5, '0')}`;
   }
 
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
@@ -324,8 +319,9 @@ export class OrdersService {
       if (uploadedDesignFiles.length > 0) {
         await this.orderRepo.update(id, { sentToCustomer: true });
         // Only UPLOADED ones need a status bump; SENT_FOR_APPROVAL already correct
-        for (const cad of uploadedDesignFiles.filter(c => c.status === CadFileStatus.UPLOADED)) {
-          await this.cadRepo.update(cad.id, { status: CadFileStatus.SENT_FOR_APPROVAL });
+        const toBumpIds = uploadedDesignFiles.filter(c => c.status === CadFileStatus.UPLOADED).map(c => c.id);
+        if (toBumpIds.length) {
+          await this.cadRepo.update({ id: In(toBumpIds) }, { status: CadFileStatus.SENT_FOR_APPROVAL });
         }
         if (saved.customerEmail) {
           this.emailService.sendCadReadyForApproval({
@@ -699,8 +695,18 @@ export class OrdersService {
 
     // One query for the rows (most-recent-first, capped) + one lightweight
     // grouped count — replaces the previous 8 separate per-status queries.
+    // Row query only selects what the Kanban card actually renders, instead
+    // of the full entity (customer notes, financial fields the card doesn't
+    // show, etc.) — the payload shrinks accordingly as order volume grows.
     const [allOrders, rawCounts] = await Promise.all([
-      buildBase().orderBy('o.updatedAt', 'DESC').take(3000).getMany(),
+      buildBase()
+        .select([
+          'o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.status', 'o.cadSubStatus',
+          'o.sentToCustomer', 'o.stoneStatus', 'o.isPriorityCustomer', 'o.quotedCost',
+          'o.orderType', 'o.metalType', 'o.metalColor', 'o.salesRepName', 'o.salesRepEmail',
+          'o.storeName', 'o.customerFullName', 'o.createdAt', 'o.updatedAt',
+        ])
+        .orderBy('o.updatedAt', 'DESC').take(3000).getMany(),
       buildBase().select('o.status', 'status').addSelect('COUNT(*)', 'count').groupBy('o.status').getRawMany(),
     ]);
 

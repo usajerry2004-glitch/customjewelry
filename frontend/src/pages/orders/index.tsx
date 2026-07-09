@@ -95,6 +95,7 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
   const [statusFilter, setStatusFilter] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -238,7 +239,13 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  useEffect(() => { setPage(0); load(0); }, [search, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
+  // Debounce the search box so typing doesn't fire a request per keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
   useEffect(() => { load(page); }, [page]);
 
   const openNewOrderModal = async () => {

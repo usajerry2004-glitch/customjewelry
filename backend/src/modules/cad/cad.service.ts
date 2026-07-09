@@ -109,12 +109,12 @@ export class CadService {
 
     // Mark all non-reference design files as SENT_FOR_APPROVAL so the customer portal shows approval buttons
     const allCads = await this.cadRepo.find({ where: { orderId } });
-    const designFiles = allCads.filter(
+    const designFileIds = allCads.filter(
       c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image'
         && c.status === CadFileStatus.UPLOADED,
-    );
-    for (const cad of designFiles) {
-      await this.cadRepo.update(cad.id, { status: CadFileStatus.SENT_FOR_APPROVAL });
+    ).map(c => c.id);
+    if (designFileIds.length) {
+      await this.cadRepo.update({ id: In(designFileIds) }, { status: CadFileStatus.SENT_FOR_APPROVAL });
     }
 
     if (order.customerEmail) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -106,7 +106,7 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, []);
 
-  const allFiltered = customers
+  const allFiltered = useMemo(() => customers
     .filter(c => {
       if (search && !`${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterStatus === 'active' && !c.isActive) return false;
@@ -120,7 +120,7 @@ export default function CustomersPage() {
       const nameA = (a.storeName || `${a.firstName} ${a.lastName}`).toLowerCase();
       const nameB = (b.storeName || `${b.firstName} ${b.lastName}`).toLowerCase();
       return nameA.localeCompare(nameB);
-    });
+    }), [customers, search, filterStatus, filterPriority, filterSalesRep]);
 
   const totalPages = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);

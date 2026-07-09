@@ -51,29 +51,40 @@ export class SlaService {
       where: [{ role: UserRole.ADMIN, isActive: true }, { role: UserRole.AUTHORIZER, isActive: true }],
       select: ['id'],
     });
+    if (targets.length === 0) return 0;
 
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const orderIds  = activeOverdue.map(o => o.id);
+    const targetIds = targets.map(u => u.id);
+
+    // One query for every already-notified-today (order, user) pair instead
+    // of one existence check per pair inside the loop below.
+    const alreadyNotified = await this.notifRepo
+      .createQueryBuilder('n')
+      .select(['n.orderId', 'n.targetUserId'])
+      .where('n.orderId IN (:...orderIds)', { orderIds })
+      .andWhere('n.targetUserId IN (:...targetIds)', { targetIds })
+      .andWhere('n.type = :t', { t: NotificationType.SLA_OVERDUE })
+      .andWhere('n.createdAt >= :today', { today })
+      .getMany();
+    const notifiedKeys = new Set(alreadyNotified.map(n => `${n.orderId}:${n.targetUserId}`));
+
+    const toCreate: Notification[] = [];
     for (const order of activeOverdue) {
       const daysOld = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86400000);
       for (const user of targets) {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const existing = await this.notifRepo
-          .createQueryBuilder('n')
-          .where('n.orderId = :oid', { oid: order.id })
-          .andWhere('n.targetUserId = :uid', { uid: user.id })
-          .andWhere('n.type = :t', { t: NotificationType.SLA_OVERDUE })
-          .andWhere('n.createdAt >= :today', { today })
-          .getOne();
-        if (existing) continue;
-        await this.notifRepo.save(this.notifRepo.create({
+        if (notifiedKeys.has(`${order.id}:${user.id}`)) continue;
+        toCreate.push(this.notifRepo.create({
           type: NotificationType.SLA_OVERDUE,
           title: `⚠️ SLA Overdue — ${order.poNumber}`,
           message: `Order ${order.poNumber} is ${daysOld} days old and still not completed. Please review.`,
           orderId: order.id,
           targetUserId: user.id,
         }));
-        alertCount++;
       }
     }
+    if (toCreate.length) await this.notifRepo.save(toCreate);
+    alertCount = toCreate.length;
 
     this.logger.log(`SLA check complete — ${alertCount} alerts created`);
     return alertCount;
