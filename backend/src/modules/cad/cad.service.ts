@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, MoreThan } from 'typeorm';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -52,9 +52,19 @@ export class CadService {
     );
   }
 
-  async upload(orderId: string, file: Express.Multer.File, uploadedBy: string, designerNotes?: string): Promise<CadFile> {
+  async upload(
+    orderId: string,
+    file: Express.Multer.File,
+    uploadedBy: string,
+    designerNotes?: string,
+    cadPersonName?: string,
+    verifiedByName?: string,
+  ): Promise<CadFile> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+    if (!cadPersonName?.trim() || !verifiedByName?.trim()) {
+      throw new BadRequestException('CAD Person Name and Verified By Name are both required.');
+    }
 
     const existing = await this.cadRepo.find({ where: { orderId } });
     const revisionNumber = existing.length + 1;
@@ -69,6 +79,8 @@ export class CadService {
       uploadedBy,
       revisionNumber,
       designerNotes,
+      cadPersonName:  cadPersonName.trim(),
+      verifiedByName: verifiedByName.trim(),
       status: CadFileStatus.SENT_FOR_APPROVAL,
     });
     return this.cadRepo.save(cad);

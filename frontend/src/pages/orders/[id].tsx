@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
-import { apiFetch, API } from '../../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
@@ -18,6 +18,7 @@ interface CadFile {
   designerNotes?: string; customerFeedback?: string;
   approvedAt?: string; approvedBy?: string; createdAt: string;
   filePath?: string; thumbnailPath?: string;
+  cadPersonName?: string; verifiedByName?: string;
 }
 
 const CAD_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -224,6 +225,16 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
 
       {/* ── Notes + Actions ── */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-card)' }}>
+        {(cad.cadPersonName || cad.verifiedByName) && (
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
+            {cad.cadPersonName && (
+              <div><span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700, letterSpacing: '0.6px' }}>CAD Person </span>{cad.cadPersonName}</div>
+            )}
+            {cad.verifiedByName && (
+              <div><span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700, letterSpacing: '0.6px' }}>Verified By </span>{cad.verifiedByName}</div>
+            )}
+          </div>
+        )}
         {(cad.designerNotes || cad.customerFeedback) && (
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {cad.designerNotes && (
@@ -390,6 +401,12 @@ export default function OrderDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadCadPerson, setUploadCadPerson] = useState('');
+  const [uploadVerifiedBy, setUploadVerifiedBy] = useState('');
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const uploadFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -588,6 +605,30 @@ export default function OrderDetail() {
     ? validNextStatuses
     : allowedStatuses.filter(s => validNextStatuses.includes(s));
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
+
+  const handleUploadFiles = async () => {
+    if (!order?.id || !uploadFiles.length || !uploadCadPerson.trim() || !uploadVerifiedBy.trim()) return;
+    setUploadingFiles(true);
+    const fd = new FormData();
+    uploadFiles.forEach(f => fd.append('files', f));
+    fd.append('cadPersonName', uploadCadPerson.trim());
+    fd.append('verifiedByName', uploadVerifiedBy.trim());
+    const res = await apiFetch(`${API}/cad/upload/${order.id}`, { method: 'POST', body: fd });
+    if (res.ok) {
+      const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+      if (cRes.ok) setCads(await cRes.json());
+      const oRes = await apiFetch(`${API}/orders/${order.id}`);
+      if (oRes.ok) setOrder(await oRes.json());
+      setShowUploadModal(false);
+      setUploadFiles([]);
+      setUploadCadPerson('');
+      setUploadVerifiedBy('');
+    } else {
+      const err = await res.json().catch(() => null);
+      toast.error(getErrorMessage(err, 'Failed to upload files'));
+    }
+    setUploadingFiles(false);
+  };
 
   const handleDeleteOrder = async () => {
     if (!order?.id || deleteConfirmInput !== order.poNumber) return;
@@ -880,28 +921,22 @@ export default function OrderDetail() {
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
-              <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}>
+              <button
+                onClick={() => uploadFileRef.current?.click()}
+                style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}
+              >
                 + Upload Files
-                <input type="file" multiple style={{ display: 'none' }}
-                  onChange={async e => {
-                    const files = Array.from(e.target.files || []);
-                    if (!files.length || !order?.id) return;
-                    const fd = new FormData();
-                    files.forEach(f => fd.append('files', f));
-                    await fetch(`${API}/cad/upload/${order.id}`, {
-                      method: 'POST',
-                      credentials: 'include',
-                      body: fd,
-                    });
-                    const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
-                    if (cRes.ok) setCads(await cRes.json());
-                    const oRes = await apiFetch(`${API}/orders/${order.id}`);
-                    if (oRes.ok) setOrder(await oRes.json());
-                    e.target.value = '';
-                  }}
-                />
-              </label>
+              </button>
             )}
+            <input ref={uploadFileRef} type="file" multiple style={{ display: 'none' }}
+              onChange={e => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                setUploadFiles(files);
+                setShowUploadModal(true);
+                e.target.value = '';
+              }}
+            />
             </div>
           </div>
 
@@ -986,6 +1021,8 @@ export default function OrderDetail() {
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>·</span>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(cad.createdAt).toLocaleDateString()}</span>
+                          {cad.cadPersonName && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>· CAD: {cad.cadPersonName}</span>}
+                          {cad.verifiedByName && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>· Verified: {cad.verifiedByName}</span>}
                           {cad.designerNotes && <span style={{ fontSize: '10px', color: 'var(--text-muted)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {cad.designerNotes}</span>}
                         </div>
                       </div>
@@ -1333,6 +1370,53 @@ export default function OrderDetail() {
                 disabled={deleteConfirmInput !== order.poNumber || deleting}
                 style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (deleteConfirmInput !== order.poNumber || deleting) ? 0.5 : 1 }}>
                 {deleting ? 'Deleting…' : '🗑 Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUploadModal && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '420px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Upload CAD Files
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
+              {uploadFiles.length} file{uploadFiles.length === 1 ? '' : 's'} selected. Both fields are required before uploading.
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              CAD Person Name *
+            </label>
+            <input
+              type="text"
+              value={uploadCadPerson}
+              onChange={e => setUploadCadPerson(e.target.value)}
+              placeholder="Who modeled this file"
+              autoFocus
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
+            />
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Verified By Name *
+            </label>
+            <input
+              type="text"
+              value={uploadVerifiedBy}
+              onChange={e => setUploadVerifiedBy(e.target.value)}
+              placeholder="Who verified it before upload"
+              onKeyDown={e => { if (e.key === 'Enter') handleUploadFiles(); }}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); setUploadCadPerson(''); setUploadVerifiedBy(''); }} disabled={uploadingFiles}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleUploadFiles}
+                disabled={!uploadCadPerson.trim() || !uploadVerifiedBy.trim() || uploadingFiles}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!uploadCadPerson.trim() || !uploadVerifiedBy.trim() || uploadingFiles) ? 0.5 : 1 }}>
+                {uploadingFiles ? 'Uploading…' : '↑ Upload'}
               </button>
             </div>
           </div>

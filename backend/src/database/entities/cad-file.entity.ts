@@ -37,6 +37,14 @@ export class CadFile {
   @Column({ nullable: true })
   uploadedBy: string;
 
+  // Collected from the CAD designer at upload time — who modeled it and
+  // who verified it before it went out, for the order detail page's audit trail.
+  @Column({ nullable: true })
+  cadPersonName: string;
+
+  @Column({ nullable: true })
+  verifiedByName: string;
+
   @Column({ nullable: true })
   revisionNumber: number;
 

@@ -87,11 +87,13 @@ export class CadController {
     @Param('orderId') orderId: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Body('designerNotes') designerNotes: string,
+    @Body('cadPersonName') cadPersonName: string,
+    @Body('verifiedByName') verifiedByName: string,
     @Request() req: any,
   ) {
     const results = [];
     for (const file of files) {
-      const cad = await this.cadService.upload(orderId, file, req.user?.email || 'designer', designerNotes);
+      const cad = await this.cadService.upload(orderId, file, req.user?.email || 'designer', designerNotes, cadPersonName, verifiedByName);
       results.push(cad);
     }
     // Single notification for the whole batch

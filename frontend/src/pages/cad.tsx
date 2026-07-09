@@ -13,6 +13,8 @@ export default function CADPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [notes, setNotes] = useState('');
+  const [cadPersonName, setCadPersonName] = useState('');
+  const [verifiedByName, setVerifiedByName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedFileCount, setSelectedFileCount] = useState(0);
   const [isCadDesigner, setIsCadDesigner] = useState(false);
@@ -36,16 +38,20 @@ export default function CADPage() {
 
   const upload = async () => {
     const files = fileRef.current?.files;
-    if (!files || files.length === 0 || !selectedOrderId) return;
+    if (!files || files.length === 0 || !selectedOrderId || !cadPersonName.trim() || !verifiedByName.trim()) return;
     setUploading(true);
     try {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append('files', f));
       if (notes) fd.append('designerNotes', notes);
+      fd.append('cadPersonName', cadPersonName.trim());
+      fd.append('verifiedByName', verifiedByName.trim());
       const res = await apiFetch(`${API}/cad/upload/${selectedOrderId}`, { method: 'POST', body: fd });
       if (res.ok) {
         toast.success('CAD file uploaded.');
         setNotes('');
+        setCadPersonName('');
+        setVerifiedByName('');
         setSelectedOrderId('');
         setSelectedFileCount(0);
         if (fileRef.current) fileRef.current.value = '';
@@ -105,11 +111,21 @@ export default function CADPage() {
             </div>
             <button
               onClick={upload}
-              disabled={uploading || !selectedOrderId}
-              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: uploading || !selectedOrderId ? 0.6 : 1 }}
+              disabled={uploading || !selectedOrderId || !cadPersonName.trim() || !verifiedByName.trim()}
+              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (uploading || !selectedOrderId || !cadPersonName.trim() || !verifiedByName.trim()) ? 0.6 : 1 }}
             >
               {uploading ? 'Uploading…' : '↑ Upload'}
             </button>
+          </div>
+          <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'end', marginTop: '12px' }}>
+            <div>
+              <label style={lbl}>CAD Person Name *</label>
+              <input value={cadPersonName} onChange={e => setCadPersonName(e.target.value)} placeholder="Who modeled this file" style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Verified By Name *</label>
+              <input value={verifiedByName} onChange={e => setVerifiedByName(e.target.value)} placeholder="Who verified it before upload" style={inp} />
+            </div>
           </div>
         </div>
       )}
