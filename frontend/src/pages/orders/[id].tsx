@@ -326,6 +326,7 @@ const FIELD_GROUPS = [
       { key: 'storeName', label: 'Store Name' },
       { key: 'customerFullName', label: 'Customer Name' },
       { key: 'customerEmail', label: 'Customer Email' },
+      { key: 'phoneNumber', label: 'Phone' },
     ],
   },
   {
@@ -385,6 +386,9 @@ export default function OrderDetail() {
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
   const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     try {
@@ -582,6 +586,21 @@ export default function OrderDetail() {
   const movableStatuses = userRole === UserRole.ADMIN
     ? validNextStatuses
     : allowedStatuses.filter(s => validNextStatuses.includes(s));
+  const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
+
+  const handleDeleteOrder = async () => {
+    if (!order?.id || deleteConfirmInput !== order.poNumber) return;
+    setDeleting(true);
+    const res = await apiFetch(`${API}/orders/${order.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      toast.success(`Order ${order.poNumber} permanently deleted.`);
+      router.push('/orders');
+    } else {
+      const err = await res.json().catch(() => null);
+      toast.error(err?.message || 'Failed to delete order');
+      setDeleting(false);
+    }
+  };
 
   return (
     <>
@@ -643,6 +662,14 @@ export default function OrderDetail() {
           >
             ← Back to Orders
           </button>
+          {canDelete && (
+            <button
+              onClick={() => { setDeleteConfirmInput(''); setShowDeleteModal(true); }}
+              style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.35)', borderRadius: '8px', padding: '7px 16px', color: '#dc2626', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              🗑 Delete Order
+            </button>
+          )}
         </div>
       }
     >
@@ -656,11 +683,14 @@ export default function OrderDetail() {
           {/* ── Col 1: Field groups ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {FIELD_GROUPS.map(group => {
-              // invoiceNumber stays admin-only; quotedCost is visible to everyone once set
-              const FINANCIAL_KEYS = ['invoiceNumber'];
-              const visibleFields = userRole === UserRole.ADMIN
-                ? group.fields
-                : group.fields.filter(f => !FINANCIAL_KEYS.includes(f.key));
+              // invoiceNumber stays admin-only; Factory Manager doesn't see pricing;
+              // phone number only shows up when the order actually has one
+              const visibleFields = group.fields.filter(f => {
+                if (f.key === 'invoiceNumber' && userRole !== UserRole.ADMIN) return false;
+                if (f.key === 'quotedCost' && userRole === UserRole.FACTORY_MANAGER) return false;
+                if (f.key === 'phoneNumber' && !order.phoneNumber) return false;
+                return true;
+              });
               if (visibleFields.length === 0) return null;
               return (
               <div key={group.title} style={cardStyle}>
@@ -1260,6 +1290,44 @@ export default function OrderDetail() {
                 disabled={!repairContractorInput.trim()}
                 style={{ flex: 2, background: '#EF4444', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: !repairContractorInput.trim() ? 0.5 : 1 }}>
                 🔧 Confirm — Send for Repair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '420px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+              ⚠ Delete Order Permanently
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
+              This will permanently delete order <strong>{order.poNumber}</strong> and everything attached to it —
+              CAD/reference files, SKU, notifications, messages, and the audit log. <strong>This cannot be undone.</strong>
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Type <strong>{order.poNumber}</strong> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmInput}
+              onChange={e => setDeleteConfirmInput(e.target.value)}
+              placeholder={order.poNumber}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleDeleteOrder(); }}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowDeleteModal(false)} disabled={deleting}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteOrder}
+                disabled={deleteConfirmInput !== order.poNumber || deleting}
+                style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (deleteConfirmInput !== order.poNumber || deleting) ? 0.5 : 1 }}>
+                {deleting ? 'Deleting…' : '🗑 Delete Permanently'}
               </button>
             </div>
           </div>

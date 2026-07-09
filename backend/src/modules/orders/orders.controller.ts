@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
@@ -112,5 +112,13 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get audit log for an order' })
   getEvents(@Param('id') id: string) {
     return this.ordersService.getEvents(id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Permanently delete an order and all related records (Admin/Authorizer only)' })
+  remove(@Param('id') id: string, @Request() req: any) {
+    return this.ordersService.remove(id, req.user);
   }
 }

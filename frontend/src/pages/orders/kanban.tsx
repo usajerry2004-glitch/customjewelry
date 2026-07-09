@@ -279,7 +279,7 @@ export default function KanbanPage() {
               <div className="kanban-orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(272px, 1fr))', gap: '10px' }}>
                 {selectedCol.orders.map(order => (
                   <div key={order.id}>
-                    <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} currentUserRole={userRole} />
+                    <OrderCard order={order} compact onClick={() => router.push(`/orders/${order.id}`)} currentUserRole={userRole} hideFinancials={userRole === 'FACTORY_MANAGER'} />
                   </div>
                 ))}
               </div>

@@ -36,6 +36,7 @@ export interface Order {
   storeName?: string;
   customerFullName?: string;
   customerEmail?: string;
+  phoneNumber?: string;
   orderType?: string;
   size?: string;
   metalType?: string;
