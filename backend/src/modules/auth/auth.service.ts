@@ -120,6 +120,13 @@ export class AuthService {
   }
 
   async seedAdmin() {
+    // Only ever seed a completely empty database (fresh local/dev setup).
+    // Checking each account by its hardcoded default email would otherwise
+    // recreate these as duplicates the moment a real admin renames or
+    // deletes one — the old email just looks "unused" again on the next restart.
+    const userCount = await this.userRepo.count();
+    if (userCount > 0) return;
+
     // Passwords sourced from env vars; fall back to strong defaults.
     // These are ONLY used when creating accounts for the first time (if they don't exist).
     // Existing accounts are NOT modified on each restart.
