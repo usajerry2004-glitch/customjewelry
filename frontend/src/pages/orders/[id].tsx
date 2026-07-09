@@ -17,6 +17,7 @@ interface CadFile {
   status: string; revisionNumber: number; uploadedBy: string;
   designerNotes?: string; customerFeedback?: string;
   approvedAt?: string; approvedBy?: string; createdAt: string;
+  filePath?: string; thumbnailPath?: string;
 }
 
 const CAD_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -811,6 +812,7 @@ export default function OrderDetail() {
                       const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
                       const isVid = ['mp4','mov','avi','webm','mkv','wmv'].includes(ext);
                       const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
+                      const thumbUrl = cad.thumbnailPath || fileUrl;
                       const fallbackIcon = ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'pdf' ? '📄' : '📎';
                       return (
                         <div key={cad.id}
@@ -820,7 +822,7 @@ export default function OrderDetail() {
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                         >
                           {isImg ? (
-                            <img src={fileUrl} alt={cad.originalName} className="ref-thumb-img"
+                            <img src={thumbUrl} alt={cad.originalName} className="ref-thumb-img"
                               style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
                               onError={e => { const img = e.target as HTMLImageElement; img.style.display = 'none'; const fb = img.nextElementSibling as HTMLElement; if (fb) fb.style.display = 'flex'; }}
                             />
@@ -967,7 +969,7 @@ export default function OrderDetail() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       {isImage ? (
                         <img
-                          src={cad.filePath || `/uploads/cad/${cad.fileName}`}
+                          src={cad.thumbnailPath || cad.filePath || `/uploads/cad/${cad.fileName}`}
                           alt={cad.originalName}
                           style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)', cursor: 'pointer' }}
                           onClick={() => { setViewingCadList(designList); setViewingCad(cad); }}

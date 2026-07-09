@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
+import * as compression from 'compression';
 import * as Sentry from '@sentry/node';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -22,6 +23,7 @@ async function bootstrap() {
 
   // Security
   app.use(helmet());
+  app.use(compression());
   const allowedOrigins = (process.env.FRONTEND_URL || '')
     .split(',')
     .map((o) => o.trim())

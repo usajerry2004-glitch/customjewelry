@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import * as multerS3 from 'multer-s3';
 import { extname } from 'path';
+import { generateThumbnail } from './thumbnail.util';
 
-export interface S3MulterFile extends Express.Multer.File {
-  key: string;
-  location: string;
-  bucket: string;
+export interface UploadedFileResult {
+  fileName: string;
+  filePath: string;
+  thumbnailPath: string | null;
 }
 
 @Injectable()
@@ -34,17 +34,22 @@ export class SpacesService {
     });
   }
 
-  getMulterStorage(folder: string) {
-    return multerS3({
-      s3:          this.client,
-      bucket:      this.bucket,
-      acl:         'public-read',
-      contentType: multerS3.AUTO_CONTENT_TYPE,
-      key: (_req, file, cb) => {
-        const unique = Date.now() + '-' + Math.round(Math.random() * 1e6);
-        cb(null, `${folder}/${unique}${extname(file.originalname)}`);
-      },
-    });
+  // Uploads the original, and — for raster images only — a resized JPEG
+  // derivative alongside it, so list/card views never have to load the
+  // full-resolution original just to paint a thumbnail.
+  async uploadWithThumbnail(buffer: Buffer, folder: string, originalName: string, contentType?: string): Promise<UploadedFileResult> {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e6);
+    const key = `${folder}/${unique}${extname(originalName)}`;
+    const filePath = await this.uploadBuffer(buffer, key, contentType);
+
+    let thumbnailPath: string | null = null;
+    const thumbBuffer = await generateThumbnail(buffer, contentType);
+    if (thumbBuffer) {
+      const thumbKey = `${folder}/${unique}-thumb.jpg`;
+      thumbnailPath = await this.uploadBuffer(thumbBuffer, thumbKey, 'image/jpeg');
+    }
+
+    return { fileName: key, filePath, thumbnailPath };
   }
 
   async uploadBuffer(buffer: Buffer, key: string, contentType = 'application/octet-stream'): Promise<string> {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, MoreThan } from 'typeorm';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -6,11 +6,13 @@ import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
-import { S3MulterFile } from '../spaces/spaces.service';
+import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
 
 @Injectable()
 export class CadService {
+  private readonly logger = new Logger(CadService.name);
+
   constructor(
     @InjectRepository(CadFile)    private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(Order)      private readonly orderRepo: Repository<Order>,
@@ -18,6 +20,7 @@ export class CadService {
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
+    private readonly spacesService: SpacesService,
   ) {}
 
   private async getTeamEmails(roles: UserRole[]): Promise<{ emails: string[]; users: User[] }> {
@@ -56,12 +59,13 @@ export class CadService {
     const existing = await this.cadRepo.find({ where: { orderId } });
     const revisionNumber = existing.length + 1;
 
-    const s3File = file as S3MulterFile;
+    const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'cad', file.originalname, file.mimetype);
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,
-      fileName:     s3File.key      ?? file.filename,
-      filePath:     s3File.location ?? file.path,
+      fileName:      uploaded.fileName,
+      filePath:      uploaded.filePath,
+      thumbnailPath: uploaded.thumbnailPath,
       uploadedBy,
       revisionNumber,
       designerNotes,
@@ -87,13 +91,13 @@ export class CadService {
     }
     const authorizerEmails = authUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
     if (authorizerEmails.length) {
-      await this.emailService.sendCadSentForApprovalToAuthorizers({
+      this.emailService.sendCadSentForApprovalToAuthorizers({
         to: authorizerEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
-      });
+      }).catch(err => this.logger.warn('CAD sent-for-approval email failed:', err));
     }
   }
 
@@ -114,14 +118,14 @@ export class CadService {
     }
 
     if (order.customerEmail) {
-      await this.emailService.sendCadReadyForApproval({
+      this.emailService.sendCadReadyForApproval({
         to:            order.customerEmail,
         poNumber:      order.poNumber,
         customerName:  order.customerFullName || order.storeName || 'Valued Customer',
         orderType:     order.orderType || '—',
         orderId:       order.id,
         trackingToken: order.trackingToken,
-      });
+      }).catch(err => this.logger.warn('CAD ready for approval email failed:', err));
     }
   }
 
@@ -129,12 +133,13 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     const existing = await this.cadRepo.find({ where: { orderId } });
-    const s3File = file as S3MulterFile;
+    const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'cad', file.originalname, file.mimetype);
     const cad = this.cadRepo.create({
       orderId,
       originalName: file.originalname,
-      fileName:     s3File.key      ?? file.filename,
-      filePath:     s3File.location ?? file.path,
+      fileName:      uploaded.fileName,
+      filePath:      uploaded.filePath,
+      thumbnailPath: uploaded.thumbnailPath,
       uploadedBy,
       revisionNumber: existing.length + 1,
       designerNotes: 'Reference image',
@@ -166,13 +171,13 @@ export class CadService {
     }
     const saAuthorizerEmails = saUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
     if (saAuthorizerEmails.length) {
-      await this.emailService.sendCadSentForApprovalToAuthorizers({
+      this.emailService.sendCadSentForApprovalToAuthorizers({
         to: saAuthorizerEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
-      });
+      }).catch(err => this.logger.warn('CAD sent-for-approval email failed:', err));
     }
 
     return saved;
@@ -245,13 +250,13 @@ export class CadService {
           order.id, true);
       }
       if (emails.length) {
-        await this.emailService.sendCadRevisionAlert({
+        this.emailService.sendCadRevisionAlert({
           to: emails,
           poNumber: order.poNumber,
           customerName: order.customerFullName || order.storeName || 'Valued Customer',
           orderType: order.orderType || '—',
           orderId: order.id,
-        });
+        }).catch(err => this.logger.warn('CAD revision email failed:', err));
       }
     }
 
@@ -297,7 +302,7 @@ export class CadService {
       .getMany();
     const map: Record<string, string> = {};
     for (const cad of cads) {
-      if (!map[cad.orderId]) map[cad.orderId] = cad.filePath || cad.fileName;
+      if (!map[cad.orderId]) map[cad.orderId] = cad.thumbnailPath || cad.filePath || cad.fileName;
     }
     return map;
   }

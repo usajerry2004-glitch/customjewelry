@@ -112,13 +112,13 @@ export class OrdersService {
     // Email via EmailService
     const emails = targets.map(u => u.email).filter(Boolean);
     if (emails.length) {
-      await this.emailService.sendCadRevisionAlert({
+      this.emailService.sendCadRevisionAlert({
         to: emails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || '—',
         orderType: order.orderType || '—',
         orderId: order.id,
-      });
+      }).catch(err => this.logger.warn('CAD revision email failed:', err));
     }
   }
 
@@ -270,14 +270,14 @@ export class OrdersService {
     // Email customer: order received (with magic tracking link)
     const customerEmail = saved.customerEmail || (user?.role === 'CUSTOMER' ? user.email : null);
     if (customerEmail) {
-      await this.emailService.sendOrderPlaced({
+      this.emailService.sendOrderPlaced({
         to:             customerEmail,
         poNumber:       saved.poNumber,
         customerName:   saved.customerFullName || saved.storeName || 'Valued Customer',
         orderType:      saved.orderType || '—',
         orderId:        saved.id,
         trackingToken:  saved.trackingToken,
-      });
+      }).catch(err => this.logger.warn('Order placed email failed:', err));
     }
 
     // Notify authorizers/admins: new order received — they review before assigning CAD
@@ -293,14 +293,14 @@ export class OrdersService {
       })),
     ));
     if (authEmails.length) {
-      await this.emailService.sendNewOrderToAuthorizers({
+      this.emailService.sendNewOrderToAuthorizers({
         to: authEmails,
         poNumber: saved.poNumber,
         customerName: saved.customerFullName || saved.storeName || 'Valued Customer',
         orderType: saved.orderType || '—',
         storeName: saved.storeName || '',
         orderId: saved.id,
-      });
+      }).catch(err => this.logger.warn('New order authorizer email failed:', err));
     }
 
     return saved;
@@ -328,14 +328,14 @@ export class OrdersService {
           await this.cadRepo.update(cad.id, { status: CadFileStatus.SENT_FOR_APPROVAL });
         }
         if (saved.customerEmail) {
-          await this.emailService.sendCadReadyForApproval({
+          this.emailService.sendCadReadyForApproval({
             to:            saved.customerEmail,
             poNumber:      saved.poNumber,
             customerName:  saved.customerFullName || saved.storeName || 'Valued Customer',
             orderType:     saved.orderType || '—',
             orderId:       saved.id,
             trackingToken: saved.trackingToken,
-          });
+          }).catch(err => this.logger.warn('CAD ready for approval email failed:', err));
         }
       }
     }
@@ -384,14 +384,14 @@ export class OrdersService {
 
       // Email customer: design approved, in production
       if (vpoOrder.customerEmail) {
-        await this.emailService.sendOrderInProduction({
+        this.emailService.sendOrderInProduction({
           to: vpoOrder.customerEmail,
           poNumber: vpoOrder.poNumber,
           customerName: vpoOrder.customerFullName || vpoOrder.storeName || 'Valued Customer',
           orderType: vpoOrder.orderType || '—',
           quotedCost: vpoOrder.quotedCost ? Number(vpoOrder.quotedCost) : undefined,
           orderId: vpoOrder.id,
-        });
+        }).catch(err => this.logger.warn('Order in production email failed:', err));
       }
 
       // Notify Factory Manager and Stone Manager simultaneously
@@ -448,13 +448,13 @@ export class OrdersService {
         })),
       ));
       if (cadEmails.length) {
-        await this.emailService.sendPendingCadToDesigners({
+        this.emailService.sendPendingCadToDesigners({
           to: cadEmails,
           poNumber: updated.poNumber,
           customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
           orderType: updated.orderType || '—',
           orderId: updated.id,
-        });
+        }).catch(err => this.logger.warn('Pending CAD designer email failed:', err));
       }
       if (updated.customerEmail) {
         this.emailService.sendOrderConfirmedToCustomer({
@@ -484,7 +484,7 @@ export class OrdersService {
     // SHIPPED — email customer + authorizers
     if (status === OrderStatus.SHIPPED) {
       if (updated.customerEmail) {
-        await this.emailService.sendOrderShipped({
+        this.emailService.sendOrderShipped({
           to: updated.customerEmail,
           poNumber: updated.poNumber,
           customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
@@ -492,7 +492,7 @@ export class OrdersService {
           trackingNumber: updated.trackingNumber,
           shipMethod: updated.shipMethod,
           orderId: updated.id,
-        });
+        }).catch(err => this.logger.warn('Order shipped email failed:', err));
       }
       // In-portal notification for authorizers (no email)
       const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER, UserRole.ADMIN]) } });
@@ -509,13 +509,13 @@ export class OrdersService {
 
     // COMPLETED — email customer
     if (status === OrderStatus.COMPLETED && updated.customerEmail) {
-      await this.emailService.sendOrderDelivered({
+      this.emailService.sendOrderDelivered({
         to: updated.customerEmail,
         poNumber: updated.poNumber,
         customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
         orderType: updated.orderType || '—',
         orderId: updated.id,
-      });
+      }).catch(err => this.logger.warn('Order delivered email failed:', err));
     }
 
     return updated;

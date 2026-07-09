@@ -22,6 +22,8 @@ interface CadFile {
   designerNotes?: string;
   customerFeedback?: string;
   createdAt: string;
+  filePath?: string;
+  thumbnailPath?: string;
 }
 
 
@@ -424,6 +426,7 @@ export default function CustomerOrderDetail() {
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
               const isVid = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
               const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
+              const thumbUrl = cad.thumbnailPath || fileUrl;
               const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'jcd' ? '💎' : '📎';
               return (
                 <div key={cad.id}
@@ -433,7 +436,7 @@ export default function CustomerOrderDetail() {
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                 >
                   {isImage ? (
-                    <img src={fileUrl} alt={cad.originalName}
+                    <img src={thumbUrl} alt={cad.originalName}
                       style={{ width: '150px', height: '110px', objectFit: 'cover', display: 'block' }}
                       onError={e => {
                         const img = e.target as HTMLImageElement;

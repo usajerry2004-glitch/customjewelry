@@ -26,6 +26,11 @@ export class CadFile {
   @Column()
   filePath: string;
 
+  // Resized derivative for image files only — used by list/card thumbnails
+  // so they don't load the full-resolution original. Null for non-images.
+  @Column({ nullable: true })
+  thumbnailPath: string;
+
   @Column({ type: 'varchar', default: CadFileStatus.UPLOADED })
   status: CadFileStatus;
 

@@ -8,7 +8,7 @@ import { User, UserRole } from '../../database/entities/user.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
-import { S3MulterFile } from '../spaces/spaces.service';
+import { SpacesService } from '../spaces/spaces.service';
 
 export interface WebOrderDto {
   // Contact
@@ -51,6 +51,7 @@ export class PublicOrdersService {
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
+    private readonly spacesService: SpacesService,
   ) {}
 
   // ── Auto-generate next CO##### PO number ─────────────────────────────
@@ -126,11 +127,13 @@ export class PublicOrdersService {
 
       // Save uploaded reference images
       for (const file of files || []) {
+        const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'customer-uploads', file.originalname, file.mimetype);
         await this.cadRepo.save(this.cadRepo.create({
           orderId:      order.id,
           originalName: file.originalname,
-          fileName:     (file as S3MulterFile).key,
-          filePath:     (file as S3MulterFile).location,
+          fileName:      uploaded.fileName,
+          filePath:      uploaded.filePath,
+          thumbnailPath: uploaded.thumbnailPath,
           uploadedBy:   dto.email,
           revisionNumber: 1,
           designerNotes: 'Customer reference image',

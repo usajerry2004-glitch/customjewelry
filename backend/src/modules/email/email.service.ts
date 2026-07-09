@@ -19,7 +19,11 @@ export class EmailService {
     const gmailUser = this.config.get<string>('GMAIL_USER');
     const gmailPass = this.config.get<string>('GMAIL_APP_PASSWORD');
     this.transporter = gmailUser && gmailPass
-      ? nodemailer.createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: gmailUser, pass: gmailPass } })
+      ? nodemailer.createTransport({
+          host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: gmailUser, pass: gmailPass },
+          // Reuse SMTP connections instead of a fresh TCP+TLS+AUTH handshake per send
+          pool: true, maxConnections: 5, maxMessages: 100,
+        })
       : null;
   }
 
