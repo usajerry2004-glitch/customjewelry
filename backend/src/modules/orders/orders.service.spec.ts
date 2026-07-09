@@ -7,7 +7,10 @@ import { User } from '../../database/entities/user.entity';
 import { Notification } from '../../database/entities/notification.entity';
 import { CadFile } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
+import { OrderMessage } from '../../database/entities/order-message.entity';
+import { Sku } from '../../database/entities/sku.entity';
 import { EmailService } from '../email/email.service';
+import { SkuService } from '../sku/sku.service';
 
 const makeRepo = (overrides: any = {}) => ({
   find: jest.fn().mockResolvedValue([]),
@@ -57,7 +60,20 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(Notification), useValue: makeRepo() },
         { provide: getRepositoryToken(CadFile),      useValue: makeRepo() },
         { provide: getRepositoryToken(OrderEvent),   useValue: makeRepo() },
-        { provide: EmailService, useValue: { sendOrderInProduction: jest.fn().mockResolvedValue(true), sendNewOrderToAuthorizers: jest.fn().mockResolvedValue(true), sendOrderPlaced: jest.fn().mockResolvedValue(true), sendCadRevisionAlert: jest.fn().mockResolvedValue(true) } },
+        { provide: getRepositoryToken(OrderMessage), useValue: makeRepo() },
+        { provide: getRepositoryToken(Sku),          useValue: makeRepo() },
+        { provide: EmailService, useValue: {
+          sendOrderInProduction:      jest.fn().mockResolvedValue(true),
+          sendNewOrderToAuthorizers:  jest.fn().mockResolvedValue(true),
+          sendOrderPlaced:            jest.fn().mockResolvedValue(true),
+          sendCadRevisionAlert:       jest.fn().mockResolvedValue(true),
+          sendCadReadyForApproval:    jest.fn().mockResolvedValue(true),
+          sendPendingCadToDesigners:  jest.fn().mockResolvedValue(true),
+          sendOrderConfirmedToCustomer: jest.fn().mockResolvedValue(true),
+          sendOrderShipped:           jest.fn().mockResolvedValue(true),
+          sendOrderDelivered:         jest.fn().mockResolvedValue(true),
+        } },
+        { provide: SkuService, useValue: { generate: jest.fn().mockResolvedValue({ skuNumber: 'CJ-TEST' }) } },
       ],
     }).compile();
 
