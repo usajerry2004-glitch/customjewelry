@@ -28,14 +28,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    // Built-in HttpException subclasses (BadRequestException, ConflictException, etc.)
+    // return a full { statusCode, message, error } object from getResponse() even
+    // when constructed with a plain string — nesting that whole object under our
+    // own `message` key means every client-side `data?.message` read gets an
+    // object instead of a string (or string[] for validation errors).
+    const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
+    const message =
+      exceptionResponse === null
+        ? 'Internal server error'
+        : typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : (exceptionResponse as any).message ?? 'Unexpected error';
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message:
-        exception instanceof HttpException
-          ? exception.getResponse()
-          : 'Internal server error',
+      message,
     });
   }
 }
