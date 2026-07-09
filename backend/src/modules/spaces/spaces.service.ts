@@ -72,7 +72,14 @@ export class SpacesService {
   }
 
   getPublicUrl(key: string): string {
-    if (this.cdnUrl) return `${this.cdnUrl}/${key}`;
+    if (this.cdnUrl) {
+      // Tolerate DO_SPACES_CDN_URL being set without a scheme (e.g. just
+      // "nyc3.digitaloceanspaces.com/bucket") — without this the resulting
+      // URL is scheme-relative and browsers resolve it against the current
+      // page instead of Spaces.
+      const cdn = /^https?:\/\//i.test(this.cdnUrl) ? this.cdnUrl : `https://${this.cdnUrl}`;
+      return `${cdn}/${key}`;
+    }
     const host = this.endpoint.replace(/^https?:\/\//, '');
     return `https://${this.bucket}.${host}/${key}`;
   }
