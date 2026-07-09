@@ -85,9 +85,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           </span>
         </div>
 
-        <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-          {order.storeName || order.customerFullName || (['FACTORY_MANAGER', 'STONE_MANAGER'].includes(currentUserRole || '') ? (order.orderType || 'Order') : 'Unknown Store')}
-        </div>
+        {(order.storeName || order.customerFullName || !['FACTORY_MANAGER', 'STONE_MANAGER'].includes(currentUserRole || '')) && (
+          <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+            {order.storeName || order.customerFullName || 'Unknown Store'}
+          </div>
+        )}
 
         {priorityReason && (
           <div style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '5px', padding: '2px 8px', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
