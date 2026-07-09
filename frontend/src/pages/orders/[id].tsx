@@ -683,11 +683,14 @@ export default function OrderDetail() {
           {/* ── Col 1: Field groups ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {FIELD_GROUPS.map(group => {
-              // invoiceNumber stays admin-only; Factory Manager doesn't see pricing;
+              // invoiceNumber stays admin-only; Factory/Stone Manager don't see pricing or
+              // customer identity (also enforced server-side, see FactoryRedactionInterceptor);
               // phone number only shows up when the order actually has one
+              const FACTORY_HIDDEN_KEYS = ['quotedCost', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
+              const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.STONE_MANAGER;
               const visibleFields = group.fields.filter(f => {
                 if (f.key === 'invoiceNumber' && userRole !== UserRole.ADMIN) return false;
-                if (f.key === 'quotedCost' && userRole === UserRole.FACTORY_MANAGER) return false;
+                if (FACTORY_HIDDEN_KEYS.includes(f.key) && isRestrictedRole) return false;
                 if (f.key === 'phoneNumber' && !order.phoneNumber) return false;
                 return true;
               });

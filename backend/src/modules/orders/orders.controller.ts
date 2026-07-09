@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
@@ -7,6 +7,7 @@ import { UpdateStatusDto } from './update-status.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
+import { FactoryRedactionInterceptor } from '../../common/interceptors/factory-redaction.interceptor';
 
 class BulkStatusDto {
   @IsArray()
@@ -21,6 +22,7 @@ class BulkStatusDto {
 @ApiTags('Orders')
 @ApiBearerAuth()
 @Controller('orders')
+@UseInterceptors(FactoryRedactionInterceptor)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 

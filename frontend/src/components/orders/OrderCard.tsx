@@ -86,7 +86,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
         </div>
 
         <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-          {order.storeName || order.customerFullName || 'Unknown Store'}
+          {order.storeName || order.customerFullName || (['FACTORY_MANAGER', 'STONE_MANAGER'].includes(currentUserRole || '') ? (order.orderType || 'Order') : 'Unknown Store')}
         </div>
 
         {priorityReason && (

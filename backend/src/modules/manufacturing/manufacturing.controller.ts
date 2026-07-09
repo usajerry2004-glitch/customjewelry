@@ -1,13 +1,15 @@
-import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ManufacturingService } from './manufacturing.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
+import { FactoryRedactionInterceptor } from '../../common/interceptors/factory-redaction.interceptor';
 
 @ApiTags('Manufacturing')
 @ApiBearerAuth()
 @Controller('manufacturing')
+@UseInterceptors(FactoryRedactionInterceptor)
 export class ManufacturingController {
   constructor(private readonly manufacturingService: ManufacturingService) {}
 
