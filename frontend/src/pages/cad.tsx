@@ -95,7 +95,6 @@ export default function CADPage() {
                 ref={fileRef}
                 type="file"
                 multiple
-                accept=".stl,.obj,.3dm,.pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.avi,.webm,.mkv,.wmv,.zip"
                 style={inp}
                 onChange={e => setSelectedFileCount(e.target.files?.length ?? 0)}
               />

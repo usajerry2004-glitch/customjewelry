@@ -447,7 +447,7 @@ export default function CustomersPage() {
                   transition: 'all 0.15s',
                 }}
               >
-                <input ref={refImageRef} type="file" accept="image/*,.pdf,.3dm,.stl" style={{ display: 'none' }}
+                <input ref={refImageRef} type="file" style={{ display: 'none' }}
                   onChange={e => setRefImage(e.target.files?.[0] || null)} />
                 {refImage
                   ? <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 600 }}>📎 {refImage.name}</div>

@@ -626,7 +626,7 @@ export default function OrdersPage() {
                 }}
               >
                 <input
-                  ref={fileRef} type="file" accept="image/*,video/*,.pdf,.3dm,.stl" multiple style={{ display: 'none' }}
+                  ref={fileRef} type="file" multiple style={{ display: 'none' }}
                   onChange={e => {
                     const picked = Array.from(e.target.files || []);
                     setRefFiles(prev => [...prev, ...picked].slice(0, 10));

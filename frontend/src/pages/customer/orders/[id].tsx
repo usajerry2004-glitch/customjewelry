@@ -7,6 +7,7 @@ import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
 import { OrderConversation } from '../../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
+const StlViewer = dynamic(() => import('../../../components/StlViewer'), { ssr: false });
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -33,6 +34,7 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
   const isPdf    = ext === 'pdf';
   const isVideo  = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
   const is3dm    = ext === '3dm';
+  const isStl    = ext === 'stl';
   const isJcd    = ext === 'jcd';
   const fileUrl  = cad.filePath || `/uploads/cad/${cad.fileName}`;
   const companionForJcd = isJcd
@@ -66,7 +68,7 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : is3dm ? '📐' : isJcd ? '💎' : '📎'}</span>
+            <span style={{ fontSize: '20px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : is3dm ? '📐' : isStl ? '🔺' : isJcd ? '💎' : '📎'}</span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cad.originalName}</div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '2px', alignItems: 'center' }}>
@@ -115,6 +117,8 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
             />
           ) : is3dm ? (
             <ThreeDmViewer fileUrl={fileUrl} height={480} />
+          ) : isStl ? (
+            <StlViewer fileUrl={fileUrl} height={480} />
           ) : isJcd ? (
             companionForJcd ? (
               <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -391,7 +395,7 @@ export default function CustomerOrderDetail() {
             </h3>
             <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 10px', background: 'transparent' }}>
               + Add Image
-              <input type="file" accept="image/*,.pdf,.3dm,.stl" style={{ display: 'none' }}
+              <input type="file" style={{ display: 'none' }}
                 onChange={async e => {
                   const file = e.target.files?.[0];
                   if (!file || !order?.id) return;
@@ -420,7 +424,7 @@ export default function CustomerOrderDetail() {
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
               const isVid = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
               const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
-              const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : '📎';
+              const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'jcd' ? '💎' : '📎';
               return (
                 <div key={cad.id}
                   onClick={() => setViewerState({ list: refs, idx: cadIdx })}

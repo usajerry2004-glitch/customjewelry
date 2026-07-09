@@ -9,6 +9,7 @@ import { apiFetch, API } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
+const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
 
 // ── CAD types ────────────────────────────────────────────────────────────
 interface CadFile {
@@ -98,7 +99,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
         background: 'var(--bg-input)', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-          <span style={{ fontSize: '18px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : isJcd ? '💎' : ext === '3dm' ? '🧊' : '📎'}</span>
+          <span style={{ fontSize: '18px' }}>{isImage ? '🖼' : isPdf ? '📄' : isVideo ? '🎬' : isJcd ? '💎' : ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : '📎'}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {cad.originalName}
@@ -180,6 +181,8 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
           />
         ) : ext === '3dm' ? (
           <ThreeDmViewer fileUrl={fileUrl} height={460} />
+        ) : ext === 'stl' ? (
+          <StlViewer fileUrl={fileUrl} height={460} />
         ) : isJcd ? (
           companionForJcd ? (
             <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -735,7 +738,7 @@ export default function OrderDetail() {
                   {canUploadRef && (
                     <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '3px 10px', background: 'transparent', whiteSpace: 'nowrap' }}>
                       + Add Reference
-                      <input type="file" accept="image/*,.pdf,.mp4,.mov,.3dm,.stl" multiple style={{ display: 'none' }}
+                      <input type="file" multiple style={{ display: 'none' }}
                         onChange={async e => {
                           const files = Array.from(e.target.files || []);
                           if (!files.length || !order?.id) return;
@@ -775,6 +778,7 @@ export default function OrderDetail() {
                       const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
                       const isVid = ['mp4','mov','avi','webm','mkv','wmv'].includes(ext);
                       const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
+                      const fallbackIcon = ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'pdf' ? '📄' : '📎';
                       return (
                         <div key={cad.id}
                           onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
@@ -791,7 +795,7 @@ export default function OrderDetail() {
                             <video src={fileUrl} className="ref-thumb-img" style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                           ) : null}
                           <div style={{ width: '100%', height: '110px', display: (isImg || isVid) ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>
-                            📎
+                            {fallbackIcon}
                           </div>
                           <div style={{ padding: '5px 7px', borderTop: '1px solid var(--border)' }}>
                             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -843,7 +847,7 @@ export default function OrderDetail() {
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
               <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}>
                 + Upload Files
-                <input type="file" accept="image/*,.pdf,.mp4,.mov,.webm,.avi,.3dm,.obj,.stl,.dxf" multiple style={{ display: 'none' }}
+                <input type="file" multiple style={{ display: 'none' }}
                   onChange={async e => {
                     const files = Array.from(e.target.files || []);
                     if (!files.length || !order?.id) return;
@@ -937,7 +941,7 @@ export default function OrderDetail() {
                           onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
                         />
                       ) : (
-                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{isPdf ? '📄' : ext === '3dm' ? '🧊' : ext === 'jcd' ? '💎' : ['mp4','mov','webm','avi','mkv','wmv'].includes(ext) ? '🎬' : '📎'}</span>
+                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{isPdf ? '📄' : ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'jcd' ? '💎' : ['mp4','mov','webm','avi','mkv','wmv'].includes(ext) ? '🎬' : '📎'}</span>
                       )}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
