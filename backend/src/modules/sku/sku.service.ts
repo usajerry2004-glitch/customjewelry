@@ -25,9 +25,11 @@ function colorCode(metalColor?: string | null): string {
   return 'X';
 }
 
-// Extract the numeric part from a PO like "CO10613" or "KJ-2026-0001 (CO10479)" or "CO-00555"
+// Extract the numeric part from a PO like "C00001", "CO10613", "KJ-2026-0001 (CO10479)", or "CO-00555"
 function poDigits(poNumber: string): string {
-  const m1 = poNumber.match(/^CO(\d+)$/);          // CO10613
+  const m0 = poNumber.match(/^C(\d+)$/);            // C00001 (current PO style)
+  if (m0) return m0[1];
+  const m1 = poNumber.match(/^CO(\d+)$/);           // CO10613 (legacy)
   if (m1) return m1[1];
   const m2 = poNumber.match(/\(CO(\d+)\)/);         // KJ-2026-XXXX (CO10479)
   if (m2) return m2[1];

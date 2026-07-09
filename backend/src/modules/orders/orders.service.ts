@@ -7,6 +7,8 @@ import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
+import { OrderMessage } from '../../database/entities/order-message.entity';
+import { Sku } from '../../database/entities/sku.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
@@ -36,6 +38,8 @@ export class OrdersService {
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(OrderEvent)   private readonly eventRepo: Repository<OrderEvent>,
+    @InjectRepository(OrderMessage) private readonly messageRepo: Repository<OrderMessage>,
+    @InjectRepository(Sku)          private readonly skuRepo: Repository<Sku>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
   ) {}
@@ -62,6 +66,23 @@ export class OrdersService {
 
   async getEvents(orderId: string): Promise<OrderEvent[]> {
     return this.eventRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
+  }
+
+  // Permanently deletes an order and every row that hangs off its orderId.
+  // No FK cascade exists at the DB level, so child tables are cleared explicitly.
+  async remove(id: string, user?: { email: string }): Promise<{ deleted: true; poNumber: string }> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+
+    await this.cadRepo.delete({ orderId: id });
+    await this.skuRepo.delete({ orderId: id });
+    await this.notifRepo.delete({ orderId: id });
+    await this.messageRepo.delete({ orderId: id });
+    await this.eventRepo.delete({ orderId: id });
+    await this.orderRepo.delete(id);
+
+    this.logger.warn(`Order ${order.poNumber} (${id}) permanently deleted by ${user?.email || 'unknown'}`);
+    return { deleted: true, poNumber: order.poNumber };
   }
 
   // Send in-app notifications + optional Resend email to authorizers and CAD designers on revision
@@ -187,23 +208,20 @@ export class OrdersService {
   }
 
   private async generatePoNumber(): Promise<string> {
-    // Find the highest CO##### number across both storage formats:
-    //   new: "CO10613"
-    //   old embedded: "KJ-2026-XXXX (CO10479)"
+    // New style: "C00001", "C00002", ... Legacy "CO#####" orders (and the
+    // embedded "KJ-2026-XXXX (CO#####)" format) are a separate, frozen
+    // sequence — this only continues the highest existing "C#####" number.
     const rows = await this.orderRepo
       .createQueryBuilder('o')
       .select('o.poNumber')
-      .where("o.poNumber LIKE 'CO%' OR o.poNumber LIKE '%(CO%'")
+      .where("o.poNumber ~ '^C[0-9]+$'")
       .getMany();
-    let maxSeq = 10612; // PO sequence floor
+    let maxSeq = 0;
     for (const row of rows) {
-      const po = row.poNumber;
-      const m1 = po.match(/^CO(\d+)$/);
-      if (m1) maxSeq = Math.max(maxSeq, parseInt(m1[1], 10));
-      const m2 = po.match(/\(CO(\d+)\)/);
-      if (m2) maxSeq = Math.max(maxSeq, parseInt(m2[1], 10));
+      const m = row.poNumber.match(/^C(\d+)$/);
+      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
     }
-    return `CO${String(maxSeq + 1).padStart(5, '0')}`;
+    return `C${String(maxSeq + 1).padStart(5, '0')}`;
   }
 
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
