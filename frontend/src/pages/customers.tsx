@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
-import { apiFetch, API } from '../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../utils/types';
 import { formatName } from '../utils/name';
+import { toast } from '../utils/toast';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -134,39 +135,44 @@ export default function CustomersPage() {
       setError('Order Type, Metal Type, and Metal Color are required.'); return;
     }
     setSaving(true); setError('');
-    const res = await apiFetch(`${API}/orders`, {
-      method: 'POST',
-      body: JSON.stringify({
-        ...newOrder,
-        customerId: showOrder.id,
-        customerEmail: showOrder.email,
-        customerFullName: formatName(showOrder.firstName, showOrder.lastName),
-        quotedCost: newOrder.quotedCost ? parseFloat(newOrder.quotedCost) : undefined,
-        manufacturingPath: 'STANDARD',
-      }),
-    });
-    if (res.ok) {
-      const created = await res.json();
-      if (refImage && created.id) {
-        try {
-          const fd = new FormData();
-          fd.append('file', refImage);
-          await fetch(`${API}/cad/reference/${created.id}`, {
-            method: 'POST',
-            credentials: 'include',
-            body: fd,
-          });
-        } catch {}
+    try {
+      const res = await apiFetch(`${API}/orders`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newOrder,
+          customerId: showOrder.id,
+          customerEmail: showOrder.email,
+          customerFullName: formatName(showOrder.firstName, showOrder.lastName),
+          quotedCost: newOrder.quotedCost ? parseFloat(newOrder.quotedCost) : undefined,
+          manufacturingPath: 'STANDARD',
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        if (refImage && created.id) {
+          try {
+            const fd = new FormData();
+            fd.append('file', refImage);
+            await fetch(`${API}/cad/reference/${created.id}`, {
+              method: 'POST',
+              credentials: 'include',
+              body: fd,
+            });
+          } catch {}
+        }
+        setShowOrder(null);
+        setRefImage(null);
+        setNewOrder({ orderType: '', metalType: '', metalColor: '', size: '', diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '' });
+        router.push(`/orders/${created.id}`);
+      } else {
+        const d = await res.json().catch(() => null);
+        setError(getErrorMessage(d, 'Failed to create order.'));
       }
-      setShowOrder(null);
-      setRefImage(null);
-      setNewOrder({ orderType: '', metalType: '', metalColor: '', size: '', diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '' });
-      router.push(`/orders/${created.id}`);
-    } else {
-      const d = await res.json();
-      setError(d.message || 'Failed to create order.');
+    } catch {
+      setError('Failed to create order — check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const viewOrders = async (customer: Customer, e: React.MouseEvent) => {
@@ -193,6 +199,18 @@ export default function CustomersPage() {
   const togglePriority = async (id: string) => {
     await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
     await load();
+  };
+
+  const changeSalesRep = async (customerId: string, salesRepId: string) => {
+    setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, salesRepId } : c));
+    const res = await apiFetch(`${API}/users/${customerId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ salesRepId }),
+    });
+    if (!res.ok) {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to update Sales Rep.'));
+      await load();
+    }
   };
 
   const modalBg: React.CSSProperties = {
@@ -296,7 +314,22 @@ export default function CustomersPage() {
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--text-secondary)' }}>{c.email}</td>
                 <td style={{ padding: '14px 16px' }}>
-                  {c.salesRepId && salesRepMap[c.salesRepId] ? (
+                  {isAdmin ? (
+                    <select
+                      value={c.salesRepId || ''}
+                      onChange={e => changeSalesRep(c.id, e.target.value)}
+                      style={{
+                        fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)',
+                        padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--border-light)',
+                        background: 'var(--bg-input)', cursor: 'pointer', maxWidth: '160px',
+                      }}
+                    >
+                      <option value="">— Unassigned —</option>
+                      {Object.entries(salesRepMap).map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                    </select>
+                  ) : c.salesRepId && salesRepMap[c.salesRepId] ? (
                     <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {salesRepMap[c.salesRepId]}
                     </span>

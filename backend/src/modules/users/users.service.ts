@@ -14,6 +14,7 @@ export class CreateUserDto {
   @IsEnum(UserRole) @IsOptional() role?: UserRole;
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() phone?: string;
+  @IsString() @IsOptional() salesRepId?: string;
 }
 
 export class InviteUserDto {
@@ -21,6 +22,7 @@ export class InviteUserDto {
   @IsString() lastName: string;
   @IsEmail() email: string;
   @IsEnum(UserRole) role: UserRole;
+  @IsString() @IsOptional() salesRepId?: string;
 }
 
 export class UpdateUserDto {
@@ -30,6 +32,7 @@ export class UpdateUserDto {
   @IsBoolean() @IsOptional() isActive?: boolean;
   @IsString() @IsOptional() department?: string;
   @IsString() @IsOptional() storeName?: string;
+  @IsString() @IsOptional() salesRepId?: string;
 }
 
 @Injectable()
@@ -65,13 +68,23 @@ export class UsersService {
     // request is ignored, not just hidden by the UI, so this can't be
     // bypassed by calling the API directly.
     const role = caller?.role === UserRole.SALES_REP ? UserRole.CUSTOMER : (dto.role || UserRole.CUSTOMER);
+
+    let salesRepId: string | undefined = caller?.role === UserRole.SALES_REP ? caller.id : dto.salesRepId;
+    if (role === UserRole.CUSTOMER && caller?.role !== UserRole.SALES_REP) {
+      if (!salesRepId) throw new BadRequestException('A Sales Rep must be assigned to every customer account.');
+      const rep = await this.userRepo.findOne({ where: { id: salesRepId } });
+      if (!rep || rep.role !== UserRole.SALES_REP) {
+        throw new BadRequestException('salesRepId must reference an existing Sales Rep.');
+      }
+    }
+
     const user = this.userRepo.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
       email: dto.email,
       passwordHash,
       role,
-      salesRepId: caller?.role === UserRole.SALES_REP ? caller.id : undefined,
+      salesRepId,
       storeName: dto.storeName,
     });
     return this.userRepo.save(user);
@@ -87,6 +100,15 @@ export class UsersService {
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;
     if (dto.storeName !== undefined) user.storeName = dto.storeName;
+    if (dto.salesRepId !== undefined) {
+      if (dto.salesRepId) {
+        const rep = await this.userRepo.findOne({ where: { id: dto.salesRepId } });
+        if (!rep || rep.role !== UserRole.SALES_REP) {
+          throw new BadRequestException('salesRepId must reference an existing Sales Rep.');
+        }
+      }
+      user.salesRepId = (dto.salesRepId || null) as any;
+    }
     return this.userRepo.save(user);
   }
 

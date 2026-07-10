@@ -609,25 +609,30 @@ export default function OrderDetail() {
   const handleUploadFiles = async () => {
     if (!order?.id || !uploadFiles.length || !uploadCadPerson.trim() || !uploadVerifiedBy.trim()) return;
     setUploadingFiles(true);
-    const fd = new FormData();
-    uploadFiles.forEach(f => fd.append('files', f));
-    fd.append('cadPersonName', uploadCadPerson.trim());
-    fd.append('verifiedByName', uploadVerifiedBy.trim());
-    const res = await apiFetch(`${API}/cad/upload/${order.id}`, { method: 'POST', body: fd });
-    if (res.ok) {
-      const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
-      if (cRes.ok) setCads(await cRes.json());
-      const oRes = await apiFetch(`${API}/orders/${order.id}`);
-      if (oRes.ok) setOrder(await oRes.json());
-      setShowUploadModal(false);
-      setUploadFiles([]);
-      setUploadCadPerson('');
-      setUploadVerifiedBy('');
-    } else {
-      const err = await res.json().catch(() => null);
-      toast.error(getErrorMessage(err, 'Failed to upload files'));
+    try {
+      const fd = new FormData();
+      uploadFiles.forEach(f => fd.append('files', f));
+      fd.append('cadPersonName', uploadCadPerson.trim());
+      fd.append('verifiedByName', uploadVerifiedBy.trim());
+      const res = await apiFetch(`${API}/cad/upload/${order.id}`, { method: 'POST', body: fd });
+      if (res.ok) {
+        const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+        if (cRes.ok) setCads(await cRes.json());
+        const oRes = await apiFetch(`${API}/orders/${order.id}`);
+        if (oRes.ok) setOrder(await oRes.json());
+        setShowUploadModal(false);
+        setUploadFiles([]);
+        setUploadCadPerson('');
+        setUploadVerifiedBy('');
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to upload files'));
+      }
+    } catch {
+      toast.error('Upload failed — check your connection and try again.');
+    } finally {
+      setUploadingFiles(false);
     }
-    setUploadingFiles(false);
   };
 
   const handleDeleteOrder = async () => {

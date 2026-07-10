@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { Order, OrderStatus, StoneStatus, STATUS_CONFIG } from '../utils/types';
+import { toast } from '../utils/toast';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -14,12 +15,15 @@ export default function StonePage() {
 
   const reload = async () => {
     setLoading(true);
-    const res = await apiFetch(`${API}/manufacturing/queue`);
-    if (res.ok) {
-      const all: Order[] = await res.json();
-      setOrders(all.filter(o => o.status === OrderStatus.VPO_ISSUED));
+    try {
+      const res = await apiFetch(`${API}/manufacturing/queue`);
+      if (res.ok) {
+        const all: Order[] = await res.json();
+        setOrders(all.filter(o => o.status === OrderStatus.VPO_ISSUED));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { reload(); }, []);
@@ -29,9 +33,14 @@ export default function StonePage() {
 
   const markStoneSent = async (id: string) => {
     setActionLoading(id);
-    await apiFetch(`${API}/manufacturing/${id}/stone-sent`, { method: 'PATCH' });
-    await reload();
-    setActionLoading(null);
+    try {
+      await apiFetch(`${API}/manufacturing/${id}/stone-sent`, { method: 'PATCH' });
+      await reload();
+    } catch {
+      toast.error('Failed to update — check your connection and try again.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const kpi = [

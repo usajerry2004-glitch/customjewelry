@@ -66,7 +66,7 @@ const inp: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-const emptyForm = { firstName: '', lastName: '', email: '', role: UserRole.SALES_REP };
+const emptyForm = { firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '' };
 
 export default function SettingsPage() {
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -78,6 +78,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
 
   const reload = async () => {
     setLoading(true);
@@ -85,6 +86,7 @@ export default function SettingsPage() {
     if (res.ok) {
       const all: StaffUser[] = await res.json();
       setStaff(all.filter(u => u.role !== UserRole.CUSTOMER));
+      setSalesReps(all.filter(u => u.role === UserRole.SALES_REP));
     }
     setLoading(false);
   };
@@ -96,35 +98,49 @@ export default function SettingsPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.role === UserRole.CUSTOMER && !form.salesRepId) {
+      setError('Please select a Sales Rep for this customer.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
-    const res = await apiFetch(`${API}/users/invite`, {
-      method: 'POST',
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      setSuccessEmail(form.email);
-      setForm(emptyForm);
-      setShowForm(false);
-      await reload();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setError(getErrorMessage(data, 'Failed to send invite. Please try again.'));
+    try {
+      const res = await apiFetch(`${API}/users/invite`, {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setSuccessEmail(form.email);
+        setForm(emptyForm);
+        setShowForm(false);
+        await reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(getErrorMessage(data, 'Failed to send invite. Please try again.'));
+      }
+    } catch {
+      setError('Failed to send invite — check your connection and try again.');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const handleRemove = async (u: StaffUser) => {
     if (!confirm(`Remove ${formatName(u.firstName, u.lastName)} (${u.email})? This cannot be undone.`)) return;
     setRemovingId(u.id);
-    const res = await apiFetch(`${API}/users/${u.id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await reload();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      toast.error(getErrorMessage(data, 'Failed to remove user.'));
+    try {
+      const res = await apiFetch(`${API}/users/${u.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        await reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(getErrorMessage(data, 'Failed to remove user.'));
+      }
+    } catch {
+      toast.error('Failed to remove user — check your connection and try again.');
+    } finally {
+      setRemovingId(null);
     }
-    setRemovingId(null);
   };
 
   const activeCount  = staff.filter(u => u.isActive).length;
@@ -220,6 +236,22 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
+            {form.role === UserRole.CUSTOMER && (
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Sales Rep (required)</label>
+                <select
+                  required
+                  value={form.salesRepId}
+                  onChange={e => setForm(f => ({ ...f, salesRepId: e.target.value }))}
+                  style={{ ...inp, cursor: 'pointer' }}
+                >
+                  <option value="">— Select a Sales Rep —</option>
+                  {salesReps.map(r => (
+                    <option key={r.id} value={r.id}>{formatName(r.firstName, r.lastName)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {error && (
               <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '7px', padding: '10px 14px', fontSize: '12px', color: '#991B1B', marginBottom: '12px' }}>
                 {error}

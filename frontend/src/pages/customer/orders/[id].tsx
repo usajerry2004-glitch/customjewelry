@@ -239,26 +239,36 @@ export default function CustomerOrderDetail() {
 
   const cadAction = async (cadId: string, action: 'approve' | 'reject' | 'revision') => {
     setActionLoading(cadId + action);
-    const feedback = cadFeedback[cadId] || '';
-    await apiFetch(`${API}/cad/${cadId}/${action}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ feedback }),
-    });
-    await reload();
-    setActionLoading(null);
+    try {
+      const feedback = cadFeedback[cadId] || '';
+      await apiFetch(`${API}/cad/${cadId}/${action}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ feedback }),
+      });
+      await reload();
+    } catch {
+      alert('Failed to submit — check your connection and try again.');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const batchCadAction = async (cadIds: string[], action: 'approve' | 'reject' | 'revision') => {
     setActionLoading('batch-' + action);
-    for (const cadId of cadIds) {
-      await apiFetch(`${API}/cad/${cadId}/${action}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ feedback: batchFeedback }),
-      });
+    try {
+      for (const cadId of cadIds) {
+        await apiFetch(`${API}/cad/${cadId}/${action}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ feedback: batchFeedback }),
+        });
+      }
+      setBatchFeedback('');
+      await reload();
+    } catch {
+      alert('Failed to submit — check your connection and try again.');
+    } finally {
+      setActionLoading(null);
     }
-    setBatchFeedback('');
-    await reload();
-    setActionLoading(null);
   };
 
   if (loading) {
@@ -400,16 +410,22 @@ export default function CustomerOrderDetail() {
               <input type="file" style={{ display: 'none' }}
                 onChange={async e => {
                   const file = e.target.files?.[0];
-                  if (!file || !order?.id) return;
-                  const fd = new FormData();
-                  fd.append('file', file);
-                  const res = await fetch(`/api/proxy/cad/reference/${order.id}`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: fd,
-                  });
-                  if (res.ok) reload();
-                  e.target.value = '';
+                  if (!file || !order?.id) { e.target.value = ''; return; }
+                  try {
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await fetch(`/api/proxy/cad/reference/${order.id}`, {
+                      method: 'POST',
+                      credentials: 'include',
+                      body: fd,
+                    });
+                    if (res.ok) reload();
+                    else alert('Failed to upload image — check your connection and try again.');
+                  } catch {
+                    alert('Failed to upload image — check your connection and try again.');
+                  } finally {
+                    e.target.value = '';
+                  }
                 }}
               />
             </label>
