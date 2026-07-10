@@ -36,8 +36,6 @@ export default function JobBagPage() {
     { label: 'Quality',       value: order.diamondQuality },
     { label: 'Shape',         value: order.centerStoneShape },
     { label: 'Carat',         value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : null },
-    { label: 'Store',         value: order.storeName },
-    { label: 'Customer',      value: order.customerFullName },
     { label: 'Tracking',      value: (order as any).trackingNumber },
   ].filter(r => r.value);
 
