@@ -46,9 +46,9 @@ export class SlaService {
     const activeOverdue = overdueOrders.filter(o => !FINAL.includes(o.status));
     if (activeOverdue.length === 0) return 0;
 
-    // Only notify Admin and Authorizer
+    // Only notify Authorizer (Admins only get notified when tagged in the order's conversation)
     const targets = await this.userRepo.find({
-      where: [{ role: UserRole.ADMIN, isActive: true }, { role: UserRole.AUTHORIZER, isActive: true }],
+      where: [{ role: UserRole.AUTHORIZER, isActive: true }],
       select: ['id'],
     });
     if (targets.length === 0) return 0;

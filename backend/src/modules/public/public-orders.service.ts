@@ -130,9 +130,9 @@ export class PublicOrdersService {
         }));
       }));
 
-      // Notify CAD team + Authorizers
+      // Notify CAD team + Authorizers (Admins only get notified when tagged in the order's conversation)
       const staff = await this.userRepo.find({
-        where: [{ role: UserRole.CAD_DESIGNER }, { role: UserRole.AUTHORIZER }, { role: UserRole.ADMIN }],
+        where: [{ role: UserRole.CAD_DESIGNER }, { role: UserRole.AUTHORIZER }],
       });
       await Promise.all(staff.map(u =>
         this.notifRepo.save(this.notifRepo.create({
@@ -241,7 +241,7 @@ export class PublicOrdersService {
 
     // Notify team
     const staff = await this.userRepo.find({
-      where: [{ role: UserRole.ADMIN }, { role: UserRole.AUTHORIZER }, { role: UserRole.CAD_DESIGNER }],
+      where: [{ role: UserRole.AUTHORIZER }, { role: UserRole.CAD_DESIGNER }],
     });
     await Promise.all(staff.map(u =>
       this.notifRepo.save(this.notifRepo.create({
@@ -279,9 +279,9 @@ export class PublicOrdersService {
     cad.customerFeedback = feedback || 'Customer requested changes.';
     await this.cadRepo.save(cad);
 
-    // Notify CAD designers + admins
+    // Notify CAD designers
     const staff = await this.userRepo.find({
-      where: [{ role: UserRole.ADMIN }, { role: UserRole.CAD_DESIGNER }],
+      where: [{ role: UserRole.CAD_DESIGNER }],
     });
     await Promise.all(staff.map(u =>
       this.notifRepo.save(this.notifRepo.create({

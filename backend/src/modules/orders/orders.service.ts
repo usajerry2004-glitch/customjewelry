@@ -88,7 +88,7 @@ export class OrdersService {
   // Send in-app notifications + optional Resend email to authorizers and CAD designers on revision
   private async notifyRevision(order: Order): Promise<void> {
     const targets = await this.userRepo.find({
-      where: { role: In([UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.ADMIN]) },
+      where: { role: In([UserRole.AUTHORIZER, UserRole.CAD_DESIGNER]) },
     });
 
     const title = `CAD Revision Required — ${order.poNumber}`;
@@ -280,8 +280,9 @@ export class OrdersService {
       }).catch(err => this.logger.warn('Order placed email failed:', err));
     }
 
-    // Notify authorizers/admins: new order received — they review before assigning CAD
-    const authTeam = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
+    // Notify authorizers: new order received — they review before assigning CAD.
+    // Admins only get notified when tagged in the order's conversation.
+    const authTeam = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER]) } });
     const authEmails = authTeam.map(u => u.email).filter(Boolean);
     await Promise.all(authTeam.map(u =>
       this.notifRepo.save(this.notifRepo.create({
@@ -397,7 +398,7 @@ export class OrdersService {
 
       // Notify Factory Manager and Stone Manager simultaneously
       const vpoUsers = await this.userRepo.find({
-        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]) },
+        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]) },
       });
       await Promise.all(vpoUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
@@ -437,7 +438,7 @@ export class OrdersService {
 
     // NEW → CAD_IN_PROGRESS: notify CAD designers
     if (status === OrderStatus.CAD_IN_PROGRESS) {
-      const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER, UserRole.ADMIN]) } });
+      const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER]) } });
       const cadEmails = cadUsers.filter(u => u.role === UserRole.CAD_DESIGNER).map(u => u.email).filter(Boolean);
       await Promise.all(cadUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
@@ -468,9 +469,9 @@ export class OrdersService {
       }
     }
 
-    // MANUFACTURED — notify authorizers/admins (US team to receive)
+    // MANUFACTURED — notify authorizers (US team to receive)
     if (status === OrderStatus.MANUFACTURED) {
-      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER, UserRole.ADMIN]) } });
+      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER]) } });
       await Promise.all(teamUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
@@ -496,7 +497,7 @@ export class OrdersService {
         }).catch(err => this.logger.warn('Order shipped email failed:', err));
       }
       // In-portal notification for authorizers (no email)
-      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER, UserRole.ADMIN]) } });
+      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER]) } });
       await Promise.all(teamUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.ORDER_SHIPPED,
@@ -526,7 +527,7 @@ export class OrdersService {
     // Kept for API compatibility — orders now start at CAD_IN_PROGRESS directly.
     // This notifies CAD designers that a new order is ready.
     const order = await this.findOne(id);
-    const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER, UserRole.ADMIN]) } });
+    const cadUsers = await this.userRepo.find({ where: { role: In([UserRole.CAD_DESIGNER]) } });
     await Promise.all(cadUsers.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type: NotificationType.STATUS_CHANGED,

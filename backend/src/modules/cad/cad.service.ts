@@ -93,8 +93,8 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
 
-    // In-app notification → both Authorizer and Admin; email → Authorizer only
-    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
+    // Admins only get notified when tagged in the order's conversation, not on every batch upload
+    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
     if (authUsers.length) {
       await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD Files Ready for Review — ${order.poNumber}`,
@@ -173,8 +173,8 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (!order) return saved;
 
-    // In-app notification → both Authorizer and Admin; email → Authorizer only
-    const { users: saUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
+    // Admins only get notified when tagged in the order's conversation, not on every CAD submission
+    const { users: saUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
     if (saUsers.length) {
       await this.notifyTeam(saUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD File Ready for Review — ${order.poNumber}`,
@@ -209,7 +209,7 @@ export class CadService {
       const sku = await this.skuService.generate(order.id, approvedBy);
       await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED });
 
-      const { users: vpoUsers } = await this.getTeamEmails([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER, UserRole.ADMIN]);
+      const { users: vpoUsers } = await this.getTeamEmails([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]);
       if (vpoUsers.length) {
         await this.notifyTeam(vpoUsers, NotificationType.STATUS_CHANGED,
           `VPO Issued — ${order.poNumber}`,
@@ -232,7 +232,7 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      const { users } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.ADMIN]);
+      const { users } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.CAD_DESIGNER]);
       if (users.length) {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `Order Cancelled — ${order.poNumber}`,
@@ -254,7 +254,7 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      const { emails, users } = await this.getTeamEmails([UserRole.CAD_DESIGNER, UserRole.AUTHORIZER, UserRole.ADMIN]);
+      const { emails, users } = await this.getTeamEmails([UserRole.CAD_DESIGNER, UserRole.AUTHORIZER]);
       if (users.length) {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `CAD Revision Requested — ${order.poNumber}`,

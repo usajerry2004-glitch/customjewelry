@@ -43,7 +43,7 @@ export class RepairsService {
     const saved = await this.orderRepo.save(order);
 
     const recipients = await this.userRepo.find({
-      where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) },
+      where: { role: In([UserRole.AUTHORIZER]) },
     });
     await Promise.all(
       recipients.map(u =>
