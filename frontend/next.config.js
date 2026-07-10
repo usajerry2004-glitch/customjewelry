@@ -21,10 +21,11 @@ const nextConfig = {
   async rewrites() {
     const backend = process.env.BACKEND_URL || 'http://localhost:4000';
     return [
-      {
-        source: '/api/proxy/:path*',
-        destination: `${backend}/api/v1/:path*`,
-      },
+      // /api/proxy/:path* is NOT listed here — it's handled entirely by the
+      // custom pages/api/proxy/[...path].ts route, which forwards headers,
+      // streams the body, and returns readable errors. A framework rewrite
+      // to the same path previously raced with that route and produced an
+      // opaque 500 with no way to catch it from application code.
       {
         source: '/uploads/:path*',
         destination: `${backend}/uploads/:path*`,
