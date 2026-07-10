@@ -320,7 +320,7 @@ const ROLE_STAGE_PERMISSIONS: Record<string, OrderStatus[]> = {
   [UserRole.CUSTOMER]:        [],
 };
 
-const FIELD_GROUPS = [
+const FIELD_GROUPS: { title: string; fields: { key: string; label: string; format?: (v: any) => string }[] }[] = [
   {
     title: 'Order Details',
     fields: [
@@ -351,14 +351,6 @@ const FIELD_GROUPS = [
       { key: 'diamondQuality', label: 'Diamond Quality' },
       { key: 'centerStoneShape', label: 'Stone Shape' },
       { key: 'approximateCaratWeight', label: 'Carat Weight' },
-    ],
-  },
-  {
-    title: 'Pricing & Logistics',
-    fields: [
-      { key: 'quotedCost', label: 'Quoted Cost', format: (v: any) => v ? `$${Number(v).toLocaleString()}` : '—' },
-      { key: 'vendorName', label: 'Vendor' },
-      { key: 'invoiceNumber', label: 'Invoice #' },
     ],
   },
 ];
@@ -794,13 +786,12 @@ export default function OrderDetail() {
           {/* ── Col 1: Field groups ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {FIELD_GROUPS.map(group => {
-              // invoiceNumber stays admin-only; Factory/Stone Manager don't see pricing or
-              // customer identity (also enforced server-side, see FactoryRedactionInterceptor);
-              // phone number only shows up when the order actually has one
-              const FACTORY_HIDDEN_KEYS = ['quotedCost', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
+              // Factory/Stone Manager don't see customer identity (also enforced
+              // server-side, see FactoryRedactionInterceptor); phone number only
+              // shows up when the order actually has one
+              const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
               const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.STONE_MANAGER;
               const visibleFields = group.fields.filter(f => {
-                if (f.key === 'invoiceNumber' && userRole !== UserRole.ADMIN) return false;
                 if (FACTORY_HIDDEN_KEYS.includes(f.key) && isRestrictedRole) return false;
                 if (f.key === 'phoneNumber' && !order.phoneNumber) return false;
                 return true;
