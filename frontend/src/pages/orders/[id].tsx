@@ -369,6 +369,12 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'd
 const MAX_REFERENCE_IMAGES = 4;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
 
+// Same option lists as the New Order form, so specs stay consistent everywhere
+const SPEC_SELECT_OPTIONS: Record<string, string[]> = {
+  metalType: ['10K', '14K', '18K', 'Platinum'],
+  metalColor: ['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'],
+};
+
 const cardStyle = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
@@ -839,12 +845,27 @@ export default function OrderDetail() {
                           </div>
                         ) : canEditSpec ? (
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <input
-                              value={specInputs[key] ?? ''}
-                              onChange={e => setSpecInputs(s => ({ ...s, [key]: e.target.value }))}
-                              placeholder={label}
-                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
-                            />
+                            {SPEC_SELECT_OPTIONS[key] ? (
+                              <select
+                                value={specInputs[key] ?? ''}
+                                onChange={e => setSpecInputs(s => ({ ...s, [key]: e.target.value }))}
+                                style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                              >
+                                <option value="">Select…</option>
+                                {/* Keep whatever value is already saved selectable, even if it predates this list */}
+                                {(specInputs[key] && !SPEC_SELECT_OPTIONS[key].includes(specInputs[key])) && (
+                                  <option value={specInputs[key]}>{specInputs[key]}</option>
+                                )}
+                                {SPEC_SELECT_OPTIONS[key].map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                value={specInputs[key] ?? ''}
+                                onChange={e => setSpecInputs(s => ({ ...s, [key]: e.target.value }))}
+                                placeholder={label}
+                                style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
+                              />
+                            )}
                             {(specInputs[key] ?? '') !== (raw ?? '') && (
                               <button
                                 onClick={() => saveSpecField(key)}
