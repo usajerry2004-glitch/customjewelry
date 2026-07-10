@@ -3,6 +3,7 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { UserRole } from '../utils/types';
 import { toast } from '../utils/toast';
+import { formatName, getInitials } from '../utils/name';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -114,7 +115,7 @@ export default function SettingsPage() {
   };
 
   const handleRemove = async (u: StaffUser) => {
-    if (!confirm(`Remove ${u.firstName} ${u.lastName} (${u.email})? This cannot be undone.`)) return;
+    if (!confirm(`Remove ${formatName(u.firstName, u.lastName)} (${u.email})? This cannot be undone.`)) return;
     setRemovingId(u.id);
     const res = await apiFetch(`${API}/users/${u.id}`, { method: 'DELETE' });
     if (res.ok) {
@@ -268,9 +269,9 @@ export default function SettingsPage() {
                     <td style={{ padding: '12px 18px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${ROLE_COLORS[u.role] || '#6B7280'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: ROLE_COLORS[u.role] || '#6B7280', flexShrink: 0 }}>
-                          {u.firstName[0]}{u.lastName[0]}
+                          {getInitials(u.firstName, u.lastName)}
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{u.firstName} {u.lastName}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatName(u.firstName, u.lastName)}</span>
                       </div>
                     </td>
                     <td style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>{u.email}</td>

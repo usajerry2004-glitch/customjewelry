@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../utils/types';
+import { formatName } from '../utils/name';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -98,7 +99,7 @@ export default function CustomersPage() {
     if (rRes.ok) {
       const reps: any[] = await rRes.json();
       const map: Record<string, string> = {};
-      reps.forEach(r => { map[r.id] = `${r.firstName} ${r.lastName}`; });
+      reps.forEach(r => { map[r.id] = formatName(r.firstName, r.lastName); });
       setSalesRepMap(map);
     }
     setLoading(false);
@@ -108,7 +109,7 @@ export default function CustomersPage() {
 
   const allFiltered = useMemo(() => customers
     .filter(c => {
-      if (search && !`${c.storeName || ''} ${c.firstName} ${c.lastName} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !`${c.storeName || ''} ${formatName(c.firstName, c.lastName)} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterStatus === 'active' && !c.isActive) return false;
       if (filterStatus === 'inactive' && c.isActive) return false;
       if (filterPriority === 'priority' && !c.isPriority) return false;
@@ -117,8 +118,8 @@ export default function CustomersPage() {
       return true;
     })
     .sort((a, b) => {
-      const nameA = (a.storeName || `${a.firstName} ${a.lastName}`).toLowerCase();
-      const nameB = (b.storeName || `${b.firstName} ${b.lastName}`).toLowerCase();
+      const nameA = (a.storeName || formatName(a.firstName, a.lastName)).toLowerCase();
+      const nameB = (b.storeName || formatName(b.firstName, b.lastName)).toLowerCase();
       return nameA.localeCompare(nameB);
     }), [customers, search, filterStatus, filterPriority, filterSalesRep]);
 
@@ -139,7 +140,7 @@ export default function CustomersPage() {
         ...newOrder,
         customerId: showOrder.id,
         customerEmail: showOrder.email,
-        customerFullName: `${showOrder.firstName} ${showOrder.lastName}`,
+        customerFullName: formatName(showOrder.firstName, showOrder.lastName),
         quotedCost: newOrder.quotedCost ? parseFloat(newOrder.quotedCost) : undefined,
         manufacturingPath: 'STANDARD',
       }),
@@ -285,11 +286,11 @@ export default function CustomersPage() {
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <td style={{ padding: '14px 16px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {c.storeName || `${c.firstName} ${c.lastName}`}
+                    {c.storeName || formatName(c.firstName, c.lastName)}
                   </div>
                   {c.storeName && (
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {c.firstName} {c.lastName}
+                      {formatName(c.firstName, c.lastName)}
                     </div>
                   )}
                 </td>
@@ -415,7 +416,7 @@ export default function CustomersPage() {
           <div className="modal-box" style={{ ...modalBox, maxWidth: '620px' }} onClick={e => e.stopPropagation()}>
             <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', margin: '0 0 4px' }}>New Order</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px', margin: '4px 0 20px' }}>
-              For <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{showOrder.firstName} {showOrder.lastName}</span> ({showOrder.email})
+              For <span style={{ color: 'var(--accent-dark)', fontWeight: 600 }}>{formatName(showOrder.firstName, showOrder.lastName)}</span> ({showOrder.email})
             </p>
 
             <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -515,10 +516,10 @@ export default function CustomersPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                  {showOrders.customer.storeName || `${showOrders.customer.firstName} ${showOrders.customer.lastName}`}
+                  {showOrders.customer.storeName || formatName(showOrders.customer.firstName, showOrders.customer.lastName)}
                 </h2>
                 {showOrders.customer.storeName && (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '1px' }}>{showOrders.customer.firstName} {showOrders.customer.lastName}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '1px' }}>{formatName(showOrders.customer.firstName, showOrders.customer.lastName)}</div>
                 )}
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>{showOrders.orders.length} order{showOrders.orders.length !== 1 ? 's' : ''}</p>
               </div>

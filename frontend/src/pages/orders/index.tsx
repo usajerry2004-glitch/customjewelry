@@ -6,6 +6,7 @@ import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
 import { Order, OrderStatus, StoneStatus } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
+import { formatName } from '../../utils/name';
 
 const ALL_STATUS_FILTERS = [
   { label: 'All',             value: '' },
@@ -258,7 +259,7 @@ export default function OrdersPage() {
 
   const selectCustomer = (c: Customer) => {
     setSelectedCustomer(c);
-    setCustomerSearch(c.storeName || `${c.firstName} ${c.lastName}`);
+    setCustomerSearch(c.storeName || formatName(c.firstName, c.lastName));
     setShowCustomerDrop(false);
     // Auto-fill contact info from selected customer
     setContact(p => ({
@@ -266,7 +267,7 @@ export default function OrdersPage() {
       firstName: c.firstName || '',
       lastName: c.lastName || '',
       companyName: c.storeName ? c.storeName : 'Other',
-      companyNameOther: c.storeName ? '' : `${c.firstName} ${c.lastName}`,
+      companyNameOther: c.storeName ? '' : formatName(c.firstName, c.lastName),
       email: c.email || '',
     }));
   };
@@ -280,10 +281,10 @@ export default function OrdersPage() {
         customerId: selectedCustomer.id,
         customerEmail: contact.email || selectedCustomer.email,
         customerFullName: (contact.firstName || contact.lastName)
-          ? `${contact.firstName} ${contact.lastName}`.trim()
-          : `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
+          ? formatName(contact.firstName, contact.lastName)
+          : formatName(selectedCustomer.firstName, selectedCustomer.lastName),
       } : {
-        customerFullName: `${contact.firstName} ${contact.lastName}`.trim() || undefined,
+        customerFullName: formatName(contact.firstName, contact.lastName) || undefined,
         customerEmail: contact.email || undefined,
       };
       const res = await apiFetch(`${API}/orders`, {
