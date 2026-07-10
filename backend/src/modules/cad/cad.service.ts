@@ -9,6 +9,8 @@ import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
 
+const MAX_REFERENCE_IMAGES = 4;
+
 @Injectable()
 export class CadService {
   private readonly logger = new Logger(CadService.name);
@@ -145,6 +147,12 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     const existing = await this.cadRepo.find({ where: { orderId } });
+    const existingRefCount = existing.filter(
+      c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image',
+    ).length;
+    if (existingRefCount >= MAX_REFERENCE_IMAGES) {
+      throw new BadRequestException(`Maximum of ${MAX_REFERENCE_IMAGES} reference images allowed per order.`);
+    }
     const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'cad', file.originalname, file.mimetype);
     const cad = this.cadRepo.create({
       orderId,

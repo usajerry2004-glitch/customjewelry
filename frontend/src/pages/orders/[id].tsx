@@ -366,6 +366,9 @@ const FIELD_GROUPS = [
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
 const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
+const MAX_REFERENCE_IMAGES = 4;
+const DESIGN_FILES_COLLAPSED_COUNT = 2;
+
 const cardStyle = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
@@ -400,6 +403,8 @@ export default function OrderDetail() {
   const [savingShipDate, setSavingShipDate] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
+  const [showAllRefs, setShowAllRefs] = useState(false);
+  const [showAllDesignFiles, setShowAllDesignFiles] = useState(false);
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
@@ -878,24 +883,32 @@ export default function OrderDetail() {
             )}
           </div>
 
-          {/* ── Col 2: Reference Images & Videos ── */}
+          {/* ── Col 2: Reference Files + Design Files ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {(() => {
             const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
             const canUploadRef = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(userRole as UserRole);
+            const atRefLimit = refs.length >= MAX_REFERENCE_IMAGES;
+            const visibleRefs = showAllRefs ? refs : refs.slice(0, MAX_REFERENCE_IMAGES);
+            const hiddenRefCount = refs.length - visibleRefs.length;
             return (
               <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
-                    📌 Reference Files {refs.length > 0 && `(${refs.length})`}
+                    📌 Reference Files {refs.length > 0 && `(${refs.length}/${MAX_REFERENCE_IMAGES})`}
                   </h3>
-                  {canUploadRef && (
+                  {canUploadRef && (atRefLimit ? (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Limit reached</span>
+                  ) : (
                     <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '3px 10px', background: 'transparent', whiteSpace: 'nowrap' }}>
                       + Add Reference
                       <input type="file" multiple style={{ display: 'none' }}
                         onChange={async e => {
                           const files = Array.from(e.target.files || []);
                           if (!files.length || !order?.id) return;
-                          for (const file of files) {
+                          const allowed = Math.max(0, MAX_REFERENCE_IMAGES - refs.length);
+                          if (allowed === 0) { e.target.value = ''; return; }
+                          for (const file of files.slice(0, allowed)) {
                             const fd = new FormData();
                             fd.append('file', file);
                             await fetch(`${API}/cad/reference/${order.id}`, {
@@ -910,7 +923,7 @@ export default function OrderDetail() {
                         }}
                       />
                     </label>
-                  )}
+                  ))}
                 </div>
 
                 {refs.length === 0 ? (
@@ -926,7 +939,7 @@ export default function OrderDetail() {
                   </div>
                 ) : (
                   <div className="card-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    {refs.map(cad => {
+                    {visibleRefs.map(cad => {
                       const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                       const isImg = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
                       const isVid = ['mp4','mov','avi','webm','mkv','wmv'].includes(ext);
@@ -962,6 +975,15 @@ export default function OrderDetail() {
                   </div>
                 )}
 
+                {hiddenRefCount > 0 && (
+                  <button
+                    onClick={() => setShowAllRefs(v => !v)}
+                    style={{ width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '8px', fontSize: '12px', color: 'var(--accent-dark)', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {showAllRefs ? '▴ Show less' : `▾ View ${hiddenRefCount} more`}
+                  </button>
+                )}
+
                 {/* ── Reference Image Modal ── */}
                 {viewingRef && (
                   <div
@@ -986,12 +1008,7 @@ export default function OrderDetail() {
             );
           })()}
 
-          </div>{/* ── end fields+refs sub-grid ── */}
-
-          {/* ── Design Files + Conversation wrapper (relative so CAD modal scopes here) ── */}
-          <div style={{ position: 'relative' }}>
-
-          {/* ── CAD Design Files ── */}
+          {/* ── Design Files (moved into Col 2, right after Reference Files) ── */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
@@ -1070,9 +1087,12 @@ export default function OrderDetail() {
                 No CAD files uploaded yet for this order.
               </div>
             );
+            const visibleDesignFiles = showAllDesignFiles ? designList : designList.slice(0, DESIGN_FILES_COLLAPSED_COUNT);
+            const hiddenDesignFileCount = designList.length - visibleDesignFiles.length;
             return (
+            <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {designList.map(cad => {
+              {visibleDesignFiles.map(cad => {
                 const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
                 const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
                 const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
@@ -1137,9 +1157,22 @@ export default function OrderDetail() {
                 );
               })}
             </div>
+            {hiddenDesignFileCount > 0 && (
+              <button
+                onClick={() => setShowAllDesignFiles(v => !v)}
+                style={{ width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '8px', fontSize: '12px', color: 'var(--accent-dark)', fontWeight: 600, cursor: 'pointer', marginTop: '10px' }}
+              >
+                {showAllDesignFiles ? '▴ Show less' : `▾ View ${hiddenDesignFileCount} more`}
+              </button>
+            )}
+            </>
             );
           })()}
         </div>
+
+          </div>{/* ── end Col 2 (Reference Files + Design Files) ── */}
+
+          </div>{/* ── end fields+refs sub-grid ── */}
 
           {/* Conversation */}
           {order.id && currentUser && (
@@ -1152,14 +1185,14 @@ export default function OrderDetail() {
             </div>
           )}
 
-          {/* ── Design File Preview Modal (absolute: overlays Design Files + Conversation) ── */}
+          {/* ── Design File Preview Modal (fixed: full viewport, matches Reference Image Modal) ── */}
           {viewingCad && (
             <div
               onClick={e => { if (e.target === e.currentTarget) setViewingCad(null); }}
               style={{
-                position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
-                zIndex: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-                padding: '16px', overflowY: 'auto', borderRadius: 'var(--radius)',
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+                zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                padding: '16px', overflowY: 'auto',
               }}
             >
               <div style={{ width: '100%', maxWidth: '900px', flexShrink: 0, borderRadius: 'var(--radius-lg)' }}>
@@ -1175,8 +1208,6 @@ export default function OrderDetail() {
               </div>
             </div>
           )}
-
-          </div>{/* ── end Design Files + Conversation wrapper ── */}
 
         </div>{/* ── end main content column ── */}
 
