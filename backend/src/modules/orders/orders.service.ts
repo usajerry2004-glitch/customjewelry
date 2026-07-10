@@ -17,6 +17,9 @@ export { OrderFilterDto };
 
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
+// Product spec fields — editable via PUT /orders/:id, Admin/Authorizer only
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
@@ -312,6 +315,10 @@ export class OrdersService {
     if (dto.committedShipDate !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can set the committed ship date.');
+    }
+    if (EDITABLE_SPEC_KEYS.some(k => (dto as any)[k] !== undefined)
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
+      throw new ForbiddenException('Only Admin or Authorizer can edit product specs.');
     }
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);

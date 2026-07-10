@@ -363,6 +363,9 @@ const FIELD_GROUPS = [
   },
 ];
 
+// Product spec fields — editable inline, Admin/Authorizer only, any order status
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+
 const cardStyle = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
@@ -395,6 +398,8 @@ export default function OrderDetail() {
   const [savingPo, setSavingPo] = useState(false);
   const [shipDateInput, setShipDateInput] = useState('');
   const [savingShipDate, setSavingShipDate] = useState(false);
+  const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
+  const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
@@ -437,6 +442,9 @@ export default function OrderDetail() {
           setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
           setCustomerPoInput(o.refCustomerPo || '');
           setShipDateInput(o.committedShipDate ? String(o.committedShipDate).slice(0, 10) : '');
+          const specs: Record<string, string> = {};
+          EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = o[k] ?? ''; });
+          setSpecInputs(specs);
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -555,6 +563,27 @@ export default function OrderDetail() {
       if (fresh.ok) setOrder(await fresh.json());
     }
     setSavingPo(false);
+  };
+
+  const saveSpecField = async (key: string) => {
+    if (!order?.id) return;
+    setSavingSpecKey(key);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [key]: specInputs[key]?.trim() || null }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save.'));
+      }
+    } catch {
+      toast.error('Failed to save — check your connection and try again.');
+    } finally {
+      setSavingSpecKey(null);
+    }
   };
 
   const saveShipDate = async () => {
@@ -778,6 +807,8 @@ export default function OrderDetail() {
                     const isLink = key === 'referenceWeblink' && raw;
                     const canEditPo = key === 'refCustomerPo' &&
                       [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER].includes(userRole as UserRole);
+                    const canEditSpec = EDITABLE_SPEC_KEYS.includes(key) &&
+                      (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -798,6 +829,24 @@ export default function OrderDetail() {
                                 style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingPo ? 0.5 : 1 }}
                               >
                                 {savingPo ? '…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        ) : canEditSpec ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              value={specInputs[key] ?? ''}
+                              onChange={e => setSpecInputs(s => ({ ...s, [key]: e.target.value }))}
+                              placeholder={label}
+                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
+                            />
+                            {(specInputs[key] ?? '') !== (raw ?? '') && (
+                              <button
+                                onClick={() => saveSpecField(key)}
+                                disabled={savingSpecKey === key}
+                                style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingSpecKey === key ? 0.5 : 1 }}
+                              >
+                                {savingSpecKey === key ? '…' : 'Save'}
                               </button>
                             )}
                           </div>
