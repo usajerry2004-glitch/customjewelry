@@ -369,6 +369,7 @@ export default function CustomerOrderDetail() {
             { label: 'Your PO #', value: order.refCustomerPo },
             { label: 'SKU', value: order.kiraSkuNumber },
             { label: 'Tracking', value: order.trackingNumber },
+            { label: 'Committed Ship Date', value: order.committedShipDate ? new Date(order.committedShipDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null },
             { label: 'Placed', value: order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null },
             { label: 'Updated', value: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null },
           ].map(({ label, value }) => value ? (

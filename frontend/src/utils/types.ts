@@ -48,6 +48,7 @@ export interface Order {
   customerNotes?: string;
   refCustomerPo?: string;
   quotedCost?: number;
+  committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
   repairContractor?: string;

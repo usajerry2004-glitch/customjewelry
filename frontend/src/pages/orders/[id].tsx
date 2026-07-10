@@ -393,6 +393,8 @@ export default function OrderDetail() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [customerPoInput, setCustomerPoInput] = useState('');
   const [savingPo, setSavingPo] = useState(false);
+  const [shipDateInput, setShipDateInput] = useState('');
+  const [savingShipDate, setSavingShipDate] = useState(false);
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
@@ -434,6 +436,7 @@ export default function OrderDetail() {
           setOrder(o);
           setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
           setCustomerPoInput(o.refCustomerPo || '');
+          setShipDateInput(o.committedShipDate ? String(o.committedShipDate).slice(0, 10) : '');
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -552,6 +555,27 @@ export default function OrderDetail() {
       if (fresh.ok) setOrder(await fresh.json());
     }
     setSavingPo(false);
+  };
+
+  const saveShipDate = async () => {
+    if (!order?.id || !shipDateInput) return;
+    setSavingShipDate(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ committedShipDate: shipDateInput }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save committed ship date.'));
+      }
+    } catch {
+      toast.error('Failed to save committed ship date — check your connection and try again.');
+    } finally {
+      setSavingShipDate(false);
+    }
   };
 
   const confirmPriceAndMove = async () => {
@@ -1182,6 +1206,39 @@ export default function OrderDetail() {
               ) : (
                 <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
                   {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Committed Ship Date — only once the order is approved (VPO issued or later) */}
+          {userRole !== UserRole.CUSTOMER
+            && ![OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED].includes(order.status!) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Committed Ship Date
+              </div>
+              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={shipDateInput}
+                    onChange={e => setShipDateInput(e.target.value)}
+                    style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={saveShipDate}
+                    disabled={savingShipDate || !shipDateInput}
+                    style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingShipDate || !shipDateInput) ? 0.5 : 1 }}
+                  >
+                    {savingShipDate ? '…' : 'Save'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '20px', fontWeight: 700, color: order.committedShipDate ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
+                  {order.committedShipDate
+                    ? new Date(order.committedShipDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Not set yet'}
                 </div>
               )}
             </div>

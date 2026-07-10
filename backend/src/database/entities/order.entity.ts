@@ -137,6 +137,10 @@ export class Order {
   @Column({ nullable: true })
   courierName: string;
 
+  // Set by Admin/Authorizer once the order is approved (VPO issued or later).
+  @Column({ type: 'date', nullable: true })
+  committedShipDate: string;
+
   @Column({ nullable: true, type: 'text' })
   shippingNotes: string;
 

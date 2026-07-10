@@ -309,6 +309,10 @@ export class OrdersService {
 
   async update(id: string, dto: Partial<Order>, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.findOne(id, user);
+    if (dto.committedShipDate !== undefined
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
+      throw new ForbiddenException('Only Admin or Authorizer can set the committed ship date.');
+    }
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
 

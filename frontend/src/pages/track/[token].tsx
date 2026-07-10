@@ -73,6 +73,7 @@ interface OrderData {
   trackingNumber: string | null;
   shipMethod: string | null;
   quotedCost: number | null;
+  committedShipDate: string | null;
   cadFiles: CadFile[];
 }
 
@@ -251,6 +252,15 @@ export default function TrackPage() {
                     <div style={{ fontSize: 11, color: '#3B82F6', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Shipping Tracking</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1A2740' }}>{order.trackingNumber}</div>
                     {order.shipMethod && <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{order.shipMethod}</div>}
+                  </div>
+                )}
+
+                {order.committedShipDate && (
+                  <div style={{ marginTop: 16, background: '#FFF7ED', borderRadius: 8, padding: '12px 16px' }}>
+                    <div style={{ fontSize: 11, color: '#C2410C', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Committed Ship Date</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1A2740' }}>
+                      {new Date(order.committedShipDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </div>
                   </div>
                 )}
               </div>
