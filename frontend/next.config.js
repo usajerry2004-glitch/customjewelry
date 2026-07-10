@@ -39,4 +39,8 @@ module.exports = withSentryConfig(nextConfig, {
   // Disable source map upload until SENTRY_AUTH_TOKEN is configured
   disableServerWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
   disableClientWebpackPlugin: !process.env.SENTRY_AUTH_TOKEN,
+  // Sentry's automatic wrapping of API route handlers conflicts with this
+  // app's custom bodyParser:false/externalResolver:true proxy route,
+  // producing an opaque 500 that bypasses the route's own try/catch.
+  autoInstrumentServerFunctions: false,
 });
