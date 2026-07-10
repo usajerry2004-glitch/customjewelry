@@ -358,6 +358,9 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
 const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
+// Customer detail fields — editable inline, Admin only, any order status
+const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
+
 const MAX_REFERENCE_IMAGES = 4;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
 
@@ -401,6 +404,8 @@ export default function OrderDetail() {
   const [savingShipDate, setSavingShipDate] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
+  const [customerInputs, setCustomerInputs] = useState<Record<string, string>>({});
+  const [savingCustomerKey, setSavingCustomerKey] = useState<string | null>(null);
   const [showAllRefs, setShowAllRefs] = useState(false);
   const [showAllDesignFiles, setShowAllDesignFiles] = useState(false);
   const [repairModal, setRepairModal] = useState(false);
@@ -448,6 +453,9 @@ export default function OrderDetail() {
           const specs: Record<string, string> = {};
           EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = o[k] ?? ''; });
           setSpecInputs(specs);
+          const customerFields: Record<string, string> = {};
+          EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
+          setCustomerInputs(customerFields);
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -586,6 +594,27 @@ export default function OrderDetail() {
       toast.error('Failed to save — check your connection and try again.');
     } finally {
       setSavingSpecKey(null);
+    }
+  };
+
+  const saveCustomerField = async (key: string) => {
+    if (!order?.id) return;
+    setSavingCustomerKey(key);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [key]: customerInputs[key]?.trim() || null }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save.'));
+      }
+    } catch {
+      toast.error('Failed to save — check your connection and try again.');
+    } finally {
+      setSavingCustomerKey(null);
     }
   };
 
@@ -811,6 +840,7 @@ export default function OrderDetail() {
                       [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER].includes(userRole as UserRole);
                     const canEditSpec = EDITABLE_SPEC_KEYS.includes(key) &&
                       (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
+                    const canEditCustomer = EDITABLE_CUSTOMER_KEYS.includes(key) && userRole === UserRole.ADMIN;
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -864,6 +894,24 @@ export default function OrderDetail() {
                                 style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingSpecKey === key ? 0.5 : 1 }}
                               >
                                 {savingSpecKey === key ? '…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        ) : canEditCustomer ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              value={customerInputs[key] ?? ''}
+                              onChange={e => setCustomerInputs(s => ({ ...s, [key]: e.target.value }))}
+                              placeholder={label}
+                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
+                            />
+                            {(customerInputs[key] ?? '') !== (raw ?? '') && (
+                              <button
+                                onClick={() => saveCustomerField(key)}
+                                disabled={savingCustomerKey === key}
+                                style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingCustomerKey === key ? 0.5 : 1 }}
+                              >
+                                {savingCustomerKey === key ? '…' : 'Save'}
                               </button>
                             )}
                           </div>
