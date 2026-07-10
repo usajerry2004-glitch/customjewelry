@@ -21,27 +21,34 @@ function readBody(req: NextApiRequest): Promise<Buffer> {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const backendBase = process.env.BACKEND_URL || 'http://localhost:4000';
-  const segments = (req.query.path as string[]) ?? [];
-  const qs = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  const targetUrl = `${backendBase}/api/v1/${segments.join('/')}${qs}`;
-
-  const fwdHeaders: Record<string, string> = {};
-  for (const [k, v] of Object.entries(req.headers)) {
-    if (!HOP_BY_HOP.has(k.toLowerCase()) && typeof v === 'string') {
-      fwdHeaders[k] = v;
-    }
-  }
-  try { fwdHeaders['host'] = new URL(backendBase).host; } catch { /* invalid URL handled below */ }
-
+  // Everything below is wrapped in one try/catch — any uncaught throw here
+  // (bad query shape, header construction, network failure, etc.) would
+  // otherwise escape as a bare framework 500 with no detail instead of a
+  // readable JSON error the frontend can display.
   try {
+    const backendBase = process.env.BACKEND_URL || 'http://localhost:4000';
+    const pathParam = req.query?.path;
+    const segments: string[] = Array.isArray(pathParam) ? pathParam : (pathParam ? [pathParam] : []);
+    const qs = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    const targetUrl = `${backendBase}/api/v1/${segments.join('/')}${qs}`;
+
+    const fwdHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(req.headers || {})) {
+      if (!HOP_BY_HOP.has(k.toLowerCase()) && typeof v === 'string') {
+        fwdHeaders[k] = v;
+      }
+    }
+    try { fwdHeaders['host'] = new URL(backendBase).host; } catch { /* invalid URL handled below */ }
+
     const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
     const bodyBuf = hasBody ? await readBody(req) : undefined;
 
     const backendRes = await fetch(targetUrl, {
       method: req.method,
       headers: fwdHeaders,
-      body: bodyBuf,
+      // Buffer is a valid runtime BodyInit (Uint8Array), but TS resolves the
+      // fetch() overload against a narrower lib.dom type here — cast, don't rewrap.
+      body: bodyBuf as BodyInit | undefined,
     });
 
     for (const [k, v] of backendRes.headers.entries()) {
