@@ -64,6 +64,7 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(Sku),          useValue: makeRepo() },
         { provide: EmailService, useValue: {
           sendOrderInProduction:      jest.fn().mockResolvedValue(true),
+          sendVpoIssuedNotice:        jest.fn().mockResolvedValue(true),
           sendNewOrderToAuthorizers:  jest.fn().mockResolvedValue(true),
           sendOrderPlaced:            jest.fn().mockResolvedValue(true),
           sendCadRevisionAlert:       jest.fn().mockResolvedValue(true),

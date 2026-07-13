@@ -327,6 +327,19 @@ export class EmailService {
     });
   }
 
+  // For an external stakeholder with no in-app account — kept free of customer PII,
+  // same spirit as the Factory/Stone Manager redaction elsewhere.
+  async sendVpoIssuedNotice(opts: { to: string; poNumber: string; orderType: string }) {
+    return this.send({
+      to: opts.to,
+      subject: `VPO Issued — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#0EA5E9;margin:0 0 16px">VPO Issued</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been issued to the factory for manufacturing.</p>
+      `),
+    });
+  }
+
   async sendOrderInProduction(opts: {
     to: string;
     poNumber: string;

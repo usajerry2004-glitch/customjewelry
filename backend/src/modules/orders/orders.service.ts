@@ -26,6 +26,10 @@ const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail'
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
 const ADMIN_ONLY_KEYS = ['supplySource'];
 
+// External stakeholder with no in-app account — emailed on every VPO issuance,
+// same as Factory Manager's in-app notification.
+const VPO_EXTERNAL_NOTICE_EMAIL = 'archana@creationjewel.co.in';
+
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
@@ -449,6 +453,13 @@ export class OrdersService {
           targetUserId: u.id,
         })),
       ));
+
+      // External stakeholder (no account) — notified by email on every VPO issuance
+      this.emailService.sendVpoIssuedNotice({
+        to: VPO_EXTERNAL_NOTICE_EMAIL,
+        poNumber: vpoOrder.poNumber,
+        orderType: vpoOrder.orderType || '—',
+      }).catch(err => this.logger.warn('VPO external notice email failed:', err));
 
       return vpoOrder;
     }
