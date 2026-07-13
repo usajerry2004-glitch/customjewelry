@@ -354,7 +354,7 @@ export class OrdersService {
           && (c.status === CadFileStatus.UPLOADED || c.status === CadFileStatus.SENT_FOR_APPROVAL),
       );
       if (uploadedDesignFiles.length > 0) {
-        await this.orderRepo.update(id, { sentToCustomer: true });
+        await this.orderRepo.update(id, { sentToCustomer: true, lastApprovalEmailAt: new Date() });
         // Only UPLOADED ones need a status bump; SENT_FOR_APPROVAL already correct
         const toBumpIds = uploadedDesignFiles.filter(c => c.status === CadFileStatus.UPLOADED).map(c => c.id);
         if (toBumpIds.length) {

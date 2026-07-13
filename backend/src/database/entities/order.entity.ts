@@ -196,6 +196,11 @@ export class Order {
   @Column({ default: false })
   sentToCustomer: boolean;
 
+  // When the customer was last emailed about the CAD approval — set on the initial
+  // send and on each follow-up reminder; used to rate-limit the reminder button.
+  @Column({ type: 'timestamp', nullable: true })
+  lastApprovalEmailAt: Date | null;
+
   @Column({ nullable: true })
   headStyle: string;
 

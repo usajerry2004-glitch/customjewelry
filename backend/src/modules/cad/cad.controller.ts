@@ -57,6 +57,14 @@ export class CadController {
     return { sent: true };
   }
 
+  @Patch('order/:orderId/send-reminder')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Send a follow-up reminder email to the customer awaiting CAD approval (rate-limited to once per 24h)' })
+  async sendReminder(@Param('orderId') orderId: string) {
+    return this.cadService.sendApprovalReminder(orderId);
+  }
+
   @Get('thumbnails')
   @ApiOperation({ summary: 'Get first reference image filename for a batch of orders' })
   @ApiQuery({ name: 'orderIds', required: true, description: 'Comma-separated order IDs' })

@@ -119,7 +119,7 @@ export class CadService {
   async sendToCustomer(orderId: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-    await this.orderRepo.update(orderId, { sentToCustomer: true });
+    await this.orderRepo.update(orderId, { sentToCustomer: true, lastApprovalEmailAt: new Date() });
 
     // Mark all non-reference design files as SENT_FOR_APPROVAL so the customer portal shows approval buttons
     const allCads = await this.cadRepo.find({ where: { orderId } });
@@ -141,6 +141,36 @@ export class CadService {
         trackingToken: order.trackingToken,
       }).catch(err => this.logger.warn('CAD ready for approval email failed:', err));
     }
+  }
+
+  // Admin/Authorizer manually nudges a customer who hasn't approved/rejected yet.
+  // Rate-limited to once per 24h (checked against the last approval or reminder email).
+  async sendApprovalReminder(orderId: string): Promise<{ sent: true }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+    if (order.status !== OrderStatus.CAD_IN_PROGRESS || !order.sentToCustomer) {
+      throw new BadRequestException('This order is not currently awaiting customer approval.');
+    }
+    if (order.lastApprovalEmailAt) {
+      const hoursSince = (Date.now() - new Date(order.lastApprovalEmailAt).getTime()) / (1000 * 60 * 60);
+      if (hoursSince < 24) {
+        throw new BadRequestException(`A reminder was already sent recently. Try again in ${Math.ceil(24 - hoursSince)}h.`);
+      }
+    }
+    if (!order.customerEmail) {
+      throw new BadRequestException('This order has no customer email on file.');
+    }
+
+    await this.emailService.sendCadApprovalReminder({
+      to:            order.customerEmail,
+      poNumber:      order.poNumber,
+      customerName:  order.customerFullName || order.storeName || 'Valued Customer',
+      orderType:     order.orderType || '—',
+      orderId:       order.id,
+      trackingToken: order.trackingToken,
+    });
+    await this.orderRepo.update(orderId, { lastApprovalEmailAt: new Date() });
+    return { sent: true };
   }
 
   async uploadReference(orderId: string, file: Express.Multer.File, uploadedBy: string): Promise<CadFile> {

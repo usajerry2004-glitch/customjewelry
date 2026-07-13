@@ -415,6 +415,7 @@ export default function OrderDetail() {
   const [repairModal, setRepairModal] = useState(false);
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -692,6 +693,26 @@ export default function OrderDetail() {
       if (fresh.ok) setOrder(await fresh.json());
     }
     setSendingToCustomer(false);
+  };
+
+  const sendApprovalReminder = async () => {
+    if (!order?.id) return;
+    setSendingReminder(true);
+    try {
+      const res = await apiFetch(`${API}/cad/order/${order.id}/send-reminder`, { method: 'PATCH' });
+      if (res.ok) {
+        toast.success('Follow-up email sent to the customer.');
+        const fresh = await apiFetch(`${API}/orders/${order.id}`);
+        if (fresh.ok) setOrder(await fresh.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to send follow-up email.'));
+      }
+    } catch {
+      toast.error('Failed to send follow-up email — check your connection and try again.');
+    } finally {
+      setSendingReminder(false);
+    }
   };
 
   if (loading) {
@@ -1175,6 +1196,10 @@ export default function OrderDetail() {
             if (isAuthAdmin && filesUploaded && alreadySent && order.status === OrderStatus.CAD_IN_PROGRESS) {
               const pendingBatch = cads.filter(c => c.status === 'SENT_FOR_APPROVAL');
               if (pendingBatch.length > 0) {
+                const hoursSinceReminder = order.lastApprovalEmailAt
+                  ? (Date.now() - new Date(order.lastApprovalEmailAt).getTime()) / (1000 * 60 * 60)
+                  : Infinity;
+                const canRemind = hoursSinceReminder >= 24;
                 return (
                   <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                     <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 600 }}>
@@ -1188,6 +1213,11 @@ export default function OrderDetail() {
                       <button onClick={() => { setViewingCadList(pendingBatch); setViewingCad(pendingBatch[0]); }}
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         Review →
+                      </button>
+                      <button onClick={sendApprovalReminder} disabled={!canRemind || sendingReminder}
+                        title={canRemind ? undefined : `A reminder was already sent within the last 24h`}
+                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: (!canRemind || sendingReminder) ? 'not-allowed' : 'pointer', opacity: (!canRemind || sendingReminder) ? 0.5 : 1 }}>
+                        {sendingReminder ? 'Sending…' : '✉ Send Follow-up Email'}
                       </button>
                     </div>
                   </div>

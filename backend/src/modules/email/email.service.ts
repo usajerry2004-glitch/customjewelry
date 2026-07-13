@@ -304,6 +304,29 @@ export class EmailService {
     });
   }
 
+  async sendCadApprovalReminder(opts: {
+    to: string;
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    orderId: string;
+    trackingToken?: string;
+  }) {
+    const reviewLink = this.loginUrl(opts.to, opts.orderId);
+    return this.send({
+      to: opts.to,
+      subject: `Reminder: your CAD design is still awaiting your review — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#6366F1;margin:0 0 16px">Just a Reminder — Your Design is Waiting</h2>
+        <p>Hi ${opts.customerName},</p>
+        <p>We wanted to check in — your CAD design is still awaiting your review. Click the button below whenever you're ready to approve it or request changes.</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <a href="${reviewLink}" style="${btnStyle('#6366F1')}">Review & Approve Design →</a>
+        <p style="margin-top:16px;font-size:12px;color:#9CA3AF">We'll email you a one-time code — no password needed.</p>
+      `),
+    });
+  }
+
   async sendOrderInProduction(opts: {
     to: string;
     poNumber: string;
