@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { UserRole } from '../utils/types';
@@ -79,6 +79,32 @@ export default function SettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
+  const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const sortedStaff = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...staff].sort((a, b) => {
+      switch (sortKey) {
+        case 'email':
+          return dir * a.email.localeCompare(b.email);
+        case 'role':
+          return dir * (ROLE_LABELS[a.role] || a.role).localeCompare(ROLE_LABELS[b.role] || b.role);
+        case 'status':
+          return dir * (Number(a.isActive) - Number(b.isActive));
+        case 'added':
+          return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        case 'name':
+        default:
+          return dir * formatName(a.firstName, a.lastName).localeCompare(formatName(b.firstName, b.lastName));
+      }
+    });
+  }, [staff, sortKey, sortDir]);
 
   const reload = async () => {
     setLoading(true);
@@ -290,14 +316,32 @@ export default function SettingsPage() {
             <table className="staff-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-input)' }}>
-                  {['Name', 'Email', 'Role', 'Status', 'Added', ''].map(h => (
-                    <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                  {([
+                    { key: 'name', label: 'Name' },
+                    { key: 'email', label: 'Email' },
+                    { key: 'role', label: 'Role' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'added', label: 'Added' },
+                    { key: null, label: '' },
+                  ] as { key: typeof sortKey | null; label: string }[]).map(({ key, label }) => (
+                    <th
+                      key={label || 'actions'}
+                      onClick={() => key && toggleSort(key)}
+                      style={{
+                        padding: '10px 18px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)',
+                        textTransform: 'uppercase', letterSpacing: '0.7px', borderBottom: '1px solid var(--border)',
+                        cursor: key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {label}
+                      {key && sortKey === key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {staff.map((u, i) => (
-                  <tr key={u.id} style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                {sortedStaff.map((u, i) => (
+                  <tr key={u.id} style={{ borderBottom: i < sortedStaff.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <td style={{ padding: '12px 18px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${ROLE_COLORS[u.role] || '#6B7280'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: ROLE_COLORS[u.role] || '#6B7280', flexShrink: 0 }}>
