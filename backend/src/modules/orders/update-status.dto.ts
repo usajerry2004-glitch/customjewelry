@@ -1,6 +1,6 @@
 import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderStatus } from '../../database/entities/order.entity';
+import { OrderStatus, SupplySource } from '../../database/entities/order.entity';
 
 export class UpdateStatusDto {
   @IsEnum(OrderStatus, {
@@ -17,4 +17,10 @@ export class UpdateStatusDto {
   @IsOptional()
   @IsString()
   repairContractor?: string;
+
+  @IsOptional()
+  @IsEnum(SupplySource, {
+    message: `supplySource must be one of: ${Object.values(SupplySource).join(', ')}`,
+  })
+  supplySource?: SupplySource;
 }

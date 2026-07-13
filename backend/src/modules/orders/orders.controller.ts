@@ -99,7 +99,7 @@ export class OrdersController {
     @Body() body: UpdateStatusDto,
     @Request() req: any,
   ) {
-    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor);
+    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor, body.supplySource);
   }
 
   @Patch(':id/authorize')

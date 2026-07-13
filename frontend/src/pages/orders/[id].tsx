@@ -4,7 +4,7 @@ import { toast } from '../../utils/toast';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
@@ -329,6 +329,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'kiraSkuNumber', label: 'Kira SKU' },
       { key: 'orderType', label: 'Order Type' },
       { key: 'manufacturingPath', label: 'Manufacturing Path' },
+      { key: 'supplySource', label: 'Supply Source', format: (v) => SUPPLY_SOURCE_CONFIG[v]?.label || v },
       { key: 'referenceWeblink', label: 'Reference Link' },
     ],
   },
@@ -396,6 +397,9 @@ export default function OrderDetail() {
   const refSectionRef = useRef<HTMLDivElement>(null);
   const [priceModal, setPriceModal] = useState(false);
   const [pendingPrice, setPendingPrice] = useState('');
+  const [pendingSupplySource, setPendingSupplySource] = useState<SupplySource | ''>('');
+  const [supplySourceInput, setSupplySourceInput] = useState<SupplySource | ''>('');
+  const [savingSupplySource, setSavingSupplySource] = useState(false);
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
   const [customerPoInput, setCustomerPoInput] = useState('');
@@ -456,6 +460,7 @@ export default function OrderDetail() {
           const customerFields: Record<string, string> = {};
           EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
           setCustomerInputs(customerFields);
+          setSupplySourceInput(o.supplySource || '');
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -514,11 +519,12 @@ export default function OrderDetail() {
     setSummaryLoading(false);
   };
 
-  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
+  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string, supplySource?: SupplySource) => {
     if (!order?.id) return;
-    // Issuing the VPO requires a price — show modal if not provided
-    if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
+    // Issuing the VPO requires a price and a supply-source choice — show modal if not provided
+    if (newStatus === OrderStatus.VPO_ISSUED && (!quotedCost || !supplySource)) {
       setPendingPrice(order.quotedCost ? String(order.quotedCost) : '');
+      setPendingSupplySource((order.supplySource as SupplySource) || '');
       setPriceModal(true);
       return;
     }
@@ -532,6 +538,7 @@ export default function OrderDetail() {
     const body: any = { status: newStatus };
     if (quotedCost) body.quotedCost = quotedCost;
     if (repairContractor) body.repairContractor = repairContractor;
+    if (supplySource) body.supplySource = supplySource;
     const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -539,6 +546,9 @@ export default function OrderDetail() {
     if (res.ok) {
       const updated = await res.json();
       setOrder(updated);
+    } else {
+      const err = await res.json().catch(() => null);
+      toast.error(getErrorMessage(err, 'Failed to update status.'));
     }
     setUpdatingStatus(false);
   };
@@ -618,6 +628,27 @@ export default function OrderDetail() {
     }
   };
 
+  const saveSupplySource = async () => {
+    if (!order?.id || !supplySourceInput) return;
+    setSavingSupplySource(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ supplySource: supplySourceInput }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save.'));
+      }
+    } catch {
+      toast.error('Failed to save — check your connection and try again.');
+    } finally {
+      setSavingSupplySource(false);
+    }
+  };
+
   const saveShipDate = async () => {
     if (!order?.id || !shipDateInput) return;
     setSavingShipDate(true);
@@ -641,9 +672,9 @@ export default function OrderDetail() {
 
   const confirmPriceAndMove = async () => {
     const price = parseFloat(pendingPrice);
-    if (!price || price <= 0) return;
+    if (!price || price <= 0 || !pendingSupplySource) return;
     setPriceModal(false);
-    await moveStatus(OrderStatus.VPO_ISSUED, price);
+    await moveStatus(OrderStatus.VPO_ISSUED, price, undefined, pendingSupplySource);
   };
 
   const confirmRepair = async () => {
@@ -820,9 +851,12 @@ export default function OrderDetail() {
               // shows up when the order actually has one
               const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
               const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.STONE_MANAGER;
+              // Supply source is only meaningful once the VPO has been issued
+              const supplySourceRelevant = order.status !== OrderStatus.NEW && order.status !== OrderStatus.CAD_IN_PROGRESS;
               const visibleFields = group.fields.filter(f => {
                 if (FACTORY_HIDDEN_KEYS.includes(f.key) && isRestrictedRole) return false;
                 if (f.key === 'phoneNumber' && !order.phoneNumber) return false;
+                if (f.key === 'supplySource' && !supplySourceRelevant) return false;
                 return true;
               });
               if (visibleFields.length === 0) return null;
@@ -841,6 +875,7 @@ export default function OrderDetail() {
                     const canEditSpec = EDITABLE_SPEC_KEYS.includes(key) &&
                       (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
                     const canEditCustomer = EDITABLE_CUSTOMER_KEYS.includes(key) && userRole === UserRole.ADMIN;
+                    const canEditSupplySource = key === 'supplySource' && userRole === UserRole.ADMIN;
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -912,6 +947,27 @@ export default function OrderDetail() {
                                 style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingCustomerKey === key ? 0.5 : 1 }}
                               >
                                 {savingCustomerKey === key ? '…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        ) : canEditSupplySource ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <select
+                              value={supplySourceInput}
+                              onChange={e => setSupplySourceInput(e.target.value as SupplySource)}
+                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                            >
+                              {(Object.values(SupplySource) as SupplySource[]).map(s => (
+                                <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+                              ))}
+                            </select>
+                            {supplySourceInput !== (raw ?? '') && (
+                              <button
+                                onClick={saveSupplySource}
+                                disabled={savingSupplySource}
+                                style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingSupplySource ? 0.5 : 1 }}
+                              >
+                                {savingSupplySource ? '…' : 'Save'}
                               </button>
                             )}
                           </div>
@@ -1486,6 +1542,26 @@ export default function OrderDetail() {
               onKeyDown={e => { if (e.key === 'Enter') confirmPriceAndMove(); }}
               style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '15px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
             />
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Supply Source
+            </label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              {(Object.values(SupplySource) as SupplySource[]).map(s => {
+                const cfg = SUPPLY_SOURCE_CONFIG[s];
+                const selected = pendingSupplySource === s;
+                return (
+                  <button key={s} onClick={() => setPendingSupplySource(s)}
+                    style={{
+                      flex: 1, borderRadius: '8px', padding: '10px 8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                      border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
+                      background: selected ? cfg.bg : 'var(--bg-input)',
+                      color: selected ? cfg.color : 'var(--text-secondary)',
+                    }}>
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setPriceModal(false)}
                 style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
@@ -1493,8 +1569,8 @@ export default function OrderDetail() {
               </button>
               <button
                 onClick={confirmPriceAndMove}
-                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
+                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0 || !pendingSupplySource}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0 || !pendingSupplySource) ? 0.5 : 1 }}>
                 Confirm & Issue VPO
               </button>
             </div>

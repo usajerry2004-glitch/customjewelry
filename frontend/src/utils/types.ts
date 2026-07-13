@@ -14,6 +14,11 @@ export enum StoneStatus {
   STONE_RECEIVED = 'STONE_RECEIVED',
 }
 
+export enum SupplySource {
+  STONE_CREATIONS = 'STONE_CREATIONS',
+  KIRA            = 'KIRA',
+}
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   SALES_REP = 'SALES_REP',
@@ -51,6 +56,7 @@ export interface Order {
   committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
+  supplySource?: SupplySource | null;
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
@@ -79,6 +85,11 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
   REPAIR:          { label: 'Repair',        color: '#EF4444', bg: '#FEE2E2' },
   COMPLETED:       { label: 'Completed',     color: '#10B981', bg: '#D1FAE5' },
   CANCELLED:       { label: 'Cancelled',     color: '#6B7280', bg: '#F3F4F6' },
+};
+
+export const SUPPLY_SOURCE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  STONE_CREATIONS: { label: 'Stone Creations Supply', color: '#B45309', bg: '#FEF3C7' },
+  KIRA:            { label: 'Kira Supply',            color: '#9333EA', bg: '#F3E8FF' },
 };
 
 export const ROLE_ACTION_COLOR: Record<string, string> = {

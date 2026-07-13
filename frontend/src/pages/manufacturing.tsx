@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG } from '../utils/types';
+import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG } from '../utils/types';
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -15,6 +15,14 @@ export default function ManufacturingPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ role: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('jf_user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   const reload = async () => {
     const [qRes, mRes] = await Promise.all([apiFetch(`${API}/manufacturing/queue`), apiFetch(`${API}/manufacturing/metrics`)]);
@@ -110,9 +118,17 @@ export default function ManufacturingPage() {
 
                   {order.status === OrderStatus.VPO_ISSUED && (
                     order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
-                      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500 }}>
-                        ⏳ Waiting for Stone Manager to send the stone before production can proceed.
-                      </div>
+                      order.supplySource === SupplySource.STONE_CREATIONS &&
+                      (currentUser?.role === 'FACTORY_MANAGER' || currentUser?.role === 'ADMIN') ? (
+                        <button onClick={() => action(order.id, 'stone-sent')} disabled={busy}
+                          style={{ background: '#7C3AED', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                          💎 Mark Stone Received
+                        </button>
+                      ) : (
+                        <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400E', fontWeight: 500 }}>
+                          ⏳ Waiting for Stone Manager to send the stone before production can proceed.
+                        </div>
+                      )
                     ) : (
                       <button onClick={() => action(order.id, 'complete')} disabled={busy}
                         style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>

@@ -24,6 +24,11 @@ export enum StoneStatus {
   STONE_RECEIVED = 'STONE_RECEIVED',
 }
 
+export enum SupplySource {
+  STONE_CREATIONS = 'STONE_CREATIONS',
+  KIRA            = 'KIRA',
+}
+
 @Entity('orders')
 @Index(['poNumber'], { unique: true })
 @Index(['status'])
@@ -173,6 +178,11 @@ export class Order {
 
   @Column({ type: 'varchar', nullable: true })
   stoneStatus: StoneStatus | null;
+
+  // Who supplies the stone for this order — chosen by Admin when the VPO is issued.
+  // Stone Creations orders skip the internal Stone Manager queue entirely.
+  @Column({ type: 'varchar', nullable: true, default: SupplySource.KIRA })
+  supplySource: SupplySource | null;
 
   @Column({ default: false })
   isArchived: boolean;

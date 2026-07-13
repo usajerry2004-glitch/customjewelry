@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Order, OrderStatus, StoneStatus } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus, SupplySource } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -22,6 +22,9 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'd
 
 // Customer detail fields — editable via PUT /orders/:id, Admin only
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
+
+// Admin-only fields editable via PUT /orders/:id outside the status-change flow
+const ADMIN_ONLY_KEYS = ['supplySource'];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
@@ -147,6 +150,7 @@ export class OrdersService {
     } else if (user?.role === 'STONE_MANAGER') {
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
       qb.andWhere('(order.stoneStatus = :pendingStone OR order.stoneStatus IS NULL)', { pendingStone: 'PENDING_STONE' });
+      qb.andWhere('(order.supplySource IS NULL OR order.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
@@ -207,6 +211,10 @@ export class OrdersService {
     if (user?.role === 'FACTORY_MANAGER' &&
         order.status !== OrderStatus.VPO_ISSUED &&
         order.status !== OrderStatus.MANUFACTURED) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
+    if (user?.role === 'STONE_MANAGER' && order.supplySource === SupplySource.STONE_CREATIONS) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
@@ -326,6 +334,12 @@ export class OrdersService {
     if (EDITABLE_CUSTOMER_KEYS.some(k => (dto as any)[k] !== undefined) && user?.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only Admin can edit customer details.');
     }
+    // dto.status !== undefined means this write is part of a status transition (e.g. VPO issuance
+    // sets supplySource alongside status) — that path is gated by the status endpoint's own role check,
+    // not this one, which only guards standalone edits via PUT /orders/:id.
+    if (ADMIN_ONLY_KEYS.some(k => (dto as any)[k] !== undefined) && dto.status === undefined && user?.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only Admin can edit the supply source.');
+    }
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
 
@@ -368,6 +382,7 @@ export class OrdersService {
     user?: { id?: string; email: string; role: string },
     quotedCost?: number,
     repairContractor?: string,
+    supplySource?: SupplySource,
   ): Promise<Order> {
     if (user?.role === 'CUSTOMER') {
       throw new ForbiddenException('Not authorized to change order status directly');
@@ -395,11 +410,15 @@ export class OrdersService {
       if (!finalPrice || Number(finalPrice) <= 0) {
         throw new BadRequestException('Approximate quoted price is required before issuing the VPO.');
       }
+      const finalSupplySource = supplySource ?? order.supplySource;
+      if (!finalSupplySource) {
+        throw new BadRequestException('Supply source (Stone Creations or Kira) is required before issuing the VPO.');
+      }
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);
       }
-      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice }, user);
-      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
+      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, supplySource: finalSupplySource }, user);
+      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, `Supply source: ${finalSupplySource}`);
 
       // Email customer: design approved, in production
       if (vpoOrder.customerEmail) {
@@ -413,10 +432,12 @@ export class OrdersService {
         }).catch(err => this.logger.warn('Order in production email failed:', err));
       }
 
-      // Notify Factory Manager and Stone Manager simultaneously
-      const vpoUsers = await this.userRepo.find({
-        where: { role: In([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]) },
-      });
+      // Notify Factory Manager always; Stone Manager only when Kira supplies the stone —
+      // Stone Creations orders bypass the internal Stone Manager queue entirely.
+      const vpoRoles = finalSupplySource === SupplySource.KIRA
+        ? [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]
+        : [UserRole.FACTORY_MANAGER];
+      const vpoUsers = await this.userRepo.find({ where: { role: In(vpoRoles) } });
       await Promise.all(vpoUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
@@ -579,6 +600,9 @@ export class OrdersService {
       const allowed = ROLE_STATUSES[role];
       if (allowed) q.andWhere('o.status IN (:...rs)', { rs: allowed });
       if (role === UserRole.SALES_REP && user.id) q.andWhere('o.salesRepId = :uid', { uid: user.id });
+      if (role === UserRole.STONE_MANAGER) {
+        q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+      }
       return q;
     };
 
@@ -607,12 +631,19 @@ export class OrdersService {
         .getMany(),
       // Stone Manager: stone pending > 1 day — run FIRST so it wins over generic overdue
       [UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)
-        ? this.orderRepo.createQueryBuilder('o')
-            .where('o.isArchived = false')
-            .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-            .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
-            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-            .getMany()
+        ? (() => {
+            const q = this.orderRepo.createQueryBuilder('o')
+              .where('o.isArchived = false')
+              .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+              .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
+              .andWhere('o."updatedAt" < :d', { d: daysAgo(1) });
+            // Admin still sees Stone-Creations orders flagged here (they may need to chase Factory) —
+            // only Stone Manager's own view excludes orders they were never assigned.
+            if (role === UserRole.STONE_MANAGER) {
+              q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+            }
+            return q.getMany();
+          })()
         : none,
       // 2. Overall SLA: orders > 10 days old — skip Stone Manager (they only care about stone status)
       role !== UserRole.STONE_MANAGER
@@ -712,6 +743,9 @@ export class OrdersService {
         q.andWhere('o.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
       } else if (user?.role === 'FACTORY_MANAGER') {
         q.andWhere('o.kiraSkuNumber IS NOT NULL');
+      } else if (user?.role === 'STONE_MANAGER') {
+        q.andWhere('o.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
+        q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
       }
       return q;
     };
@@ -725,7 +759,7 @@ export class OrdersService {
       buildBase()
         .select([
           'o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.status', 'o.cadSubStatus',
-          'o.sentToCustomer', 'o.stoneStatus', 'o.isPriorityCustomer', 'o.quotedCost',
+          'o.sentToCustomer', 'o.stoneStatus', 'o.supplySource', 'o.isPriorityCustomer', 'o.quotedCost',
           'o.orderType', 'o.metalType', 'o.metalColor', 'o.salesRepName', 'o.salesRepEmail',
           'o.storeName', 'o.customerFullName', 'o.createdAt', 'o.updatedAt',
         ])
