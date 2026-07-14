@@ -747,17 +747,18 @@ export default function OrdersPage() {
       {showStoneSubRow && (
         <div className="stone-sub-filter" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px', paddingLeft: '8px', borderLeft: '3px solid #7C3AED' }}>
           {[
-            { label: 'All VPO',         value: '' },
-            { label: '💎 Pending Stone', value: 'stone_pending' },
-            { label: '✓ Stone Received', value: 'stone_received' },
+            { label: 'All VPO',            value: '',                  color: '#7C3AED' },
+            { label: '🏭 Assign Supplier', value: 'stone_unassigned',  color: '#0369A1' },
+            { label: '💎 Pending Stone',   value: 'stone_pending',     color: '#7C3AED' },
+            { label: '✓ Stone Received',   value: 'stone_received',    color: '#7C3AED' },
           ].map(f => (
             <button key={f.value} onClick={() => setStoneSubFilter(f.value)}
               style={{
                 padding: '4px 12px', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
                 fontWeight: stoneSubFilter === f.value ? 700 : 400,
-                background: stoneSubFilter === f.value ? '#7C3AED' : 'var(--bg-card)',
+                background: stoneSubFilter === f.value ? f.color : 'var(--bg-card)',
                 color: stoneSubFilter === f.value ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${stoneSubFilter === f.value ? '#7C3AED' : 'var(--border)'}`,
+                border: `1px solid ${stoneSubFilter === f.value ? f.color : 'var(--border)'}`,
                 transition: 'all 0.15s',
               }}
             >{f.label}</button>

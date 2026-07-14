@@ -171,8 +171,11 @@ export class OrdersService {
       qb.andWhere('order.cadSubStatus = :csApproved', { csApproved: 'APPROVED' });
 
     // Stone sub-filters
-    if (filters.stoneSubFilter === 'stone_pending')
-      qb.andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
+    if (filters.stoneSubFilter === 'stone_unassigned')
+      qb.andWhere('(order.assignedFactory IS NULL OR order.supplySource IS NULL)');
+    else if (filters.stoneSubFilter === 'stone_pending')
+      qb.andWhere('order.assignedFactory IS NOT NULL AND order.supplySource IS NOT NULL')
+        .andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
     else if (filters.stoneSubFilter === 'stone_received')
       qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
 
