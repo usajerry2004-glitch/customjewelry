@@ -136,6 +136,12 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quotedCost: number;
 
+  // Multiple price options offered to the customer (e.g. different metal/quality
+  // tiers) while they decide — purely informational until Admin/Authorizer sets
+  // the final quotedCost above.
+  @Column({ type: 'jsonb', nullable: true })
+  quoteOptions: { label: string; price: number }[] | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   goldLockPrice: number;
 

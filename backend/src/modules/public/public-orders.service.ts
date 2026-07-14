@@ -210,6 +210,7 @@ export class PublicOrdersService {
       trackingNumber: order.trackingNumber,
       shipMethod:     order.shipMethod,
       quotedCost:     order.quotedCost ?? null,
+      quoteOptions:   order.quoteOptions ?? null,
       committedShipDate: order.committedShipDate ?? null,
       cadFiles: cadFiles.map(f => ({
         id:             f.id,

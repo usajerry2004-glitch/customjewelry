@@ -303,7 +303,7 @@ const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED, OrderStatus.CANCELLED],
   [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CANCELLED],
-  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.CANCELLED],
+  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.CANCELLED, OrderStatus.VPO_ISSUED],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
   [OrderStatus.COMPLETED]:       [],
   [OrderStatus.CANCELLED]:       [],
@@ -400,6 +400,8 @@ export default function OrderDetail() {
   const [pendingPrice, setPendingPrice] = useState('');
   const [supplySourceInput, setSupplySourceInput] = useState<SupplySource | ''>('');
   const [savingSupplySource, setSavingSupplySource] = useState(false);
+  const [quoteOptionsInput, setQuoteOptionsInput] = useState<{ label: string; price: string }[]>([]);
+  const [savingQuoteOptions, setSavingQuoteOptions] = useState(false);
   const [assignSupplierModal, setAssignSupplierModal] = useState(false);
   const [assignFactoryInput, setAssignFactoryInput] = useState<Factory | ''>('');
   const [assignSupplySourceInput, setAssignSupplySourceInput] = useState<SupplySource | ''>('');
@@ -466,6 +468,7 @@ export default function OrderDetail() {
           EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
           setCustomerInputs(customerFields);
           setSupplySourceInput(o.supplySource || '');
+          setQuoteOptionsInput((o.quoteOptions || []).map((q: any) => ({ label: q.label || '', price: String(q.price) })));
         }
       })
       .catch((e) => { if (!signal.aborted) console.error('Order fetch error:', e); });
@@ -526,9 +529,13 @@ export default function OrderDetail() {
 
   const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
     if (!order?.id) return;
-    // Issuing the VPO requires a price — show modal if not provided. Stone supplier
-    // and factory are assigned separately afterwards, via "Assign Supplier".
-    if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
+    // Admin reverting Manufactured -> VPO Issued — a corrective undo, not a fresh
+    // approval, so skip the price modal entirely and just confirm.
+    if (newStatus === OrderStatus.VPO_ISSUED && order.status === OrderStatus.MANUFACTURED) {
+      if (!confirm('Revert this order from Manufactured back to VPO Issued?')) return;
+    } else if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
+      // Issuing the VPO requires a price — show modal if not provided. Stone supplier
+      // and factory are assigned separately afterwards, via "Assign Supplier".
       setPendingPrice(order.quotedCost ? String(order.quotedCost) : '');
       setPriceModal(true);
       return;
@@ -650,6 +657,35 @@ export default function OrderDetail() {
       toast.error('Failed to save — check your connection and try again.');
     } finally {
       setSavingSupplySource(false);
+    }
+  };
+
+  const addQuoteOptionRow = () => setQuoteOptionsInput(rows => [...rows, { label: '', price: '' }]);
+  const removeQuoteOptionRow = (i: number) => setQuoteOptionsInput(rows => rows.filter((_, idx) => idx !== i));
+  const updateQuoteOptionRow = (i: number, field: 'label' | 'price', value: string) =>
+    setQuoteOptionsInput(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+
+  const saveQuoteOptions = async () => {
+    if (!order?.id) return;
+    const options = quoteOptionsInput
+      .filter(r => r.price && parseFloat(r.price) > 0)
+      .map(r => ({ label: r.label.trim(), price: parseFloat(r.price) }));
+    setSavingQuoteOptions(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/quote-options`, {
+        method: 'PATCH',
+        body: JSON.stringify({ options }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save quote options.'));
+      }
+    } catch {
+      toast.error('Failed to save — check your connection and try again.');
+    } finally {
+      setSavingQuoteOptions(false);
     }
   };
 
@@ -1481,6 +1517,79 @@ export default function OrderDetail() {
                 <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
                   {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Quote Options — multiple price options the customer can review while
+              deciding (e.g. different metal/quality tiers). Purely informational;
+              Admin still confirms one final price above via Quoted Price. */}
+          {![UserRole.CUSTOMER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER].includes(userRole as UserRole) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Quote Options
+              </div>
+              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                    {quoteOptionsInput.map((row, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <input
+                          value={row.label}
+                          onChange={e => updateQuoteOptionRow(i, 'label', e.target.value)}
+                          placeholder="e.g. 14K Yellow Gold"
+                          style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none' }}
+                        />
+                        <div style={{ position: 'relative', width: '110px' }}>
+                          <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--text-muted)', pointerEvents: 'none' }}>$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={row.price}
+                            onChange={e => updateQuoteOptionRow(i, 'price', e.target.value)}
+                            placeholder="0.00"
+                            style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 8px 6px 18px', fontSize: '12px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeQuoteOptionRow(i)}
+                          style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '0 4px' }}
+                          aria-label="Remove option"
+                        >×</button>
+                      </div>
+                    ))}
+                    {quoteOptionsInput.length === 0 && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No price options added yet.</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={addQuoteOptionRow}
+                      style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      + Add Option
+                    </button>
+                    <button
+                      onClick={saveQuoteOptions}
+                      disabled={savingQuoteOptions}
+                      style={{ flex: 1, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: savingQuoteOptions ? 0.6 : 1 }}
+                    >
+                      {savingQuoteOptions ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </>
+              ) : (order.quoteOptions && order.quoteOptions.length > 0) ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {order.quoteOptions.map((q, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{q.label || `Option ${i + 1}`}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${Number(q.price).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No price options added yet.</div>
               )}
             </div>
           )}

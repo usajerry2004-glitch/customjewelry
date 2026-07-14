@@ -60,6 +60,7 @@ export interface Order {
   customerNotes?: string;
   refCustomerPo?: string;
   quotedCost?: number;
+  quoteOptions?: { label: string; price: number }[] | null;
   committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;

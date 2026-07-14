@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { UserRole } from '../../database/entities/user.entity';
 
-const REDACTED_FIELDS = ['quotedCost', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
+const REDACTED_FIELDS = ['quotedCost', 'quoteOptions', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
 const REDACTED_ROLES: string[] = [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER];
 
 // Recursively strips REDACTED_FIELDS from any order-shaped object (identified

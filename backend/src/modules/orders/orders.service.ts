@@ -24,13 +24,13 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'd
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
-const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory'];
+const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions'];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
   [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED],
-  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR],
+  [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.VPO_ISSUED],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED],
   [OrderStatus.SHIPPED]:         [OrderStatus.COMPLETED],
   [OrderStatus.COMPLETED]:       [],
@@ -410,6 +410,18 @@ export class OrdersService {
       );
     }
 
+    // Admin-only revert: undo an accidental "Manufactured" mark, back to VPO Issued.
+    // Skips the approve-order side effects below (no new SKU/price/notifications) —
+    // the order was already approved and assigned, this just corrects the stage.
+    if (existing.status === OrderStatus.MANUFACTURED && status === OrderStatus.VPO_ISSUED) {
+      if (user?.role !== UserRole.ADMIN) {
+        throw new ForbiddenException('Only Admin can revert a manufactured order back to VPO Issued.');
+      }
+      const reverted = await this.update(id, { status, processedDate: null as any }, user);
+      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, 'Reverted from Manufactured by Admin');
+      return reverted;
+    }
+
     // Approve the order: require quoted price, auto-generate the SKU, and issue the
     // VPO. Supplier/factory are NOT chosen here — the order stays invisible to every
     // Factory/Stone Manager until Admin/Authorizer completes the separate
@@ -641,6 +653,23 @@ export class OrdersService {
       orderId: saved.id,
     }).catch(err => this.logger.warn('Stone supplier assigned alert email failed:', err));
 
+    return saved;
+  }
+
+  // Admin/Authorizer only — sets the list of price options shown to the customer
+  // while they decide (e.g. different metal/quality tiers for the same design).
+  // Purely informational: issuing the VPO still requires quotedCost to be set
+  // separately once a final price is agreed.
+  async updateQuoteOptions(
+    id: string,
+    options: { label?: string; price: number }[],
+    user?: { id?: string; email: string; role: string },
+  ): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+    order.quoteOptions = options.map(o => ({ label: o.label?.trim() || '', price: Number(o.price) }));
+    const saved = await this.orderRepo.save(order);
+    this.logEvent(id, 'QUOTE_OPTIONS_UPDATED', user, undefined, undefined, `${options.length} option(s)`);
     return saved;
   }
 

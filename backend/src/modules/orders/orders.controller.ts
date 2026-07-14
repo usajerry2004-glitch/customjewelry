@@ -4,6 +4,7 @@ import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
 import { Order } from '../../database/entities/order.entity';
 import { UpdateStatusDto, AssignSupplierDto } from './update-status.dto';
+import { UpdateQuoteOptionsDto } from './dto/quote-options.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
@@ -112,6 +113,18 @@ export class OrdersController {
     @Request() req: any,
   ) {
     return this.ordersService.assignSupplier(id, body.factory, body.supplySource, req.user);
+  }
+
+  @Patch(':id/quote-options')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Set the list of price options shown to the customer while they decide' })
+  updateQuoteOptions(
+    @Param('id') id: string,
+    @Body() body: UpdateQuoteOptionsDto,
+    @Request() req: any,
+  ) {
+    return this.ordersService.updateQuoteOptions(id, body.options, req.user);
   }
 
   @Patch(':id/authorize')

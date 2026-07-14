@@ -73,6 +73,7 @@ interface OrderData {
   trackingNumber: string | null;
   shipMethod: string | null;
   quotedCost: number | null;
+  quoteOptions: { label: string; price: number }[] | null;
   committedShipDate: string | null;
   cadFiles: CadFile[];
 }
@@ -235,6 +236,23 @@ export default function TrackPage() {
                   <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F0EDE8' }}>
                     <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Your Notes</div>
                     <div style={{ fontSize: 14, color: '#4B5563', lineHeight: 1.6 }}>{order.customerNotes}</div>
+                  </div>
+                )}
+
+                {(order.quotedCost == null || order.quotedCost <= 0) && order.quoteOptions && order.quoteOptions.length > 0 && (
+                  <div style={{ marginTop: 16, background: '#EFF6FF', borderRadius: 8, padding: '12px 16px' }}>
+                    <div style={{ fontSize: 11, color: '#2563EB', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Price Options</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                      {order.quoteOptions.map((q, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                          <span style={{ color: '#4B5563' }}>{q.label || `Option ${i + 1}`}</span>
+                          <span style={{ fontWeight: 700, color: '#1A2740' }}>${Number(q.price).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', lineHeight: 1.5 }}>
+                      Talk to your sales rep to confirm which option you'd like — we'll finalize the price once you decide.
+                    </div>
                   </div>
                 )}
 
