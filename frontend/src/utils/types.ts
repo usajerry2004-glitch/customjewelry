@@ -80,6 +80,7 @@ export interface OrderMessage {
   authorRole: string;
   content: string;
   isInternal: boolean;
+  mentionNames?: string[];
   mentions: string[];
   createdAt: string;
 }

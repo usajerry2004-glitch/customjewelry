@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderMessage } from '../utils/types';
+import { formatName } from '../utils/name';
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN:          '#C09B58',
@@ -12,10 +13,12 @@ const ROLE_COLORS: Record<string, string> = {
   CUSTOMER:       '#059669',
 };
 
-const MENTION_ROLES = [
-  '@ADMIN', '@AUTHORIZER', '@CAD_DESIGNER',
-  '@FACTORY_MANAGER', '@STONE_MANAGER', '@SALES_REP',
-];
+interface MentionableUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+}
 
 // CAD event messages start with one of these emojis
 const CAD_EVENT_PREFIX = /^(📎|🔔|✅|❌|↺)/;
@@ -40,6 +43,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   const [content, setContent] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [mentions, setMentions] = useState<string[]>([]);
+  const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
   const [sending, setSending] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -51,9 +55,20 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
 
   useEffect(() => { load(); }, [orderId]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (isCustomer) return;
+    apiFetch(`${API}/orders/${orderId}/messages/mentionable-users`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setMentionableUsers);
+  }, [orderId, isCustomer]);
 
-  const toggleMention = (m: string) =>
-    setMentions(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+  const mentionNameById = (id: string) => {
+    const u = mentionableUsers.find(u => u.id === id);
+    return u ? formatName(u.firstName, u.lastName) : 'Unknown user';
+  };
+
+  const toggleMention = (id: string) =>
+    setMentions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const send = async () => {
     if (!content.trim()) return;
@@ -153,10 +168,10 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                     color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {msg.content}
-                    {msg.mentions?.length > 0 && (
+                    {msg.mentionNames && msg.mentionNames.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {msg.mentions.map(m => (
-                          <span key={m} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>{m}</span>
+                        {msg.mentionNames.map((name, i) => (
+                          <span key={i} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>@{name}</span>
                         ))}
                       </div>
                     )}
@@ -200,25 +215,28 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                 @ Mention {mentions.length > 0 && `(${mentions.length})`}
               </button>
               {showMentions && (
-                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '180px', boxShadow: 'var(--shadow-md)' }}>
-                  {MENTION_ROLES.map(m => (
+                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '200px', maxHeight: '240px', overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
+                  {mentionableUsers.length === 0 && (
+                    <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--text-muted)' }}>No one to mention yet.</div>
+                  )}
+                  {mentionableUsers.map(u => (
                     <div
-                      key={m}
-                      onClick={() => toggleMention(m)}
+                      key={u.id}
+                      onClick={() => toggleMention(u.id)}
                       style={{
                         padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px',
-                        color: mentions.includes(m) ? '#2563EB' : 'var(--text-secondary)',
-                        background: mentions.includes(m) ? 'rgba(37,99,235,0.08)' : 'transparent',
+                        color: mentions.includes(u.id) ? '#2563EB' : 'var(--text-secondary)',
+                        background: mentions.includes(u.id) ? 'rgba(37,99,235,0.08)' : 'transparent',
                       }}
                     >
-                      {mentions.includes(m) ? '✓ ' : ''}{m}
+                      {mentions.includes(u.id) ? '✓ ' : ''}{formatName(u.firstName, u.lastName)}
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            {mentions.length > 0 && mentions.map(m => (
-              <span key={m} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>{m}</span>
+            {mentions.length > 0 && mentions.map(id => (
+              <span key={id} style={{ fontSize: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563EB', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.2)' }}>@{mentionNameById(id)}</span>
             ))}
           </div>
         )}
