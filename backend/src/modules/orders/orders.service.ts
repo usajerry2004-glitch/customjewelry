@@ -179,6 +179,9 @@ export class OrdersService {
     else if (filters.stoneSubFilter === 'stone_received')
       qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
 
+    if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
+    if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
+
     if (filters.search) {
       const escaped = filters.search.replace(/[%_\\]/g, c => `\\${c}`);
       qb.andWhere(

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, STATUS_CONFIG, StoneStatus, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR } from '../../utils/types';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -121,6 +121,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && order.status === 'VPO_ISSUED' && (order as any).assignedFactory && order.supplySource && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#065F46', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               💎 Stone Received
+            </span>
+          )}
+          {(order as any).assignedFactory && FACTORY_CONFIG[(order as any).assignedFactory] && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: FACTORY_CONFIG[(order as any).assignedFactory].color, background: FACTORY_CONFIG[(order as any).assignedFactory].bg, border: `1px solid ${FACTORY_CONFIG[(order as any).assignedFactory].color}30`, borderRadius: '5px', padding: '1px 7px' }}>
+              🏭 {FACTORY_CONFIG[(order as any).assignedFactory].label}
+            </span>
+          )}
+          {order.supplySource && SUPPLY_SOURCE_CONFIG[order.supplySource] && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: SUPPLY_SOURCE_CONFIG[order.supplySource].color, background: SUPPLY_SOURCE_CONFIG[order.supplySource].bg, border: `1px solid ${SUPPLY_SOURCE_CONFIG[order.supplySource].color}30`, borderRadius: '5px', padding: '1px 7px' }}>
+              💎 {SUPPLY_SOURCE_CONFIG[order.supplySource].label}
             </span>
           )}
         </div>

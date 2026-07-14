@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
-import { Order, OrderStatus, StoneStatus } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
@@ -128,6 +128,8 @@ export default function OrdersPage() {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [cadSubFilter, setCadSubFilter] = useState('');
   const [stoneSubFilter, setStoneSubFilter] = useState('');
+  const [factoryFilter, setFactoryFilter] = useState('');
+  const [supplySourceFilter, setSupplySourceFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [customerFilterInput, setCustomerFilterInput] = useState('');
   const [showFilterDrop, setShowFilterDrop] = useState(false);
@@ -175,6 +177,8 @@ export default function OrdersPage() {
       }
       if (statusFilter === OrderStatus.CAD_IN_PROGRESS && cadSubFilter) params.set('cadSubFilter', cadSubFilter);
       if (stoneSubFilter) params.set('stoneSubFilter', stoneSubFilter);
+      if (factoryFilter) params.set('assignedFactory', factoryFilter);
+      if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       const res = await apiFetch(`${API}/orders?${params}`);
@@ -246,7 +250,7 @@ export default function OrdersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo]);
   useEffect(() => { load(page); }, [page]);
 
   const openNewOrderModal = async () => {
@@ -685,6 +689,31 @@ export default function OrdersPage() {
           placeholder="Search PO number, store, customer, SKU…"
           style={{ ...inputStyle, flex: '1 1 200px', minWidth: '140px', maxWidth: '300px' }}
         />
+
+        {userRole !== 'CUSTOMER' && (
+          <>
+            <select
+              value={factoryFilter}
+              onChange={e => setFactoryFilter(e.target.value)}
+              style={{ ...inputStyle, flex: '0 1 160px', cursor: 'pointer' }}
+            >
+              <option value="">All Factories</option>
+              {(Object.values(Factory) as Factory[]).map(f => (
+                <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
+              ))}
+            </select>
+            <select
+              value={supplySourceFilter}
+              onChange={e => setSupplySourceFilter(e.target.value)}
+              style={{ ...inputStyle, flex: '0 1 170px', cursor: 'pointer' }}
+            >
+              <option value="">All Stone Suppliers</option>
+              {(Object.values(SupplySource) as SupplySource[]).map(s => (
+                <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+              ))}
+            </select>
+          </>
+        )}
 
         {/* Desktop: pill buttons */}
         <div className="status-tabs-desktop" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
