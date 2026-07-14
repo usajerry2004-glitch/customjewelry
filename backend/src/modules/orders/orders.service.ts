@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Order, OrderStatus, StoneStatus, SupplySource } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -24,11 +24,7 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'd
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
-const ADMIN_ONLY_KEYS = ['supplySource'];
-
-// External stakeholder with no in-app account — emailed on every VPO issuance,
-// same as Factory Manager's in-app notification.
-const VPO_EXTERNAL_NOTICE_EMAIL = 'archana@creationjewel.co.in';
+const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory'];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
@@ -135,7 +131,7 @@ export class OrdersService {
     }
   }
 
-  async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string }) {
+  async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const qb = this.orderRepo.createQueryBuilder('order');
 
     if (user?.role === 'CUSTOMER') {
@@ -148,13 +144,16 @@ export class OrdersService {
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
     } else if (user?.role === 'FACTORY_MANAGER') {
+      // Invisible until Admin/Authorizer assigns this order to this user's factory.
       qb.andWhere('order.status IN (:...factoryStatuses)', {
         factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED],
       });
+      qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
     } else if (user?.role === 'STONE_MANAGER') {
+      // Invisible until Admin/Authorizer assigns this order to this user's supply source.
       qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
       qb.andWhere('(order.stoneStatus = :pendingStone OR order.stoneStatus IS NULL)', { pendingStone: 'PENDING_STONE' });
-      qb.andWhere('(order.supplySource IS NULL OR order.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+      qb.andWhere('order.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
     }
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
@@ -200,7 +199,7 @@ export class OrdersService {
     return { orders, total };
   }
 
-  async findOne(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
@@ -212,13 +211,18 @@ export class OrdersService {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    if (user?.role === 'FACTORY_MANAGER' &&
-        order.status !== OrderStatus.VPO_ISSUED &&
-        order.status !== OrderStatus.MANUFACTURED) {
+    // Invisible until Admin/Authorizer assigns this order to this user's factory.
+    if (user?.role === 'FACTORY_MANAGER' && (
+      (order.status !== OrderStatus.VPO_ISSUED && order.status !== OrderStatus.MANUFACTURED) ||
+      !order.assignedFactory || order.assignedFactory !== user.assignedFactory
+    )) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    if (user?.role === 'STONE_MANAGER' && order.supplySource === SupplySource.STONE_CREATIONS) {
+    // Invisible until Admin/Authorizer assigns this order to this user's supply source.
+    if (user?.role === 'STONE_MANAGER' && (
+      !order.supplySource || order.supplySource !== user.assignedSupplySource
+    )) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
@@ -386,7 +390,6 @@ export class OrdersService {
     user?: { id?: string; email: string; role: string },
     quotedCost?: number,
     repairContractor?: string,
-    supplySource?: SupplySource,
   ): Promise<Order> {
     if (user?.role === 'CUSTOMER') {
       throw new ForbiddenException('Not authorized to change order status directly');
@@ -407,22 +410,21 @@ export class OrdersService {
       );
     }
 
-    // Require quoted price, auto-generate the SKU, and issue the VPO in one step
+    // Approve the order: require quoted price, auto-generate the SKU, and issue the
+    // VPO. Supplier/factory are NOT chosen here — the order stays invisible to every
+    // Factory/Stone Manager until Admin/Authorizer completes the separate
+    // "Assign Supplier" step (see assignSupplier() below).
     if (status === OrderStatus.VPO_ISSUED) {
       const order = await this.findOne(id);
       const finalPrice = quotedCost ?? order.quotedCost;
       if (!finalPrice || Number(finalPrice) <= 0) {
         throw new BadRequestException('Approximate quoted price is required before issuing the VPO.');
       }
-      const finalSupplySource = supplySource ?? order.supplySource;
-      if (!finalSupplySource) {
-        throw new BadRequestException('Supply source (Stone Creations or Kira) is required before issuing the VPO.');
-      }
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);
       }
-      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, supplySource: finalSupplySource }, user);
-      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, `Supply source: ${finalSupplySource}`);
+      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice }, user);
+      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
       // Email customer: design approved, in production
       if (vpoOrder.customerEmail) {
@@ -436,30 +438,25 @@ export class OrdersService {
         }).catch(err => this.logger.warn('Order in production email failed:', err));
       }
 
-      // Notify Factory Manager always; Stone Manager only when Kira supplies the stone —
-      // Stone Creations orders bypass the internal Stone Manager queue entirely.
-      const vpoRoles = finalSupplySource === SupplySource.KIRA
-        ? [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]
-        : [UserRole.FACTORY_MANAGER];
-      const vpoUsers = await this.userRepo.find({ where: { role: In(vpoRoles) } });
-      await Promise.all(vpoUsers.map(u =>
+      // Notify Admin + Authorizer: VPO issued, needs a supplier/factory assignment
+      // before it becomes visible to production.
+      const assignerUsers = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
+      await Promise.all(assignerUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
-          title: `VPO Issued — ${vpoOrder.poNumber}`,
-          message: u.role === UserRole.STONE_MANAGER
-            ? `Order ${vpoOrder.poNumber} is ready — please arrange stones.`
-            : `Order ${vpoOrder.poNumber} has been issued to the factory for manufacturing.`,
+          title: `Assign Supplier — ${vpoOrder.poNumber}`,
+          message: `Order ${vpoOrder.poNumber} has been approved (VPO Issued). Select a stone supplier and factory to release it to production.`,
           orderId: vpoOrder.id,
           targetUserId: u.id,
         })),
       ));
-
-      // External stakeholder (no account) — notified by email on every VPO issuance
-      this.emailService.sendVpoIssuedNotice({
-        to: VPO_EXTERNAL_NOTICE_EMAIL,
+      const assignerEmails = assignerUsers.map(u => u.email).filter(Boolean);
+      this.emailService.sendAssignSupplierAlert({
+        to: assignerEmails,
         poNumber: vpoOrder.poNumber,
         orderType: vpoOrder.orderType || '—',
-      }).catch(err => this.logger.warn('VPO external notice email failed:', err));
+        orderId: vpoOrder.id,
+      }).catch(err => this.logger.warn('Assign supplier alert email failed:', err));
 
       return vpoOrder;
     }
@@ -472,10 +469,15 @@ export class OrdersService {
       return this.update(id, { status: OrderStatus.REPAIR, repairContractor: repairContractor.trim() }, user);
     }
 
-    // Factory Manager: moving VPO_ISSUED → MANUFACTURED requires stone received
-    if (user?.role === 'FACTORY_MANAGER' && status === OrderStatus.MANUFACTURED) {
+    // VPO_ISSUED → MANUFACTURED requires a supplier assignment and (for Factory
+    // Manager specifically) a received stone — guards against jumping the queue
+    // via a direct API call before "Assign Supplier" has run.
+    if (status === OrderStatus.MANUFACTURED) {
       const currentOrder = await this.findOne(id);
-      if (currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+      if (!currentOrder.assignedFactory || !currentOrder.supplySource) {
+        throw new BadRequestException('Assign a stone supplier and factory before marking this order as manufactured.');
+      }
+      if (user?.role === 'FACTORY_MANAGER' && currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
         throw new BadRequestException('Stone must be received before marking order as manufactured');
       }
     }
@@ -572,6 +574,76 @@ export class OrdersService {
     return updated;
   }
 
+  // Admin/Authorizer only — routes an already-approved (VPO_ISSUED) order to a
+  // specific factory and stone supplier. This is the only thing that makes the
+  // order visible to any Factory/Stone Manager: notifications and visibility are
+  // scoped to whichever accounts are tagged with this exact factory/supplySource,
+  // never a blanket "all factory managers" broadcast.
+  async assignSupplier(
+    id: string,
+    factory: Factory,
+    supplySource: SupplySource,
+    user?: { id?: string; email: string; role: string },
+  ): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+    if (order.status !== OrderStatus.VPO_ISSUED) {
+      throw new BadRequestException('Supplier can only be assigned once the VPO has been issued.');
+    }
+
+    order.assignedFactory = factory;
+    order.supplySource = supplySource;
+    const saved = await this.orderRepo.save(order);
+    this.logEvent(id, 'SUPPLIER_ASSIGNED', user, undefined, undefined, `Factory: ${factory}, Supply source: ${supplySource}`);
+
+    // Matched by tag, not role — a Stone Manager account can also be tagged with
+    // a factory (e.g. Archana covers both stones and factory orders for Creations)
+    // and still gets the factory-side notification alongside her Stone Manager one.
+    const [factoryUsers, stoneUsers] = await Promise.all([
+      this.userRepo.find({ where: { assignedFactory: factory } }),
+      this.userRepo.find({ where: { assignedSupplySource: supplySource } }),
+    ]);
+
+    await Promise.all([
+      ...factoryUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `VPO Issued — ${saved.poNumber}`,
+          message: `Order ${saved.poNumber} has been issued to your factory for manufacturing.`,
+          orderId: saved.id,
+          targetUserId: u.id,
+        })),
+      ),
+      ...stoneUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `VPO Issued — ${saved.poNumber}`,
+          message: `Order ${saved.poNumber} is ready — please arrange stones.`,
+          orderId: saved.id,
+          targetUserId: u.id,
+        })),
+      ),
+    ]);
+
+    const factoryEmails = factoryUsers.map(u => u.email).filter(Boolean);
+    this.emailService.sendFactoryAssignedAlert({
+      to: factoryEmails,
+      poNumber: saved.poNumber,
+      orderType: saved.orderType || '—',
+      orderId: saved.id,
+    }).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
+
+    const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
+    this.emailService.sendStoneSupplierAssignedAlert({
+      to: stoneEmails,
+      poNumber: saved.poNumber,
+      orderType: saved.orderType || '—',
+      orderId: saved.id,
+    }).catch(err => this.logger.warn('Stone supplier assigned alert email failed:', err));
+
+    return saved;
+  }
+
   async authorize(id: string): Promise<Order> {
     // Kept for API compatibility — orders now start at CAD_IN_PROGRESS directly.
     // This notifies CAD designers that a new order is ready.
@@ -589,7 +661,7 @@ export class OrdersService {
     return order;
   }
 
-  async findPriority(user: { id: string; email: string; role: string }): Promise<any[]> {
+  async findPriority(user: { id: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<any[]> {
     const now = new Date();
     const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
     const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
@@ -612,7 +684,10 @@ export class OrdersService {
       if (allowed) q.andWhere('o.status IN (:...rs)', { rs: allowed });
       if (role === UserRole.SALES_REP && user.id) q.andWhere('o.salesRepId = :uid', { uid: user.id });
       if (role === UserRole.STONE_MANAGER) {
-        q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+        q.andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
+      }
+      if (role === UserRole.FACTORY_MANAGER) {
+        q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
       }
       return q;
     };
@@ -648,10 +723,11 @@ export class OrdersService {
               .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
               .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
               .andWhere('o."updatedAt" < :d', { d: daysAgo(1) });
-            // Admin still sees Stone-Creations orders flagged here (they may need to chase Factory) —
-            // only Stone Manager's own view excludes orders they were never assigned.
+            // Admin still sees every pending-stone order regardless of supplier (they
+            // may need to chase whoever it's assigned to) — only Stone Manager's own
+            // view excludes orders they weren't personally assigned.
             if (role === UserRole.STONE_MANAGER) {
-              q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+              q.andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
             }
             return q.getMany();
           })()
@@ -743,7 +819,7 @@ export class OrdersService {
     });
   }
 
-  async getKanbanBoard(user?: { id: string; role: string }) {
+  async getKanbanBoard(user?: { id: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const statuses = Object.values(OrderStatus);
 
     const buildBase = () => {
@@ -754,9 +830,10 @@ export class OrdersService {
         q.andWhere('o.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
       } else if (user?.role === 'FACTORY_MANAGER') {
         q.andWhere('o.kiraSkuNumber IS NOT NULL');
+        q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
       } else if (user?.role === 'STONE_MANAGER') {
         q.andWhere('o.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
-        q.andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS });
+        q.andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
       }
       return q;
     };
@@ -770,7 +847,7 @@ export class OrdersService {
       buildBase()
         .select([
           'o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.status', 'o.cadSubStatus',
-          'o.sentToCustomer', 'o.stoneStatus', 'o.supplySource', 'o.isPriorityCustomer', 'o.quotedCost',
+          'o.sentToCustomer', 'o.stoneStatus', 'o.supplySource', 'o.assignedFactory', 'o.isPriorityCustomer', 'o.quotedCost',
           'o.orderType', 'o.metalType', 'o.metalColor', 'o.salesRepName', 'o.salesRepEmail',
           'o.storeName', 'o.customerFullName', 'o.createdAt', 'o.updatedAt',
         ])

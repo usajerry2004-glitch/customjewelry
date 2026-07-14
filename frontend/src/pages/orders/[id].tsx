@@ -4,7 +4,7 @@ import { toast } from '../../utils/toast';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
@@ -329,7 +329,8 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'kiraSkuNumber', label: 'Kira SKU' },
       { key: 'orderType', label: 'Order Type' },
       { key: 'manufacturingPath', label: 'Manufacturing Path' },
-      { key: 'supplySource', label: 'Supply Source', format: (v) => SUPPLY_SOURCE_CONFIG[v]?.label || v },
+      { key: 'supplySource', label: 'Stone Supplier', format: (v) => SUPPLY_SOURCE_CONFIG[v]?.label || v },
+      { key: 'assignedFactory', label: 'Factory', format: (v) => FACTORY_CONFIG[v]?.label || v },
       { key: 'referenceWeblink', label: 'Reference Link' },
     ],
   },
@@ -397,9 +398,12 @@ export default function OrderDetail() {
   const refSectionRef = useRef<HTMLDivElement>(null);
   const [priceModal, setPriceModal] = useState(false);
   const [pendingPrice, setPendingPrice] = useState('');
-  const [pendingSupplySource, setPendingSupplySource] = useState<SupplySource | ''>('');
   const [supplySourceInput, setSupplySourceInput] = useState<SupplySource | ''>('');
   const [savingSupplySource, setSavingSupplySource] = useState(false);
+  const [assignSupplierModal, setAssignSupplierModal] = useState(false);
+  const [assignFactoryInput, setAssignFactoryInput] = useState<Factory | ''>('');
+  const [assignSupplySourceInput, setAssignSupplySourceInput] = useState<SupplySource | ''>('');
+  const [assigningSupplier, setAssigningSupplier] = useState(false);
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
   const [customerPoInput, setCustomerPoInput] = useState('');
@@ -520,12 +524,12 @@ export default function OrderDetail() {
     setSummaryLoading(false);
   };
 
-  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string, supplySource?: SupplySource) => {
+  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
     if (!order?.id) return;
-    // Issuing the VPO requires a price and a supply-source choice — show modal if not provided
-    if (newStatus === OrderStatus.VPO_ISSUED && (!quotedCost || !supplySource)) {
+    // Issuing the VPO requires a price — show modal if not provided. Stone supplier
+    // and factory are assigned separately afterwards, via "Assign Supplier".
+    if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
       setPendingPrice(order.quotedCost ? String(order.quotedCost) : '');
-      setPendingSupplySource((order.supplySource as SupplySource) || '');
       setPriceModal(true);
       return;
     }
@@ -539,7 +543,6 @@ export default function OrderDetail() {
     const body: any = { status: newStatus };
     if (quotedCost) body.quotedCost = quotedCost;
     if (repairContractor) body.repairContractor = repairContractor;
-    if (supplySource) body.supplySource = supplySource;
     const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -673,9 +676,29 @@ export default function OrderDetail() {
 
   const confirmPriceAndMove = async () => {
     const price = parseFloat(pendingPrice);
-    if (!price || price <= 0 || !pendingSupplySource) return;
+    if (!price || price <= 0) return;
     setPriceModal(false);
-    await moveStatus(OrderStatus.VPO_ISSUED, price, undefined, pendingSupplySource);
+    await moveStatus(OrderStatus.VPO_ISSUED, price);
+  };
+
+  const confirmAssignSupplier = async () => {
+    if (!order?.id || !assignFactoryInput || !assignSupplySourceInput) return;
+    setAssigningSupplier(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/assign-supplier`, {
+        method: 'PATCH',
+        body: JSON.stringify({ factory: assignFactoryInput, supplySource: assignSupplySourceInput }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+        setAssignSupplierModal(false);
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to assign supplier.'));
+      }
+    } finally {
+      setAssigningSupplier(false);
+    }
   };
 
   const confirmRepair = async () => {
@@ -872,12 +895,12 @@ export default function OrderDetail() {
               // shows up when the order actually has one
               const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
               const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.STONE_MANAGER;
-              // Supply source is only meaningful once the VPO has been issued
+              // Supply source / factory are only meaningful once the VPO has been issued
               const supplySourceRelevant = order.status !== OrderStatus.NEW && order.status !== OrderStatus.CAD_IN_PROGRESS;
               const visibleFields = group.fields.filter(f => {
                 if (FACTORY_HIDDEN_KEYS.includes(f.key) && isRestrictedRole) return false;
                 if (f.key === 'phoneNumber' && !order.phoneNumber) return false;
-                if (f.key === 'supplySource' && !supplySourceRelevant) return false;
+                if ((f.key === 'supplySource' || f.key === 'assignedFactory') && !supplySourceRelevant) return false;
                 return true;
               });
               if (visibleFields.length === 0) return null;
@@ -1401,6 +1424,30 @@ export default function OrderDetail() {
             </div>
           )}
 
+          {/* Assign Supplier — VPO issued but not yet routed to a factory/stone supplier.
+              Invisible to Factory/Stone Manager until this completes. */}
+          {order.status === OrderStatus.VPO_ISSUED && (!order.assignedFactory || !order.supplySource)
+            && (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER) && (
+            <div style={{ ...cardStyle, borderLeft: '3px solid #0EA5E9' }}>
+              <div style={{ fontSize: '10px', color: '#0EA5E9', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700 }}>
+                VPO Issued — Assign Supplier
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
+                This order isn't visible to any factory or stone supplier yet. Select both to release it to production.
+              </p>
+              <button
+                onClick={() => {
+                  setAssignFactoryInput((order.assignedFactory as Factory) || '');
+                  setAssignSupplySourceInput((order.supplySource as SupplySource) || '');
+                  setAssignSupplierModal(true);
+                }}
+                style={{ width: '100%', background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '9px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Assign Supplier
+              </button>
+            </div>
+          )}
+
           {/* Quoted Price — editable for Authorizer/Admin, read-only for others */}
           {userRole !== UserRole.CUSTOMER && (
             <div style={cardStyle}>
@@ -1556,7 +1603,7 @@ export default function OrderDetail() {
               Set Quoted Price
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
-              The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before issuing the VPO — the SKU will be generated automatically. The customer will be notified.
+              The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before issuing the VPO — the SKU will be generated automatically. The customer will be notified. Stone supplier and factory are assigned in a separate step afterwards.
             </p>
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               Approximate Price ($)
@@ -1572,15 +1619,61 @@ export default function OrderDetail() {
               onKeyDown={e => { if (e.key === 'Enter') confirmPriceAndMove(); }}
               style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '15px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
             />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setPriceModal(false)}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={confirmPriceAndMove}
+                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
+                Confirm & Issue VPO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Supplier Modal — picks the factory + stone supplier for a VPO-issued order */}
+      {assignSupplierModal && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '420px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Assign Supplier
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Select the factory and stone supplier for this order. Only the matching Factory Manager and Stone Manager will be able to see it once assigned.
+            </p>
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
-              Supply Source
+              Factory
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '18px' }}>
+              {(Object.values(Factory) as Factory[]).map(f => {
+                const cfg = FACTORY_CONFIG[f];
+                const selected = assignFactoryInput === f;
+                return (
+                  <button key={f} onClick={() => setAssignFactoryInput(f)}
+                    style={{
+                      borderRadius: '8px', padding: '10px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                      border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
+                      background: selected ? cfg.bg : 'var(--bg-input)',
+                      color: selected ? cfg.color : 'var(--text-secondary)',
+                    }}>
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Stone Supplier
             </label>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
               {(Object.values(SupplySource) as SupplySource[]).map(s => {
                 const cfg = SUPPLY_SOURCE_CONFIG[s];
-                const selected = pendingSupplySource === s;
+                const selected = assignSupplySourceInput === s;
                 return (
-                  <button key={s} onClick={() => setPendingSupplySource(s)}
+                  <button key={s} onClick={() => setAssignSupplySourceInput(s)}
                     style={{
                       flex: 1, borderRadius: '8px', padding: '10px 8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                       border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
@@ -1593,15 +1686,15 @@ export default function OrderDetail() {
               })}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setPriceModal(false)}
+              <button onClick={() => setAssignSupplierModal(false)}
                 style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
                 Cancel
               </button>
               <button
-                onClick={confirmPriceAndMove}
-                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0 || !pendingSupplySource}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0 || !pendingSupplySource) ? 0.5 : 1 }}>
-                Confirm & Issue VPO
+                onClick={confirmAssignSupplier}
+                disabled={!assignFactoryInput || !assignSupplySourceInput || assigningSupplier}
+                style={{ flex: 2, background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!assignFactoryInput || !assignSupplySourceInput || assigningSupplier) ? 0.5 : 1 }}>
+                {assigningSupplier ? 'Assigning…' : 'Assign & Notify'}
               </button>
             </div>
           </div>

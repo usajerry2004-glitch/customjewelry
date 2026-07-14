@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
 import { Order } from '../../database/entities/order.entity';
-import { UpdateStatusDto } from './update-status.dto';
+import { UpdateStatusDto, AssignSupplierDto } from './update-status.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
@@ -99,7 +99,19 @@ export class OrdersController {
     @Body() body: UpdateStatusDto,
     @Request() req: any,
   ) {
-    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor, body.supplySource);
+    return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor);
+  }
+
+  @Patch(':id/assign-supplier')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Assign a factory and stone supplier to a VPO-issued order — only then is it visible to the assigned Factory/Stone Manager' })
+  assignSupplier(
+    @Param('id') id: string,
+    @Body() body: AssignSupplierDto,
+    @Request() req: any,
+  ) {
+    return this.ordersService.assignSupplier(id, body.factory, body.supplySource, req.user);
   }
 
   @Patch(':id/authorize')

@@ -19,6 +19,12 @@ export enum SupplySource {
   KIRA            = 'KIRA',
 }
 
+export enum Factory {
+  KAMA_JEWELRY   = 'KAMA_JEWELRY',
+  CREATIONS      = 'CREATIONS',
+  UNIQUE_DESIGNS = 'UNIQUE_DESIGNS',
+}
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   SALES_REP = 'SALES_REP',
@@ -58,6 +64,7 @@ export interface Order {
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
   supplySource?: SupplySource | null;
+  assignedFactory?: Factory | null;
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
@@ -91,6 +98,12 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
 export const SUPPLY_SOURCE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   STONE_CREATIONS: { label: 'Stone Creations Supply', color: '#B45309', bg: '#FEF3C7' },
   KIRA:            { label: 'Kira Supply',            color: '#9333EA', bg: '#F3E8FF' },
+};
+
+export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  KAMA_JEWELRY:   { label: 'Kama Jewelry',   color: '#0EA5E9', bg: '#E0F2FE' },
+  CREATIONS:      { label: 'Creations',      color: '#B45309', bg: '#FEF3C7' },
+  UNIQUE_DESIGNS: { label: 'Unique Designs', color: '#059669', bg: '#D1FAE5' },
 };
 
 export const ROLE_ACTION_COLOR: Record<string, string> = {

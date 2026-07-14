@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Order, OrderStatus, StoneStatus, SupplySource } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
@@ -14,20 +14,28 @@ export class ManufacturingService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async getQueue(user?: { role?: string }) {
-    const where: any = { status: OrderStatus.VPO_ISSUED };
-    // Stone Manager never handles Stone Creations orders — Admin/Authorizer/Factory
-    // still need the full queue (Factory works both supply sources as normal flow).
+  async getQueue(user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
+    // Stone Manager / Factory Manager only ever see orders assigned to them
+    // specifically — Admin/Authorizer see the full queue, including orders still
+    // awaiting a supplier assignment.
     if (user?.role === UserRole.STONE_MANAGER) {
       const orders = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-        .andWhere('(o.supplySource IS NULL OR o.supplySource != :stoneCreations)', { stoneCreations: SupplySource.STONE_CREATIONS })
+        .andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null })
+        .getMany();
+      return this.sortQueue(orders);
+    }
+    if (user?.role === UserRole.FACTORY_MANAGER) {
+      const orders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+        .andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null })
         .getMany();
       return this.sortQueue(orders);
     }
 
-    const orders = await this.orderRepo.find({ where });
+    const orders = await this.orderRepo.find({ where: { status: OrderStatus.VPO_ISSUED } });
     return this.sortQueue(orders);
   }
 
@@ -45,7 +53,7 @@ export class ManufacturingService {
     });
   }
 
-  async markStoneSent(id: string, user?: { role?: string }) {
+  async markStoneSent(id: string, user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (order.status !== OrderStatus.VPO_ISSUED) {
@@ -54,18 +62,28 @@ export class ManufacturingService {
     if (order.stoneStatus === StoneStatus.STONE_RECEIVED) {
       throw new BadRequestException('Stone has already been marked as sent');
     }
-    // Factory Manager may only mark receipt on Stone Creations orders — Kira-supply
-    // stones stay Stone Manager's job.
-    if (user?.role === UserRole.FACTORY_MANAGER && order.supplySource !== SupplySource.STONE_CREATIONS) {
-      throw new ForbiddenException('Only the Stone Manager can mark this order\'s stone as received.');
+    // Factory Manager may only mark receipt on their own Stone Creations orders —
+    // Kira-supply stones stay Stone Manager's job.
+    if (user?.role === UserRole.FACTORY_MANAGER) {
+      if (order.supplySource !== SupplySource.STONE_CREATIONS) {
+        throw new ForbiddenException('Only the Stone Manager can mark this order\'s stone as received.');
+      }
+      if (!order.assignedFactory || order.assignedFactory !== user.assignedFactory) {
+        throw new NotFoundException(`Order ${id} not found`);
+      }
+    }
+    if (user?.role === UserRole.STONE_MANAGER
+        && (!order.supplySource || order.supplySource !== user.assignedSupplySource)) {
+      throw new NotFoundException(`Order ${id} not found`);
     }
 
     // Stone sent = stone received on factory side, no manual action needed from factory
     order.stoneStatus = StoneStatus.STONE_RECEIVED;
     const saved = await this.orderRepo.save(order);
 
-    // Notify all Factory Managers — portal auto-shows Stone Received
-    const factoryManagers = await this.userRepo.find({ where: { role: UserRole.FACTORY_MANAGER } });
+    // Notify only the Factory Manager(s) assigned to this order's factory — not every
+    // Factory Manager account in the system.
+    const factoryManagers = await this.userRepo.find({ where: { role: UserRole.FACTORY_MANAGER, assignedFactory: order.assignedFactory } });
     await Promise.all(
       factoryManagers.map(u =>
         this.notificationsService.create(
@@ -81,9 +99,13 @@ export class ManufacturingService {
     return saved;
   }
 
-  async completeManufacturing(id: string) {
+  async completeManufacturing(id: string, user?: { role?: string; assignedFactory?: Factory | null }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
+    if (user?.role === UserRole.FACTORY_MANAGER
+        && (!order.assignedFactory || order.assignedFactory !== user.assignedFactory)) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
     if (order.status !== OrderStatus.VPO_ISSUED) {
       throw new BadRequestException('Order must be in VPO_ISSUED status to mark as manufactured');
     }

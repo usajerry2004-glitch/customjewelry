@@ -163,10 +163,16 @@ export class AuthService {
   }
 
   private signToken(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName };
+    const payload = {
+      sub: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName,
+      assignedFactory: user.assignedFactory, assignedSupplySource: user.assignedSupplySource,
+    };
     return {
       access_token: this.jwtService.sign(payload),
-      user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+      user: {
+        id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role,
+        assignedFactory: user.assignedFactory, assignedSupplySource: user.assignedSupplySource,
+      },
     };
   }
 }

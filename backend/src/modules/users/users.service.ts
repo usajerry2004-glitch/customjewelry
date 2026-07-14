@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
-import { Order } from '../../database/entities/order.entity';
+import { Order, Factory, SupplySource } from '../../database/entities/order.entity';
 
 export class CreateUserDto {
   @IsString() firstName: string;
@@ -15,6 +15,8 @@ export class CreateUserDto {
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() salesRepId?: string;
+  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
+  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
 }
 
 export class InviteUserDto {
@@ -23,6 +25,8 @@ export class InviteUserDto {
   @IsEmail() email: string;
   @IsEnum(UserRole) role: UserRole;
   @IsString() @IsOptional() salesRepId?: string;
+  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
+  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
 }
 
 export class UpdateUserDto {
@@ -33,6 +37,8 @@ export class UpdateUserDto {
   @IsString() @IsOptional() department?: string;
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() salesRepId?: string;
+  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory | null;
+  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource | null;
 }
 
 @Injectable()
@@ -86,6 +92,12 @@ export class UsersService {
       role,
       salesRepId,
       storeName: dto.storeName,
+      // Not restricted to one role: a Stone Manager account may also be tagged
+      // with a factory (e.g. one contact who handles both stones and factory
+      // orders for the same outside partner) and still receive factory-side
+      // notifications alongside their normal Stone Manager queue.
+      assignedFactory: dto.assignedFactory,
+      assignedSupplySource: dto.assignedSupplySource,
     });
     return this.userRepo.save(user);
   }
@@ -100,6 +112,8 @@ export class UsersService {
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;
     if (dto.storeName !== undefined) user.storeName = dto.storeName;
+    if (dto.assignedFactory !== undefined) user.assignedFactory = dto.assignedFactory;
+    if (dto.assignedSupplySource !== undefined) user.assignedSupplySource = dto.assignedSupplySource;
     if (dto.salesRepId !== undefined) {
       if (dto.salesRepId) {
         const rep = await this.userRepo.findOne({ where: { id: dto.salesRepId } });

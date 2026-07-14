@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
-import { UserRole } from '../utils/types';
+import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG } from '../utils/types';
 import { toast } from '../utils/toast';
 import { formatName, getInitials } from '../utils/name';
 
@@ -66,7 +66,10 @@ const inp: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-const emptyForm = { firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '' };
+const emptyForm = {
+  firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '',
+  assignedFactory: '' as Factory | '', assignedSupplySource: '' as SupplySource | '',
+};
 
 export default function SettingsPage() {
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -131,9 +134,12 @@ export default function SettingsPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const payload: any = { ...form };
+      if (!payload.assignedFactory) delete payload.assignedFactory;
+      if (!payload.assignedSupplySource) delete payload.assignedSupplySource;
       const res = await apiFetch(`${API}/users/invite`, {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setSuccessEmail(form.email);
@@ -253,7 +259,10 @@ export default function SettingsPage() {
                 <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Role</label>
                 <select
                   value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                  onChange={e => {
+                    const role = e.target.value as UserRole;
+                    setForm(f => ({ ...f, role, assignedFactory: '', assignedSupplySource: '' }));
+                  }}
                   style={{ ...inp, cursor: 'pointer' }}
                 >
                   {STAFF_ROLES.map(r => (
@@ -276,6 +285,42 @@ export default function SettingsPage() {
                     <option key={r.id} value={r.id}>{formatName(r.firstName, r.lastName)}</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.STONE_MANAGER) && (
+              <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Factory{form.role === UserRole.FACTORY_MANAGER ? ' (required)' : ' (optional)'}
+                  </label>
+                  <select
+                    required={form.role === UserRole.FACTORY_MANAGER}
+                    value={form.assignedFactory}
+                    onChange={e => setForm(f => ({ ...f, assignedFactory: e.target.value as Factory }))}
+                    style={{ ...inp, cursor: 'pointer' }}
+                  >
+                    <option value="">— Select a Factory —</option>
+                    {(Object.values(Factory) as Factory[]).map(fac => (
+                      <option key={fac} value={fac}>{FACTORY_CONFIG[fac].label}</option>
+                    ))}
+                  </select>
+                </div>
+                {form.role === UserRole.STONE_MANAGER && (
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Stone Supplier (required)</label>
+                    <select
+                      required
+                      value={form.assignedSupplySource}
+                      onChange={e => setForm(f => ({ ...f, assignedSupplySource: e.target.value as SupplySource }))}
+                      style={{ ...inp, cursor: 'pointer' }}
+                    >
+                      <option value="">— Select a Supplier —</option>
+                      {(Object.values(SupplySource) as SupplySource[]).map(s => (
+                        <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             )}
             {error && (

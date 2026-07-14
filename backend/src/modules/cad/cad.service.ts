@@ -95,15 +95,16 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
 
-    // Admins only get notified when tagged in the order's conversation, not on every batch upload
-    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
+    // Admin + Authorizer both need to review and set the quote price before this
+    // goes to the customer.
+    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
     if (authUsers.length) {
       await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD Files Ready for Review — ${order.poNumber}`,
         `CAD designer has uploaded file(s) for order ${order.poNumber}. Please review and set the quote price.`,
         order.id);
     }
-    const authorizerEmails = authUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
+    const authorizerEmails = authUsers.map(u => u.email).filter(Boolean);
     if (authorizerEmails.length) {
       this.emailService.sendCadSentForApprovalToAuthorizers({
         to: authorizerEmails,
@@ -211,15 +212,16 @@ export class CadService {
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (!order) return saved;
 
-    // Admins only get notified when tagged in the order's conversation, not on every CAD submission
-    const { users: saUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
+    // Admin + Authorizer both need to review and set the quote price before this
+    // goes to the customer.
+    const { users: saUsers } = await this.getTeamEmails([UserRole.AUTHORIZER, UserRole.ADMIN]);
     if (saUsers.length) {
       await this.notifyTeam(saUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD File Ready for Review — ${order.poNumber}`,
         `CAD design for order ${order.poNumber} has been uploaded. Please review and set the quote price.`,
         order.id);
     }
-    const saAuthorizerEmails = saUsers.filter(u => u.role === UserRole.AUTHORIZER).map(u => u.email).filter(Boolean);
+    const saAuthorizerEmails = saUsers.map(u => u.email).filter(Boolean);
     if (saAuthorizerEmails.length) {
       this.emailService.sendCadSentForApprovalToAuthorizers({
         to: saAuthorizerEmails,
@@ -247,13 +249,23 @@ export class CadService {
       const sku = await this.skuService.generate(order.id, approvedBy);
       await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED });
 
-      const { users: vpoUsers } = await this.getTeamEmails([UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER]);
-      if (vpoUsers.length) {
-        await this.notifyTeam(vpoUsers, NotificationType.STATUS_CHANGED,
-          `VPO Issued — ${order.poNumber}`,
-          `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated and the order has been issued to the factory.`,
+      // Order is VPO_ISSUED but not yet routed to any factory/stone supplier —
+      // Admin/Authorizer must complete "Assign Supplier" before it's visible to
+      // any Factory/Stone Manager. Same two-step flow as the manual VPO path in
+      // orders.service.ts.
+      const { emails: assignerEmails, users: assignerUsers } = await this.getTeamEmails([UserRole.ADMIN, UserRole.AUTHORIZER]);
+      if (assignerUsers.length) {
+        await this.notifyTeam(assignerUsers, NotificationType.STATUS_CHANGED,
+          `Assign Supplier — ${order.poNumber}`,
+          `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated. Select a stone supplier and factory to release it to production.`,
           order.id);
       }
+      this.emailService.sendAssignSupplierAlert({
+        to: assignerEmails,
+        poNumber: order.poNumber,
+        orderType: order.orderType || '—',
+        orderId: order.id,
+      }).catch(err => this.logger.warn('Assign supplier alert email failed:', err));
     }
 
     return saved;

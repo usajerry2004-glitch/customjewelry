@@ -41,7 +41,7 @@ export class ManufacturingController {
   @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Mark manufacturing complete — moves to MANUFACTURED' })
-  complete(@Param('id') id: string) {
-    return this.manufacturingService.completeManufacturing(id);
+  complete(@Param('id') id: string, @Request() req: any) {
+    return this.manufacturingService.completeManufacturing(id, req.user);
   }
 }

@@ -29,6 +29,12 @@ export enum SupplySource {
   KIRA            = 'KIRA',
 }
 
+export enum Factory {
+  KAMA_JEWELRY   = 'KAMA_JEWELRY',
+  CREATIONS      = 'CREATIONS',
+  UNIQUE_DESIGNS = 'UNIQUE_DESIGNS',
+}
+
 @Entity('orders')
 @Index(['poNumber'], { unique: true })
 @Index(['status'])
@@ -179,10 +185,16 @@ export class Order {
   @Column({ type: 'varchar', nullable: true })
   stoneStatus: StoneStatus | null;
 
-  // Who supplies the stone for this order — chosen by Admin when the VPO is issued.
-  // Stone Creations orders skip the internal Stone Manager queue entirely.
-  @Column({ type: 'varchar', nullable: true, default: SupplySource.KIRA })
+  // Who supplies the stone for this order — chosen by Admin/Authorizer via the
+  // "Assign Supplier" step, after the VPO is issued. Stays null (invisible to any
+  // Stone Manager) until then.
+  @Column({ type: 'varchar', nullable: true })
   supplySource: SupplySource | null;
+
+  // Which factory manufactures this order — chosen alongside supplySource via
+  // "Assign Supplier". Stays null (invisible to any Factory Manager) until then.
+  @Column({ type: 'varchar', nullable: true })
+  assignedFactory: Factory | null;
 
   @Column({ default: false })
   isArchived: boolean;

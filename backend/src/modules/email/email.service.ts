@@ -340,6 +340,51 @@ export class EmailService {
     });
   }
 
+  // VPO just issued — order is approved but not yet routed to any factory/stone
+  // supplier. Only Admin/Authorizer can see it until they assign it.
+  async sendAssignSupplierAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+    if (!opts.to.length) return;
+    return this.send({
+      to: opts.to,
+      subject: `[Assign Supplier] ${opts.poNumber} — VPO Issued`,
+      html: emailLayout(`
+        <h2 style="color:#0EA5E9;margin:0 0 16px">VPO Issued — Assign Supplier</h2>
+        <p>Order <strong>${opts.poNumber}</strong> has been approved and issued. Select a stone supplier and factory to release it to production.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#0EA5E9')}">Assign Supplier →</a>
+      `),
+    });
+  }
+
+  // Sent only to the Factory Manager(s) tagged to the factory this order was just
+  // routed to — not a blanket "all factory managers" notice.
+  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+    if (!opts.to.length) return;
+    return this.send({
+      to: opts.to,
+      subject: `[New Order] ${opts.poNumber} issued to your factory`,
+      html: emailLayout(`
+        <h2 style="color:#D97706;margin:0 0 16px">Order Issued to Your Factory</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been issued for manufacturing.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
+      `),
+    });
+  }
+
+  // Sent only to the Stone Manager(s) tagged to the supply source this order was
+  // just routed to — not a blanket "all stone managers" notice.
+  async sendStoneSupplierAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+    if (!opts.to.length) return;
+    return this.send({
+      to: opts.to,
+      subject: `[Stones Needed] ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#9333EA;margin:0 0 16px">Stones Needed for New Order</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) is ready — please arrange stones.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#9333EA')}">Open Order →</a>
+      `),
+    });
+  }
+
   async sendOrderInProduction(opts: {
     to: string;
     poNumber: string;
