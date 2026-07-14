@@ -108,12 +108,17 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
               ⚠ +{daysOverdue}d overdue
             </span>
           )}
-          {order.status === 'VPO_ISSUED' && (order as any).stoneStatus !== StoneStatus.STONE_RECEIVED && (
+          {order.status === 'VPO_ISSUED' && (!(order as any).assignedFactory || !order.supplySource) && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#0369A1', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              🏭 Assign Supplier
+            </span>
+          )}
+          {order.status === 'VPO_ISSUED' && (order as any).assignedFactory && order.supplySource && (order as any).stoneStatus !== StoneStatus.STONE_RECEIVED && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#5B21B6', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               💎 Pending Stone
             </span>
           )}
-          {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && order.status === 'VPO_ISSUED' && (
+          {(order as any).stoneStatus === StoneStatus.STONE_RECEIVED && order.status === 'VPO_ISSUED' && (order as any).assignedFactory && order.supplySource && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#065F46', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               💎 Stone Received
             </span>

@@ -82,6 +82,7 @@ export default function StonePage() {
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {orders.map(order => {
               const cfg = STATUS_CONFIG[order.status] || { label: order.status, color: '#6B7280' };
+              const unassigned = !order.assignedFactory || !order.supplySource;
               const stonePending = order.stoneStatus !== StoneStatus.STONE_RECEIVED;
               const busy = actionLoading === order.id;
 
@@ -95,9 +96,11 @@ export default function StonePage() {
                         {order.kiraSkuNumber && (
                           <span style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', border: '1px solid var(--border)' }}>{order.kiraSkuNumber}</span>
                         )}
-                        {stonePending
-                          ? <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
-                          : <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
+                        {unassigned
+                          ? <span style={{ background: 'rgba(14,165,233,0.1)', color: '#0369A1', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>🏭 Assign Supplier</span>
+                          : stonePending
+                            ? <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
+                            : <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
                         }
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -110,7 +113,13 @@ export default function StonePage() {
                     </div>
                   </div>
 
-                  {stonePending && (
+                  {unassigned && (
+                    <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#0369A1', fontWeight: 500 }}>
+                      🏭 This order needs a factory and stone supplier assigned before it can be worked on.
+                    </div>
+                  )}
+
+                  {!unassigned && stonePending && (
                     <button
                       onClick={() => markStoneSent(order.id)}
                       disabled={busy}

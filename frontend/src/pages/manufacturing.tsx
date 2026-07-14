@@ -100,9 +100,11 @@ export default function ManufacturingPage() {
                           <span style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', border: '1px solid var(--border)' }}>{order.kiraSkuNumber}</span>
                         )}
                         {order.status === OrderStatus.VPO_ISSUED && (
-                          order.stoneStatus === StoneStatus.STONE_RECEIVED
-                            ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
-                            : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
+                          !order.assignedFactory || !order.supplySource
+                            ? <span style={{ background: 'rgba(14,165,233,0.1)', color: '#0369A1', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>🏭 Assign Supplier</span>
+                            : order.stoneStatus === StoneStatus.STONE_RECEIVED
+                              ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
+                              : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
                         )}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -116,7 +118,13 @@ export default function ManufacturingPage() {
                   </div>
 
 
-                  {order.status === OrderStatus.VPO_ISSUED && (
+                  {order.status === OrderStatus.VPO_ISSUED && (!order.assignedFactory || !order.supplySource) && (
+                    <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#0369A1', fontWeight: 500 }}>
+                      🏭 This order needs a factory and stone supplier assigned before production can proceed. Open it to Assign Supplier.
+                    </div>
+                  )}
+
+                  {order.status === OrderStatus.VPO_ISSUED && order.assignedFactory && order.supplySource && (
                     order.stoneStatus !== StoneStatus.STONE_RECEIVED ? (
                       order.supplySource === SupplySource.STONE_CREATIONS &&
                       (currentUser?.role === 'FACTORY_MANAGER' || currentUser?.role === 'ADMIN') ? (

@@ -1399,8 +1399,9 @@ export default function OrderDetail() {
             );
           })()}
 
-          {/* Stone status — sidebar card */}
-          {order.status === OrderStatus.VPO_ISSUED && (
+          {/* Stone status — sidebar card. Hidden until supplier is assigned —
+              "Pending Stone" isn't meaningful before anyone's been asked for stones. */}
+          {order.status === OrderStatus.VPO_ISSUED && order.assignedFactory && order.supplySource && (
             <div style={{ ...cardStyle, borderTop: `3px solid ${order.stoneStatus === StoneStatus.STONE_RECEIVED ? '#10B981' : '#7C3AED'}` }}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>💎 Stone Status</div>
               <div style={{ marginBottom: (userRole === UserRole.STONE_MANAGER || userRole === UserRole.ADMIN) && order.stoneStatus !== StoneStatus.STONE_RECEIVED ? '12px' : '0' }}>
