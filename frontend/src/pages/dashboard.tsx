@@ -8,7 +8,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 export async function getServerSideProps() { return { props: {} }; }
 
 interface Metrics    { total: number; byStatus: { status: string; count: string }[] }
-interface Overdue    { id: string; poNumber: string; storeName: string; status: string; daysOld: number; slaLabel: string }
 interface Priority   { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
 interface Trend      { date: string; created: number; completed: number }
 interface RecentOrder{ id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; orderType?: string; createdAt: string }
@@ -35,7 +34,6 @@ const PRIORITY_COLORS = { CRITICAL: '#7C3AED', HIGH: '#DC2626', MEDIUM: GOLD_DAR
 export default function Dashboard() {
   const router = useRouter();
   const [metrics, setMetrics]     = useState<Metrics | null>(null);
-  const [overdue, setOverdue]     = useState<Overdue[]>([]);
   const [actions, setActions]     = useState<Priority[]>([]);
   const [recent, setRecent]       = useState<RecentOrder[]>([]);
   const [myOrderTotal, setMyOrderTotal] = useState<number>(0);
@@ -54,15 +52,13 @@ export default function Dashboard() {
     const load = async () => {
       // Fetch role-filtered total (used by Sales Rep and other roles) alongside
       // everything else — it was a separate sequential round trip before.
-      const [mRes, slaRes, priRes, rRes, myRes] = await Promise.all([
+      const [mRes, priRes, rRes, myRes] = await Promise.all([
         apiFetch(`${API}/orders/metrics`),
-        apiFetch(`${API}/sla/overdue`),
         apiFetch(`${API}/orders/priority`),
         apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
         apiFetch(`${API}/orders?limit=1`),
       ]);
       if (mRes.ok)  setMetrics(await mRes.json());
-      if (slaRes.ok) setOverdue(await slaRes.json());
       if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
       let ids: string[] = [];
       if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
@@ -170,7 +166,6 @@ export default function Dashboard() {
       <div className="dash-kpi">
         <KpiCard label="Active Orders"  value={activeOrders}   color={NAVY}                                         sub="not completed or cancelled" link="/orders" />
         <KpiCard label="New This Week"  value={recent.length}  color="#0891B2"                                      sub="last 7 days"                link="/orders" />
-        <KpiCard label="SLA Breaches"   value={overdue.length} color={overdue.length > 0 ? '#DC2626' : '#059669'}  sub="orders older than 10 days"  link="/todos" accent />
         <KpiCard label="My Actions"     value={actions.length} color="#7C3AED"                                      sub="priority tasks"              link="/todos" accent />
       </div>
 
@@ -193,39 +188,6 @@ export default function Dashboard() {
             );
           })}
         </div>
-      </div>
-
-      {/* SLA Alerts */}
-      <div style={{ ...card, padding: '20px 22px', borderTop: `3px solid ${overdue.length > 0 ? '#DC2626' : '#059669'}`, margin: '0 0 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 3 }}>
-            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 19, fontWeight: 600, color: NAVY, margin: 0 }}>SLA Alerts</h2>
-            <a href="/todos" style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 4 }}>View all →</a>
-          </div>
-          <div style={{ fontSize: 13, color: '#9BA8B5', marginBottom: 14 }}>Orders older than 10 days not yet completed</div>
-          {loading ? (
-            <div style={{ color: '#9BA8B5', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Loading…</div>
-          ) : overdue.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: 26, marginBottom: 8 }}>✅</div>
-              <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>All orders on time</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 210, overflowY: 'auto' }}>
-              {overdue.map(o => (
-                <div key={o.id} onClick={() => router.push(`/orders/${o.id}`)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', background: 'rgba(220,38,38,0.03)', border: '1px solid rgba(220,38,38,0.12)', borderRadius: 10, cursor: 'pointer', transition: 'background 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.07)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'rgba(220,38,38,0.03)'}
-                >
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
-                    <div style={{ fontSize: 12, color: '#9BA8B5', marginTop: 1 }}>{o.storeName}</div>
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', padding: '3px 9px', borderRadius: 99, whiteSpace: 'nowrap' }}>{o.daysOld}d old</span>
-                </div>
-              ))}
-            </div>
-          )}
       </div>
 
       {/* ── Queues ── */}

@@ -247,7 +247,7 @@ export class CadService {
     if (order) {
       // Customer approval auto-generates the SKU and issues the VPO immediately — no manual SKU step.
       const sku = await this.skuService.generate(order.id, approvedBy);
-      await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED });
+      await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED, vpoIssuedAt: new Date() });
 
       // Order is VPO_ISSUED but not yet routed to any factory/stone supplier —
       // Admin/Authorizer must complete "Assign Supplier" before it's visible to

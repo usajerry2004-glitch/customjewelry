@@ -26,7 +26,6 @@ import { ShippingModule } from './modules/shipping/shipping.module';
 import { UsersModule } from './modules/users/users.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { ImportModule } from './modules/import/import.module';
-import { SlaModule } from './modules/sla/sla.module';
 import { EmailModule } from './modules/email/email.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { RepairsModule } from './modules/repairs/repairs.module';
@@ -82,7 +81,6 @@ import { HealthController } from './health.controller';
     UsersModule,
     MessagesModule,
     ImportModule,
-    SlaModule,
     EmailModule,
     TodosModule,
     RepairsModule,

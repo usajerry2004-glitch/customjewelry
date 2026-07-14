@@ -442,7 +442,7 @@ export class OrdersService implements OnModuleInit {
       if (user?.role !== UserRole.ADMIN) {
         throw new ForbiddenException('Only Admin can revert a manufactured order back to VPO Issued.');
       }
-      const reverted = await this.update(id, { status, processedDate: null as any }, user);
+      const reverted = await this.update(id, { status, processedDate: null as any, vpoIssuedAt: new Date() }, user);
       this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, 'Reverted from Manufactured by Admin');
       return reverted;
     }
@@ -460,7 +460,7 @@ export class OrdersService implements OnModuleInit {
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);
       }
-      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice }, user);
+      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, vpoIssuedAt: new Date() }, user);
       this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
       // Email customer: design approved, in production
@@ -752,31 +752,27 @@ export class OrdersService implements OnModuleInit {
     const [
       revisionOrders,
       priorityCustomers,
-      stoneOverdue,
-      overdue10,
-      cadOverdue,
-      quotePending,
-      factoryOverdue,
-      repairOverdue,
+      vpoOverdueStone,
+      vpoOverdueFactory,
     ] = await Promise.all([
-      // 0. CAD revision requested — always CRITICAL
+      // CAD revision requested — always CRITICAL
       qb()
         .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
         .andWhere('o."cadSubStatus" = :r', { r: 'REVISION' })
         .getMany(),
-      // 1. Priority customer orders — scoped to role's status domain
+      // Priority customer orders — scoped to role's status domain
       qb()
         .andWhere('o.isPriorityCustomer = true')
         .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
         .getMany(),
-      // Stone Manager: stone pending > 1 day — run FIRST so it wins over generic overdue
+      // Stone Manager: stone still pending > 2 days since the VPO was issued
       [UserRole.STONE_MANAGER, UserRole.ADMIN].includes(role as UserRole)
         ? (() => {
             const q = this.orderRepo.createQueryBuilder('o')
               .where('o.isArchived = false')
               .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
               .andWhere('(o.stoneStatus = :pending OR o.stoneStatus IS NULL)', { pending: StoneStatus.PENDING_STONE })
-              .andWhere('o."updatedAt" < :d', { d: daysAgo(1) });
+              .andWhere('o."vpoIssuedAt" IS NOT NULL AND o."vpoIssuedAt" < :d', { d: daysAgo(2) });
             // Admin still sees every pending-stone order regardless of supplier (they
             // may need to chase whoever it's assigned to) — only Stone Manager's own
             // view excludes orders they weren't personally assigned.
@@ -786,43 +782,18 @@ export class OrdersService implements OnModuleInit {
             return q.getMany();
           })()
         : none,
-      // 2. Overall SLA: orders > 10 days old — skip Stone Manager (they only care about stone status)
-      role !== UserRole.STONE_MANAGER
-        ? qb()
-            .andWhere('o.status NOT IN (:...fin)', { fin: FINAL })
-            .andWhere('o."createdAt" < :d', { d: daysAgo(10) })
-            .getMany()
-        : none,
-      // CAD: in CAD_IN_PROGRESS > 1 day with no file uploaded
-      [UserRole.CAD_DESIGNER, UserRole.ADMIN].includes(role as UserRole)
-        ? qb()
-            .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
-            .andWhere('(o."cadSubStatus" IS NULL OR o."cadSubStatus" = :u)', { u: 'PENDING' })
-            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-            .getMany()
-        : none,
-      // Authorizer: awaiting quote price (cadSubStatus=APPROVED) > 1 day
-      [UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)
-        ? qb()
-            .andWhere('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
-            .andWhere('o."cadSubStatus" = :cs', { cs: 'APPROVED' })
-            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-            .getMany()
-        : none,
-      // Factory: in VPO_ISSUED > 4 days
+      // Factory: still in VPO Issued > 6 days since it was issued
       [UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)
-        ? qb()
-            .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-            .andWhere('o."updatedAt" < :d', { d: daysAgo(4) })
-            .getMany()
-        : none,
-      // Repair: in REPAIR > 1 day — needs follow-up
-      [UserRole.AUTHORIZER, UserRole.ADMIN].includes(role as UserRole)
-        ? this.orderRepo.createQueryBuilder('o')
-            .where('o.isArchived = false')
-            .andWhere('o.status = :s', { s: OrderStatus.REPAIR })
-            .andWhere('o."updatedAt" < :d', { d: daysAgo(1) })
-            .getMany()
+        ? (() => {
+            const q = this.orderRepo.createQueryBuilder('o')
+              .where('o.isArchived = false')
+              .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+              .andWhere('o."vpoIssuedAt" IS NOT NULL AND o."vpoIssuedAt" < :d', { d: daysAgo(6) });
+            if (role === UserRole.FACTORY_MANAGER) {
+              q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
+            }
+            return q.getMany();
+          })()
         : none,
     ]);
 
@@ -832,31 +803,14 @@ export class OrdersService implements OnModuleInit {
       if (!results.find(r => r.id === o.id))
         results.push({ ...o, priorityReason: 'Priority Customer', priorityLevel: 'HIGH' });
     });
-    stoneOverdue.forEach(o => {
+    vpoOverdueStone.forEach(o => {
       if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'Stone pending — over 1 day since VPO issued', priorityLevel: 'HIGH' });
+        results.push({ ...o, priorityReason: 'Stone pending — over 2 days since VPO issued', priorityLevel: 'HIGH' });
     });
-    overdue10.forEach(o => {
+    vpoOverdueFactory.forEach(o => {
       if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'Order older than 10 days — not completed', priorityLevel: 'HIGH' });
+        results.push({ ...o, priorityReason: 'In VPO stage — over 6 days since issued', priorityLevel: 'MEDIUM' });
     });
-    cadOverdue.forEach(o => {
-      if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'CAD file not uploaded — over 1 day', priorityLevel: 'HIGH' });
-    });
-    quotePending.forEach(o => {
-      if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'Quote price pending — over 1 day', priorityLevel: 'HIGH' });
-    });
-    factoryOverdue.forEach(o => {
-      if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: 'In VPO stage — over 4 days', priorityLevel: 'MEDIUM' });
-    });
-    repairOverdue.forEach(o => {
-      if (!results.find(r => r.id === o.id))
-        results.push({ ...o, priorityReason: `With repair contractor${o.repairContractor ? ` (${o.repairContractor})` : ''} — over 1 day`, priorityLevel: 'HIGH' });
-    });
-
 
     const LEVEL_ORDER = { CRITICAL: 0, HIGH: 1, MEDIUM: 2 };
     return results.sort((a, b) => {

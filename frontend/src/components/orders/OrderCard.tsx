@@ -6,20 +6,17 @@ interface OrderCardProps {
   onClick?: (order: Partial<Order>) => void;
   compact?: boolean;
   hideFinancials?: boolean;
-  daysOverdue?: number;
   referenceImage?: string;
   currentUserRole?: string;
 }
 
 function calcPriorityReason(order: Partial<Order>): string | null {
-  const days = Math.floor((Date.now() - new Date((order as any).createdAt || 0).getTime()) / (1000 * 60 * 60 * 24));
   const fin = ['COMPLETED','DELIVERED','CANCELLED'];
   if ((order as any).isPriorityCustomer && !fin.includes(order.status!)) return '★ Priority Customer';
-  if (days > 10 && !fin.includes(order.status!)) return `${days}d — overdue`;
   return null;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, daysOverdue, referenceImage, currentUserRole }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, referenceImage, currentUserRole }) => {
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
   const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
   const priorityReason = calcPriorityReason(order);
@@ -102,11 +99,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           {!hideFinancials && order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
           {cadSubLabel === 'Revision' && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>
-          )}
-          {daysOverdue !== undefined && daysOverdue > 0 && (
-            <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              ⚠ +{daysOverdue}d overdue
-            </span>
           )}
           {order.status === 'VPO_ISSUED' && (!(order as any).assignedFactory || !order.supplySource) && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#0369A1', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>

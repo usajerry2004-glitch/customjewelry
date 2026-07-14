@@ -202,6 +202,12 @@ export class Order {
   @Column({ type: 'varchar', nullable: true })
   assignedFactory: Factory | null;
 
+  // When the order most recently entered VPO_ISSUED — the clock overdue alerts
+  // count from (6 days for Factory Manager, 2 days for Stone Manager). Set on
+  // approval and reset if Admin reverts from Manufactured back to VPO_ISSUED.
+  @Column({ type: 'timestamp', nullable: true })
+  vpoIssuedAt: Date | null;
+
   @Column({ default: false })
   isArchived: boolean;
 
