@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomBytes } from 'crypto';
@@ -38,7 +38,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 @Injectable()
-export class OrdersService {
+export class OrdersService implements OnModuleInit {
   private readonly logger = new Logger(OrdersService.name);
 
   constructor(
@@ -52,6 +52,25 @@ export class OrdersService {
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
   ) {}
+
+  // One-time startup fix: TypeORM's synchronize didn't drop the old DB-level
+  // DEFAULT 'KIRA' on supplySource when that default was removed from the
+  // entity, so every order created since then was silently getting
+  // supplySource='KIRA' at INSERT time even though nothing ever assigned it.
+  // Idempotent — safe to run on every boot; a no-op once the default is gone
+  // and no bogus rows remain.
+  async onModuleInit() {
+    try {
+      await this.orderRepo.query(`ALTER TABLE orders ALTER COLUMN "supplySource" DROP DEFAULT`);
+      const result = await this.orderRepo.query(
+        `UPDATE orders SET "supplySource" = NULL WHERE "assignedFactory" IS NULL AND "supplySource" IS NOT NULL`,
+      );
+      const affected = Array.isArray(result) ? result[1] : result?.affectedRows;
+      if (affected) this.logger.warn(`Startup cleanup: cleared bogus supplySource default on ${affected} order(s)`);
+    } catch (err) {
+      this.logger.error('Startup supplySource cleanup failed:', (err as Error)?.message);
+    }
+  }
 
   private logEvent(
     orderId: string,
