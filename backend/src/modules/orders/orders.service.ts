@@ -138,8 +138,8 @@ export class OrdersService implements OnModuleInit {
       ),
     );
 
-    // Email via EmailService
-    const emails = targets.map(u => u.email).filter(Boolean);
+    // Email only CAD Designers — Authorizer shouldn't get any CAD-related email.
+    const emails = targets.filter(u => u.role === UserRole.CAD_DESIGNER).map(u => u.email).filter(Boolean);
     if (emails.length) {
       this.emailService.sendCadRevisionAlert({
         to: emails,

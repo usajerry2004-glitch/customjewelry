@@ -60,16 +60,16 @@ export class CadService {
     return { emails: users.map(u => u.email).filter(Boolean), users };
   }
 
-  // The whole Authorizer team still gets these (no per-order authorizer is
-  // assigned), but only the designer who actually uploaded this CAD file needs
-  // to hear about it — not every CAD_DESIGNER.
-  private async getAuthorizersAndCadDesigner(uploadedByEmail?: string | null): Promise<{ emails: string[]; users: User[] }> {
-    const { emails: authEmails, users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
+  // In-app: the whole Authorizer team still gets these (no per-order authorizer
+  // is assigned) plus the designer who actually uploaded this CAD file — not
+  // every CAD_DESIGNER. Kept separate so callers can still email just the
+  // designer — Authorizer shouldn't get any CAD-related email.
+  private async getAuthorizersAndCadDesigner(uploadedByEmail?: string | null): Promise<{ authUsers: User[]; designer: User | null }> {
+    const { users: authUsers } = await this.getTeamEmails([UserRole.AUTHORIZER]);
     const designer = uploadedByEmail
       ? await this.userRepo.findOne({ where: { email: uploadedByEmail, role: UserRole.CAD_DESIGNER } })
       : null;
-    if (!designer) return { emails: authEmails, users: authUsers };
-    return { emails: [...authEmails, designer.email], users: [...authUsers, designer] };
+    return { authUsers, designer };
   }
 
   private async notifyTeam(
@@ -335,7 +335,8 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      const { users } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
+      const { authUsers, designer } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
+      const users = designer ? [...authUsers, designer] : authUsers;
       if (users.length) {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `Order Cancelled — ${order.poNumber}`,
@@ -357,16 +358,18 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
-      const { emails, users } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
+      const { authUsers, designer } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
+      const users = designer ? [...authUsers, designer] : authUsers;
       if (users.length) {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `CAD Revision Requested — ${order.poNumber}`,
           `Revision requested for order ${order.poNumber}: "${feedback}". Please upload a revised design.`,
           order.id, true, order.isPriorityCustomer);
       }
-      if (emails.length) {
+      // Email only the designer — Authorizer shouldn't get any CAD-related email.
+      if (designer?.email) {
         this.emailService.sendCadRevisionAlert({
-          to: emails,
+          to: [designer.email],
           poNumber: order.poNumber,
           customerName: order.customerFullName || order.storeName || 'Valued Customer',
           orderType: order.orderType || '—',

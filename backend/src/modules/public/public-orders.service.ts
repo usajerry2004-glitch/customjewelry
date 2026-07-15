@@ -261,10 +261,10 @@ export class PublicOrdersService {
       })),
     ));
 
-    const staffEmails = staff.map(u => u.email).filter(Boolean);
-    if (staffEmails.length) {
+    // Email only the designer — Authorizer shouldn't get any CAD-related email.
+    if (designer?.email) {
       this.emailService.sendCustomerApprovedCadToTeam({
-        to:           staffEmails,
+        to:           [designer.email],
         poNumber:     order.poNumber,
         customerName: order.customerFullName,
         orderType:    order.orderType || 'Custom Order',
