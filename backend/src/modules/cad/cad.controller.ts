@@ -148,6 +148,30 @@ export class CadController {
     return { deleted: true };
   }
 
+  @Post('order/:orderId/time/start')
+  @Roles(UserRole.CAD_DESIGNER, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Start logging work time on this order for the current CAD designer' })
+  async startTimer(@Param('orderId') orderId: string, @Request() req: any) {
+    return this.cadService.startTimer(orderId, req.user.id);
+  }
+
+  @Patch('order/:orderId/time/stop')
+  @Roles(UserRole.CAD_DESIGNER, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Stop logging work time on this order for the current CAD designer' })
+  async stopTimer(@Param('orderId') orderId: string, @Request() req: any) {
+    return this.cadService.stopTimer(orderId, req.user.id);
+  }
+
+  @Get('order/:orderId/time/status')
+  @Roles(UserRole.CAD_DESIGNER, UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Whether the current CAD designer has an active work session on this order' })
+  async getTimerStatus(@Param('orderId') orderId: string, @Request() req: any) {
+    return this.cadService.getTimerStatus(orderId, req.user.id);
+  }
+
   @Patch(':id/revision')
   @ApiOperation({ summary: 'Request revision (Customer or Admin)' })
   async revision(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {

@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThan } from 'typeorm';
+import { Repository, In, MoreThan, IsNull } from 'typeorm';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
+import { CadTimeLog } from '../../database/entities/cad-time-log.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
@@ -20,10 +21,39 @@ export class CadService {
     @InjectRepository(Order)      private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)       private readonly userRepo: Repository<User>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
+    @InjectRepository(CadTimeLog) private readonly timeLogRepo: Repository<CadTimeLog>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
     private readonly spacesService: SpacesService,
   ) {}
+
+  // ── Work-time tracking ────────────────────────────────────────────────
+  // Raw start/stop log only — no duration is ever returned to the frontend
+  // beyond "is a session currently running", so nothing here surfaces on the
+  // portal. A later weekly report will aggregate durationSeconds directly
+  // from the table.
+
+  async startTimer(orderId: string, userId: string): Promise<{ running: true }> {
+    const open = await this.timeLogRepo.findOne({ where: { orderId, userId, stoppedAt: IsNull() } });
+    if (open) return { running: true };
+    await this.timeLogRepo.save(this.timeLogRepo.create({ orderId, userId, startedAt: new Date() }));
+    return { running: true };
+  }
+
+  async stopTimer(orderId: string, userId: string): Promise<{ running: false }> {
+    const open = await this.timeLogRepo.findOne({ where: { orderId, userId, stoppedAt: IsNull() } });
+    if (!open) throw new BadRequestException('No active work session for this order.');
+    const stoppedAt = new Date();
+    open.stoppedAt = stoppedAt;
+    open.durationSeconds = Math.round((stoppedAt.getTime() - open.startedAt.getTime()) / 1000);
+    await this.timeLogRepo.save(open);
+    return { running: false };
+  }
+
+  async getTimerStatus(orderId: string, userId: string): Promise<{ running: boolean }> {
+    const open = await this.timeLogRepo.findOne({ where: { orderId, userId, stoppedAt: IsNull() } });
+    return { running: !!open };
+  }
 
   private async getTeamEmails(roles: UserRole[]): Promise<{ emails: string[]; users: User[] }> {
     const users = await this.userRepo.find({ where: { role: In(roles) } });

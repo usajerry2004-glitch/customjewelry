@@ -434,6 +434,8 @@ export default function OrderDetail() {
   const [uploadVerifiedBy, setUploadVerifiedBy] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const uploadFileRef = useRef<HTMLInputElement>(null);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerLoading, setTimerLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -441,6 +443,37 @@ export default function OrderDetail() {
       if (raw) setCurrentUser(JSON.parse(raw));
     } catch {}
   }, []);
+
+  // Work-time tracking — just enough state to render Start vs Stop; the
+  // actual duration/log is never shown here, only recorded server-side.
+  useEffect(() => {
+    if (!id || !currentUser) return;
+    if (currentUser.role !== UserRole.CAD_DESIGNER && currentUser.role !== UserRole.ADMIN) return;
+    apiFetch(`${API}/cad/order/${id}/time/status`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setTimerRunning(!!d.running); })
+      .catch(() => {});
+  }, [id, currentUser]);
+
+  const toggleTimer = async () => {
+    if (!id) return;
+    setTimerLoading(true);
+    try {
+      const res = timerRunning
+        ? await apiFetch(`${API}/cad/order/${id}/time/stop`, { method: 'PATCH' })
+        : await apiFetch(`${API}/cad/order/${id}/time/start`, { method: 'POST' });
+      if (res.ok) {
+        setTimerRunning(!timerRunning);
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to update work timer.'));
+      }
+    } catch {
+      toast.error('Failed to update work timer — check your connection and try again.');
+    } finally {
+      setTimerLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -1233,6 +1266,21 @@ export default function OrderDetail() {
               Design Files {cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image').length > 0 && `(${cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image').length})`}
             </h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
+              <button
+                onClick={toggleTimer}
+                disabled={timerLoading}
+                style={{
+                  cursor: timerLoading ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 600,
+                  color: timerRunning ? '#DC2626' : '#059669',
+                  border: `1px solid ${timerRunning ? 'rgba(220,38,38,0.4)' : 'rgba(5,150,105,0.4)'}`,
+                  borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap',
+                  opacity: timerLoading ? 0.6 : 1,
+                }}
+              >
+                {timerLoading ? '…' : timerRunning ? '⏹ Stop' : '▶ Start'}
+              </button>
+            )}
             {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
               <button
                 onClick={() => uploadFileRef.current?.click()}
