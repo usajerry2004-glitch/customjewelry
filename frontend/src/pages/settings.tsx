@@ -81,9 +81,10 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', role: UserRole.SALES_REP as UserRole });
   const [savingEdit, setSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
   const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -125,7 +126,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     reload();
-    try { const u = localStorage.getItem('jf_user'); if (u) setCurrentUserId(JSON.parse(u).id || null); } catch {}
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) {
+        const parsed = JSON.parse(u);
+        setCurrentUserId(parsed.id || null);
+        setCurrentUserRole(parsed.role || null);
+      }
+    } catch {}
   }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -180,7 +188,7 @@ export default function SettingsPage() {
 
   const handleEditClick = (u: StaffUser) => {
     setEditingId(u.id);
-    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email });
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role });
   };
 
   const handleCancelEdit = () => setEditingId(null);
@@ -457,9 +465,21 @@ export default function SettingsPage() {
                       ) : u.email}
                     </td>
                     <td style={{ padding: '12px 18px' }}>
-                      <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
-                        {ROLE_LABELS[u.role] || u.role}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editForm.role}
+                          onChange={e => setEditForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                          style={{ ...inp, cursor: 'pointer', width: 'auto' }}
+                        >
+                          {STAFF_ROLES.map(r => (
+                            <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
+                          {ROLE_LABELS[u.role] || u.role}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '12px 18px' }}>
                       <span style={{ background: u.isActive ? '#D1FAE5' : '#F3F4F6', color: u.isActive ? '#065F46' : '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
@@ -489,12 +509,14 @@ export default function SettingsPage() {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                          <button
-                            onClick={() => handleEditClick(u)}
-                            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 12px', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            Edit
-                          </button>
+                          {currentUserRole === UserRole.ADMIN && (
+                            <button
+                              onClick={() => handleEditClick(u)}
+                              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 12px', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Edit
+                            </button>
+                          )}
                           {u.id !== currentUserId && (
                             <button
                               onClick={() => handleRemove(u)}

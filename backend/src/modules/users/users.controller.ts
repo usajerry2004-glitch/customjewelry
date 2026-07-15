@@ -59,9 +59,9 @@ export class UsersController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update user — name, password, active status (Admin only)' })
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  @ApiOperation({ summary: 'Update user — name, email, role, password, active status (Admin only)' })
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @CurrentUser() caller?: any) {
+    return this.usersService.update(id, dto, caller);
   }
 
   @Patch(':id/priority')

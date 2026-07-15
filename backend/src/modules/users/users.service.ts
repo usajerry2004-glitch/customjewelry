@@ -33,6 +33,7 @@ export class UpdateUserDto {
   @IsString() @IsOptional() firstName?: string;
   @IsString() @IsOptional() lastName?: string;
   @IsEmail() @IsOptional() email?: string;
+  @IsEnum(UserRole) @IsOptional() role?: UserRole;
   @IsString() @IsOptional() @MinLength(6) password?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
   @IsString() @IsOptional() department?: string;
@@ -103,13 +104,17 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
+  async update(id: string, dto: UpdateUserDto, caller?: { id: string }): Promise<User> {
     const user = await this.findOne(id);
+    if (dto.role !== undefined && dto.role !== user.role && id === caller?.id) {
+      throw new BadRequestException('You cannot change your own role');
+    }
     if (dto.password) {
       (user as any).passwordHash = await bcrypt.hash(dto.password, 10);
     }
     if (dto.firstName !== undefined) user.firstName = dto.firstName;
     if (dto.lastName !== undefined) user.lastName = dto.lastName;
+    if (dto.role !== undefined) user.role = dto.role;
     if (dto.email !== undefined && dto.email !== user.email) {
       const existing = await this.userRepo.findOne({ where: { email: dto.email } });
       if (existing && existing.id !== id) throw new ConflictException('Email already registered');
