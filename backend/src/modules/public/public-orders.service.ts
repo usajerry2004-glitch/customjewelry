@@ -241,10 +241,13 @@ export class PublicOrdersService {
     order.customerEmailApproval = true;
     await this.orderRepo.save(order);
 
-    // Notify team
-    const staff = await this.userRepo.find({
-      where: [{ role: UserRole.AUTHORIZER }, { role: UserRole.CAD_DESIGNER }],
-    });
+    // Notify the whole Authorizer team (no per-order authorizer is assigned) plus
+    // only the designer who actually uploaded this CAD file — not every CAD_DESIGNER.
+    const authorizers = await this.userRepo.find({ where: { role: UserRole.AUTHORIZER } });
+    const designer = cad.uploadedBy
+      ? await this.userRepo.findOne({ where: { email: cad.uploadedBy, role: UserRole.CAD_DESIGNER } })
+      : null;
+    const staff = designer ? [...authorizers, designer] : authorizers;
     await Promise.all(staff.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type:         NotificationType.CAD_APPROVED,
@@ -281,10 +284,11 @@ export class PublicOrdersService {
     cad.customerFeedback = feedback || 'Customer requested changes.';
     await this.cadRepo.save(cad);
 
-    // Notify CAD designers
-    const staff = await this.userRepo.find({
-      where: [{ role: UserRole.CAD_DESIGNER }],
-    });
+    // Only the designer who uploaded this CAD file needs to act on it — not
+    // every CAD_DESIGNER on the team.
+    const staff = cad.uploadedBy
+      ? await this.userRepo.find({ where: { email: cad.uploadedBy, role: UserRole.CAD_DESIGNER } })
+      : [];
     await Promise.all(staff.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type:         NotificationType.CAD_REJECTED,

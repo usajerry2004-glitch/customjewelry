@@ -125,12 +125,12 @@ export class EmailService {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[CAD Sent] ${opts.poNumber} — Awaiting Customer Review`,
+      subject: `[CAD Ready] ${opts.poNumber} — Needs Your Review`,
       html: emailLayout(`
-        <h2 style="color:#6366F1;margin:0 0 16px">CAD Design Sent to Customer</h2>
-        <p>The CAD design for the order below has been sent to the customer for review and approval.</p>
+        <h2 style="color:#6366F1;margin:0 0 16px">CAD Design Ready for Internal Review</h2>
+        <p>The CAD design for the order below has been uploaded. Please review it and set the quote price before it's sent to the customer.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
-        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#6366F1')}">View Order →</a>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#6366F1')}">Review & Set Price →</a>
       `),
     });
   }
