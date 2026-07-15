@@ -2,16 +2,19 @@ import React, { useRef, useState } from 'react';
 
 export async function getServerSideProps() { return { props: {} }; }
 
-// Dedicated intake page for the Exclusive Custom Designs referral partnership
-// — every submission is tagged with their store name so it's grouped/
-// searchable in the portal as their orders, same as any other storefront
-// customer. Posts straight to the existing public web-order endpoint (the
-// same one the WordPress plugin uses) — no backend changes needed. One-off
-// page for this one partner, not a generalized system. Styled with the
-// portal's own theme (same tokens as every other page) rather than a
-// separate visual identity.
+// Dedicated intake page for the Exclusive Custom Designs referral partnership.
+// Every submission routes to their existing account (laura@exclusivecustomjewelry.com)
+// — we never create a new customer per submission, and Kira never contacts
+// the actual end buyer. The buyer's name/email/phone are collected only so
+// Exclusive can follow up with their own customer themselves; that info is
+// folded into the order's notes, not used as the order's customer identity.
+// Posts straight to the existing public web-order endpoint (the same one the
+// WordPress plugin uses) — no backend changes needed. One-off page for this
+// one partner, not a generalized system. Styled with the portal's own theme
+// (same tokens as every other page) rather than a separate visual identity.
 
-const PARTNER_STORE_NAME = 'Exclusive Custom Designs';
+const PARTNER_ACCOUNT_EMAIL = 'laura@exclusivecustomjewelry.com';
+const PARTNER_ACCOUNT_NAME = 'Exclusive Custom Jewelry LLC';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 // Not a real secret — the same key already ships in plaintext in the
 // WordPress plugin source that hits this same endpoint.
@@ -80,9 +83,26 @@ export default function ExclusiveCustomDesignsPage() {
     setSubmitting(true);
     setError('');
     try {
+      // The buyer's own contact info is for Exclusive's follow-up only — it
+      // never becomes the order's customer identity in the portal, just a
+      // note on the order so whoever's handling it there knows who to reach.
+      const requestedByLines = [
+        `Requested by: ${[form.firstName, form.lastName].filter(Boolean).join(' ') || '—'}`,
+        form.email && `Email: ${form.email}`,
+        form.phoneNumber && `Phone: ${form.phoneNumber}`,
+      ].filter(Boolean).join('\n');
+      const combinedNotes = [requestedByLines, form.customerNotes.trim()].filter(Boolean).join('\n\n');
+
       const fd = new FormData();
-      fd.append('storeName', PARTNER_STORE_NAME);
-      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      Object.entries(form).forEach(([k, v]) => { if (v && k !== 'customerNotes') fd.append(k, v); });
+      if (combinedNotes) fd.set('customerNotes', combinedNotes);
+      // Overrides whatever was collected above — every order always belongs
+      // to the one existing Exclusive Custom Jewelry account, not a new
+      // customer per submission.
+      fd.set('firstName', PARTNER_ACCOUNT_NAME);
+      fd.delete('lastName');
+      fd.set('email', PARTNER_ACCOUNT_EMAIL);
+      fd.delete('phoneNumber');
       files.forEach(f => fd.append('files', f));
 
       const res = await fetch(`${API_BASE}/public/orders`, {

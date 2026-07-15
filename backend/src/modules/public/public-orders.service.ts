@@ -59,7 +59,15 @@ export class PublicOrdersService {
   // ── Find or create customer by email ─────────────────────────────────
   private async findOrCreateCustomer(dto: WebOrderDto): Promise<User> {
     const email = dto.email.toLowerCase().trim();
-    const existing = await this.userRepo.findOne({ where: { email } });
+    // Case-insensitive on purpose — an exact match here would risk creating a
+    // second account for an existing customer whose email happens to be
+    // stored with different casing (same class of bug fixed elsewhere for
+    // login/invite), which for a fixed partner address like this one would
+    // silently start splitting their orders across two accounts.
+    const existing = await this.userRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :email', { email })
+      .getOne();
     if (existing) return existing;
 
     const passwordHash = await bcrypt.hash(`Kira@Web${Date.now()}!`, 10);
