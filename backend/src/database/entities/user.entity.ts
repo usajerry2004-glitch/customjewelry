@@ -61,6 +61,12 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  // When false, this account is excluded from every outgoing notification
+  // email (still gets in-app notifications) — set per-person, e.g. someone
+  // who wants to stop being CC'd on every step without losing their role.
+  @Column({ default: true })
+  emailNotificationsEnabled: boolean;
+
   @Column({ default: false })
   isPriority: boolean;
 

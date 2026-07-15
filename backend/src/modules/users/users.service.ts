@@ -36,6 +36,7 @@ export class UpdateUserDto {
   @IsEnum(UserRole) @IsOptional() role?: UserRole;
   @IsString() @IsOptional() @MinLength(6) password?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
+  @IsBoolean() @IsOptional() emailNotificationsEnabled?: boolean;
   @IsString() @IsOptional() department?: string;
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() salesRepId?: string;
@@ -115,6 +116,7 @@ export class UsersService {
     if (dto.firstName !== undefined) user.firstName = dto.firstName;
     if (dto.lastName !== undefined) user.lastName = dto.lastName;
     if (dto.role !== undefined) user.role = dto.role;
+    if (dto.emailNotificationsEnabled !== undefined) user.emailNotificationsEnabled = dto.emailNotificationsEnabled;
     if (dto.email !== undefined && dto.email !== user.email) {
       const existing = await this.userRepo.findOne({ where: { email: dto.email } });
       if (existing && existing.id !== id) throw new ConflictException('Email already registered');

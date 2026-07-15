@@ -14,6 +14,7 @@ interface StaffUser {
   email: string;
   role: UserRole;
   isActive: boolean;
+  emailNotificationsEnabled: boolean;
   createdAt: string;
 }
 
@@ -81,7 +82,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', role: UserRole.SALES_REP as UserRole });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', role: UserRole.SALES_REP as UserRole, emailNotificationsEnabled: true });
   const [savingEdit, setSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -188,7 +189,7 @@ export default function SettingsPage() {
 
   const handleEditClick = (u: StaffUser) => {
     setEditingId(u.id);
-    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role });
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, emailNotificationsEnabled: u.emailNotificationsEnabled });
   };
 
   const handleCancelEdit = () => setEditingId(null);
@@ -456,13 +457,30 @@ export default function SettingsPage() {
                     </td>
                     <td style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       {isEditing ? (
-                        <input
-                          type="email"
-                          value={editForm.email}
-                          onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
-                          style={{ ...inp, minWidth: '200px' }}
-                        />
-                      ) : u.email}
+                        <>
+                          <input
+                            type="email"
+                            value={editForm.email}
+                            onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                            style={{ ...inp, minWidth: '200px' }}
+                          />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={editForm.emailNotificationsEnabled}
+                              onChange={e => setEditForm(f => ({ ...f, emailNotificationsEnabled: e.target.checked }))}
+                            />
+                            Send notification emails
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          {u.email}
+                          {!u.emailNotificationsEnabled && (
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>Email notifications off</div>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td style={{ padding: '12px 18px' }}>
                       {isEditing ? (

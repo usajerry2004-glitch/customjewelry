@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
+import { User } from '../../database/entities/user.entity';
 
 export interface EmailPayload {
   to: string | string[];
@@ -14,7 +17,10 @@ export class EmailService {
   private readonly frontendUrl: string;
   private readonly transporter: nodemailer.Transporter | null;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {
     this.frontendUrl = (this.config.get('FRONTEND_URL', 'http://localhost:3000')).split(',')[0].trim();
     const gmailUser = this.config.get<string>('GMAIL_USER');
     const gmailPass = this.config.get<string>('GMAIL_APP_PASSWORD');
@@ -36,11 +42,19 @@ export class EmailService {
     }
 
     try {
+      const requested = Array.isArray(payload.to) ? payload.to : [payload.to];
+      const optedOut = await this.userRepo.find({
+        where: { email: In(requested), emailNotificationsEnabled: false },
+      });
+      const optedOutEmails = new Set(optedOut.map(u => u.email));
+      const recipients = requested.filter(e => !optedOutEmails.has(e));
+      if (!recipients.length) {
+        this.logger.log(`Email skipped (all recipients opted out): "${payload.subject}"`);
+        return false;
+      }
 
       const override = this.config.get<string>('TEST_EMAIL_OVERRIDE');
-      const to = override
-        ? override
-        : (Array.isArray(payload.to) ? payload.to.join(', ') : payload.to);
+      const to = override ? override : recipients.join(', ');
 
       await this.transporter.sendMail({
         from: `Kira Custom Jewelry <${gmailUser}>`,
