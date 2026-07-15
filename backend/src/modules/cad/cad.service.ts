@@ -49,6 +49,7 @@ export class CadService {
     message: string,
     orderId: string,
     dedupe = false,
+    isPriority = false,
   ): Promise<void> {
     await Promise.all(
       users.map(async u => {
@@ -60,7 +61,7 @@ export class CadService {
           if (recent) return;
         }
         await this.notifRepo.save(
-          this.notifRepo.create({ type, title, message, orderId, targetUserId: u.id }),
+          this.notifRepo.create({ type, title, message, orderId, targetUserId: u.id, isPriority }),
         );
       }),
     );
@@ -114,7 +115,7 @@ export class CadService {
       await this.notifyTeam(authUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD Files Ready for Review — ${order.poNumber}`,
         `CAD designer has uploaded file(s) for order ${order.poNumber}. Please review and set the quote price.`,
-        order.id);
+        order.id, false, order.isPriorityCustomer);
     }
     const authorizerEmails = authUsers.map(u => u.email).filter(Boolean);
     if (authorizerEmails.length) {
@@ -124,6 +125,7 @@ export class CadService {
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('CAD sent-for-approval email failed:', err));
     }
   }
@@ -231,7 +233,7 @@ export class CadService {
       await this.notifyTeam(saUsers, NotificationType.CAD_SENT_FOR_APPROVAL,
         `CAD File Ready for Review — ${order.poNumber}`,
         `CAD design for order ${order.poNumber} has been uploaded. Please review and set the quote price.`,
-        order.id);
+        order.id, false, order.isPriorityCustomer);
     }
     const saAuthorizerEmails = saUsers.map(u => u.email).filter(Boolean);
     if (saAuthorizerEmails.length) {
@@ -241,6 +243,7 @@ export class CadService {
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
         orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('CAD sent-for-approval email failed:', err));
     }
 
@@ -270,13 +273,14 @@ export class CadService {
         await this.notifyTeam(assignerUsers, NotificationType.STATUS_CHANGED,
           `Assign Supplier — ${order.poNumber}`,
           `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated. Select a stone supplier and factory to release it to production.`,
-          order.id);
+          order.id, false, order.isPriorityCustomer);
       }
       this.emailService.sendAssignSupplierAlert({
         to: assignerEmails,
         poNumber: order.poNumber,
         orderType: order.orderType || '—',
         orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('Assign supplier alert email failed:', err));
     }
 
@@ -299,7 +303,7 @@ export class CadService {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `Order Cancelled — ${order.poNumber}`,
           `Customer rejected the CAD for order ${order.poNumber} and the order has been cancelled.`,
-          order.id, true);
+          order.id, true, order.isPriorityCustomer);
       }
     }
 
@@ -321,7 +325,7 @@ export class CadService {
         await this.notifyTeam(users, NotificationType.CAD_REJECTED,
           `CAD Revision Requested — ${order.poNumber}`,
           `Revision requested for order ${order.poNumber}: "${feedback}". Please upload a revised design.`,
-          order.id, true);
+          order.id, true, order.isPriorityCustomer);
       }
       if (emails.length) {
         this.emailService.sendCadRevisionAlert({
@@ -330,6 +334,7 @@ export class CadService {
           customerName: order.customerFullName || order.storeName || 'Valued Customer',
           orderType: order.orderType || '—',
           orderId: order.id,
+          isPriorityCustomer: order.isPriorityCustomer,
         }).catch(err => this.logger.warn('CAD revision email failed:', err));
       }
     }

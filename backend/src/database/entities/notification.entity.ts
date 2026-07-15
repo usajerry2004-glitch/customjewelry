@@ -44,6 +44,13 @@ export class Notification {
   @Column({ default: false })
   isRead: boolean;
 
+  // Snapshot of the order's priority flag at the moment this notification was
+  // created — same denormalized-at-creation pattern as title/message, so it
+  // still reflects "was this priority when it happened" even if the order's
+  // flag changes later.
+  @Column({ default: false })
+  isPriority: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }

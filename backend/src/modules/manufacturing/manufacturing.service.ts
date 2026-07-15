@@ -92,6 +92,7 @@ export class ManufacturingService {
           `Stone for order ${order.poNumber} has been sent and is now marked as received. You can proceed with production.`,
           order.id,
           u.id,
+          order.isPriorityCustomer,
         ),
       ),
     );
@@ -122,6 +123,7 @@ export class ManufacturingService {
       `Order ${order.poNumber} has been manufactured and is en route to the US office.`,
       order.id,
       null,
+      order.isPriorityCustomer,
     );
 
     return saved;

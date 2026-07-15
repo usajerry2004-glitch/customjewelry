@@ -46,6 +46,7 @@ export class ShippingService {
         `Order ${order.poNumber} has been dispatched${details.trackingNumber ? `. Tracking: ${details.trackingNumber}` : ''}.`,
         order.id,
         order.customerId,
+        order.isPriorityCustomer,
       );
     }
 
@@ -55,6 +56,7 @@ export class ShippingService {
       `Order ${order.poNumber} has been shipped${details.trackingNumber ? `. Tracking: ${details.trackingNumber}` : ''}.`,
       order.id,
       null,
+      order.isPriorityCustomer,
     );
 
     return saved;

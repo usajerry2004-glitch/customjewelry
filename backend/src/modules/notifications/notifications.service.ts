@@ -9,8 +9,8 @@ export class NotificationsService {
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
   ) {}
 
-  async create(type: NotificationType, title: string, message: string, orderId?: string, targetUserId?: string): Promise<Notification> {
-    const notif = this.notifRepo.create({ type, title, message, orderId, targetUserId });
+  async create(type: NotificationType, title: string, message: string, orderId?: string, targetUserId?: string, isPriority?: boolean): Promise<Notification> {
+    const notif = this.notifRepo.create({ type, title, message, orderId, targetUserId, isPriority });
     return this.notifRepo.save(notif);
   }
 

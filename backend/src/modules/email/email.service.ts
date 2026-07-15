@@ -95,15 +95,16 @@ export class EmailService {
     orderType: string;
     storeName: string;
     orderId: string;
+    isPriorityCustomer?: boolean;
   }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[New Order] ${opts.poNumber} — Authorization Required`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New Order] ${opts.poNumber} — Authorization Required`,
       html: emailLayout(`
         <h2 style="color:#F59E0B;margin:0 0 16px">New Order Received</h2>
         <p>A new order has been placed and is waiting for your authorization before CAD design begins.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType, '', opts.isPriorityCustomer)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#F59E0B')}">Review & Authorize →</a>
       `),
     });
@@ -115,15 +116,16 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    isPriorityCustomer?: boolean;
   }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[New CAD Job] ${opts.poNumber} is in your queue`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New CAD Job] ${opts.poNumber} is in your queue`,
       html: emailLayout(`
         <h2 style="color:#8B5CF6;margin:0 0 16px">New Order in CAD Queue</h2>
         <p>An order has been authorized and is ready for CAD design. Please log in to start working on it.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType, '', opts.isPriorityCustomer)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#8B5CF6')}">Open Order →</a>
       `),
     });
@@ -135,15 +137,16 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    isPriorityCustomer?: boolean;
   }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[CAD Ready] ${opts.poNumber} — Needs Your Review`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[CAD Ready] ${opts.poNumber} — Needs Your Review`,
       html: emailLayout(`
         <h2 style="color:#6366F1;margin:0 0 16px">CAD Design Ready for Internal Review</h2>
         <p>The CAD design for the order below has been uploaded. Please review it and set the quote price before it's sent to the customer.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType, '', opts.isPriorityCustomer)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#6366F1')}">Review & Set Price →</a>
       `),
     });
@@ -155,15 +158,16 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    isPriorityCustomer?: boolean;
   }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[Approved ✓] Customer approved CAD — ${opts.poNumber}`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Approved ✓] Customer approved CAD — ${opts.poNumber}`,
       html: emailLayout(`
         <h2 style="color:#10B981;margin:0 0 16px">Customer Approved the CAD Design ✓</h2>
         <p>Great news! The customer has approved the CAD design. The order is now ready to move forward to SKU Creation.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType, '', opts.isPriorityCustomer)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#10B981')}">Move to SKU Creation →</a>
       `),
     });
@@ -219,14 +223,15 @@ export class EmailService {
     customerName: string;
     orderType: string;
     orderId: string;
+    isPriorityCustomer?: boolean;
   }) {
     return this.send({
       to: opts.to,
-      subject: `[Action Required] CAD Revision — ${opts.poNumber}`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Action Required] CAD Revision — ${opts.poNumber}`,
       html: emailLayout(`
         <h2 style="color:#DC6B19;margin:0 0 16px">CAD Revision Required</h2>
         <p>The customer has <strong>rejected</strong> the CAD design for the following order. Please review and upload a revised design.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType, '', opts.isPriorityCustomer)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#DC6B19')}">Open Order →</a>
       `),
     });
@@ -356,12 +361,13 @@ export class EmailService {
 
   // VPO just issued — order is approved but not yet routed to any factory/stone
   // supplier. Only Admin/Authorizer can see it until they assign it.
-  async sendAssignSupplierAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+  async sendAssignSupplierAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[Assign Supplier] ${opts.poNumber} — VPO Issued`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Assign Supplier] ${opts.poNumber} — VPO Issued`,
       html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
         <h2 style="color:#0EA5E9;margin:0 0 16px">VPO Issued — Assign Supplier</h2>
         <p>Order <strong>${opts.poNumber}</strong> has been approved and issued. Select a stone supplier and factory to release it to production.</p>
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#0EA5E9')}">Assign Supplier →</a>
@@ -371,12 +377,13 @@ export class EmailService {
 
   // Sent only to the Factory Manager(s) tagged to the factory this order was just
   // routed to — not a blanket "all factory managers" notice.
-  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[New Order] ${opts.poNumber} issued to your factory`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New Order] ${opts.poNumber} issued to your factory`,
       html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
         <h2 style="color:#D97706;margin:0 0 16px">Order Issued to Your Factory</h2>
         <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been issued for manufacturing.</p>
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
@@ -386,12 +393,13 @@ export class EmailService {
 
   // Sent only to the Stone Manager(s) tagged to the supply source this order was
   // just routed to — not a blanket "all stone managers" notice.
-  async sendStoneSupplierAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string }) {
+  async sendStoneSupplierAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
-      subject: `[Stones Needed] ${opts.poNumber}`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Stones Needed] ${opts.poNumber}`,
       html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
         <h2 style="color:#9333EA;margin:0 0 16px">Stones Needed for New Order</h2>
         <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) is ready — please arrange stones.</p>
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#9333EA')}">Open Order →</a>
@@ -561,8 +569,19 @@ function emailLayout(body: string): string {
 </body></html>`;
 }
 
-function orderCard(poNumber: string, customerName: string, orderType: string, extraRows = ''): string {
+// Prefix a subject line so priority orders stand out in an inbox at a glance.
+function prioritySubjectPrefix(isPriority?: boolean): string {
+  return isPriority ? '⭐ PRIORITY — ' : '';
+}
+
+function priorityBanner(isPriority?: boolean): string {
+  if (!isPriority) return '';
+  return `<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;color:#92400E;margin:0 0 16px;letter-spacing:0.3px">⭐ PRIORITY ORDER — please handle ahead of the regular queue</div>`;
+}
+
+function orderCard(poNumber: string, customerName: string, orderType: string, extraRows = '', isPriority = false): string {
   return `
+    ${priorityBanner(isPriority)}
     <table style="width:100%;border:1px solid #E8E4DC;border-radius:8px;border-collapse:collapse;margin:20px 0;padding:16px">
       <tr style="background:#F9F8F6"><td colspan="2" style="padding:12px 16px;font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #E8E4DC">Order Details</td></tr>
       <tr><td style="padding:10px 16px;color:#6B7280;font-size:13px;border-bottom:1px solid #F0EDE8">PO Number</td><td style="padding:10px 16px;font-weight:700;color:#1A2740;border-bottom:1px solid #F0EDE8">${poNumber}</td></tr>

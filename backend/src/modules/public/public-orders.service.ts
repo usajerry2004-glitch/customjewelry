@@ -141,6 +141,7 @@ export class PublicOrdersService {
           message: `A new order from ${dto.storeName || dto.firstName + ' ' + dto.lastName} was submitted via the website.`,
           orderId: order.id,
           targetUserId: u.id,
+          isPriority: order.isPriorityCustomer,
         })),
       ));
 
@@ -167,6 +168,7 @@ export class PublicOrdersService {
           orderType:    order.orderType || 'Custom Order',
           storeName:    order.storeName || 'Web Order',
           orderId:      order.id,
+          isPriorityCustomer: order.isPriorityCustomer,
         }).catch(err => this.logger.warn('New order authorizer email failed:', err));
       }
 
@@ -255,6 +257,7 @@ export class PublicOrdersService {
         message:      `${order.customerFullName} approved the CAD design.`,
         orderId:      order.id,
         targetUserId: u.id,
+        isPriority:   order.isPriorityCustomer,
       })),
     ));
 
@@ -266,6 +269,7 @@ export class PublicOrdersService {
         customerName: order.customerFullName,
         orderType:    order.orderType || 'Custom Order',
         orderId:      order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('CAD approved email failed:', err));
     }
 
@@ -296,6 +300,7 @@ export class PublicOrdersService {
         message:      `${order.customerFullName} requested changes: "${cad.customerFeedback}"`,
         orderId:      order.id,
         targetUserId: u.id,
+        isPriority:   order.isPriorityCustomer,
       })),
     ));
 
@@ -307,6 +312,7 @@ export class PublicOrdersService {
         customerName: order.customerFullName,
         orderType:    order.orderType || 'Custom Order',
         orderId:      order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('CAD revision email failed:', err));
     }
 

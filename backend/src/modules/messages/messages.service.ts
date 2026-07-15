@@ -107,7 +107,10 @@ export class MessagesService {
     const saved = await this.msgRepo.save(msg);
 
     if (isCustomer) {
-      const authorizers = await this.userRepo.find({ where: { role: 'AUTHORIZER' as any } });
+      const [authorizers, order] = await Promise.all([
+        this.userRepo.find({ where: { role: 'AUTHORIZER' as any } }),
+        this.orderRepo.findOne({ where: { id: orderId } }),
+      ]);
       await Promise.all(authorizers.map(auth =>
         this.notificationsService.create(
           NotificationType.CUSTOMER_MESSAGE,
@@ -115,10 +118,14 @@ export class MessagesService {
           `${authorName} left a message on an order and may need a response.`,
           orderId,
           auth.id,
+          order?.isPriorityCustomer,
         ),
       ));
     } else if (dto.mentions?.length) {
-      const mentionedUsers = await this.userRepo.find({ where: { id: In(dto.mentions) } });
+      const [mentionedUsers, order] = await Promise.all([
+        this.userRepo.find({ where: { id: In(dto.mentions) } }),
+        this.orderRepo.findOne({ where: { id: orderId } }),
+      ]);
       await Promise.all(mentionedUsers.filter(u => u.id !== user.id).map(u =>
         this.notificationsService.create(
           NotificationType.MENTION,
@@ -126,6 +133,7 @@ export class MessagesService {
           `${authorName} mentioned you: "${dto.content.substring(0, 100)}"`,
           orderId,
           u.id,
+          order?.isPriorityCustomer,
         ),
       ));
     }

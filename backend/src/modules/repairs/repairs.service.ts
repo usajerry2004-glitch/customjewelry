@@ -53,6 +53,7 @@ export class RepairsService {
           `Order ${order.poNumber} repair has been completed${order.repairContractor ? ` by ${order.repairContractor}` : ''}.`,
           order.id,
           u.id,
+          order.isPriorityCustomer,
         ),
       ),
     );

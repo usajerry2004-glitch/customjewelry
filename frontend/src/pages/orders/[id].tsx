@@ -413,6 +413,7 @@ export default function OrderDetail() {
   const [savingPo, setSavingPo] = useState(false);
   const [shipDateInput, setShipDateInput] = useState('');
   const [savingShipDate, setSavingShipDate] = useState(false);
+  const [savingPriority, setSavingPriority] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
   const [customerInputs, setCustomerInputs] = useState<Record<string, string>>({});
@@ -708,6 +709,27 @@ export default function OrderDetail() {
       toast.error('Failed to save committed ship date — check your connection and try again.');
     } finally {
       setSavingShipDate(false);
+    }
+  };
+
+  const togglePriority = async () => {
+    if (!order?.id) return;
+    setSavingPriority(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isPriorityCustomer: !order.isPriorityCustomer }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to update priority.'));
+      }
+    } catch {
+      toast.error('Failed to update priority — check your connection and try again.');
+    } finally {
+      setSavingPriority(false);
     }
   };
 
@@ -1447,6 +1469,30 @@ export default function OrderDetail() {
               </div>
             );
           })()}
+
+          {/* Priority — Admin can flag this specific order as priority regardless
+              of whether the customer itself is marked priority. */}
+          <div style={{ ...cardStyle, borderTop: order.isPriorityCustomer ? '3px solid var(--accent)' : undefined }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>Priority</div>
+            {order.isPriorityCustomer ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(192,155,88,0.15)', color: 'var(--accent-dark)', padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700 }}>
+                ★ Priority Order
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--bg-input)', color: 'var(--text-muted)', padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 600 }}>
+                Regular Order
+              </span>
+            )}
+            {userRole === UserRole.ADMIN && (
+              <button
+                onClick={togglePriority}
+                disabled={savingPriority}
+                style={{ width: '100%', marginTop: '10px', background: order.isPriorityCustomer ? 'var(--bg-input)' : 'var(--accent)', border: order.isPriorityCustomer ? '1px solid var(--border)' : 'none', borderRadius: '8px', padding: '9px', color: order.isPriorityCustomer ? 'var(--text-secondary)' : '#fff', fontSize: '12px', fontWeight: 700, cursor: savingPriority ? 'not-allowed' : 'pointer', opacity: savingPriority ? 0.6 : 1 }}
+              >
+                {savingPriority ? '…' : order.isPriorityCustomer ? 'Remove Priority' : '★ Mark as Priority'}
+              </button>
+            )}
+          </div>
 
           {/* Stone status — sidebar card. Hidden until supplier is assigned —
               "Pending Stone" isn't meaningful before anyone's been asked for stones. */}

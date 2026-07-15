@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
-interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; }
+interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; isPriority?: boolean; }
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -194,8 +194,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                         >
                           <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 600, color: n.isRead ? 'var(--text-secondary)' : 'var(--text-primary)', marginBottom: '2px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: n.isRead ? 400 : 600, color: n.isRead ? 'var(--text-secondary)' : 'var(--text-primary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               {n.title}
+                              {n.isPriority && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--accent-dark)', background: 'rgba(192,155,88,0.15)', border: '1px solid rgba(192,155,88,0.3)', borderRadius: '99px', padding: '1px 7px', letterSpacing: '0.3px' }}>
+                                  ★ Priority
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{n.message}</div>
                             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', opacity: 0.7 }}>

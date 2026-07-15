@@ -24,7 +24,7 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'd
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
-const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions'];
+const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer'];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
@@ -132,6 +132,7 @@ export class OrdersService implements OnModuleInit {
             message,
             orderId: order.id,
             targetUserId: u.id,
+            isPriority: order.isPriorityCustomer,
           }),
         ),
       ),
@@ -146,6 +147,7 @@ export class OrdersService implements OnModuleInit {
         customerName: order.customerFullName || order.storeName || '—',
         orderType: order.orderType || '—',
         orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
       }).catch(err => this.logger.warn('CAD revision email failed:', err));
     }
   }
@@ -353,6 +355,7 @@ export class OrdersService implements OnModuleInit {
         message: `A new order ${saved.poNumber} has been placed and is awaiting your review.`,
         orderId: saved.id,
         targetUserId: u.id,
+        isPriority: saved.isPriorityCustomer,
       })),
     ));
     if (authEmails.length) {
@@ -363,6 +366,7 @@ export class OrdersService implements OnModuleInit {
         orderType: saved.orderType || '—',
         storeName: saved.storeName || '',
         orderId: saved.id,
+        isPriorityCustomer: saved.isPriorityCustomer,
       }).catch(err => this.logger.warn('New order authorizer email failed:', err));
     }
 
@@ -386,7 +390,7 @@ export class OrdersService implements OnModuleInit {
     // sets supplySource alongside status) — that path is gated by the status endpoint's own role check,
     // not this one, which only guards standalone edits via PUT /orders/:id.
     if (ADMIN_ONLY_KEYS.some(k => (dto as any)[k] !== undefined) && dto.status === undefined && user?.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only Admin can edit the supply source.');
+      throw new ForbiddenException('Only Admin can edit this field.');
     }
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
@@ -500,6 +504,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${vpoOrder.poNumber} has been approved (VPO Issued). Select a stone supplier and factory to release it to production.`,
           orderId: vpoOrder.id,
           targetUserId: u.id,
+          isPriority: vpoOrder.isPriorityCustomer,
         })),
       ));
       const assignerEmails = assignerUsers.map(u => u.email).filter(Boolean);
@@ -508,6 +513,7 @@ export class OrdersService implements OnModuleInit {
         poNumber: vpoOrder.poNumber,
         orderType: vpoOrder.orderType || '—',
         orderId: vpoOrder.id,
+        isPriorityCustomer: vpoOrder.isPriorityCustomer,
       }).catch(err => this.logger.warn('Assign supplier alert email failed:', err));
 
       return vpoOrder;
@@ -550,6 +556,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${updated.poNumber} is ready for CAD design.`,
           orderId: updated.id,
           targetUserId: u.id,
+          isPriority: updated.isPriorityCustomer,
         })),
       ));
       if (cadEmails.length) {
@@ -559,6 +566,7 @@ export class OrdersService implements OnModuleInit {
           customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
           orderType: updated.orderType || '—',
           orderId: updated.id,
+          isPriorityCustomer: updated.isPriorityCustomer,
         }).catch(err => this.logger.warn('Pending CAD designer email failed:', err));
       }
       if (updated.customerEmail) {
@@ -582,6 +590,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${updated.poNumber} has been manufactured and is en route to the US office.`,
           orderId: updated.id,
           targetUserId: u.id,
+          isPriority: updated.isPriorityCustomer,
         })),
       ));
     }
@@ -608,6 +617,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${updated.poNumber} has been shipped${updated.trackingNumber ? ` (${updated.trackingNumber})` : ''}.`,
           orderId: updated.id,
           targetUserId: u.id,
+          isPriority: updated.isPriorityCustomer,
         })),
       ));
     }
@@ -664,6 +674,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${saved.poNumber} has been issued to your factory for manufacturing.`,
           orderId: saved.id,
           targetUserId: u.id,
+          isPriority: saved.isPriorityCustomer,
         })),
       ),
       ...stoneUsers.map(u =>
@@ -673,6 +684,7 @@ export class OrdersService implements OnModuleInit {
           message: `Order ${saved.poNumber} is ready — please arrange stones.`,
           orderId: saved.id,
           targetUserId: u.id,
+          isPriority: saved.isPriorityCustomer,
         })),
       ),
     ]);
@@ -683,6 +695,7 @@ export class OrdersService implements OnModuleInit {
       poNumber: saved.poNumber,
       orderType: saved.orderType || '—',
       orderId: saved.id,
+      isPriorityCustomer: saved.isPriorityCustomer,
     }).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
 
     const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
@@ -691,6 +704,7 @@ export class OrdersService implements OnModuleInit {
       poNumber: saved.poNumber,
       orderType: saved.orderType || '—',
       orderId: saved.id,
+      isPriorityCustomer: saved.isPriorityCustomer,
     }).catch(err => this.logger.warn('Stone supplier assigned alert email failed:', err));
 
     return saved;
@@ -725,6 +739,7 @@ export class OrdersService implements OnModuleInit {
         message: `Order ${order.poNumber} is ready for CAD design.`,
         orderId: order.id,
         targetUserId: u.id,
+        isPriority: order.isPriorityCustomer,
       })),
     ));
     return order;
