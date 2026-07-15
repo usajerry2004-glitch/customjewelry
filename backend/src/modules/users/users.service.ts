@@ -51,8 +51,14 @@ export class UsersService {
     @InjectRepository(Order) private orderRepo: Repository<Order>,
   ) {}
 
-  async findAll(role?: string, caller?: { id: string; role: string }): Promise<User[]> {
+  async findAll(role?: string, caller?: { id: string; role: string }, email?: string): Promise<User[]> {
     const qb = this.userRepo.createQueryBuilder('u');
+    // Exact email lookup searches every role — this is how an existing
+    // account (e.g. a customer being promoted to staff) gets found regardless
+    // of its current role, since the Staff table only lists non-customer roles.
+    if (email) {
+      return qb.where('LOWER(u.email) = LOWER(:email)', { email: email.trim() }).getMany();
+    }
     if (role) qb.where('u.role = :role', { role });
     // Sort customers alphabetically; sort staff by creation date
     if (role === UserRole.CUSTOMER) {

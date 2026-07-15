@@ -25,9 +25,9 @@ export class UsersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List users, optionally filtered by role' })
-  findAll(@Query('role') role?: string, @CurrentUser() caller?: any) {
-    return this.usersService.findAll(role, caller);
+  @ApiOperation({ summary: 'List users, optionally filtered by role or looked up by exact email (any role)' })
+  findAll(@Query('role') role?: string, @Query('email') email?: string, @CurrentUser() caller?: any) {
+    return this.usersService.findAll(role, caller, email);
   }
 
   @Get(':id')

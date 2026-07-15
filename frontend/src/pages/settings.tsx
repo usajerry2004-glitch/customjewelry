@@ -89,6 +89,9 @@ export default function SettingsPage() {
   const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
   const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const toggleSort = (key: typeof sortKey) => {
     if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -160,12 +163,47 @@ export default function SettingsPage() {
         await reload();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(getErrorMessage(data, 'Failed to send invite. Please try again.'));
+        const msg = getErrorMessage(data, 'Failed to send invite. Please try again.');
+        setError(
+          res.status === 409
+            ? `${msg} — that email already has an account. Use "Find an existing account by email" below to change its role instead.`
+            : msg,
+        );
       }
     } catch {
       setError('Failed to send invite — check your connection and try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Finds an existing account by exact email regardless of its current role
+  // (e.g. someone already registered as a Customer) and pulls it into the
+  // Staff table so it can be promoted via the normal Edit flow — otherwise
+  // there's no way to see or change a non-staff account from this page.
+  const handleLookupEmail = async () => {
+    const email = lookupEmail.trim();
+    if (!email) return;
+    setLookupLoading(true);
+    setLookupError(null);
+    try {
+      const res = await apiFetch(`${API}/users?email=${encodeURIComponent(email)}`);
+      if (!res.ok) {
+        setLookupError('Lookup failed. Please try again.');
+        return;
+      }
+      const found: StaffUser[] = await res.json();
+      if (!found.length) {
+        setLookupError(`No account found for ${email}.`);
+        return;
+      }
+      setStaff(prev => [found[0], ...prev.filter(u => u.id !== found[0].id)]);
+      setLookupEmail('');
+      handleEditClick(found[0]);
+    } catch {
+      setLookupError('Lookup failed — check your connection and try again.');
+    } finally {
+      setLookupLoading(false);
     }
   };
 
@@ -257,6 +295,36 @@ export default function SettingsPage() {
             {showForm ? 'Cancel' : '+ Invite Member'}
           </button>
         </div>
+
+        {/* Find an existing account by email — for promoting a Customer to staff,
+            since the table below only lists non-customer roles. */}
+        {currentUserRole === UserRole.ADMIN && (
+          <div style={{ padding: '14px 22px', borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+              Find an existing account by email (e.g. to promote a Customer to staff)
+            </label>
+            <div style={{ display: 'flex', gap: '8px', maxWidth: '420px' }}>
+              <input
+                type="email"
+                value={lookupEmail}
+                onChange={e => { setLookupEmail(e.target.value); setLookupError(null); }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLookupEmail(); } }}
+                placeholder="name@example.com"
+                style={inp}
+              />
+              <button
+                onClick={handleLookupEmail}
+                disabled={lookupLoading || !lookupEmail.trim()}
+                style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: lookupLoading ? 'not-allowed' : 'pointer', opacity: (lookupLoading || !lookupEmail.trim()) ? 0.6 : 1, whiteSpace: 'nowrap' }}
+              >
+                {lookupLoading ? 'Searching…' : 'Find'}
+              </button>
+            </div>
+            {lookupError && (
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#DC2626' }}>{lookupError}</div>
+            )}
+          </div>
+        )}
 
         {/* Invite form */}
         {showForm && (
