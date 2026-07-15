@@ -492,9 +492,11 @@ export class OrdersService implements OnModuleInit {
           isPriority: vpoOrder.isPriorityCustomer,
         })),
       ));
-      const assignerEmails = assignerUsers.map(u => u.email).filter(Boolean);
+      // Email only Admin — Authorizer still sees the in-app notification above but
+      // shouldn't be emailed to assign the supplier.
+      const assignerAdminEmails = assignerUsers.filter(u => u.role === UserRole.ADMIN).map(u => u.email).filter(Boolean);
       this.emailService.sendAssignSupplierAlert({
-        to: assignerEmails,
+        to: assignerAdminEmails,
         poNumber: vpoOrder.poNumber,
         orderType: vpoOrder.orderType || '—',
         orderId: vpoOrder.id,

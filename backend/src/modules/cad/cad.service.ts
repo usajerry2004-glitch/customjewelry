@@ -117,10 +117,12 @@ export class CadService {
         `CAD designer has uploaded file(s) for order ${order.poNumber}. Please review and set the quote price.`,
         order.id, false, order.isPriorityCustomer);
     }
-    const authorizerEmails = authUsers.map(u => u.email).filter(Boolean);
-    if (authorizerEmails.length) {
+    // Email only Admin — Authorizer still sees the in-app notification above but
+    // shouldn't be emailed to set the quote price.
+    const adminEmails = authUsers.filter(u => u.role === UserRole.ADMIN).map(u => u.email).filter(Boolean);
+    if (adminEmails.length) {
       this.emailService.sendCadSentForApprovalToAuthorizers({
-        to: authorizerEmails,
+        to: adminEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
@@ -235,10 +237,12 @@ export class CadService {
         `CAD design for order ${order.poNumber} has been uploaded. Please review and set the quote price.`,
         order.id, false, order.isPriorityCustomer);
     }
-    const saAuthorizerEmails = saUsers.map(u => u.email).filter(Boolean);
-    if (saAuthorizerEmails.length) {
+    // Email only Admin — Authorizer still sees the in-app notification above but
+    // shouldn't be emailed to set the quote price.
+    const saAdminEmails = saUsers.filter(u => u.role === UserRole.ADMIN).map(u => u.email).filter(Boolean);
+    if (saAdminEmails.length) {
       this.emailService.sendCadSentForApprovalToAuthorizers({
-        to: saAuthorizerEmails,
+        to: saAdminEmails,
         poNumber: order.poNumber,
         customerName: order.customerFullName || order.storeName || 'Valued Customer',
         orderType: order.orderType || '—',
@@ -268,15 +272,18 @@ export class CadService {
       // Admin/Authorizer must complete "Assign Supplier" before it's visible to
       // any Factory/Stone Manager. Same two-step flow as the manual VPO path in
       // orders.service.ts.
-      const { emails: assignerEmails, users: assignerUsers } = await this.getTeamEmails([UserRole.ADMIN, UserRole.AUTHORIZER]);
+      const { users: assignerUsers } = await this.getTeamEmails([UserRole.ADMIN, UserRole.AUTHORIZER]);
       if (assignerUsers.length) {
         await this.notifyTeam(assignerUsers, NotificationType.STATUS_CHANGED,
           `Assign Supplier — ${order.poNumber}`,
           `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated. Select a stone supplier and factory to release it to production.`,
           order.id, false, order.isPriorityCustomer);
       }
+      // Email only Admin — Authorizer still sees the in-app notification above but
+      // shouldn't be emailed to assign the supplier.
+      const assignerAdminEmails = assignerUsers.filter(u => u.role === UserRole.ADMIN).map(u => u.email).filter(Boolean);
       this.emailService.sendAssignSupplierAlert({
-        to: assignerEmails,
+        to: assignerAdminEmails,
         poNumber: order.poNumber,
         orderType: order.orderType || '—',
         orderId: order.id,
