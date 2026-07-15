@@ -80,6 +80,9 @@ export default function SettingsPage() {
   const [successEmail, setSuccessEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
   const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
@@ -172,6 +175,35 @@ export default function SettingsPage() {
       toast.error('Failed to remove user — check your connection and try again.');
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const handleEditClick = (u: StaffUser) => {
+    setEditingId(u.id);
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email });
+  };
+
+  const handleCancelEdit = () => setEditingId(null);
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setSavingEdit(true);
+    try {
+      const res = await apiFetch(`${API}/users/${editingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(editForm),
+      });
+      if (res.ok) {
+        setEditingId(null);
+        await reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(getErrorMessage(data, 'Failed to update user.'));
+      }
+    } catch {
+      toast.error('Failed to update user — check your connection and try again.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -385,17 +417,45 @@ export default function SettingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedStaff.map((u, i) => (
+                {sortedStaff.map((u, i) => {
+                  const isEditing = editingId === u.id;
+                  return (
                   <tr key={u.id} style={{ borderBottom: i < sortedStaff.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <td style={{ padding: '12px 18px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${ROLE_COLORS[u.role] || '#6B7280'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: ROLE_COLORS[u.role] || '#6B7280', flexShrink: 0 }}>
-                          {getInitials(u.firstName, u.lastName)}
+                      {isEditing ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            value={editForm.firstName}
+                            onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))}
+                            placeholder="First name"
+                            style={{ ...inp, width: '90px' }}
+                          />
+                          <input
+                            value={editForm.lastName}
+                            onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))}
+                            placeholder="Last name"
+                            style={{ ...inp, width: '90px' }}
+                          />
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatName(u.firstName, u.lastName)}</span>
-                      </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${ROLE_COLORS[u.role] || '#6B7280'}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: ROLE_COLORS[u.role] || '#6B7280', flexShrink: 0 }}>
+                            {getInitials(u.firstName, u.lastName)}
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatName(u.firstName, u.lastName)}</span>
+                        </div>
+                      )}
                     </td>
-                    <td style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>{u.email}</td>
+                    <td style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      {isEditing ? (
+                        <input
+                          type="email"
+                          value={editForm.email}
+                          onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                          style={{ ...inp, minWidth: '200px' }}
+                        />
+                      ) : u.email}
+                    </td>
                     <td style={{ padding: '12px 18px' }}>
                       <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
                         {ROLE_LABELS[u.role] || u.role}
@@ -409,19 +469,47 @@ export default function SettingsPage() {
                     <td style={{ padding: '12px 18px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       {new Date(u.createdAt).toLocaleDateString()}
                     </td>
-                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                      {u.id !== currentUserId && (
-                        <button
-                          onClick={() => handleRemove(u)}
-                          disabled={removingId === u.id}
-                          style={{ background: 'none', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '4px 12px', color: '#DC2626', fontSize: '11px', fontWeight: 600, cursor: removingId === u.id ? 'not-allowed' : 'pointer', opacity: removingId === u.id ? 0.5 : 1 }}
-                        >
-                          {removingId === u.id ? 'Removing…' : 'Remove'}
-                        </button>
+                    <td style={{ padding: '12px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={savingEdit}
+                            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 12px', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, cursor: savingEdit ? 'not-allowed' : 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveEdit}
+                            disabled={savingEdit}
+                            style={{ background: 'var(--navy)', border: 'none', borderRadius: '6px', padding: '4px 12px', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: savingEdit ? 'not-allowed' : 'pointer', opacity: savingEdit ? 0.6 : 1 }}
+                          >
+                            {savingEdit ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleEditClick(u)}
+                            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 12px', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Edit
+                          </button>
+                          {u.id !== currentUserId && (
+                            <button
+                              onClick={() => handleRemove(u)}
+                              disabled={removingId === u.id}
+                              style={{ background: 'none', border: '1px solid #FCA5A5', borderRadius: '6px', padding: '4px 12px', color: '#DC2626', fontSize: '11px', fontWeight: 600, cursor: removingId === u.id ? 'not-allowed' : 'pointer', opacity: removingId === u.id ? 0.5 : 1 }}
+                            >
+                              {removingId === u.id ? 'Removing…' : 'Remove'}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

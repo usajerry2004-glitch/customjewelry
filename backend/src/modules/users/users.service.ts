@@ -32,6 +32,7 @@ export class InviteUserDto {
 export class UpdateUserDto {
   @IsString() @IsOptional() firstName?: string;
   @IsString() @IsOptional() lastName?: string;
+  @IsEmail() @IsOptional() email?: string;
   @IsString() @IsOptional() @MinLength(6) password?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
   @IsString() @IsOptional() department?: string;
@@ -109,6 +110,11 @@ export class UsersService {
     }
     if (dto.firstName !== undefined) user.firstName = dto.firstName;
     if (dto.lastName !== undefined) user.lastName = dto.lastName;
+    if (dto.email !== undefined && dto.email !== user.email) {
+      const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+      if (existing && existing.id !== id) throw new ConflictException('Email already registered');
+      user.email = dto.email;
+    }
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;
     if (dto.storeName !== undefined) user.storeName = dto.storeName;
