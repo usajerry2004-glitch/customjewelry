@@ -47,6 +47,11 @@ export class User {
   @Column({ nullable: true })
   salesRepId: string;
 
+  // Customer-role accounts belonging to the same company share this — that's
+  // what grants teammates equal access to all of the company's orders.
+  @Column({ nullable: true })
+  companyId: string | null;
+
   // Which factory this account manages orders for (FACTORY_MANAGER role) — only
   // orders assigned to this same factory are visible to them.
   @Column({ type: 'varchar', nullable: true })

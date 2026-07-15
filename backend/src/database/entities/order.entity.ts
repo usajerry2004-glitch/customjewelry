@@ -73,6 +73,13 @@ export class Order {
   @Column({ nullable: true })
   customerId: string;
 
+  // Inherited from the placing customer's companyId at creation (same
+  // denormalize-at-write pattern as salesRepName/salesRepEmail below) — this
+  // is what lets any teammate at the same company see/act on this order,
+  // not just whoever personally placed it.
+  @Column({ nullable: true })
+  companyId: string | null;
+
   @Column({ nullable: true })
   storeName: string;
 

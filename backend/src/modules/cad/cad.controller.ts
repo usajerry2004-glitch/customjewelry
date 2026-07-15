@@ -33,7 +33,7 @@ export class CadController {
   @ApiOperation({ summary: 'Get CAD files for an order' })
   async getByOrder(@Param('orderId') orderId: string, @Request() req: any) {
     if (req.user?.role === UserRole.CUSTOMER) {
-      await this.cadService.assertCustomerOwnsOrder(orderId, req.user.email);
+      await this.cadService.assertCustomerOwnsOrder(orderId, req.user);
       const cads = await this.cadService.getByOrder(orderId);
       const visible = await this.cadService.isVisibleToCustomer(orderId);
       if (!visible) {
@@ -121,7 +121,7 @@ export class CadController {
   @ApiOperation({ summary: 'Approve a CAD file (Customer or Admin)' })
   async approve(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
     if (req.user?.role === UserRole.CUSTOMER) {
-      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user);
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
@@ -132,7 +132,7 @@ export class CadController {
   @ApiOperation({ summary: 'Reject a CAD file (Customer or Admin)' })
   async reject(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
     if (req.user?.role === UserRole.CUSTOMER) {
-      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user);
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
@@ -176,7 +176,7 @@ export class CadController {
   @ApiOperation({ summary: 'Request revision (Customer or Admin)' })
   async revision(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
     if (req.user?.role === UserRole.CUSTOMER) {
-      await this.cadService.assertCustomerOwnsCadFile(id, req.user.email);
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user);
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }

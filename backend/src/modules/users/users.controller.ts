@@ -45,9 +45,9 @@ export class UsersController {
 
   @Post('invite')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Invite a new staff member — auto-generates temp password and sends email' })
-  async inviteStaff(@Body() dto: InviteUserDto) {
-    const { user, tempPassword } = await this.usersService.inviteStaff(dto);
+  @ApiOperation({ summary: 'Invite a new staff member (or a Customer teammate) — auto-generates temp password and sends email' })
+  async inviteStaff(@Body() dto: InviteUserDto, @CurrentUser() caller?: any) {
+    const { user, tempPassword } = await this.usersService.inviteStaff(dto, caller);
     await this.emailService.sendStaffInvite({
       to: user.email,
       firstName: user.firstName,
@@ -79,8 +79,14 @@ export class UsersController {
   }
 
   @Get(':id/orders')
-  @ApiOperation({ summary: 'Get all orders for a customer' })
+  @ApiOperation({ summary: 'Get all orders for a customer (includes teammates\' orders at the same company)' })
   getOrders(@Param('id') id: string) {
     return this.usersService.getCustomerOrders(id);
+  }
+
+  @Get(':id/teammates')
+  @ApiOperation({ summary: "Get every user at this customer's company (including themselves)" })
+  getTeammates(@Param('id') id: string) {
+    return this.usersService.getCompanyTeammates(id);
   }
 }

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Order, Factory, SupplySource } from '../../database/entities/order.entity';
+import { Company } from '../../database/entities/company.entity';
 
 export class CreateUserDto {
   @IsString() firstName: string;
@@ -17,6 +18,9 @@ export class CreateUserDto {
   @IsString() @IsOptional() salesRepId?: string;
   @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
   @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
+  // Admin-only: attach this Customer account to an existing company (a
+  // teammate) instead of creating a new standalone company for them.
+  @IsString() @IsOptional() companyId?: string;
 }
 
 export class InviteUserDto {
@@ -27,6 +31,7 @@ export class InviteUserDto {
   @IsString() @IsOptional() salesRepId?: string;
   @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
   @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
+  @IsString() @IsOptional() companyId?: string;
 }
 
 export class UpdateUserDto {
@@ -49,6 +54,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Order) private orderRepo: Repository<Order>,
+    @InjectRepository(Company) private companyRepo: Repository<Company>,
   ) {}
 
   async findAll(role?: string, caller?: { id: string; role: string }): Promise<User[]> {
@@ -80,11 +86,30 @@ export class UsersService {
     const role = caller?.role === UserRole.SALES_REP ? UserRole.CUSTOMER : (dto.role || UserRole.CUSTOMER);
 
     let salesRepId: string | undefined = caller?.role === UserRole.SALES_REP ? caller.id : dto.salesRepId;
-    if (role === UserRole.CUSTOMER && caller?.role !== UserRole.SALES_REP) {
-      if (!salesRepId) throw new BadRequestException('A Sales Rep must be assigned to every customer account.');
-      const rep = await this.userRepo.findOne({ where: { id: salesRepId } });
-      if (!rep || rep.role !== UserRole.SALES_REP) {
-        throw new BadRequestException('salesRepId must reference an existing Sales Rep.');
+    let company: Company | undefined;
+
+    if (role === UserRole.CUSTOMER) {
+      if (dto.companyId) {
+        // Adding a teammate to an existing company — one Sales Rep per
+        // company, so this is inherited, not chosen, and only Admin can do it.
+        if (caller?.role !== UserRole.ADMIN) {
+          throw new ForbiddenException('Only Admin can add a teammate to an existing company.');
+        }
+        company = (await this.companyRepo.findOne({ where: { id: dto.companyId } })) ?? undefined;
+        if (!company) throw new BadRequestException('Company not found.');
+        salesRepId = company.salesRepId || undefined;
+      } else {
+        if (caller?.role !== UserRole.SALES_REP) {
+          if (!salesRepId) throw new BadRequestException('A Sales Rep must be assigned to every customer account.');
+          const rep = await this.userRepo.findOne({ where: { id: salesRepId } });
+          if (!rep || rep.role !== UserRole.SALES_REP) {
+            throw new BadRequestException('salesRepId must reference an existing Sales Rep.');
+          }
+        }
+        company = await this.companyRepo.save(this.companyRepo.create({
+          name: dto.storeName?.trim() || `${dto.firstName} ${dto.lastName}`.trim(),
+          salesRepId: salesRepId || null,
+        }));
       }
     }
 
@@ -95,7 +120,8 @@ export class UsersService {
       passwordHash,
       role,
       salesRepId,
-      storeName: dto.storeName,
+      companyId: company?.id,
+      storeName: company?.name ?? dto.storeName,
       // Not restricted to one role: a Stone Manager account may also be tagged
       // with a factory (e.g. one contact who handles both stones and factory
       // orders for the same outside partner) and still receive factory-side
@@ -128,7 +154,15 @@ export class UsersService {
     }
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;
-    if (dto.storeName !== undefined) user.storeName = dto.storeName;
+    if (dto.storeName !== undefined) {
+      user.storeName = dto.storeName;
+      // Keep the whole company's display name in sync — a Customer with
+      // teammates shouldn't show a different company name per person.
+      if (user.companyId) {
+        await this.companyRepo.update(user.companyId, { name: dto.storeName });
+        await this.userRepo.update({ companyId: user.companyId }, { storeName: dto.storeName });
+      }
+    }
     if (dto.assignedFactory !== undefined) user.assignedFactory = dto.assignedFactory;
     if (dto.assignedSupplySource !== undefined) user.assignedSupplySource = dto.assignedSupplySource;
     if (dto.salesRepId !== undefined) {
@@ -138,18 +172,37 @@ export class UsersService {
           throw new BadRequestException('salesRepId must reference an existing Sales Rep.');
         }
       }
-      user.salesRepId = (dto.salesRepId || null) as any;
+      const nextSalesRepId = (dto.salesRepId || null) as any;
+      user.salesRepId = nextSalesRepId;
+      // One Sales Rep per company — changing it here changes it for every teammate.
+      if (user.companyId) {
+        await this.companyRepo.update(user.companyId, { salesRepId: nextSalesRepId });
+        await this.userRepo.update({ companyId: user.companyId }, { salesRepId: nextSalesRepId });
+      }
     }
     return this.userRepo.save(user);
   }
 
   async getCustomerOrders(customerId: string): Promise<{ orders: Order[]; total: number }> {
     const user = await this.findOne(customerId);
+    // Companies share order visibility — this shows every teammate's orders,
+    // not just the ones this specific person placed. The customerId/email
+    // clauses stay as a fallback for orders placed before companies existed.
+    const where = user.companyId
+      ? [{ companyId: user.companyId }, { customerId }, { customerEmail: user.email }]
+      : [{ customerId }, { customerEmail: user.email }];
     const [orders, total] = await this.orderRepo.findAndCount({
-      where: [{ customerId }, { customerEmail: user.email }],
+      where,
       order: { createdAt: 'DESC' },
     });
     return { orders, total };
+  }
+
+  // Teammates at the same company as this customer (including themselves).
+  async getCompanyTeammates(customerId: string): Promise<User[]> {
+    const user = await this.findOne(customerId);
+    if (!user.companyId) return [user];
+    return this.userRepo.find({ where: { companyId: user.companyId }, order: { createdAt: 'ASC' } });
   }
 
   async togglePriority(id: string): Promise<User> {
@@ -164,11 +217,11 @@ export class UsersService {
     return user;
   }
 
-  async inviteStaff(dto: InviteUserDto): Promise<{ user: User; tempPassword: string }> {
+  async inviteStaff(dto: InviteUserDto, caller?: { id: string; role: string }): Promise<{ user: User; tempPassword: string }> {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const tempPassword = `KiRa-${rand(4)}-${rand(4)}`;
-    const user = await this.create({ ...dto, password: tempPassword });
+    const user = await this.create({ ...dto, password: tempPassword }, caller);
     return { user, tempPassword };
   }
 

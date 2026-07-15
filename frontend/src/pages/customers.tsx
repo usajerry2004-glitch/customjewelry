@@ -20,6 +20,7 @@ interface Customer {
   createdAt: string;
   salesRepId?: string;
   storeName?: string;
+  companyId?: string | null;
 }
 
 interface Stats { totalCustomers: number; activeCustomers: number; totalStaff: number }
@@ -71,6 +72,13 @@ export default function CustomersPage() {
   const [userRole, setUserRole] = useState('');
   const [refImage, setRefImage] = useState<File | null>(null);
   const refImageRef = useRef<HTMLInputElement>(null);
+  const [showTeam, setShowTeam] = useState<{ customer: Customer; teammates: Customer[] } | null>(null);
+  const [showTeamTop, setShowTeamTop] = useState(200);
+  const [showTeamH, setShowTeamH] = useState(400);
+  const [addingTeammate, setAddingTeammate] = useState(false);
+  const [teammateForm, setTeammateForm] = useState({ firstName: '', lastName: '', email: '' });
+  const [savingTeammate, setSavingTeammate] = useState(false);
+  const [teammateError, setTeammateError] = useState('');
 
   useEffect(() => {
     try {
@@ -123,6 +131,14 @@ export default function CustomersPage() {
       const nameB = (b.storeName || formatName(b.firstName, b.lastName)).toLowerCase();
       return nameA.localeCompare(nameB);
     }), [customers, search, filterStatus, filterPriority, filterSalesRep]);
+
+  // Team size per company, computed from the already-fetched customer list
+  // — no extra request needed just to show a "2 people" badge per row.
+  const teamSizeByCompany = useMemo(() => {
+    const counts: Record<string, number> = {};
+    customers.forEach(c => { if (c.companyId) counts[c.companyId] = (counts[c.companyId] || 0) + 1; });
+    return counts;
+  }, [customers]);
 
   const totalPages = Math.max(1, Math.ceil(allFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -188,6 +204,61 @@ export default function CustomersPage() {
     if (res.ok) {
       const data = await res.json();
       setShowOrders({ customer, orders: data.orders || [] });
+    }
+  };
+
+  const viewTeam = async (customer: Customer, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const vh = window.innerHeight;
+    const mh = Math.min(360, vh - 80);
+    const rowY = rect.top;
+    const spaceBelow = vh - rowY - 20;
+    const rawTop = spaceBelow >= mh ? rowY - 12 : rowY - mh + 30;
+    setShowTeamTop(Math.min(Math.max(rawTop, 12), vh - mh - 12));
+    setShowTeamH(mh);
+    setAddingTeammate(false);
+    setTeammateError('');
+    setTeammateForm({ firstName: '', lastName: '', email: '' });
+    const res = await apiFetch(`${API}/users/${customer.id}/teammates`);
+    if (res.ok) {
+      setShowTeam({ customer, teammates: await res.json() });
+    }
+  };
+
+  const addTeammate = async () => {
+    if (!showTeam?.customer.companyId) return;
+    if (!teammateForm.firstName.trim() || !teammateForm.lastName.trim() || !teammateForm.email.trim()) {
+      setTeammateError('First name, last name, and email are all required.');
+      return;
+    }
+    setSavingTeammate(true);
+    setTeammateError('');
+    try {
+      const res = await apiFetch(`${API}/users/invite`, {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName: teammateForm.firstName.trim(),
+          lastName: teammateForm.lastName.trim(),
+          email: teammateForm.email.trim(),
+          role: 'CUSTOMER',
+          companyId: showTeam.customer.companyId,
+        }),
+      });
+      if (res.ok) {
+        const teamRes = await apiFetch(`${API}/users/${showTeam.customer.id}/teammates`);
+        if (teamRes.ok) setShowTeam({ customer: showTeam.customer, teammates: await teamRes.json() });
+        setAddingTeammate(false);
+        setTeammateForm({ firstName: '', lastName: '', email: '' });
+        toast.success('Teammate invited — they\'ll receive their login by email.');
+        await load();
+      } else {
+        const d = await res.json().catch(() => null);
+        setTeammateError(getErrorMessage(d, 'Failed to add teammate.'));
+      }
+    } catch {
+      setTeammateError('Failed to add teammate — check your connection and try again.');
+    } finally {
+      setSavingTeammate(false);
     }
   };
 
@@ -303,8 +374,15 @@ export default function CustomersPage() {
             ) : filtered.map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {c.storeName || formatName(c.firstName, c.lastName)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {c.storeName || formatName(c.firstName, c.lastName)}
+                    </div>
+                    {c.companyId && teamSizeByCompany[c.companyId] > 1 && (
+                      <span title="Teammates share access to all of this company's orders" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '99px', padding: '1px 7px', whiteSpace: 'nowrap' }}>
+                        👥 {teamSizeByCompany[c.companyId]}
+                      </span>
+                    )}
                   </div>
                   {c.storeName && (
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -376,6 +454,11 @@ export default function CustomersPage() {
                     <button onClick={e => viewOrders(c, e)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
                       View Orders
                     </button>
+                    {isAdmin && (
+                      <button onClick={e => viewTeam(c, e)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
+                        Team
+                      </button>
+                    )}
                     {isAdmin && c.isActive && (
                       <button onClick={() => deactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(220,38,38,0.3)', background: 'transparent', color: '#DC2626', fontSize: '11px', cursor: 'pointer' }}>
                         Deactivate
@@ -594,6 +677,85 @@ export default function CustomersPage() {
                   );
                 })}
               </div>
+            )}
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ── Team Modal (portal: outside scroll container) ── */}
+      {showTeam && createPortal(
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.6)', zIndex: 1000 }}
+            onClick={() => setShowTeam(null)}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              top: `${showTeamTop}px`,
+              zIndex: 1001,
+              width: '480px',
+              maxWidth: 'calc(100vw - 32px)',
+              maxHeight: `${showTeamH}px`,
+              overflowY: 'auto',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  {showTeam.customer.storeName || formatName(showTeam.customer.firstName, showTeam.customer.lastName)}
+                </h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                  {showTeam.teammates.length} {showTeam.teammates.length === 1 ? 'person' : 'people'} — all can view & manage this company's orders
+                </p>
+              </div>
+              <button onClick={() => setShowTeam(null)}
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', color: 'var(--text-muted)', fontSize: '14px', cursor: 'pointer', lineHeight: 1 }}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              {showTeam.teammates.map(t => (
+                <div key={t.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatName(t.firstName, t.lastName)}</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{t.email}</div>
+                </div>
+              ))}
+            </div>
+
+            {addingTeammate ? (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>Add a Teammate</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <input value={teammateForm.firstName} onChange={e => setTeammateForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" style={INPUT} />
+                  <input value={teammateForm.lastName} onChange={e => setTeammateForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" style={INPUT} />
+                </div>
+                <input value={teammateForm.email} onChange={e => setTeammateForm(f => ({ ...f, email: e.target.value }))} placeholder="Email address" type="email" style={{ ...INPUT, marginBottom: '10px' }} />
+                {teammateError && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '10px' }}>{teammateError}</div>}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={addTeammate} disabled={savingTeammate} style={{ flex: 1, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: savingTeammate ? 0.7 : 1 }}>
+                    {savingTeammate ? 'Inviting…' : 'Send Invite'}
+                  </button>
+                  <button onClick={() => { setAddingTeammate(false); setTeammateError(''); }} style={{ padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setAddingTeammate(true)}
+                style={{ width: '100%', background: 'transparent', border: '1px solid var(--accent)', borderRadius: '8px', padding: '9px', color: 'var(--accent-dark)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                + Add Teammate
+              </button>
             )}
           </div>
         </>,

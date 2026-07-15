@@ -174,12 +174,14 @@ export class AuthService {
     const payload = {
       sub: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName,
       assignedFactory: user.assignedFactory, assignedSupplySource: user.assignedSupplySource,
+      companyId: user.companyId,
     };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role,
         assignedFactory: user.assignedFactory, assignedSupplySource: user.assignedSupplySource,
+        companyId: user.companyId,
       },
     };
   }

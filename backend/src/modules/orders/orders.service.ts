@@ -152,13 +152,15 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
+  async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const qb = this.orderRepo.createQueryBuilder('order');
 
     if (user?.role === 'CUSTOMER') {
+      // Companies share order visibility — a teammate sees every order placed
+      // by anyone at their company, not just their own.
       qb.andWhere(
-        '(order.customerEmail = :email OR order.customerId = :uid)',
-        { email: user.email, uid: user.id },
+        '(order.customerEmail = :email OR order.customerId = :uid OR (order.companyId IS NOT NULL AND order.companyId = :companyId))',
+        { email: user.email, uid: user.id, companyId: user.companyId ?? null },
       );
     } else if (user?.role === 'SALES_REP') {
       qb.andWhere('order.salesRepId = :salesRepId', { salesRepId: user.id });
@@ -226,11 +228,14 @@ export class OrdersService implements OnModuleInit {
     return { orders, total };
   }
 
-  async findOne(id: string, user?: { id?: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
-    if (user?.role === 'CUSTOMER' && order.customerEmail !== user.email) {
+    if (user?.role === 'CUSTOMER'
+        && order.customerEmail !== user.email
+        && order.customerId !== user.id
+        && !(user.companyId && order.companyId === user.companyId)) {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
@@ -308,6 +313,9 @@ export class OrdersService implements OnModuleInit {
       const customer = await this.userRepo.findOne({ where: { id: data.customerId } });
       if (customer?.isPriority) data.isPriorityCustomer = true;
       if (!data.salesRepId && customer?.salesRepId) data.salesRepId = customer.salesRepId;
+      // So every teammate at the same company can see this order, not just
+      // whoever personally placed it.
+      data.companyId = customer?.companyId ?? null;
     }
 
     // New orders start in NEW status — auth/admin reviews and moves to CAD_IN_PROGRESS

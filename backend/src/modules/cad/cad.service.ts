@@ -396,16 +396,19 @@ export class CadService {
     return !!(order?.sentToCustomer);
   }
 
-  async assertCustomerOwnsOrder(orderId: string, customerEmail: string): Promise<void> {
+  async assertCustomerOwnsOrder(orderId: string, customer: { email: string; id?: string; companyId?: string | null }): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order || order.customerEmail !== customerEmail) {
-      throw new ForbiddenException('Access denied');
-    }
+    const owns = !!order && (
+      order.customerEmail === customer.email ||
+      order.customerId === customer.id ||
+      !!(customer.companyId && order.companyId === customer.companyId)
+    );
+    if (!owns) throw new ForbiddenException('Access denied');
   }
 
-  async assertCustomerOwnsCadFile(cadId: string, customerEmail: string): Promise<void> {
+  async assertCustomerOwnsCadFile(cadId: string, customer: { email: string; id?: string; companyId?: string | null }): Promise<void> {
     const cad = await this.findOne(cadId);
-    await this.assertCustomerOwnsOrder(cad.orderId, customerEmail);
+    await this.assertCustomerOwnsOrder(cad.orderId, customer);
   }
 
   async getThumbnails(orderIds: string[]): Promise<Record<string, string>> {
