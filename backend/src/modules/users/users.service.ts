@@ -76,7 +76,8 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, caller?: { id: string; role: string }): Promise<User> {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    const email = dto.email.toLowerCase().trim();
+    const existing = await this.userRepo.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
     const passwordHash = await bcrypt.hash(dto.password, 10);
     // A Sales Rep can only ever create Customer accounts — the role they
@@ -96,7 +97,7 @@ export class UsersService {
     const user = this.userRepo.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
-      email: dto.email,
+      email,
       passwordHash,
       role,
       salesRepId,
@@ -123,10 +124,13 @@ export class UsersService {
     if (dto.lastName !== undefined) user.lastName = dto.lastName;
     if (dto.role !== undefined) user.role = dto.role;
     if (dto.emailNotificationsEnabled !== undefined) user.emailNotificationsEnabled = dto.emailNotificationsEnabled;
-    if (dto.email !== undefined && dto.email !== user.email) {
-      const existing = await this.userRepo.findOne({ where: { email: dto.email } });
-      if (existing && existing.id !== id) throw new ConflictException('Email already registered');
-      user.email = dto.email;
+    if (dto.email !== undefined) {
+      const email = dto.email.toLowerCase().trim();
+      if (email !== user.email) {
+        const existing = await this.userRepo.findOne({ where: { email } });
+        if (existing && existing.id !== id) throw new ConflictException('Email already registered');
+        user.email = email;
+      }
     }
     if (dto.isActive !== undefined) user.isActive = dto.isActive;
     if (dto.department !== undefined) user.department = dto.department;

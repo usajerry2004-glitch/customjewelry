@@ -20,14 +20,15 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    const email = dto.email.toLowerCase().trim();
+    const existing = await this.userRepo.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = this.userRepo.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
-      email: dto.email,
+      email,
       passwordHash,
       role: dto.role || UserRole.SALES_REP,
     });
@@ -39,7 +40,7 @@ export class AuthService {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
-      .where('u.email = :email', { email: dto.email })
+      .where('LOWER(u.email) = LOWER(:email)', { email: dto.email.trim() })
       .getOne();
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
@@ -50,7 +51,11 @@ export class AuthService {
   }
 
   async requestOtp(email: string): Promise<{ found: boolean; otp?: string; firstName?: string }> {
-    const user = await this.userRepo.findOne({ where: { email, role: UserRole.CUSTOMER } });
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
+      .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
+      .getOne();
     if (!user) return { found: false };
 
     const otp = String(randomInt(100000, 1000000));
@@ -66,7 +71,7 @@ export class AuthService {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .addSelect('u.otpCodeHash')
-      .where('u.email = :email', { email })
+      .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
       .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
       .getOne();
 
@@ -92,7 +97,10 @@ export class AuthService {
   }
 
   async forgotPassword(email: string): Promise<string | null> {
-    const user = await this.userRepo.findOne({ where: { email } });
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
+      .getOne();
     if (!user) return null; // don't reveal if email exists
     const secret = `${this.config.get('JWT_SECRET', 'dev-secret')}:reset`;
     const token = this.jwtService.sign(
