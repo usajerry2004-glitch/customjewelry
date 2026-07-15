@@ -8,7 +8,7 @@ import { Toaster } from '../components/Toaster';
 import '../styles/globals.css';
 
 const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
-const PUBLIC_PREFIXES = ['/track/'];
+const PUBLIC_PREFIXES = ['/track/', '/custom/'];
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
