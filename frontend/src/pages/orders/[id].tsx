@@ -142,7 +142,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
           )}
           {!(ext === '3dm' && userRole === UserRole.CUSTOMER) && (
             <a
-              href={fileUrl} download={cad.originalName}
+              href={`${API}/cad/${cad.id}/download`}
               style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
               ↓ Download
@@ -215,7 +215,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
             <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '18px' }}>
               Preview not available for .{ext} files
             </div>
-            <a href={fileUrl} download={cad.originalName}
+            <a href={`${API}/cad/${cad.id}/download`}
               style={{ background: 'var(--accent)', color: '#fff', padding: '9px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
               ↓ Download File
             </a>

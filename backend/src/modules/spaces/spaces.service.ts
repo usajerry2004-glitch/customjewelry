@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { extname } from 'path';
 import { generateThumbnail } from './thumbnail.util';
 
@@ -61,6 +61,16 @@ export class SpacesService {
       ContentType: contentType,
     }));
     return this.getPublicUrl(key);
+  }
+
+  // Fetches an object's bytes through our own server instead of the browser
+  // linking to it directly — the DO Spaces domain is cross-origin from the
+  // frontend, and browsers ignore a client-side `download` attribute on
+  // cross-origin links (silently opening the file instead). Streaming it
+  // through here lets us set a real Content-Disposition header, which
+  // browsers always honor regardless of origin.
+  async getObject(key: string) {
+    return this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
   async deleteFile(key: string): Promise<void> {

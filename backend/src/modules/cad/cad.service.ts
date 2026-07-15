@@ -454,4 +454,14 @@ export class CadService {
     if (!cad) throw new NotFoundException(`CAD file ${id} not found`);
     return cad;
   }
+
+  async getDownloadable(id: string): Promise<{ stream: NodeJS.ReadableStream; contentType: string; filename: string }> {
+    const cad = await this.findOne(id);
+    const obj = await this.spacesService.getObject(cad.fileName);
+    return {
+      stream: obj.Body as unknown as NodeJS.ReadableStream,
+      contentType: obj.ContentType || 'application/octet-stream',
+      filename: cad.originalName,
+    };
+  }
 }

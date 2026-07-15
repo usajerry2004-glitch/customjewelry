@@ -1,7 +1,8 @@
 import {
   Controller, Post, Get, Patch, Delete, Param, Query, Body, UploadedFile, UploadedFiles,
-  UseInterceptors, Request, UseGuards, ForbiddenException,
+  UseInterceptors, Request, UseGuards, ForbiddenException, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CadService } from './cad.service';
@@ -46,6 +47,19 @@ export class CadController {
     }
     const cads = await this.cadService.getByOrder(orderId);
     return cads;
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download a CAD/reference file with a forced Content-Disposition header — browsers ignore a client-side download attribute on cross-origin links (the Spaces domain), so this streams it through our own origin instead' })
+  async download(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
+    if (req.user?.role === UserRole.CUSTOMER) {
+      await this.cadService.assertCustomerOwnsCadFile(id, req.user);
+    }
+    const { stream, contentType, filename } = await this.cadService.getDownloadable(id);
+    const safeName = filename.replace(/[\r\n"]/g, '');
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    stream.pipe(res);
   }
 
   @Patch('order/:orderId/send-to-customer')
