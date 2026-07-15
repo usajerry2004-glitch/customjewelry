@@ -7,6 +7,7 @@ import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
+import { formatName } from '../../utils/name';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
@@ -956,6 +957,9 @@ export default function OrderDetail() {
                       (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
                     const canEditCustomer = EDITABLE_CUSTOMER_KEYS.includes(key) && userRole === UserRole.ADMIN;
                     const canEditSupplySource = key === 'supplySource' && userRole === UserRole.ADMIN;
+                    const contacts = key === 'assignedFactory' ? order.factoryContacts
+                      : key === 'supplySource' ? order.stoneContacts
+                      : undefined;
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -1059,6 +1063,15 @@ export default function OrderDetail() {
                         ) : (
                           <div style={{ fontSize: '13px', color: raw ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: raw ? 500 : 400 }}>
                             {val || '—'}
+                          </div>
+                        )}
+                        {contacts && contacts.length > 0 && (
+                          <div style={{ marginTop: '4px' }}>
+                            {contacts.map(c => (
+                              <div key={c.email} style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                {formatName(c.firstName, c.lastName)}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

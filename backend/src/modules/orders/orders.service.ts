@@ -251,6 +251,21 @@ export class OrdersService implements OnModuleInit {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
+    // Who to actually contact for the assigned factory / stone supplier —
+    // resolved from whichever Factory/Stone Manager account(s) are tagged
+    // to this order's assignedFactory / supplySource.
+    const contactFields: ('firstName' | 'lastName' | 'email')[] = ['firstName', 'lastName', 'email'];
+    const [factoryContacts, stoneContacts] = await Promise.all([
+      order.assignedFactory
+        ? this.userRepo.find({ where: { role: UserRole.FACTORY_MANAGER, assignedFactory: order.assignedFactory }, select: contactFields })
+        : Promise.resolve([]),
+      order.supplySource
+        ? this.userRepo.find({ where: { role: UserRole.STONE_MANAGER, assignedSupplySource: order.supplySource }, select: contactFields })
+        : Promise.resolve([]),
+    ]);
+    (order as any).factoryContacts = factoryContacts;
+    (order as any).stoneContacts = stoneContacts;
+
     return order;
   }
 

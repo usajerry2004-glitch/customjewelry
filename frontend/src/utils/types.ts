@@ -66,6 +66,8 @@ export interface Order {
   stoneStatus?: StoneStatus | null;
   supplySource?: SupplySource | null;
   assignedFactory?: Factory | null;
+  factoryContacts?: { firstName: string; lastName: string; email: string }[];
+  stoneContacts?: { firstName: string; lastName: string; email: string }[];
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
