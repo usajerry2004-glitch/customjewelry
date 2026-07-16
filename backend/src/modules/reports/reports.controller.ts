@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -34,6 +34,7 @@ export class ReportsController {
 
   @Get('weekly/preview')
   @ApiOperation({ summary: 'Preview the computed weekly stats as JSON, without sending an email (Admin only)' })
+  @ApiQuery({ name: 'weekStart', required: false, description: 'YYYY-MM-DD — defaults to the most recently completed Monday-Sunday week' })
   async preview(@Query('weekStart') weekStartParam?: string) {
     const { weekStart, weekEnd } = resolveWeekRange(weekStartParam);
     return this.reportsService.getWeeklyStats(weekStart, weekEnd);
@@ -41,6 +42,8 @@ export class ReportsController {
 
   @Post('weekly/send')
   @ApiOperation({ summary: 'Build and email the weekly operations report now (Admin only). Optional "to" sends a one-off test copy elsewhere instead of the standing recipient.' })
+  @ApiQuery({ name: 'weekStart', required: false, description: 'YYYY-MM-DD — defaults to the most recently completed Monday-Sunday week' })
+  @ApiQuery({ name: 'to', required: false, description: 'Send this one-off copy to a different address instead of the standing recipient' })
   async sendNow(@Query('weekStart') weekStartParam?: string, @Query('to') to?: string) {
     if (to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       throw new BadRequestException('"to" is not a valid email address.');
