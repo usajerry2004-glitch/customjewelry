@@ -63,22 +63,18 @@ export class ReportsService {
     await this.sendWeeklyReport(weekStart, weekEnd);
   }
 
-  // `to` only exists so Admin can send a one-off test copy elsewhere via the
-  // manual endpoint — the Monday cron above never passes it, so the real
-  // scheduled send always goes to REPORT_RECIPIENT.
-  async sendWeeklyReport(weekStart: Date, weekEnd: Date, to?: string): Promise<void> {
+  async sendWeeklyReport(weekStart: Date, weekEnd: Date): Promise<void> {
     const stats = await this.getWeeklyStats(weekStart, weekEnd);
     const pdf = await buildWeeklyReportPdf(stats);
 
     const range = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    const recipient = to || REPORT_RECIPIENT;
     await this.emailService.send({
-      to: recipient,
+      to: REPORT_RECIPIENT,
       subject: `Weekly Operations Report — ${range}`,
       html: `<p style="font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:14px;color:#1A2740">The weekly operations report for ${range} is attached.</p>`,
       attachments: [{ filename: `weekly-report-${weekStart.toISOString().slice(0, 10)}.pdf`, content: pdf }],
     });
-    this.logger.log(`Weekly operations report sent for ${range} to ${recipient}`);
+    this.logger.log(`Weekly operations report sent for ${range}`);
   }
 
   async getWeeklyStats(weekStart: Date, weekEnd: Date): Promise<WeeklyStats> {
