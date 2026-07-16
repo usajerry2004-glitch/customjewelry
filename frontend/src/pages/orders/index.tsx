@@ -690,29 +690,33 @@ export default function OrdersPage() {
           style={{ ...inputStyle, flex: '1 1 200px', minWidth: '140px', maxWidth: '300px' }}
         />
 
+        {/* Factory names are other external manufacturing partners' business
+            identities — only Admin gets to see the full list. A Factory
+            Manager, Stone Manager, etc. has no legitimate reason to know who
+            else Kira works with. */}
+        {userRole === 'ADMIN' && (
+          <select
+            value={factoryFilter}
+            onChange={e => setFactoryFilter(e.target.value)}
+            style={{ ...inputStyle, flex: '0 1 160px', cursor: 'pointer' }}
+          >
+            <option value="">All Factories</option>
+            {(Object.values(Factory) as Factory[]).map(f => (
+              <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
+            ))}
+          </select>
+        )}
         {userRole !== 'CUSTOMER' && (
-          <>
-            <select
-              value={factoryFilter}
-              onChange={e => setFactoryFilter(e.target.value)}
-              style={{ ...inputStyle, flex: '0 1 160px', cursor: 'pointer' }}
-            >
-              <option value="">All Factories</option>
-              {(Object.values(Factory) as Factory[]).map(f => (
-                <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
-              ))}
-            </select>
-            <select
-              value={supplySourceFilter}
-              onChange={e => setSupplySourceFilter(e.target.value)}
-              style={{ ...inputStyle, flex: '0 1 170px', cursor: 'pointer' }}
-            >
-              <option value="">All Stone Suppliers</option>
-              {(Object.values(SupplySource) as SupplySource[]).map(s => (
-                <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
-              ))}
-            </select>
-          </>
+          <select
+            value={supplySourceFilter}
+            onChange={e => setSupplySourceFilter(e.target.value)}
+            style={{ ...inputStyle, flex: '0 1 170px', cursor: 'pointer' }}
+          >
+            <option value="">All Stone Suppliers</option>
+            {(Object.values(SupplySource) as SupplySource[]).map(s => (
+              <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+            ))}
+          </select>
         )}
 
         {/* Desktop: pill buttons */}

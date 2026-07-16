@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG } from '../utils/types';
@@ -73,6 +74,7 @@ const emptyForm = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -126,15 +128,24 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    reload();
+    // This page is Admin-only (staff account management, including the
+    // factory list for assigning Factory Manager accounts) — the sidebar
+    // already hides the link from everyone else, but that doesn't stop
+    // direct navigation, so enforce it here too.
     try {
       const u = localStorage.getItem('jf_user');
-      if (u) {
-        const parsed = JSON.parse(u);
-        setCurrentUserId(parsed.id || null);
-        setCurrentUserRole(parsed.role || null);
+      const parsed = u ? JSON.parse(u) : null;
+      if (parsed?.role !== UserRole.ADMIN) {
+        router.replace('/dashboard');
+        return;
       }
-    } catch {}
+      setCurrentUserId(parsed.id || null);
+      setCurrentUserRole(parsed.role);
+    } catch {
+      router.replace('/dashboard');
+      return;
+    }
+    reload();
   }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
