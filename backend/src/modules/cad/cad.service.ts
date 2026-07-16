@@ -12,6 +12,11 @@ import { SkuService } from '../sku/sku.service';
 
 const MAX_REFERENCE_IMAGES = 4;
 
+// Admin can upload/send CAD files at any order stage (e.g. adding a revised
+// reference after the VPO is already issued), but that shouldn't regress the
+// order back into the CAD approval flow once it's moved past it.
+const PRE_VPO_STATUSES: OrderStatus[] = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
+
 @Injectable()
 export class CadService {
   private readonly logger = new Logger(CadService.name);
@@ -134,9 +139,16 @@ export class CadService {
   // Called once after all files in a batch are uploaded.
   // Files are held for auth/admin review — NOT automatically sent to customer.
   async notifyBatchUploaded(orderId: string): Promise<void> {
-    await this.orderRepo.update(orderId, { cadSubStatus: 'UPLOADED' });
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
+
+    // Once the order has moved past the CAD approval stage (VPO issued or
+    // later), an Admin uploading an additional/revised file shouldn't pull it
+    // back into the "awaiting quote" queue or prompt the team to set a price
+    // that's already been set.
+    if (!PRE_VPO_STATUSES.includes(order.status)) return;
+
+    await this.orderRepo.update(orderId, { cadSubStatus: 'UPLOADED' });
 
     // Admin + Authorizer both need to review and set the quote price before this
     // goes to the customer.
@@ -253,10 +265,16 @@ export class CadService {
     const cad = await this.findOne(id);
     cad.status = CadFileStatus.SENT_FOR_APPROVAL;
     const saved = await this.cadRepo.save(cad);
-    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED' });
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (!order) return saved;
+
+    // Once the order has moved past the CAD approval stage (VPO issued or
+    // later), sending an additional/revised file shouldn't regress the order
+    // back into CAD_IN_PROGRESS or prompt the team to re-quote it.
+    if (!PRE_VPO_STATUSES.includes(order.status)) return saved;
+
+    await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, cadSubStatus: 'UPLOADED' });
 
     // Admin + Authorizer both need to review and set the quote price before this
     // goes to the customer.

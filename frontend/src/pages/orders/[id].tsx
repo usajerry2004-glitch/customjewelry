@@ -1281,7 +1281,7 @@ export default function OrderDetail() {
                 {timerLoading ? '…' : timerRunning ? '⏹ Stop' : '▶ Start'}
               </button>
             )}
-            {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && order.status === OrderStatus.CAD_IN_PROGRESS && (
+            {(userRole === UserRole.ADMIN || (userRole === UserRole.CAD_DESIGNER && order.status === OrderStatus.CAD_IN_PROGRESS)) && (
               <button
                 onClick={() => uploadFileRef.current?.click()}
                 style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 12px', background: 'transparent', whiteSpace: 'nowrap' }}
