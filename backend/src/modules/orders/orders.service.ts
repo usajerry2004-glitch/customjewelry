@@ -12,6 +12,8 @@ import { Sku } from '../../database/entities/sku.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
+import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
+import { buildFactoryOrderPdf } from './factory-order-pdf.util';
 
 export { OrderFilterDto };
 
@@ -684,14 +686,24 @@ export class OrdersService implements OnModuleInit {
       ),
     ]);
 
-    const factoryEmails = factoryUsers.map(u => u.email).filter(Boolean);
-    this.emailService.sendFactoryAssignedAlert({
-      to: factoryEmails,
-      poNumber: saved.poNumber,
-      orderType: saved.orderType || '—',
-      orderId: saved.id,
-      isPriorityCustomer: saved.isPriorityCustomer,
-    }).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
+    // Standing recipients (e.g. the Creations distribution list) always get
+    // the alert alongside whichever real FACTORY_MANAGER accounts are tagged
+    // to this factory — they're plain email addresses, not accounts, so no
+    // user row is created or required for them.
+    const factoryEmails = Array.from(new Set([
+      ...factoryUsers.map(u => u.email).filter(Boolean),
+      ...(STANDING_FACTORY_RECIPIENTS[factory] || []),
+    ]));
+    this.buildFactoryOrderPdfAttachment(saved).then(attachments =>
+      this.emailService.sendFactoryAssignedAlert({
+        to: factoryEmails,
+        poNumber: saved.poNumber,
+        orderType: saved.orderType || '—',
+        orderId: saved.id,
+        isPriorityCustomer: saved.isPriorityCustomer,
+        attachments,
+      }),
+    ).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
 
     const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
     this.emailService.sendStoneSupplierAssignedAlert({
@@ -703,6 +715,20 @@ export class OrdersService implements OnModuleInit {
     }).catch(err => this.logger.warn('Stone supplier assigned alert email failed:', err));
 
     return saved;
+  }
+
+  // Builds the product-detail PDF (no customer name/company/pricing — same
+  // redaction as the Factory Manager portal view) attached to the
+  // factory-assigned email. Failures here shouldn't block the email itself.
+  private async buildFactoryOrderPdfAttachment(order: Order): Promise<{ filename: string; content: Buffer }[]> {
+    try {
+      const cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
+      const pdf = await buildFactoryOrderPdf(order, cadFiles);
+      return [{ filename: `${order.poNumber}-manufacturing-order.pdf`, content: pdf }];
+    } catch (err) {
+      this.logger.warn(`Factory order PDF generation failed for ${order.poNumber}:`, err);
+      return [];
+    }
   }
 
   // Admin/Authorizer only — sets the list of price options shown to the customer

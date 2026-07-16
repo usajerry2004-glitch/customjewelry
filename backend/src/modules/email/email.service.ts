@@ -9,6 +9,7 @@ export interface EmailPayload {
   to: string | string[];
   subject: string;
   html: string;
+  attachments?: { filename: string; content: Buffer }[];
 }
 
 @Injectable()
@@ -61,6 +62,7 @@ export class EmailService {
         to,
         subject: payload.subject,
         html: payload.html,
+        attachments: payload.attachments,
       });
 
       this.logger.log(`Email sent: "${payload.subject}" → ${to}`);
@@ -377,7 +379,7 @@ export class EmailService {
 
   // Sent only to the Factory Manager(s) tagged to the factory this order was just
   // routed to — not a blanket "all factory managers" notice.
-  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
+  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean; attachments?: { filename: string; content: Buffer }[] }) {
     if (!opts.to.length) return;
     return this.send({
       to: opts.to,
@@ -388,6 +390,7 @@ export class EmailService {
         <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been issued for manufacturing.</p>
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
       `),
+      attachments: opts.attachments,
     });
   }
 
