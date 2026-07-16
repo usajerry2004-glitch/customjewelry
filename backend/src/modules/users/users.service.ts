@@ -199,9 +199,18 @@ export class UsersService {
   }
 
   // Teammates at the same company as this customer (including themselves).
+  // Customer accounts that predate the companies feature (bulk-imported
+  // before it shipped) still have no companyId — self-heals here instead of
+  // needing a one-off migration, since without one "Add a Teammate" has
+  // nothing to attach the invite to and silently can't do anything.
   async getCompanyTeammates(customerId: string): Promise<User[]> {
     const user = await this.findOne(customerId);
-    if (!user.companyId) return [user];
+    if (!user.companyId) {
+      const name = user.storeName?.trim() || `${user.firstName} ${user.lastName}`.trim() || user.email;
+      const company = await this.companyRepo.save(this.companyRepo.create({ name, salesRepId: user.salesRepId || null }));
+      user.companyId = company.id;
+      await this.userRepo.save(user);
+    }
     return this.userRepo.find({ where: { companyId: user.companyId }, order: { createdAt: 'ASC' } });
   }
 

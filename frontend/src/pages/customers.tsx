@@ -221,12 +221,20 @@ export default function CustomersPage() {
     setTeammateForm({ firstName: '', lastName: '', email: '' });
     const res = await apiFetch(`${API}/users/${customer.id}/teammates`);
     if (res.ok) {
-      setShowTeam({ customer, teammates: await res.json() });
+      const teammates = await res.json();
+      // The backend backfills a companyId on the fly for legacy accounts that
+      // don't have one yet — use the fresh copy, not the one from the list
+      // fetched before this call, so "Add a Teammate" has something to attach to.
+      const freshCustomer = teammates.find((t: Customer) => t.id === customer.id) || customer;
+      setShowTeam({ customer: freshCustomer, teammates });
     }
   };
 
   const addTeammate = async () => {
-    if (!showTeam?.customer.companyId) return;
+    if (!showTeam?.customer.companyId) {
+      setTeammateError('Could not set up this company — please close and try again.');
+      return;
+    }
     if (!teammateForm.firstName.trim() || !teammateForm.lastName.trim() || !teammateForm.email.trim()) {
       setTeammateError('First name, last name, and email are all required.');
       return;
