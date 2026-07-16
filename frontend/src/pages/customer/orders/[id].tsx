@@ -381,8 +381,11 @@ export default function CustomerOrderDetail() {
         </div>
       </div>
 
-      {/* Price options — shown while a final price hasn't been confirmed yet */}
-      {(!order.quotedCost || order.quotedCost <= 0) && order.quoteOptions && order.quoteOptions.length > 0 && (
+      {/* Price options — additional priced items/tiers the sales rep has quoted
+          (e.g. a matching band). Shown whenever they exist, independent of
+          whether a final price has also been set for the main item — these
+          aren't mutually exclusive with the Quoted Price below. */}
+      {order.quoteOptions && order.quoteOptions.length > 0 && (
         <div style={{ ...card, marginBottom: '16px', background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.25)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563EB', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Price Options</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
@@ -394,7 +397,7 @@ export default function CustomerOrderDetail() {
             ))}
           </div>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-            Talk to your sales rep to confirm which option you'd like — we'll finalize the price once you decide.
+            Talk to your sales rep if you'd like to include any of these.
           </p>
         </div>
       )}

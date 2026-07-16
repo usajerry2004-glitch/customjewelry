@@ -239,7 +239,7 @@ export default function TrackPage() {
                   </div>
                 )}
 
-                {(order.quotedCost == null || order.quotedCost <= 0) && order.quoteOptions && order.quoteOptions.length > 0 && (
+                {order.quoteOptions && order.quoteOptions.length > 0 && (
                   <div style={{ marginTop: 16, background: '#EFF6FF', borderRadius: 8, padding: '12px 16px' }}>
                     <div style={{ fontSize: 11, color: '#2563EB', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Price Options</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
@@ -251,7 +251,7 @@ export default function TrackPage() {
                       ))}
                     </div>
                     <div style={{ fontSize: 11, color: '#9CA3AF', lineHeight: 1.5 }}>
-                      Talk to your sales rep to confirm which option you'd like — we'll finalize the price once you decide.
+                      Talk to your sales rep if you'd like to include any of these.
                     </div>
                   </div>
                 )}
