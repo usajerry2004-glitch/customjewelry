@@ -56,6 +56,7 @@ export default function NewOrderPage() {
 
   const [form, setForm] = useState({
     orderType: '', metalType: '', metalColor: '', size: '',
+    quantity: '1', stamping: '',
     diamondType: '', diamondQuality: '', customerNotes: '',
   });
   const [refFiles, setRefFiles] = useState<File[]>([]);
@@ -111,6 +112,7 @@ export default function NewOrderPage() {
         method: 'POST',
         body: JSON.stringify({
           ...form,
+          quantity: Math.max(1, parseInt(form.quantity, 10) || 1),
           manufacturingPath: 'STANDARD',
           referenceWeblink: refLink || undefined,
         }),
@@ -222,6 +224,28 @@ export default function NewOrderPage() {
                 <option value="">Select…</option>
                 {['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'].map(o => <option key={o}>{o}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* Quantity + Stamping */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Quantity</label>
+              <input
+                type="number" min={1} step={1}
+                value={form.quantity}
+                onChange={e => set('quantity', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Stamping (optional)</label>
+              <input
+                value={form.stamping}
+                onChange={e => set('stamping', e.target.value)}
+                placeholder="e.g. 14K, initials, a date…"
+                style={inputStyle}
+              />
             </div>
           </div>
 

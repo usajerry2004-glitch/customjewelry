@@ -20,7 +20,7 @@ export { OrderFilterDto };
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
 // Product spec fields — editable via PUT /orders/:id, Admin/Authorizer only
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
 // Customer detail fields — editable via PUT /orders/:id, Admin only
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];

@@ -53,6 +53,8 @@ export interface Order {
   size?: string;
   metalType?: string;
   metalColor?: string;
+  quantity?: number;
+  stamping?: string;
   diamondType?: string;
   diamondQuality?: string;
   centerStoneShape?: string;

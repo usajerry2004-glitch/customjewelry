@@ -118,6 +118,8 @@ export async function buildFactoryOrderPdf(order: Order, cadFiles: CadFile[]): P
     { label: 'Metal Type', value: order.metalType || '—' },
     { label: 'Metal Color', value: order.metalColor || '—' },
     { label: 'Size', value: order.size || '—' },
+    { label: 'Quantity', value: String(order.quantity || 1) },
+    { label: 'Stamping', value: order.stamping || '—' },
     { label: 'Diamond Type', value: order.diamondType || '—' },
     { label: 'Diamond Quality', value: order.diamondQuality || '—' },
     { label: 'Stone Shape', value: order.centerStoneShape || '—' },

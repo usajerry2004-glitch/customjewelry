@@ -45,6 +45,8 @@ export default function CadBriefPage() {
     { label: 'Order Type',   value: order.orderType },
     { label: 'Size',         value: order.size },
     { label: 'Metal',        value: metal || null },
+    { label: 'Quantity',     value: order.quantity ? String(order.quantity) : null },
+    { label: 'Stamping',     value: order.stamping },
     { label: 'Stone Type',   value: order.diamondType },
     { label: 'Stone Quality', value: order.diamondQuality },
     { label: 'Stone Shape',  value: order.centerStoneShape },

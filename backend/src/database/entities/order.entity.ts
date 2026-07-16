@@ -113,6 +113,12 @@ export class Order {
   @Column({ nullable: true })
   metalColor: string;
 
+  @Column({ type: 'int', default: 1 })
+  quantity: number;
+
+  @Column({ nullable: true })
+  stamping: string;
+
   @Column({ nullable: true })
   diamondType: string;
 

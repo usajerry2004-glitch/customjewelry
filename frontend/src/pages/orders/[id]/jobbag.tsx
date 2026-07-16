@@ -32,6 +32,7 @@ export default function JobBagPage() {
     { label: 'Type',          value: order.orderType },
     { label: 'Metal',         value: metal || null },
     { label: 'Size',          value: order.size },
+    { label: 'Qty',           value: order.quantity ? String(order.quantity) : null },
     { label: 'Stone',         value: order.diamondType },
     { label: 'Quality',       value: order.diamondQuality },
     { label: 'Shape',         value: order.centerStoneShape },

@@ -111,6 +111,7 @@ export default function OrdersPage() {
   const [showNew, setShowNew] = useState(false);
   const [newOrder, setNewOrder] = useState({
     orderType: '', size: '', metalType: '', metalColor: '',
+    quantity: '1', stamping: '',
     diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '',
   });
   // Contact info for admin/sales rep placing order
@@ -296,6 +297,7 @@ export default function OrdersPage() {
         body: JSON.stringify({
           ...newOrder,
           ...customerFields,
+          quantity: Math.max(1, parseInt(newOrder.quantity, 10) || 1),
           storeName: resolvedCompany || undefined,
           phoneNumber: contact.phone || undefined,
           manufacturingPath: 'STANDARD',
@@ -324,7 +326,7 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
+        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
         setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
@@ -339,7 +341,7 @@ export default function OrdersPage() {
     setShowNew(false); setRefFiles([]); setRefLink('');
     setSelectedCustomer(null); setCustomerSearch('');
     setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
-    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
+    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
   };
 
   return (
@@ -568,6 +570,28 @@ export default function OrdersPage() {
                   <option value="">Select…</option>
                   {['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'].map(o => <option key={o}>{o}</option>)}
                 </select>
+              </div>
+            </div>
+
+            {/* Quantity + Stamping */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Quantity</label>
+                <input
+                  type="number" min={1} step={1}
+                  value={newOrder.quantity}
+                  onChange={e => setO('quantity', e.target.value)}
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Stamping (optional)</label>
+                <input
+                  value={newOrder.stamping}
+                  onChange={e => setO('stamping', e.target.value)}
+                  placeholder="e.g. 14K, initials, a date…"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
               </div>
             </div>
 

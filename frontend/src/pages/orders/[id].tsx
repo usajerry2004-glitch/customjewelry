@@ -349,6 +349,8 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'metalType', label: 'Metal Type' },
       { key: 'metalColor', label: 'Metal Color' },
       { key: 'size', label: 'Size' },
+      { key: 'quantity', label: 'Quantity' },
+      { key: 'stamping', label: 'Stamping' },
       { key: 'diamondType', label: 'Diamond Type' },
       { key: 'diamondQuality', label: 'Diamond Quality' },
       { key: 'centerStoneShape', label: 'Stone Shape' },
@@ -358,7 +360,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
 ];
 
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
@@ -635,9 +637,12 @@ export default function OrderDetail() {
     if (!order?.id) return;
     setSavingSpecKey(key);
     try {
+      const value = key === 'quantity'
+        ? Math.max(1, parseInt(specInputs[key], 10) || 1)
+        : (specInputs[key]?.trim() || null);
       const res = await apiFetch(`${API}/orders/${order.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ [key]: specInputs[key]?.trim() || null }),
+        body: JSON.stringify({ [key]: value }),
       });
       if (res.ok) {
         setOrder(await res.json());
