@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ShippingService } from './shipping.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -42,8 +42,9 @@ export class ShippingController {
   dispatch(
     @Param('id') id: string,
     @Body() body: { trackingNumber: string; shipMethod?: string },
+    @Request() req: any,
   ) {
-    return this.shippingService.dispatch(id, body);
+    return this.shippingService.dispatch(id, body, req.user);
   }
 
 }

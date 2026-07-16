@@ -32,6 +32,7 @@ import { EmailModule } from './modules/email/email.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { RepairsModule } from './modules/repairs/repairs.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 import { HealthController } from './health.controller';
@@ -86,6 +87,7 @@ import { HealthController } from './health.controller';
     EmailModule,
     TodosModule,
     RepairsModule,
+    ReportsModule,
   ],
   controllers: [HealthController],
   providers: [
