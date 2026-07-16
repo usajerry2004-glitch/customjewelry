@@ -250,9 +250,6 @@ export default function TrackPage() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF', lineHeight: 1.5 }}>
-                      Talk to your sales rep if you'd like to include any of these.
-                    </div>
                   </div>
                 )}
 

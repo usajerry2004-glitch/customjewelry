@@ -6,6 +6,7 @@ import { Response } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CadService } from './cad.service';
+import { CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
@@ -38,9 +39,14 @@ export class CadController {
       const cads = await this.cadService.getByOrder(orderId);
       const visible = await this.cadService.isVisibleToCustomer(orderId);
       if (!visible) {
-        // Before CAD is sent, customers can still see their reference images
+        // Before this revision round is sent, customers still see their
+        // reference images and any file already approved in an earlier
+        // round — a new revision resets sentToCustomer, but that shouldn't
+        // take away something they already approved and could see before.
         return cads.filter(c =>
-          c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image'
+          c.designerNotes === 'Reference image' ||
+          c.designerNotes === 'Customer reference image' ||
+          c.status === CadFileStatus.APPROVED
         );
       }
       return cads;

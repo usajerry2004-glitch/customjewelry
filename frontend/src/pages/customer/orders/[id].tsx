@@ -396,9 +396,6 @@ export default function CustomerOrderDetail() {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-            Talk to your sales rep if you'd like to include any of these.
-          </p>
         </div>
       )}
 
@@ -420,7 +417,7 @@ export default function CustomerOrderDetail() {
 
       {/* Reference Images — always visible, customers can upload */}
       {(() => {
-        const refs = cads.filter(c => c.designerNotes === 'Reference image');
+        const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
         return (
         <div style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
