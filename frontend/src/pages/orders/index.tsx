@@ -706,7 +706,7 @@ export default function OrdersPage() {
             ))}
           </select>
         )}
-        {userRole !== 'CUSTOMER' && (
+        {userRole === 'ADMIN' && (
           <select
             value={supplySourceFilter}
             onChange={e => setSupplySourceFilter(e.target.value)}
