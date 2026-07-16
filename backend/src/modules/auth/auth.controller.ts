@@ -62,18 +62,18 @@ export class AuthController {
 
   /**
    * POST /auth/otp/request
-   * Customer-only passwordless login: emails a 6-digit code, valid 10 minutes.
+   * Passwordless login for any role: emails a 6-digit code, valid 10 minutes.
    * Rate-limited hard to stop email-bombing.
    */
   @Public()
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('otp/request')
-  @ApiOperation({ summary: 'Email a one-time login code to a customer' })
+  @ApiOperation({ summary: 'Email a one-time login code to a user' })
   async requestOtp(@Body() dto: RequestOtpDto) {
     const result = await this.authService.requestOtp(dto.email);
     if (!result.found) {
-      this.logger.warn(`OTP requested for unknown/non-customer email: ${dto.email}`);
-      return { found: false, message: 'No customer account found with that email address.' };
+      this.logger.warn(`OTP requested for unknown email: ${dto.email}`);
+      return { found: false, message: 'No account found with that email address.' };
     }
     this.logger.log(`\n\n🔑 OTP LOGIN CODE for ${dto.email}: ${result.otp}\n`);
     const sent = await this.emailService.sendOtpCode({ to: dto.email, firstName: result.firstName!, otp: result.otp! });

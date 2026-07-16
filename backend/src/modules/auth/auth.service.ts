@@ -54,7 +54,6 @@ export class AuthService {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
-      .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
       .getOne();
     if (!user) return { found: false };
 
@@ -72,7 +71,6 @@ export class AuthService {
       .createQueryBuilder('u')
       .addSelect('u.otpCodeHash')
       .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
-      .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
       .getOne();
 
     const invalid = () => new UnauthorizedException('Invalid or expired code');
