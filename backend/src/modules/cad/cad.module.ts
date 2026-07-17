@@ -19,7 +19,7 @@ import { SkuModule } from '../sku/sku.module';
     // the file buffer available to derive an image thumbnail before upload.
     MulterModule.register({
       storage: memoryStorage(),
-      limits:  { fileSize: 200 * 1024 * 1024 },
+      limits:  { fileSize: 300 * 1024 * 1024 },
     }),
   ],
   controllers: [CadController],
