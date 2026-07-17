@@ -142,7 +142,16 @@ export default function ThreeDmViewer({ fileUrl, height = 460 }: Props) {
             }
             // Always fall back to full box so we never end up blank
             if (focusBox.isEmpty()) focusBox.copy(fullBox);
-            if (focusBox.isEmpty()) { setPhase('ready'); return; }
+            if (focusBox.isEmpty()) {
+              // No visible geometry at all — most often a file saved as pure
+              // NURBS/Brep with no cached render mesh. rhino3dm.js can only
+              // display meshes baked into the file; it can't tessellate
+              // surfaces itself, so there's nothing to draw. Report this as
+              // an error instead of silently claiming success on a blank canvas.
+              setMsg('This 3DM file has no viewable render meshes (only NURBS/surface geometry with nothing baked in). Re-save it from Rhino with render meshes included, or check the reference image instead.');
+              setPhase('error');
+              return;
+            }
 
             // ── Fit camera to bounding sphere ──
             const sphere = new THREE.Sphere();
