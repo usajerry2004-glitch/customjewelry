@@ -410,6 +410,22 @@ export class EmailService {
     });
   }
 
+  // Sent to Admin + Authorizer when an order is marked Manufactured — mirrors
+  // the Admin+Authorizer alert already sent when the VPO is issued.
+  async sendOrderManufacturedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
+    if (!opts.to.length) return;
+    return this.send({
+      to: opts.to,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Manufactured] ${opts.poNumber}`,
+      html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
+        <h2 style="color:#8B5CF6;margin:0 0 16px">Order Manufactured</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been manufactured and is en route to the US office.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#8B5CF6')}">Open Order →</a>
+      `),
+    });
+  }
+
   async sendOrderInProduction(opts: {
     to: string;
     poNumber: string;

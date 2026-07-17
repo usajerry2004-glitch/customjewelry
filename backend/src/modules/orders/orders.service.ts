@@ -577,9 +577,10 @@ export class OrdersService implements OnModuleInit {
       }
     }
 
-    // MANUFACTURED — notify authorizers (US team to receive)
+    // MANUFACTURED — notify Admin + Authorizer (US team to receive), matching
+    // the Admin+Authorizer alert already sent when the VPO is issued.
     if (status === OrderStatus.MANUFACTURED) {
-      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.AUTHORIZER]) } });
+      const teamUsers = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
       await Promise.all(teamUsers.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
@@ -590,6 +591,14 @@ export class OrdersService implements OnModuleInit {
           isPriority: updated.isPriorityCustomer,
         })),
       ));
+      const teamEmails = teamUsers.map(u => u.email).filter(Boolean);
+      this.emailService.sendOrderManufacturedAlert({
+        to: teamEmails,
+        poNumber: updated.poNumber,
+        orderType: updated.orderType || '—',
+        orderId: updated.id,
+        isPriorityCustomer: updated.isPriorityCustomer,
+      }).catch(err => this.logger.warn('Order manufactured alert email failed:', err));
     }
 
     // SHIPPED — email customer + authorizers
