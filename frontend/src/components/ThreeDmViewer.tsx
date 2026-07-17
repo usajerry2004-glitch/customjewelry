@@ -79,6 +79,12 @@ export default function ThreeDmViewer({ fileUrl, height = 460 }: Props) {
             // Override every child's material so it's visible on a light background
             obj.traverse((child: any) => {
               if (child.isMesh) {
+                // Some Rhino meshes carry no vertex normals (or degenerate
+                // ones) — MeshStandardMaterial's lighting is normal-dependent,
+                // so without this the mesh renders solid black instead of gold.
+                if (!child.geometry.attributes.normal) {
+                  child.geometry.computeVertexNormals();
+                }
                 child.material = new THREE.MeshStandardMaterial({
                   color: 0xc09b58,      // gold
                   metalness: 0.4,
