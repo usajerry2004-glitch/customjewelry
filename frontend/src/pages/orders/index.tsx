@@ -70,7 +70,11 @@ interface Customer { id: string; firstName: string; lastName: string; email: str
 const ROLES_NEED_CUSTOMER = ['SALES_REP', 'AUTHORIZER', 'ADMIN'];
 
 const ORDER_TYPES_MODAL = ['Earring', 'Ring', 'Pendant', 'Necklace', 'Bracelet', 'Other'];
-const RING_SIZES_MODAL   = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
+const RING_SIZES_MODAL = [
+  '4', '4.25', '4.5', '4.75', '5', '5.25', '5.5', '5.75', '6', '6.25', '6.5', '6.75',
+  '7', '7.25', '7.5', '7.75', '8', '8.25', '8.5', '8.75', '9', '9.25', '9.5', '9.75',
+  '10', '10.25', '10.5', '10.75', '11', '11.25', '11.5', '11.75', '12',
+];
 const PENDANT_SIZES_MODAL = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
 const BRACELET_SIZES_MODAL = ['5 inches', '5.5 inches', '6 inches', '6.5 inches', '7 inches', '7.5 inches', '8 inches', '8.5 inches'];
 const METAL_TYPES_MODAL   = ['10K', '14K', '18K', 'Platinum'];
