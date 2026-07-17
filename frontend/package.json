@@ -22,6 +22,7 @@
     "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-toast": "^1.1.5",
     "@radix-ui/react-tooltip": "^1.0.7",
+    "@sentry/nextjs": "^8.0.0",
     "@tanstack/react-query": "^5.14.2",
     "@tanstack/react-table": "^8.10.7",
     "axios": "^1.6.2",
@@ -29,19 +30,20 @@
     "clsx": "^2.0.0",
     "date-fns": "^3.0.6",
     "lucide-react": "^0.303.0",
-    "@sentry/nextjs": "^8.0.0",
     "next": "14.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.2",
     "recharts": "^2.10.3",
     "rhino3dm": "^8.0.1",
+    "sharp": "^0.35.3",
     "tailwind-merge": "^2.2.0",
     "three": "^0.184.0",
     "zod": "^3.22.4",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
@@ -51,7 +53,6 @@
     "localtunnel": "^2.0.2",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.3",
-    "@playwright/test": "^1.44.0"
+    "typescript": "^5.3.3"
   }
 }

@@ -3,8 +3,6 @@ import { useRouter } from 'next/router';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../../../utils/types';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 export default function JobBagPage() {
   const router = useRouter();
   const { id } = router.query;

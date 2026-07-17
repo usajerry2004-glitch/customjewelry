@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR } from '../../utils/types';
 
 interface OrderCardProps {
@@ -137,9 +138,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
       {/* Reference image thumbnail */}
       {referenceImage && (
         <div style={{ width: '76px', flexShrink: 0, alignSelf: 'center' }}>
-          <img
+          <Image
             src={referenceImage}
             alt="Reference"
+            width={76}
+            height={76}
             style={{ width: '76px', height: '76px', objectFit: 'cover', borderRadius: '8px', display: 'block', border: '1px solid var(--border)' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />

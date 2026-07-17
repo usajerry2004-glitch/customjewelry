@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { UserRole } from '../../utils/types';
 
 interface NavItem {
@@ -55,9 +56,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
         {/* Logo */}
         <div style={{ padding: '28px 22px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <img
+            <Image
               src="/logo.png"
               alt="Kira Jewels"
+              width={784}
+              height={261}
+              priority
               style={{ height: '42px', width: 'auto', display: 'block', objectFit: 'contain' }}
             />
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '6px', letterSpacing: '2px', textTransform: 'uppercase' }}>

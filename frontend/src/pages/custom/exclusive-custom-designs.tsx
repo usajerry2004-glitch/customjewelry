@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
-
-export async function getServerSideProps() { return { props: {} }; }
+import Image from 'next/image';
 
 // Dedicated intake page for the Exclusive Custom Designs referral partnership.
 // Every submission routes to their existing account (laura@exclusivecustomjewelry.com)
@@ -144,9 +143,12 @@ export default function ExclusiveCustomDesignsPage() {
         {/* Header band */}
         <div style={{ background: 'var(--navy)', borderRadius: '0 0 16px 16px', padding: '36px 32px 30px', textAlign: 'center', marginBottom: '36px' }}>
           {!logoBroken ? (
-            <img
+            <Image
               src="/partners/exclusive-custom-designs-logo.png"
               alt="Exclusive Custom Designs"
+              width={500}
+              height={120}
+              priority
               style={{ maxWidth: '280px', width: '100%', height: 'auto' }}
               onError={() => setLogoBroken(true)}
             />

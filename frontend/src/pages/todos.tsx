@@ -4,8 +4,6 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { STATUS_CONFIG } from '../utils/types';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface PriorityOrder {
   id: string;
   poNumber: string;

@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-
-export async function getServerSideProps() { return { props: {} }; }
 
 interface Metrics    { total: number; byStatus: { status: string; count: string }[] }
 interface Priority   { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; priorityReason: string; priorityLevel: 'CRITICAL'|'HIGH'|'MEDIUM'; createdAt: string }
@@ -115,7 +114,7 @@ export default function Dashboard() {
         onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}06` : '#FAFAF8'}
       >
         {img
-          ? <img className="order-row-img" src={img} alt="" style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ? <Image className="order-row-img" src={img} alt="" width={42} height={42} style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           : <div className="order-row-img" style={{ width: 42, height: 42, borderRadius: 8, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🖼</div>
         }
         <div className="order-row-text" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>

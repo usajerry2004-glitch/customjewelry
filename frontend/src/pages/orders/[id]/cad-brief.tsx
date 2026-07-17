@@ -3,8 +3,6 @@ import { useRouter } from 'next/router';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order } from '../../../utils/types';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface CadFile {
   id: string;
   originalName: string;

@@ -3,8 +3,6 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG } from '../utils/types';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface Metrics { inProgress: number; withContractor: number; readyToShip: number; pendingStone: number }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };

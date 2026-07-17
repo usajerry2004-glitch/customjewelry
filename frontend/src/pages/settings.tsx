@@ -6,8 +6,6 @@ import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG }
 import { toast } from '../utils/toast';
 import { formatName, getInitials } from '../utils/name';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface StaffUser {
   id: string;
   firstName: string;

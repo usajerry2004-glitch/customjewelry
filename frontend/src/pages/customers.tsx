@@ -7,8 +7,6 @@ import { Order, STATUS_CONFIG } from '../utils/types';
 import { formatName } from '../utils/name';
 import { toast } from '../utils/toast';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface Customer {
   id: string;
   firstName: string;

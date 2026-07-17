@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { useAuthStore } from '../store/auth.store';
 import { getErrorMessage } from '../utils/apiFetch';
 
@@ -135,7 +136,7 @@ export default function LoginPage() {
         flexShrink: 0,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <img src="/logo.png" alt="Kira Jewels" style={{ height: '72px', width: 'auto', display: 'block', margin: '0 auto 10px', objectFit: 'contain' }} />
+          <Image src="/logo.png" alt="Kira Jewels" width={784} height={261} priority style={{ height: '72px', width: 'auto', display: 'block', margin: '0 auto 10px', objectFit: 'contain' }} />
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '20px' }}>
             Custom Jewelry
           </div>
@@ -148,7 +149,7 @@ export default function LoginPage() {
 
       {/* Mobile-only logo bar (hidden on desktop via CSS) */}
       <div className="login-mobile-logo" style={{ display: 'none' }}>
-        <img src="/logo.png" alt="Kira Jewels" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
+        <Image src="/logo.png" alt="Kira Jewels" width={784} height={261} style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
         <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '6px' }}>
           Custom Jewelry
         </div>

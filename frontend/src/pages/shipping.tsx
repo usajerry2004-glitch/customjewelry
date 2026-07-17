@@ -4,8 +4,6 @@ import { apiFetch, API } from '../utils/apiFetch';
 import { Order, OrderStatus } from '../utils/types';
 import { toast } from '../utils/toast';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 interface Metrics { readyToShip: number; shipped: number; delivered: number }
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };

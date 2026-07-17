@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
@@ -8,10 +9,6 @@ import { OrderConversation } from '../../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../../components/StlViewer'), { ssr: false });
-
-export async function getServerSideProps() {
-  return { props: {} };
-}
 
 interface CadFile {
   id: string;
@@ -471,7 +468,7 @@ export default function CustomerOrderDetail() {
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                 >
                   {isImage ? (
-                    <img src={thumbUrl} alt={cad.originalName}
+                    <Image src={thumbUrl} alt={cad.originalName} width={150} height={110}
                       style={{ width: '150px', height: '110px', objectFit: 'cover', display: 'block' }}
                       onError={e => {
                         const img = e.target as HTMLImageElement;

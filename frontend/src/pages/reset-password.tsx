@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { getErrorMessage } from '../utils/apiFetch';
 
 const API = '/api/proxy';
@@ -64,7 +65,7 @@ export default function ResetPasswordPage() {
       {/* Left brand panel */}
       <div className="login-left-panel" style={{ width: '420px', background: 'var(--sidebar-bg)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '60px 48px', flexShrink: 0 }}>
         <div style={{ textAlign: 'center' }}>
-          <img src="/logo.png" alt="Kira Jewels" style={{ height: '72px', width: 'auto', display: 'block', margin: '0 auto 10px', objectFit: 'contain' }} />
+          <Image src="/logo.png" alt="Kira Jewels" width={784} height={261} priority style={{ height: '72px', width: 'auto', display: 'block', margin: '0 auto 10px', objectFit: 'contain' }} />
           <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '20px' }}>Custom Jewelry</div>
           <div style={{ width: '40px', height: '1px', background: 'rgba(192,155,88,0.4)', margin: '0 auto 20px' }} />
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, maxWidth: '240px', margin: 0 }}>

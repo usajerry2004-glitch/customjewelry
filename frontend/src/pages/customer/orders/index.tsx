@@ -10,8 +10,6 @@ const STATUS_ORDER = [
   'ORDER_JOB_BAG_CREATED','READY_TO_INVOICE','READY_TO_SHIP','SHIPPED','DELIVERED',
 ];
 
-export async function getServerSideProps() { return { props: {} }; }
-
 export default function CustomerOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Partial<Order>[]>([]);

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { toast } from '../../utils/toast';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
@@ -292,10 +293,6 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
       </div>
     </div>
   );
-}
-
-export async function getServerSideProps() {
-  return { props: {} };
 }
 
 // Valid next statuses from each current status (workflow transitions)
@@ -1210,7 +1207,7 @@ export default function OrderDetail() {
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                         >
                           {isImg ? (
-                            <img src={thumbUrl} alt={cad.originalName} className="ref-thumb-img"
+                            <Image src={thumbUrl} alt={cad.originalName} className="ref-thumb-img" width={200} height={110}
                               style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
                               onError={e => { const img = e.target as HTMLImageElement; img.style.display = 'none'; const fb = img.nextElementSibling as HTMLElement; if (fb) fb.style.display = 'flex'; }}
                             />
@@ -1381,9 +1378,11 @@ export default function OrderDetail() {
                   <div key={cad.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius)', border: `1px solid ${cs.color}25`, flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       {isImage ? (
-                        <img
+                        <Image
                           src={cad.thumbnailPath || cad.filePath || `/uploads/cad/${cad.fileName}`}
                           alt={cad.originalName}
+                          width={48}
+                          height={48}
                           style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0, border: '1px solid var(--border)', cursor: 'pointer' }}
                           onClick={() => { setViewingCadList(designList); setViewingCad(cad); }}
                           onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}

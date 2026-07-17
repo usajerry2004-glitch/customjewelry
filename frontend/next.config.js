@@ -6,6 +6,14 @@ const nextConfig = {
   output: 'standalone',
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
+  images: {
+    remotePatterns: [
+      // CAD files, reference images, and thumbnails uploaded to DO Spaces —
+      // matches both the direct origin and a CDN endpoint if one is enabled.
+      { protocol: 'https', hostname: '**.digitaloceanspaces.com' },
+      { protocol: 'https', hostname: '**.cdn.digitaloceanspaces.com' },
+    ],
+  },
   webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
     if (!isServer) {

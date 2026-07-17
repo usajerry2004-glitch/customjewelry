@@ -4,8 +4,6 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { Order } from '../utils/types';
 
-export async function getServerSideProps() { return { props: {} }; }
-
 function daysSince(date: string) {
   return Math.floor((Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
 }
