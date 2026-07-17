@@ -26,6 +26,8 @@ export class CreateMessageDto {
 // shouldn't see internal staff chatter that isn't addressed to them.
 const RESTRICTED_ROLES = [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER];
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -51,7 +53,10 @@ export class MessagesService {
 
     // Resolve mentioned user IDs to display names for rendering — mentions
     // itself stays as IDs so the visibility check above keeps working.
-    const allMentionedIds = Array.from(new Set(visible.flatMap(m => m.mentions || [])));
+    // Filtered to well-formed UUIDs: older/legacy-imported orders can carry
+    // junk values here, and `id` is a uuid column that throws on anything else.
+    const allMentionedIds = Array.from(new Set(visible.flatMap(m => m.mentions || [])))
+      .filter(id => UUID_RE.test(id));
     const mentionedUsers = allMentionedIds.length
       ? await this.userRepo.find({ where: { id: In(allMentionedIds) } })
       : [];
