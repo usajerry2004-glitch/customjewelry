@@ -299,7 +299,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
 const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED, OrderStatus.CANCELLED],
-  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CANCELLED],
+  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CANCELLED, OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.CANCELLED, OrderStatus.VPO_ISSUED],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
   [OrderStatus.COMPLETED]:       [],
@@ -566,6 +566,9 @@ export default function OrderDetail() {
     // approval, so skip the price modal entirely and just confirm.
     if (newStatus === OrderStatus.VPO_ISSUED && order.status === OrderStatus.MANUFACTURED) {
       if (!confirm('Revert this order from Manufactured back to VPO Issued?')) return;
+    } else if (newStatus === OrderStatus.CAD_IN_PROGRESS && order.status === OrderStatus.VPO_ISSUED) {
+      // Admin reverting VPO Issued -> CAD In Progress — same corrective-undo pattern.
+      if (!confirm('Revert this order from VPO Issued back to CAD In Progress?')) return;
     } else if (newStatus === OrderStatus.VPO_ISSUED && !quotedCost) {
       // Issuing the VPO requires a price — show modal if not provided. Stone supplier
       // and factory are assigned separately afterwards, via "Assign Supplier".
@@ -853,10 +856,15 @@ export default function OrderDetail() {
   const userRole = currentUser?.role || '';
   const allowedStatuses = ROLE_STAGE_PERMISSIONS[userRole] || [];
   const validNextStatuses = STATUS_TRANSITIONS[order.status as OrderStatus] ?? [];
+  // VPO Issued -> CAD In Progress is an Admin-only revert (matches the Manufactured
+  // -> VPO Issued revert below) — CAD_IN_PROGRESS is otherwise a normal target for
+  // Authorizer (e.g. NEW -> CAD_IN_PROGRESS), so it has to be excluded explicitly
+  // here rather than relying on ROLE_STAGE_PERMISSIONS to keep it Admin-only.
+  const isAdminOnlyRevert = order.status === OrderStatus.VPO_ISSUED;
   // Admins see all valid transitions; other roles see only what they're permitted to do
   const movableStatuses = userRole === UserRole.ADMIN
     ? validNextStatuses
-    : allowedStatuses.filter(s => validNextStatuses.includes(s));
+    : allowedStatuses.filter(s => validNextStatuses.includes(s) && !(isAdminOnlyRevert && s === OrderStatus.CAD_IN_PROGRESS));
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
 
   const handleUploadFiles = async () => {

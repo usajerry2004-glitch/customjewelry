@@ -31,7 +31,7 @@ const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isP
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
-  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED],
+  [OrderStatus.VPO_ISSUED]:      [OrderStatus.MANUFACTURED, OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.MANUFACTURED]:    [OrderStatus.COMPLETED, OrderStatus.REPAIR, OrderStatus.VPO_ISSUED],
   [OrderStatus.REPAIR]:          [OrderStatus.COMPLETED],
   [OrderStatus.SHIPPED]:         [OrderStatus.COMPLETED],
@@ -458,6 +458,22 @@ export class OrdersService implements OnModuleInit {
       }
       const reverted = await this.update(id, { status, processedDate: null as any, vpoIssuedAt: new Date() }, user);
       this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, 'Reverted from Manufactured by Admin');
+      return reverted;
+    }
+
+    // Admin-only revert: send an approved order back into CAD for rework (e.g.
+    // VPO issued by mistake, or the customer wants further changes before
+    // production starts). Resets the CAD-approval flags so it behaves like a
+    // normal CAD_IN_PROGRESS order again; the existing SKU/quoted price are
+    // left alone since re-approval will reuse or replace them.
+    if (existing.status === OrderStatus.VPO_ISSUED && status === OrderStatus.CAD_IN_PROGRESS) {
+      if (user?.role !== UserRole.ADMIN) {
+        throw new ForbiddenException('Only Admin can revert a VPO-issued order back to CAD In Progress.');
+      }
+      const reverted = await this.update(id, {
+        status, cadSubStatus: null, sentToCustomer: false, customerEmailApproval: false, vpoIssuedAt: null,
+      }, user);
+      this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status, 'Reverted from VPO Issued by Admin');
       return reverted;
     }
 

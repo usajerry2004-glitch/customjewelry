@@ -27,6 +27,16 @@ function roleLabel(role: string): string {
   return role.split('_').map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
 }
 
+// Attach-file icon — an inline SVG (not an emoji glyph) so it renders
+// identically across platforms instead of picking up the OS emoji font.
+function PaperclipIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
+
 // CAD event messages start with one of these emojis
 const CAD_EVENT_PREFIX = /^(📎|🔔|✅|❌|↺)/;
 
@@ -218,7 +228,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                           border: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text-primary)',
                         }}
                       >
-                        <span>📎</span>
+                        <PaperclipIcon />
                         <span style={{ fontSize: '12px', fontWeight: 600, wordBreak: 'break-all' }}>{msg.attachmentName}</span>
                         {typeof msg.attachmentSize === 'number' && (
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{formatFileSize(msg.attachmentSize)}</span>
@@ -305,7 +315,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
 
         {attachedFile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '5px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border)', fontSize: '12px' }}>
-            <span>📎</span>
+            <PaperclipIcon />
             <span style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{attachedFile.name}</span>
             <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(attachedFile.size)}</span>
             <button
@@ -333,12 +343,13 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             title="Attach a file (up to 50MB)"
             style={{
               alignSelf: 'flex-end', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: attachedFile ? '1px solid rgba(5,150,105,0.4)' : '1px solid var(--border)',
               background: attachedFile ? 'rgba(5,150,105,0.08)' : 'var(--bg-card)',
-              color: attachedFile ? '#059669' : 'var(--text-secondary)', fontSize: '15px',
+              color: attachedFile ? '#059669' : 'var(--text-secondary)',
             }}
           >
-            📎
+            <PaperclipIcon size={16} />
           </button>
           <textarea
             value={content}

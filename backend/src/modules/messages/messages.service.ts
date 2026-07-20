@@ -72,22 +72,23 @@ export class MessagesService {
     }));
   }
 
-  // Who a message on this order can be @mentioned to. Factory/Stone Manager
-  // accounts are scoped the same way the order itself is scoped, so a Factory
-  // Manager for a different factory never shows up as a mention option (and
-  // couldn't see the mention anyway). Sales Reps have no such tenant boundary
-  // (they can already see every order's messages) so every active one is
-  // always mentionable, not just whichever rep happens to be assigned to
-  // this particular order.
+  // Who a message on this order can be @mentioned to — scoped the same way the
+  // order itself is scoped, so a Factory Manager for a different factory never
+  // shows up as a mention option (and couldn't see the mention anyway), and a
+  // Sales Rep only shows up if they're actually the rep assigned to this order.
   async getMentionableUsers(orderId: string): Promise<User[]> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return [];
 
     const roleUsers = await this.userRepo.find({
-      where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SALES_REP]), isActive: true },
+      where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER]), isActive: true },
     });
 
     const extra: User[] = [];
+    if (order.salesRepId) {
+      const rep = await this.userRepo.findOne({ where: { id: order.salesRepId } });
+      if (rep) extra.push(rep);
+    }
     if (order.assignedFactory) {
       extra.push(...await this.userRepo.find({ where: { assignedFactory: order.assignedFactory, isActive: true } }));
     }
