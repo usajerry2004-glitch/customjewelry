@@ -73,6 +73,9 @@ export class ReportsService {
       subject: `Weekly Operations Report — ${range}`,
       html: `<p style="font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:14px;color:#1A2740">The weekly operations report for ${range} is attached.</p>`,
       attachments: [{ filename: `weekly-report-${weekStart.toISOString().slice(0, 10)}.pdf`, content: pdf }],
+      // The recipient may have general email notifications turned off (to stop
+      // getting CC'd on every step) without meaning to lose this weekly report too.
+      bypassOptOut: true,
     });
     this.logger.log(`Weekly operations report sent for ${range}`);
   }

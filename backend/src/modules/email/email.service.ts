@@ -10,6 +10,10 @@ export interface EmailPayload {
   subject: string;
   html: string;
   attachments?: { filename: string; content: Buffer }[];
+  // Skips the emailNotificationsEnabled opt-out filter below — for the rare
+  // email someone should keep getting even after opting out of the general
+  // notification noise (e.g. the weekly operations report).
+  bypassOptOut?: boolean;
 }
 
 @Injectable()
@@ -44,14 +48,17 @@ export class EmailService {
 
     try {
       const requested = Array.isArray(payload.to) ? payload.to : [payload.to];
-      const optedOut = await this.userRepo.find({
-        where: { email: In(requested), emailNotificationsEnabled: false },
-      });
-      const optedOutEmails = new Set(optedOut.map(u => u.email));
-      const recipients = requested.filter(e => !optedOutEmails.has(e));
-      if (!recipients.length) {
-        this.logger.log(`Email skipped (all recipients opted out): "${payload.subject}"`);
-        return false;
+      let recipients = requested;
+      if (!payload.bypassOptOut) {
+        const optedOut = await this.userRepo.find({
+          where: { email: In(requested), emailNotificationsEnabled: false },
+        });
+        const optedOutEmails = new Set(optedOut.map(u => u.email));
+        recipients = requested.filter(e => !optedOutEmails.has(e));
+        if (!recipients.length) {
+          this.logger.log(`Email skipped (all recipients opted out): "${payload.subject}"`);
+          return false;
+        }
       }
 
       const override = this.config.get<string>('TEST_EMAIL_OVERRIDE');
