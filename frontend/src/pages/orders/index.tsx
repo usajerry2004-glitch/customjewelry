@@ -205,8 +205,39 @@ export default function OrdersPage() {
   };
 
   const isFactoryManager = userRole === 'FACTORY_MANAGER';
+  const canBulkCancel = ['ADMIN', 'AUTHORIZER', 'SALES_REP'].includes(userRole);
 
   const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()); setStoneSubFilter(''); };
+
+  const handleBulkCancel = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Cancel ${selectedIds.size} order${selectedIds.size > 1 ? 's' : ''}? This cannot be undone from here.`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await apiFetch(`${API}/orders/bulk/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orderIds: Array.from(selectedIds) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
+        return;
+      }
+      if (data.succeeded === 0) {
+        toast.error(`${data.failed} order(s) could not be cancelled.`, 'Could not cancel orders');
+        return;
+      }
+      exitSelectMode();
+      load(page);
+      if (data.failed > 0) {
+        toast.warning(`${data.succeeded} order(s) cancelled. ${data.failed} failed.`);
+      } else {
+        toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} cancelled.`);
+      }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally { setBulkLoading(false); }
+  };
 
   const handleBulkManufactured = async () => {
     if (selectedIds.size === 0) return;
@@ -354,7 +385,7 @@ export default function OrdersPage() {
       subtitle={`${total} total orders`}
       actions={
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {isFactoryManager && (
+          {(isFactoryManager || canBulkCancel) && (
             <button
               onClick={() => {
                 if (selectMode) {
@@ -362,9 +393,11 @@ export default function OrdersPage() {
                 } else {
                   setSelectMode(true);
                   setSelectedIds(new Set());
-                  setStatusFilter(OrderStatus.VPO_ISSUED);
-                  setStoneSubFilter('stone_received');
-                  setCadSubFilter('');
+                  if (isFactoryManager) {
+                    setStatusFilter(OrderStatus.VPO_ISSUED);
+                    setStoneSubFilter('stone_received');
+                    setCadSubFilter('');
+                  }
                 }
               }}
               style={{
@@ -375,7 +408,7 @@ export default function OrdersPage() {
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
             >
-              {selectMode ? '✕ Cancel' : '☑ Select'}
+              {selectMode ? '✕ Exit Select' : '☑ Select'}
             </button>
           )}
           <button
@@ -919,7 +952,9 @@ export default function OrdersPage() {
       {/* Select mode hint bar */}
       {selectMode && selectedIds.size === 0 && (
         <div style={{ marginBottom: '12px', padding: '10px 16px', background: 'rgba(192,155,88,0.08)', border: '1px solid rgba(192,155,88,0.3)', borderRadius: '8px', fontSize: '12px', color: 'var(--accent-dark)', fontWeight: 500 }}>
-          Only orders with Stone Received can be selected. Tap them to select, then mark as Manufactured.
+          {isFactoryManager
+            ? 'Only orders with Stone Received can be selected. Tap them to select, then mark as Manufactured.'
+            : 'Tap orders to select them, then cancel in bulk. Already cancelled or completed orders can\'t be selected.'}
         </div>
       )}
 
@@ -941,12 +976,14 @@ export default function OrdersPage() {
           </div>
         );
 
-        const selectableOrders = displayOrders.filter(o => o.stoneStatus === StoneStatus.STONE_RECEIVED);
+        const selectableOrders = isFactoryManager
+          ? displayOrders.filter(o => o.stoneStatus === StoneStatus.STONE_RECEIVED)
+          : displayOrders.filter(o => o.status !== OrderStatus.CANCELLED && o.status !== OrderStatus.COMPLETED);
         const allSelectableSelected = selectableOrders.length > 0 && selectableOrders.every(o => selectedIds.has(o.id!));
 
         return (
           <>
-            {/* Select-all row — only in select mode for factory manager */}
+            {/* Select-all row — factory manager (mark manufactured) or office roles (bulk cancel) */}
             {selectMode && displayOrders.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                 <button
@@ -961,7 +998,11 @@ export default function OrdersPage() {
                   style={{ display: 'flex', alignItems: 'center', gap: '7px', background: allSelectableSelected ? 'var(--accent)' : 'var(--bg-card)', border: `1px solid ${allSelectableSelected ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '7px', padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: selectableOrders.length === 0 ? 'not-allowed' : 'pointer', color: allSelectableSelected ? '#fff' : 'var(--text-secondary)', transition: 'all 0.15s', opacity: selectableOrders.length === 0 ? 0.5 : 1 }}
                 >
                   <span style={{ fontSize: '14px' }}>{allSelectableSelected ? '☑' : '☐'}</span>
-                  {allSelectableSelected ? 'Deselect all' : `Select all Stone Received (${selectableOrders.length})`}
+                  {allSelectableSelected
+                    ? 'Deselect all'
+                    : isFactoryManager
+                      ? `Select all Stone Received (${selectableOrders.length})`
+                      : `Select all (${selectableOrders.length})`}
                 </button>
                 {selectedIds.size > 0 && (
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selectedIds.size} selected</span>
@@ -972,7 +1013,9 @@ export default function OrdersPage() {
             <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
               {displayOrders.map(order => {
                 const isSelected = selectedIds.has(order.id!);
-                const isSelectable = order.stoneStatus === StoneStatus.STONE_RECEIVED;
+                const isSelectable = isFactoryManager
+                  ? order.stoneStatus === StoneStatus.STONE_RECEIVED
+                  : order.status !== OrderStatus.CANCELLED && order.status !== OrderStatus.COMPLETED;
                 return (
                   <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
                     onClick={selectMode ? (e) => {
@@ -981,7 +1024,7 @@ export default function OrdersPage() {
                       setSelectedIds(s => { const n = new Set(s); n.has(order.id!) ? n.delete(order.id!) : n.add(order.id!); return n; });
                     } : undefined}
                   >
-                    {/* Selection indicator overlay for factory manager select mode */}
+                    {/* Selection indicator overlay for factory manager (mark manufactured) or office roles (bulk cancel) select mode */}
                     {selectMode && isSelectable && (
                       <div style={{
                         position: 'absolute', inset: 0, zIndex: 2, borderRadius: 'var(--radius)',
@@ -1045,7 +1088,7 @@ export default function OrdersPage() {
         );
       })()}
 
-      {/* Floating bulk action bar — fixed bottom, factory manager only */}
+      {/* Floating bulk action bar — factory manager (mark manufactured) or office roles (bulk cancel) */}
       {selectMode && selectedIds.size > 0 && (
         <div style={{
           position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
@@ -1058,21 +1101,25 @@ export default function OrdersPage() {
             <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700 }}>
               {selectedIds.size} order{selectedIds.size > 1 ? 's' : ''} selected
             </span>
-            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '11px' }}>Mark all as Manufactured?</span>
+            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '11px' }}>
+              {isFactoryManager ? 'Mark all as Manufactured?' : 'Cancel all selected orders?'}
+            </span>
           </div>
           <div style={{ flex: 1 }} />
           <button
             onClick={exitSelectMode}
             style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 14px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
           >
-            Cancel
+            Dismiss
           </button>
           <button
-            onClick={handleBulkManufactured}
+            onClick={isFactoryManager ? handleBulkManufactured : handleBulkCancel}
             disabled={bulkLoading}
-            style={{ background: 'var(--accent)', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
+            style={{ background: isFactoryManager ? 'var(--accent)' : '#DC2626', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
           >
-            {bulkLoading ? 'Marking…' : '✓ Mark as Manufactured'}
+            {isFactoryManager
+              ? (bulkLoading ? 'Marking…' : '✓ Mark as Manufactured')
+              : (bulkLoading ? 'Cancelling…' : '✕ Cancel Orders')}
           </button>
         </div>
       )}

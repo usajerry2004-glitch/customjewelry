@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request,
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
-import { Order } from '../../database/entities/order.entity';
+import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { UpdateStatusDto, AssignSupplierDto } from './update-status.dto';
 import { UpdateQuoteOptionsDto } from './dto/quote-options.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -18,6 +18,13 @@ class BulkStatusDto {
 
   @IsString()
   status: string;
+}
+
+class BulkOrderIdsDto {
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1)
+  orderIds: string[];
 }
 
 @ApiTags('Orders')
@@ -85,6 +92,22 @@ export class OrdersController {
   ) {
     const results = await Promise.allSettled(
       body.orderIds.map(id => this.ordersService.updateStatus(id, body.status as any, req.user)),
+    );
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    return { succeeded, failed };
+  }
+
+  @Patch('bulk/cancel')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Bulk cancel orders (Admin/Authorizer/Sales Rep)' })
+  async bulkCancel(
+    @Body() body: BulkOrderIdsDto,
+    @Request() req: any,
+  ) {
+    const results = await Promise.allSettled(
+      body.orderIds.map(id => this.ordersService.updateStatus(id, OrderStatus.CANCELLED, req.user)),
     );
     const succeeded = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
