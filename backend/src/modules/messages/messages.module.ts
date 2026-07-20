@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MulterModule } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { User } from '../../database/entities/user.entity';
 import { Order } from '../../database/entities/order.entity';
@@ -8,7 +10,14 @@ import { MessagesService } from './messages.service';
 import { MessagesController } from './messages.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([OrderMessage, User, Order]), NotificationsModule],
+  imports: [
+    TypeOrmModule.forFeature([OrderMessage, User, Order]),
+    NotificationsModule,
+    MulterModule.register({
+      storage: memoryStorage(),
+      limits:  { fileSize: 50 * 1024 * 1024 },
+    }),
+  ],
   controllers: [MessagesController],
   providers: [MessagesService],
   exports: [MessagesService],

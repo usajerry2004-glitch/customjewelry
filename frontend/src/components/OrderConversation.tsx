@@ -20,6 +20,13 @@ interface MentionableUser {
   role: string;
 }
 
+// Two staff members can share a display name (e.g. two "Harshil Lakhani"
+// accounts with different roles) — showing the role alongside the name is
+// the only way to tell them apart in the mention list.
+function roleLabel(role: string): string {
+  return role.split('_').map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+}
+
 // CAD event messages start with one of these emojis
 const CAD_EVENT_PREFIX = /^(📎|🔔|✅|❌|↺)/;
 
@@ -37,6 +44,14 @@ interface Props {
   currentUserId: string;
 }
 
+const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function OrderConversation({ orderId, currentUserRole, currentUserId }: Props) {
   const isCustomer = currentUserRole === 'CUSTOMER';
   const [messages, setMessages] = useState<OrderMessage[]>([]);
@@ -46,7 +61,11 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
   const [sending, setSending] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
+  const [mentionableLoading, setMentionableLoading] = useState(true);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachError, setAttachError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = () =>
     apiFetch(`${API}/orders/${orderId}/messages`)
@@ -57,9 +76,10 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => {
     if (isCustomer) return;
+    setMentionableLoading(true);
     apiFetch(`${API}/orders/${orderId}/messages/mentionable-users`)
       .then(r => r.ok ? r.json() : [])
-      .then(setMentionableUsers);
+      .then(users => { setMentionableUsers(users); setMentionableLoading(false); });
   }, [orderId, isCustomer]);
 
   const mentionNameById = (id: string) => {
@@ -70,17 +90,36 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   const toggleMention = (id: string) =>
     setMentions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file && file.size > MAX_ATTACHMENT_SIZE) {
+      setAttachError('File is too large — the limit is 50MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    setAttachError('');
+    setAttachedFile(file);
+  };
+
   const send = async () => {
-    if (!content.trim()) return;
+    if (!content.trim() && !attachedFile) return;
     setSending(true);
+    const formData = new FormData();
+    formData.append('content', content.trim());
+    formData.append('isInternal', String(isInternal));
+    formData.append('mentions', JSON.stringify(mentions));
+    if (attachedFile) formData.append('file', attachedFile);
     await apiFetch(`${API}/orders/${orderId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content: content.trim(), isInternal, mentions }),
+      body: formData,
     });
     setContent('');
     setMentions([]);
     setIsInternal(false);
     setShowMentions(false);
+    setAttachedFile(null);
+    setAttachError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
     await load();
     setSending(false);
   };
@@ -168,6 +207,24 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                     color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
                     {msg.content}
+                    {msg.attachmentUrl && (
+                      <a
+                        href={msg.attachmentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          marginTop: msg.content ? '8px' : 0, display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '6px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.03)',
+                          border: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text-primary)',
+                        }}
+                      >
+                        <span>📎</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, wordBreak: 'break-all' }}>{msg.attachmentName}</span>
+                        {typeof msg.attachmentSize === 'number' && (
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{formatFileSize(msg.attachmentSize)}</span>
+                        )}
+                      </a>
+                    )}
                     {msg.mentionNames && msg.mentionNames.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                         {msg.mentionNames.map((name, i) => (
@@ -215,21 +272,26 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                 @ Mention {mentions.length > 0 && `(${mentions.length})`}
               </button>
               {showMentions && (
-                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '200px', maxHeight: '240px', overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
-                  {mentionableUsers.length === 0 && (
+                <div style={{ position: 'absolute', bottom: '32px', left: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px', zIndex: 10, minWidth: '220px', maxHeight: '240px', overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
+                  {mentionableLoading && (
+                    <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--text-muted)' }}>Loading…</div>
+                  )}
+                  {!mentionableLoading && mentionableUsers.length === 0 && (
                     <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--text-muted)' }}>No one to mention yet.</div>
                   )}
-                  {mentionableUsers.map(u => (
+                  {!mentionableLoading && mentionableUsers.map(u => (
                     <div
                       key={u.id}
                       onClick={() => toggleMention(u.id)}
                       style={{
                         padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px',
+                        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px',
                         color: mentions.includes(u.id) ? '#2563EB' : 'var(--text-secondary)',
                         background: mentions.includes(u.id) ? 'rgba(37,99,235,0.08)' : 'transparent',
                       }}
                     >
-                      {mentions.includes(u.id) ? '✓ ' : ''}{formatName(u.firstName, u.lastName)}
+                      <span>{mentions.includes(u.id) ? '✓ ' : ''}{formatName(u.firstName, u.lastName)}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{roleLabel(u.role)}</span>
                     </div>
                   ))}
                 </div>
@@ -241,7 +303,43 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           </div>
         )}
 
+        {attachedFile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '5px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border)', fontSize: '12px' }}>
+            <span>📎</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{attachedFile.name}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(attachedFile.size)}</span>
+            <button
+              onClick={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+              style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: 0 }}
+              aria-label="Remove attachment"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {attachError && (
+          <div style={{ fontSize: '11px', color: '#EF4444', marginBottom: '8px' }}>{attachError}</div>
+        )}
+
         <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach a file (up to 50MB)"
+            style={{
+              alignSelf: 'flex-end', padding: '9px 12px', borderRadius: '8px', cursor: 'pointer',
+              border: attachedFile ? '1px solid rgba(5,150,105,0.4)' : '1px solid var(--border)',
+              background: attachedFile ? 'rgba(5,150,105,0.08)' : 'var(--bg-card)',
+              color: attachedFile ? '#059669' : 'var(--text-secondary)', fontSize: '15px',
+            }}
+          >
+            📎
+          </button>
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
@@ -257,12 +355,12 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           />
           <button
             onClick={send}
-            disabled={sending || !content.trim()}
+            disabled={sending || (!content.trim() && !attachedFile)}
             style={{
               alignSelf: 'flex-end', padding: '9px 18px', borderRadius: '8px', border: 'none',
-              background: content.trim() ? 'var(--navy)' : 'var(--border)',
-              color: content.trim() ? '#fff' : 'var(--text-muted)',
-              fontSize: '13px', fontWeight: 600, cursor: content.trim() ? 'pointer' : 'default',
+              background: (content.trim() || attachedFile) ? 'var(--navy)' : 'var(--border)',
+              color: (content.trim() || attachedFile) ? '#fff' : 'var(--text-muted)',
+              fontSize: '13px', fontWeight: 600, cursor: (content.trim() || attachedFile) ? 'pointer' : 'default',
               opacity: sending ? 0.7 : 1,
             }}
           >

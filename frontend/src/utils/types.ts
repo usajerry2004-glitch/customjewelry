@@ -86,6 +86,10 @@ export interface OrderMessage {
   isInternal: boolean;
   mentionNames?: string[];
   mentions: string[];
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentSize?: number | null;
+  attachmentMimeType?: string | null;
   createdAt: string;
 }
 

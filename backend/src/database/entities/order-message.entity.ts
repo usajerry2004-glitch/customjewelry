@@ -27,6 +27,18 @@ export class OrderMessage {
   @Column('simple-array', { nullable: true, default: '' })
   mentions: string[];
 
+  @Column({ nullable: true })
+  attachmentUrl: string;
+
+  @Column({ nullable: true })
+  attachmentName: string;
+
+  @Column({ nullable: true })
+  attachmentSize: number;
+
+  @Column({ nullable: true })
+  attachmentMimeType: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

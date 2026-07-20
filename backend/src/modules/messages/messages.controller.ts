@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Param, Request, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Request, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { MessagesService, CreateMessageDto } from './messages.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -26,12 +27,22 @@ export class MessagesController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Post a message on an order' })
+  @ApiOperation({ summary: 'Post a message on an order, optionally with a file attachment (any type, up to 50MB)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
   postMessage(
     @Param('orderId') orderId: string,
-    @Body() dto: CreateMessageDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('content') content: string,
+    @Body('isInternal') isInternal: string,
+    @Body('mentions') mentions: string,
     @Request() req: any,
   ) {
-    return this.messagesService.postMessage(orderId, dto, req.user);
+    const dto: CreateMessageDto = {
+      content,
+      isInternal: isInternal === 'true',
+      mentions: mentions ? JSON.parse(mentions) : [],
+    };
+    return this.messagesService.postMessage(orderId, dto, req.user, file);
   }
 }

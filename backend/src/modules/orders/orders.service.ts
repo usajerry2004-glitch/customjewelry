@@ -726,18 +726,38 @@ export class OrdersService implements OnModuleInit {
     return saved;
   }
 
+  // Reference/customer photos are for internal and customer-facing use only —
+  // the factory needs the actual uploaded CAD design files, not a reference photo.
+  private static readonly REFERENCE_NOTE_TAGS = new Set(['Reference image', 'Customer reference image']);
+
   // Builds the product-detail PDF (no customer name/company/pricing — same
-  // redaction as the Factory Manager portal view) attached to the
-  // factory-assigned email. Failures here shouldn't block the email itself.
+  // redaction as the Factory Manager portal view) plus every uploaded CAD
+  // design file — any file type, the factory needs the actual source file —
+  // attached to the factory-assigned email. A failure on any single piece
+  // (PDF render or one file fetch) shouldn't block the rest of the email.
   private async buildFactoryOrderPdfAttachment(order: Order): Promise<{ filename: string; content: Buffer }[]> {
+    const attachments: { filename: string; content: Buffer }[] = [];
+
     try {
-      const cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
-      const pdf = await buildFactoryOrderPdf(order, cadFiles);
-      return [{ filename: `${order.poNumber}-manufacturing-order.pdf`, content: pdf }];
+      const pdf = await buildFactoryOrderPdf(order);
+      attachments.push({ filename: `${order.poNumber}-manufacturing-order.pdf`, content: pdf });
     } catch (err) {
       this.logger.warn(`Factory order PDF generation failed for ${order.poNumber}:`, err);
-      return [];
     }
+
+    const cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
+    const designFiles = cadFiles.filter(c => !c.designerNotes || !OrdersService.REFERENCE_NOTE_TAGS.has(c.designerNotes));
+    for (const cad of designFiles) {
+      try {
+        const res = await fetch(cad.filePath);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        attachments.push({ filename: cad.originalName, content: Buffer.from(await res.arrayBuffer()) });
+      } catch (err) {
+        this.logger.warn(`Failed to fetch CAD file "${cad.originalName}" for ${order.poNumber}:`, err);
+      }
+    }
+
+    return attachments;
   }
 
   // Admin/Authorizer only — sets the list of price options shown to the customer

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { IsString, IsBoolean, IsOptional, IsArray } from 'class-validator';
@@ -7,10 +7,13 @@ import { User, UserRole } from '../../database/entities/user.entity';
 import { Order } from '../../database/entities/order.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
+import { SpacesService } from '../spaces/spaces.service';
 
 export class CreateMessageDto {
+  // Optional now — a message can consist of just an attachment.
+  @IsOptional()
   @IsString()
-  content: string;
+  content?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -35,6 +38,7 @@ export class MessagesService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     private notificationsService: NotificationsService,
+    private spacesService: SpacesService,
   ) {}
 
   async getMessages(orderId: string, user: { id?: string; role: string }): Promise<any[]> {
@@ -68,22 +72,22 @@ export class MessagesService {
     }));
   }
 
-  // Who a message on this order can be @mentioned to — scoped the same way the
-  // order itself is scoped, so a Factory Manager for a different factory never
-  // shows up as a mention option (and couldn't see the mention anyway).
+  // Who a message on this order can be @mentioned to. Factory/Stone Manager
+  // accounts are scoped the same way the order itself is scoped, so a Factory
+  // Manager for a different factory never shows up as a mention option (and
+  // couldn't see the mention anyway). Sales Reps have no such tenant boundary
+  // (they can already see every order's messages) so every active one is
+  // always mentionable, not just whichever rep happens to be assigned to
+  // this particular order.
   async getMentionableUsers(orderId: string): Promise<User[]> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return [];
 
     const roleUsers = await this.userRepo.find({
-      where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER]), isActive: true },
+      where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.SALES_REP]), isActive: true },
     });
 
     const extra: User[] = [];
-    if (order.salesRepId) {
-      const rep = await this.userRepo.findOne({ where: { id: order.salesRepId } });
-      if (rep) extra.push(rep);
-    }
     if (order.assignedFactory) {
       extra.push(...await this.userRepo.find({ where: { assignedFactory: order.assignedFactory, isActive: true } }));
     }
@@ -95,19 +99,35 @@ export class MessagesService {
     return Array.from(byId.values());
   }
 
-  async postMessage(orderId: string, dto: CreateMessageDto, user: any): Promise<OrderMessage> {
+  async postMessage(orderId: string, dto: CreateMessageDto, user: any, file?: Express.Multer.File): Promise<OrderMessage> {
+    if (!dto.content?.trim() && !file) {
+      throw new BadRequestException('Message must have content or an attachment.');
+    }
+
     const isCustomer = user.role === 'CUSTOMER';
     const isInternal = isCustomer ? false : (dto.isInternal ?? false);
     const authorName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+
+    let attachment: { attachmentUrl: string; attachmentName: string; attachmentSize: number; attachmentMimeType: string } | null = null;
+    if (file) {
+      const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'chat', file.originalname, file.mimetype);
+      attachment = {
+        attachmentUrl: uploaded.filePath,
+        attachmentName: file.originalname,
+        attachmentSize: file.size,
+        attachmentMimeType: file.mimetype,
+      };
+    }
 
     const msg = this.msgRepo.create({
       orderId,
       authorId: user.id,
       authorName,
       authorRole: user.role,
-      content: dto.content,
+      content: dto.content?.trim() || '',
       isInternal,
       mentions: dto.mentions || [],
+      ...attachment,
     });
     const saved = await this.msgRepo.save(msg);
 
@@ -127,6 +147,7 @@ export class MessagesService {
         ),
       ));
     } else if (dto.mentions?.length) {
+      const preview = saved.content ? `"${saved.content.substring(0, 100)}"` : `an attachment (${attachment?.attachmentName})`;
       const [mentionedUsers, order] = await Promise.all([
         this.userRepo.find({ where: { id: In(dto.mentions) } }),
         this.orderRepo.findOne({ where: { id: orderId } }),
@@ -135,7 +156,7 @@ export class MessagesService {
         this.notificationsService.create(
           NotificationType.MENTION,
           `You were mentioned on an order`,
-          `${authorName} mentioned you: "${dto.content.substring(0, 100)}"`,
+          `${authorName} mentioned you: ${preview}`,
           orderId,
           u.id,
           order?.isPriorityCustomer,

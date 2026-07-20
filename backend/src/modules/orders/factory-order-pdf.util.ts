@@ -1,11 +1,9 @@
 import { Order } from '../../database/entities/order.entity';
-import { CadFile } from '../../database/entities/cad-file.entity';
 
 // Plain require, not a typed import: without esModuleInterop, `import
 // PDFDocument from 'pdfkit'` resolves to the module's `.default`, which
-// doesn't exist on pdfkit's CJS export — same reason sharp is required below.
+// doesn't exist on pdfkit's CJS export.
 const PDFDocument = require('pdfkit');
-const sharp = require('sharp');
 
 const NAVY = '#0D1B35';
 const GOLD = '#C09B58';
@@ -59,23 +57,7 @@ function sectionLabel(doc: PDFKit.PDFDocument, text: string, y: number): number 
   return y + 16;
 }
 
-// Fetches a reference image and normalizes it to a JPEG buffer pdfkit can
-// embed directly — source files may be PNG/WEBP/etc, and fetch failures
-// (deleted file, network blip) shouldn't take down the whole PDF/email send.
-async function fetchImageBuffer(url: string): Promise<Buffer | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const bytes = Buffer.from(await res.arrayBuffer());
-    return await sharp(bytes).jpeg({ quality: 82 }).toBuffer();
-  } catch {
-    return null;
-  }
-}
-
-const REFERENCE_NOTE_TAGS = new Set(['Reference image', 'Customer reference image']);
-
-export async function buildFactoryOrderPdf(order: Order, cadFiles: CadFile[]): Promise<Buffer> {
+export async function buildFactoryOrderPdf(order: Order): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', margin: MARGIN });
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
@@ -141,35 +123,6 @@ export async function buildFactoryOrderPdf(order: Order, cadFiles: CadFile[]): P
     y += boxHeight + 16;
   } else {
     y += 16;
-  }
-
-  // ── Reference Images ──
-  const refs = cadFiles.filter(c => c.designerNotes && REFERENCE_NOTE_TAGS.has(c.designerNotes));
-  if (refs.length) {
-    if (y > 620) { doc.addPage(); y = MARGIN; }
-    y = sectionLabel(doc, `Reference Images (${refs.length})`, y);
-
-    const imgWidth = (CONTENT_WIDTH - 14) / 2;
-    const imgHeight = 160;
-    let col = 0;
-    for (const ref of refs) {
-      if (y + imgHeight > 780) { doc.addPage(); y = MARGIN; col = 0; }
-      const x = MARGIN + col * (imgWidth + 14);
-      const buf = await fetchImageBuffer(ref.filePath);
-      doc.roundedRect(x, y, imgWidth, imgHeight, 4).lineWidth(1).strokeColor(BORDER).stroke();
-      if (buf) {
-        try {
-          doc.image(buf, x + 4, y + 4, { fit: [imgWidth - 8, imgHeight - 8], align: 'center', valign: 'center' });
-        } catch {
-          doc.font('Helvetica').fontSize(9).fillColor(MUTED)
-            .text(ref.originalName, x + 8, y + imgHeight / 2 - 6, { width: imgWidth - 16, align: 'center' });
-        }
-      } else {
-        doc.font('Helvetica').fontSize(9).fillColor(MUTED)
-          .text(ref.originalName, x + 8, y + imgHeight / 2 - 6, { width: imgWidth - 16, align: 'center' });
-      }
-      if (col === 1) { y += imgHeight + 14; col = 0; } else { col = 1; }
-    }
   }
 
   // ── Footer ── pinned near the bottom of whichever page is last; must stay
