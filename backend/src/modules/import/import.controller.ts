@@ -1,5 +1,5 @@
-import { Controller, Post, Get, UploadedFile, UseInterceptors, UseGuards, Query } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, Get, UploadedFiles, UseInterceptors, UseGuards, Query, Body } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
@@ -19,22 +19,29 @@ const storage = diskStorage({
 @ApiTags('Import')
 @ApiBearerAuth()
 @Controller('import')
-@Roles(UserRole.ADMIN, UserRole.SALES_REP)
+@Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP)
 @UseGuards(RolesGuard)
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
   @Post('upload')
-  @ApiOperation({ summary: 'Upload CSV or Excel file and import orders. Use ?preview=true to preview without saving.' })
+  @ApiOperation({ summary: 'Upload CSV or Excel file and import orders, with an optional ZIP of reference photos and customer-identity overrides applied to every row. Use ?preview=true to preview without saving.' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage }))
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'file', maxCount: 1 }, { name: 'images', maxCount: 1 }], { storage }))
   async upload(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: { file?: Express.Multer.File[]; images?: Express.Multer.File[] },
     @Query('preview') preview: string,
+    @Body('customerFullName') customerFullName: string,
+    @Body('customerEmail') customerEmail: string,
+    @Body('storeName') storeName: string,
   ) {
+    const file = files?.file?.[0];
     if (!file) return { error: 'No file uploaded' };
     const isPreview = preview === 'true';
-    return this.importService.importFromFile(file.path, isPreview);
+    return this.importService.importFromFile(file.path, isPreview, {
+      overrides: { customerFullName, customerEmail, storeName },
+      imagesZipPath: files?.images?.[0]?.path,
+    });
   }
 
   @Get('template')

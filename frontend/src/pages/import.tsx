@@ -13,7 +13,12 @@ const REQUIRED_COLS = ['PO #', 'Store Name / Customer Name', 'Order Type', 'Meta
 
 export default function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const imagesRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [imagesZip, setImagesZip] = useState<File | null>(null);
+  const [customerFullName, setCustomerFullName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [storeName, setStoreName] = useState('');
   const [dragging, setDragging] = useState(false);
   const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload');
   const [preview, setPreview] = useState<PreviewRow[]>([]);
@@ -31,16 +36,34 @@ export default function ImportPage() {
     setError('');
   };
 
+  const handleImagesZip = (f: File) => {
+    if (f.name.split('.').pop()?.toLowerCase() !== 'zip') {
+      setError('Reference photos must be a single .zip file.');
+      return;
+    }
+    setImagesZip(f);
+    setError('');
+  };
+
+  const buildFormData = (extra?: Record<string, string>) => {
+    const fd = new FormData();
+    fd.append('file', file as File);
+    if (imagesZip) fd.append('images', imagesZip);
+    if (customerFullName.trim()) fd.append('customerFullName', customerFullName.trim());
+    if (customerEmail.trim()) fd.append('customerEmail', customerEmail.trim());
+    if (storeName.trim()) fd.append('storeName', storeName.trim());
+    if (extra) Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
+    return fd;
+  };
+
   const doPreview = async () => {
     if (!file) return;
     setLoading(true); setError('');
     try {
-      const fd = new FormData();
-      fd.append('file', file);
       const res = await fetch(`${API}/import/upload?preview=true`, {
         method: 'POST',
         credentials: 'include',
-        body: fd,
+        body: buildFormData(),
       });
       const data = await res.json();
       if (!res.ok) { setError(getErrorMessage(data, 'Preview failed')); return; }
@@ -54,12 +77,10 @@ export default function ImportPage() {
     if (!file) return;
     setLoading(true); setError('');
     try {
-      const fd = new FormData();
-      fd.append('file', file);
       const res = await fetch(`${API}/import/upload`, {
         method: 'POST',
         credentials: 'include',
-        body: fd,
+        body: buildFormData(),
       });
       const data = await res.json();
       if (!res.ok) { setError(getErrorMessage(data, 'Import failed')); return; }
@@ -69,7 +90,10 @@ export default function ImportPage() {
     finally { setLoading(false); }
   };
 
-  const reset = () => { setFile(null); setPreview([]); setResult(null); setStep('upload'); setError(''); };
+  const reset = () => {
+    setFile(null); setImagesZip(null); setCustomerFullName(''); setCustomerEmail(''); setStoreName('');
+    setPreview([]); setResult(null); setStep('upload'); setError('');
+  };
 
   const downloadTemplate = async () => {
     const res = await fetch(`${API}/import/template`, { credentials: 'include' });
@@ -146,6 +170,30 @@ export default function ImportPage() {
                   <span key={col} style={{ fontSize: '11px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '5px', padding: '2px 8px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{col}</span>
                 ))}
               </div>
+            </div>
+
+            {/* Design-spec import extras: customer identity (this CSV format has none of
+                its own) + an optional ZIP of reference photos, applied to every row */}
+            <div style={{ marginTop: '20px', padding: '14px 16px', background: 'var(--bg-input)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+                Optional — applies to every row in this file
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                <input value={customerFullName} onChange={e => setCustomerFullName(e.target.value)} placeholder="Customer Full Name"
+                  style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '13px' }} />
+                <input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="Customer Email"
+                  style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '13px' }} />
+                <input value={storeName} onChange={e => setStoreName(e.target.value)} placeholder="Store Name"
+                  style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '13px' }} />
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Only used for rows that don't already have their own Customer Full Name / Email / Store Name column.
+              </div>
+
+              <input ref={imagesRef} type="file" accept=".zip" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleImagesZip(e.target.files[0])} />
+              <button onClick={() => imagesRef.current?.click()} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: imagesZip ? 'rgba(16,185,129,0.06)' : 'var(--bg-card)', border: `1px solid ${imagesZip ? 'rgba(16,185,129,0.35)' : 'var(--border)'}`, borderRadius: '8px', padding: '9px 14px', color: imagesZip ? '#059669' : 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                {imagesZip ? `✅ ${imagesZip.name} (${(imagesZip.size / 1024 / 1024).toFixed(1)} MB)` : '📷 Attach reference photos (.zip) — matched by "Reference Image Filename"'}
+              </button>
             </div>
 
             {error && <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '8px', padding: '10px 14px', color: 'var(--danger)', fontSize: '13px', marginTop: '14px' }}>{error}</div>}
