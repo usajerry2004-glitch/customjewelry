@@ -102,7 +102,7 @@ function PrioritySection({
       {open && (
         compact ? (
           // ── Compact table ────────────────────────────────────────────────
-          <div className="table-scroll" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginBottom: '4px' }}>
+          <div className="table-scroll" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflowY: 'hidden', marginBottom: '4px' }}>
             <table className="todos-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-input)', borderBottom: '1px solid var(--border)' }}>

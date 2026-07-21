@@ -245,7 +245,7 @@ export default function ImportPage() {
 
             {error && <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '8px', padding: '10px 14px', color: 'var(--danger)', fontSize: '13px', marginTop: '14px' }}>{error}</div>}
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <button onClick={reset} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 18px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>← Choose different file</button>
               <button onClick={doImport} disabled={loading} style={{ background: '#10B981', border: 'none', borderRadius: '8px', padding: '9px 24px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Importing…' : '✓ Import All Rows'}
@@ -284,7 +284,7 @@ export default function ImportPage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <button onClick={reset} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 18px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>Import another file</button>
               <a href="/orders" style={{ background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '9px 24px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>View Orders →</a>
             </div>

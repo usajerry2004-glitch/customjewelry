@@ -31,6 +31,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -71,6 +72,75 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   };
 
   const hasResults = !!searchResults && (searchResults.orders.length + searchResults.customers.length + searchResults.companies.length > 0);
+
+  // Shared between the desktop inline search box and the mobile full-width
+  // overlay — same results, just anchored differently by the caller.
+  const renderSearchDropdown = () => (
+    <div style={{
+      width: '100%',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)',
+      maxHeight: '420px', overflowY: 'auto',
+    }}>
+      {searching && !searchResults ? (
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Searching…</div>
+      ) : !hasResults ? (
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>No results found</div>
+      ) : (
+        <>
+          {searchResults!.orders.length > 0 && (
+            <div>
+              <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Orders</div>
+              {searchResults!.orders.map(o => (
+                <div key={o.id} onClick={() => goToOrder(o)}
+                  style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{o.poNumber}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {o.customerFullName || o.storeName || '—'}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{o.status.replace(/_/g, ' ')}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {searchResults!.customers.length > 0 && (
+            <div>
+              <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customers</div>
+              {searchResults!.customers.map(c => (
+                <div key={c.id} onClick={() => goToCustomer(c)}
+                  style={{ padding: '9px 14px', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.storeName || `${c.firstName} ${c.lastName}`}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {searchResults!.companies.length > 0 && (
+            <div>
+              <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Companies</div>
+              {searchResults!.companies.map(c => (
+                <div key={c.id} onClick={() => goToCompany(c)}
+                  style={{ padding: '9px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {c.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -176,8 +246,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             </div>
           </div>
 
-          {/* Global search */}
-          <div style={{ flex: 1, maxWidth: '420px', minWidth: '120px', position: 'relative' }}>
+          {/* Global search — desktop inline box; collapses to an icon below 768px (see .topbar-search-desktop / .topbar-search-mobile-btn in globals.css) */}
+          <div className="topbar-search-desktop" style={{ flex: 1, maxWidth: '420px', minWidth: '120px', position: 'relative' }}>
             <input
               value={globalQuery}
               onChange={e => { setGlobalQuery(e.target.value); setSearchOpen(true); }}
@@ -191,75 +261,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               }}
             />
             {searchOpen && globalQuery.trim().length >= 2 && (
-              <div style={{
-                position: 'absolute', left: 0, top: '44px', width: '360px', maxWidth: 'calc(100vw - 32px)',
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 100,
-                maxHeight: '420px', overflowY: 'auto',
-              }}>
-                {searching && !searchResults ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Searching…</div>
-                ) : !hasResults ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>No results found</div>
-                ) : (
-                  <>
-                    {searchResults!.orders.length > 0 && (
-                      <div>
-                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Orders</div>
-                        {searchResults!.orders.map(o => (
-                          <div key={o.id} onClick={() => goToOrder(o)}
-                            style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{o.poNumber}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {o.customerFullName || o.storeName || '—'}
-                              </div>
-                            </div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{o.status.replace(/_/g, ' ')}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {searchResults!.customers.length > 0 && (
-                      <div>
-                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customers</div>
-                        {searchResults!.customers.map(c => (
-                          <div key={c.id} onClick={() => goToCustomer(c)}
-                            style={{ padding: '9px 14px', cursor: 'pointer' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.storeName || `${c.firstName} ${c.lastName}`}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {searchResults!.companies.length > 0 && (
-                      <div>
-                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Companies</div>
-                        {searchResults!.companies.map(c => (
-                          <div key={c.id} onClick={() => goToCompany(c)}
-                            style={{ padding: '9px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            {c.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+              <div style={{ position: 'absolute', left: 0, top: '44px', width: '360px', maxWidth: 'calc(100vw - 32px)', zIndex: 100 }}>
+                {renderSearchDropdown()}
               </div>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
             {actions && <div className="topbar-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>{actions}</div>}
+
+            {/* Mobile search icon — only visible below 768px, opens a full-width overlay */}
+            <button
+              className="topbar-search-mobile-btn"
+              onClick={() => setMobileSearchOpen(true)}
+              style={{
+                display: 'none', background: 'var(--bg-input)', border: '1px solid var(--border)',
+                borderRadius: '8px', width: '36px', height: '36px',
+                cursor: 'pointer', fontSize: '15px', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-secondary)',
+              }}
+              aria-label="Search"
+            >
+              🔍
+            </button>
 
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
@@ -390,6 +414,39 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               </div>
             )}
           </div>
+
+          {/* Mobile search overlay — covers the topbar so the input has full width on phones */}
+          {mobileSearchOpen && (
+            <div style={{
+              position: 'absolute', inset: 0, background: 'var(--topbar-bg, #FDFCFA)',
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '0 14px', zIndex: 101,
+            }}>
+              <input
+                autoFocus
+                value={globalQuery}
+                onChange={e => { setGlobalQuery(e.target.value); setSearchOpen(true); }}
+                placeholder="Search orders, customers, companies…"
+                style={{
+                  flex: 1, minWidth: 0, boxSizing: 'border-box',
+                  background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  borderRadius: '8px', padding: '9px 13px', fontSize: '13px',
+                  color: 'var(--text-primary)', outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => { setMobileSearchOpen(false); setSearchOpen(false); setGlobalQuery(''); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px', flexShrink: 0 }}
+                aria-label="Close search"
+              >
+                ✕
+              </button>
+              {searchOpen && globalQuery.trim().length >= 2 && (
+                <div style={{ position: 'absolute', left: '14px', right: '14px', top: '54px' }}>
+                  {renderSearchDropdown()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="main-content-pad" style={{ flex: 1, overflow: 'auto', padding: '32px 36px' }}>
@@ -398,7 +455,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
       </div>
 
       {showNotifs && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNotifs(false)} />}
-      {searchOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setSearchOpen(false)} />}
+      {searchOpen && !mobileSearchOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setSearchOpen(false)} />}
+      {mobileSearchOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={() => { setMobileSearchOpen(false); setSearchOpen(false); }} />}
     </div>
   );
 };

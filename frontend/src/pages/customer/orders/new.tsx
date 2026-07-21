@@ -152,12 +152,12 @@ export default function NewOrderPage() {
   return (
     <CustomerLayout title="Place a New Order" subtitle="Tell us about your custom piece">
       <div style={{ maxWidth: '580px' }}>
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', boxShadow: 'var(--shadow-sm)' }}>
+        <div className="order-form-card" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px', boxShadow: 'var(--shadow-sm)' }}>
 
           {/* Contact Information (pre-filled from account) */}
           <SectionTitle>Contact Information</SectionTitle>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="new-order-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>First Name</label>
               <input value={contactLoaded ? contactInfo.firstName : '…'} readOnly style={readonlyStyle} />
@@ -167,7 +167,7 @@ export default function NewOrderPage() {
               <input value={contactLoaded ? contactInfo.lastName : '…'} readOnly style={readonlyStyle} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="new-order-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Company Name</label>
               <input value={contactLoaded ? (contactInfo.storeName || '—') : '…'} readOnly style={readonlyStyle} />
@@ -214,7 +214,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Metal Type + Metal Color */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="new-order-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Metal Type *</label>
               <select value={form.metalType} onChange={e => set('metalType', e.target.value)} style={selectStyle}>
@@ -232,7 +232,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Quantity + Stamping */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="new-order-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Quantity</label>
               <input
@@ -256,7 +256,7 @@ export default function NewOrderPage() {
           {/* Diamond / Stone Details */}
           <SectionTitle>Stone Details</SectionTitle>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="new-order-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={fieldWrap}>
               <label style={labelStyle}>Diamond Type</label>
               <select value={form.diamondType} onChange={e => set('diamondType', e.target.value)} style={selectStyle}>
@@ -376,6 +376,12 @@ export default function NewOrderPage() {
           After placing your order, our team will review it and provide a quote. You'll receive CAD designs to approve before manufacturing begins.
         </div>
       </div>
+      <style jsx>{`
+        @media (max-width: 480px) {
+          .new-order-2col { grid-template-columns: 1fr !important; }
+          .order-form-card { padding: 20px !important; }
+        }
+      `}</style>
     </CustomerLayout>
   );
 }

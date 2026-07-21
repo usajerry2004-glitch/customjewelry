@@ -175,6 +175,8 @@ input::placeholder, textarea::placeholder {
   .topbar-title { font-size: 18px !important; }
   .topbar-user-name { display: none !important; }
   .topbar-signout { display: none !important; }
+  .topbar-search-desktop { display: none !important; }
+  .topbar-search-mobile-btn { display: flex !important; }
   .main-content-pad {
     padding: 16px !important;
   }
@@ -372,6 +374,14 @@ input::placeholder, textarea::placeholder {
   .topbar-actions { flex-wrap: wrap; gap: 4px !important; }
   .topbar-actions button,
   .topbar-actions a { font-size: 11px !important; padding: 5px 10px !important; }
+}
+
+/* The topbar itself was a fixed 66px tall — once .topbar-actions above wraps to a
+   second row (any page passing 3+ action buttons, e.g. order detail's
+   Print/CAD Brief/Job Bag/Back/Delete row), the extra row had nowhere to go and
+   visually overlapped the page content below instead of pushing it down. */
+@media (max-width: 768px) {
+  .admin-topbar { height: auto !important; min-height: 66px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
 }
 
 /* CAD viewer modal — full-screen on mobile */

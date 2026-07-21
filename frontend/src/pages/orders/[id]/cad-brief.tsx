@@ -65,12 +65,19 @@ export default function CadBriefPage() {
           img { break-inside: avoid; }
           @page { size: A4; margin: 10mm; }
         }
+        @media screen and (max-width: 640px) {
+          .cadb-specs-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media screen and (max-width: 400px) {
+          .cadb-specs-grid { grid-template-columns: 1fr !important; }
+          .cadb-refs-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {/* Toolbar */}
-      <div className="no-print" style={{ background: '#0d1b35', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: '#0d1b35', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '15px', fontWeight: 700, color: '#c09b58', letterSpacing: '1px' }}>KIRA JEWELS — CAD Brief</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={() => router.push(`/orders/${id}`)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '7px', padding: '6px 14px', color: 'rgba(255,255,255,0.75)', fontSize: '12px', cursor: 'pointer' }}>
             ← Back
           </button>
@@ -93,7 +100,7 @@ export default function CadBriefPage() {
         }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #0d1b35', paddingBottom: '10px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px', borderBottom: '2px solid #0d1b35', paddingBottom: '10px', marginBottom: '14px' }}>
             <div>
               <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 700, color: '#0d1b35', letterSpacing: '1px' }}>KIRA JEWELS</div>
               <div style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: '2px' }}>CAD Design Brief</div>
@@ -112,7 +119,7 @@ export default function CadBriefPage() {
           {/* Specs */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>Specs</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px 16px' }}>
+            <div className="cadb-specs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px 16px' }}>
               {specRows.map(row => (
                 <div key={row.label}>
                   <div style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{row.label}</div>
@@ -148,7 +155,7 @@ export default function CadBriefPage() {
             {refs.length === 0 ? (
               <div style={{ fontSize: '12px', color: '#9ca3af' }}>No reference images on file.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+              <div className="cadb-refs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
                 {refs.map(ref => {
                   const url = ref.filePath || `/uploads/cad/${ref.fileName}`;
                   const ext = (ref.originalName.split('.').pop() || '').toLowerCase();

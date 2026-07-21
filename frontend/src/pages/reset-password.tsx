@@ -61,7 +61,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-page)' }}>
+    <div className="login-wrapper" style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-page)' }}>
       {/* Left brand panel */}
       <div className="login-left-panel" style={{ width: '420px', background: 'var(--sidebar-bg)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '60px 48px', flexShrink: 0 }}>
         <div style={{ textAlign: 'center' }}>
@@ -71,6 +71,14 @@ export default function ResetPasswordPage() {
           <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, maxWidth: '240px', margin: 0 }}>
             Custom jewelry workflow management — from order to delivery.
           </p>
+        </div>
+      </div>
+
+      {/* Mobile-only logo bar (hidden on desktop via CSS, matches /login) */}
+      <div className="login-mobile-logo" style={{ display: 'none' }}>
+        <Image src="/logo.png" alt="Kira Jewels" width={784} height={261} style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
+        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '6px' }}>
+          Custom Jewelry
         </div>
       </div>
 

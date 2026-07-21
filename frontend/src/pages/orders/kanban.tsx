@@ -293,7 +293,7 @@ export default function KanbanPage() {
             </div>
 
             {/* Phase groups */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+            <div className="pipeline-overview-row" style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
               {PHASES.map(phase => {
                 const phaseStatuses = phase.statuses
                   .map(s => columns.find(c => c.status === s))
@@ -302,7 +302,7 @@ export default function KanbanPage() {
                 if (phaseTotal === 0) return null;
 
                 return (
-                  <div key={phase.label} style={{ flex: phaseTotal, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div key={phase.label} className="pipeline-overview-phase" style={{ flex: phaseTotal, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {/* Phase label */}
                     <div style={{ fontSize: '9px', fontWeight: 700, color: phase.color, textTransform: 'uppercase', letterSpacing: '0.7px', textAlign: 'center', marginBottom: '2px' }}>
                       {phase.label}
@@ -369,6 +369,20 @@ export default function KanbanPage() {
 
         </div>
       )}
+
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .pipeline-overview-row {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+          }
+          .pipeline-overview-row .pipeline-overview-phase {
+            flex: 0 0 auto !important;
+            min-width: 110px;
+          }
+        }
+      `}</style>
     </AppLayout>
   );
 }

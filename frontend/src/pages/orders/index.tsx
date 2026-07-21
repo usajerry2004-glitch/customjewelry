@@ -460,7 +460,7 @@ export default function OrdersPage() {
             <div style={modalSectionTitle}>Contact Information</div>
 
             {/* First Name + Last Name */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>First Name *</label>
                 <input value={contact.firstName} onChange={e => setC('firstName', e.target.value)}
@@ -549,7 +549,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Email + Phone */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Email *</label>
                 <input value={contact.email} onChange={e => setC('email', e.target.value)}
@@ -593,7 +593,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Metal Type + Metal Color */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Metal Type *</label>
                 <select value={newOrder.metalType} onChange={e => setO('metalType', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
@@ -611,7 +611,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Quantity + Stamping */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Quantity</label>
                 <input
@@ -635,7 +635,7 @@ export default function OrdersPage() {
             {/* ── STONE DETAILS ── */}
             <div style={modalSectionTitle}>Stone Details</div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Diamond Type</label>
                 <select value={newOrder.diamondType} onChange={e => setO('diamondType', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
@@ -909,7 +909,7 @@ export default function OrdersPage() {
           ? allNames.filter(n => n.toLowerCase().includes(q))
           : allNames;
         return (
-          <div style={{ position: 'relative', marginBottom: '20px', display: 'inline-block' }}>
+          <div style={{ position: 'relative', marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ position: 'relative' }}>
                 <input
@@ -1090,11 +1090,12 @@ export default function OrdersPage() {
 
       {/* Floating bulk action bar — factory manager (mark manufactured) or office roles (bulk cancel) */}
       {selectMode && selectedIds.size > 0 && (
-        <div style={{
+        <div className="bulk-action-bar" style={{
           position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          zIndex: 500, display: 'flex', alignItems: 'center', gap: '12px',
+          zIndex: 500, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
           background: 'var(--navy)', borderRadius: '12px', padding: '12px 20px',
-          boxShadow: '0 8px 32px rgba(26,39,64,0.4)', minWidth: '320px',
+          boxShadow: '0 8px 32px rgba(26,39,64,0.4)', minWidth: '320px', maxWidth: 'calc(100vw - 32px)',
+          justifyContent: 'center',
           animation: 'fadeSlideUp 0.2s ease',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1105,9 +1106,10 @@ export default function OrdersPage() {
               {isFactoryManager ? 'Mark all as Manufactured?' : 'Cancel all selected orders?'}
             </span>
           </div>
-          <div style={{ flex: 1 }} />
+          <div className="bulk-bar-spacer" style={{ flex: 1 }} />
           <button
             onClick={exitSelectMode}
+            className="bulk-bar-btn"
             style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 14px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
           >
             Dismiss
@@ -1115,6 +1117,7 @@ export default function OrdersPage() {
           <button
             onClick={isFactoryManager ? handleBulkManufactured : handleBulkCancel}
             disabled={bulkLoading}
+            className="bulk-bar-btn"
             style={{ background: isFactoryManager ? 'var(--accent)' : '#DC2626', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
           >
             {isFactoryManager
@@ -1123,6 +1126,19 @@ export default function OrdersPage() {
           </button>
         </div>
       )}
+
+      <style jsx>{`
+        @media (max-width: 480px) {
+          .bulk-action-bar {
+            min-width: 0 !important;
+            width: calc(100vw - 32px);
+            flex-direction: column;
+            align-items: stretch !important;
+          }
+          .bulk-action-bar .bulk-bar-spacer { display: none; }
+          .bulk-action-bar .bulk-bar-btn { width: 100%; }
+        }
+      `}</style>
     </AppLayout>
   );
 }

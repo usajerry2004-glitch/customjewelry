@@ -365,7 +365,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Table */}
-      <div className="table-scroll" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+      <div className="table-scroll" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflowY: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
         <table className="customers-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
@@ -492,7 +492,7 @@ export default function CustomersPage() {
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
             {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, allFiltered.length)} of {allFiltered.length}
           </span>
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={safePage === 1}
@@ -750,7 +750,7 @@ export default function CustomersPage() {
             {addingTeammate ? (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>Add a Teammate</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                   <input value={teammateForm.firstName} onChange={e => setTeammateForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" style={INPUT} />
                   <input value={teammateForm.lastName} onChange={e => setTeammateForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" style={INPUT} />
                 </div>

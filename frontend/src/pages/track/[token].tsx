@@ -174,13 +174,13 @@ export default function TrackPage() {
       <div style={{ minHeight: '100vh', background: '#F5F4F0', fontFamily: "'DM Sans', Helvetica, Arial, sans-serif" }}>
         {/* Header */}
         <div style={{ background: '#1A2740', padding: '20px 24px' }}>
-          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+          <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ minWidth: 0 }}>
               <div style={{ color: '#C09B58', fontWeight: 700, fontSize: 18, letterSpacing: 1 }}>KIRA CUSTOM JEWELRY</div>
               <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', marginTop: 2 }}>Order Tracking</div>
             </div>
             {order && (
-              <div style={{ background: STATUS_COLORS[order.status] || '#6366F1', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 600 }}>
+              <div style={{ background: STATUS_COLORS[order.status] || '#6366F1', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
                 {STATUS_LABELS[order.status] || order.status}
               </div>
             )}

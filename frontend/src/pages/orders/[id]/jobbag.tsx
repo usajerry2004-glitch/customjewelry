@@ -57,9 +57,9 @@ export default function JobBagPage() {
       `}</style>
 
       {/* Toolbar */}
-      <div className="no-print" style={{ background: '#0d1b35', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="no-print" style={{ background: '#0d1b35', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10, flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '15px', fontWeight: 700, color: '#c09b58', letterSpacing: '1px' }}>KIRA JEWELS — Job Bag Sticker</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={() => router.push(`/orders/${id}`)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '7px', padding: '6px 14px', color: 'rgba(255,255,255,0.75)', fontSize: '12px', cursor: 'pointer' }}>
             ← Back
           </button>
@@ -73,6 +73,7 @@ export default function JobBagPage() {
         {/* ── STICKER ─────────────────────────────────────── */}
         <div className="sticker" style={{
           width: '340px',
+          maxWidth: '100%',
           background: '#fff',
           border: '2px dashed #aaa5a0',
           borderRadius: '10px',
@@ -82,7 +83,7 @@ export default function JobBagPage() {
         }}>
 
           {/* ── TOP BAND ── */}
-          <div style={{ background: '#0d1b35', padding: '10px 14px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ background: '#0d1b35', padding: '10px 14px 8px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '16px', fontWeight: 700, color: '#c09b58', letterSpacing: '1.5px', lineHeight: 1 }}>KIRA JEWELS</div>
               <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.35)', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '3px' }}>Manufacturing Job Bag</div>
@@ -102,7 +103,7 @@ export default function JobBagPage() {
           </div>
 
           {/* ── BODY: specs + QR ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 0 }}>
+          <div className="jobbag-body" style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 0 }}>
 
             {/* Specs */}
             <div style={{ padding: '10px 12px 8px 14px', borderRight: '1px dashed #d8d3cc' }}>
@@ -149,7 +150,7 @@ export default function JobBagPage() {
         </div>
 
         {/* Preview note */}
-        <div className="no-print" style={{ width: '220px', padding: '16px', background: 'rgba(255,255,255,0.6)', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <div className="no-print" style={{ width: '220px', maxWidth: '100%', padding: '16px', background: 'rgba(255,255,255,0.6)', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.08)' }}>
           <div style={{ fontWeight: 700, fontSize: '12px', color: '#0d1b35', marginBottom: '8px' }}>Print tips</div>
           <ul style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.7, paddingLeft: '16px' }}>
             <li>Target size: 100 × 150 mm label</li>

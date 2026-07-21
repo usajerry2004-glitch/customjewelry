@@ -97,15 +97,15 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
           justifyContent: 'space-between',
           boxShadow: '0 1px 0 rgba(26,39,64,0.06)',
         }}>
-          <div>
+          <div style={{ minWidth: 0, flex: '1 1 auto' }}>
             {title && (
-              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.3px' }}>
+              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {title}
               </div>
             )}
-            {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>{subtitle}</div>}
+            {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
           </div>
-          {actions && <div>{actions}</div>}
+          {actions && <div style={{ flexShrink: 0, marginLeft: '12px' }}>{actions}</div>}
         </div>
       )}
 
