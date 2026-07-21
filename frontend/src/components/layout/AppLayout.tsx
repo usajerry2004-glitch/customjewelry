@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/auth.store';
@@ -6,6 +6,11 @@ import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; isPriority?: boolean; }
+
+interface SearchOrder { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; }
+interface SearchCustomer { id: string; firstName: string; lastName: string; email: string; storeName: string | null; }
+interface SearchCompany { id: string; name: string; }
+interface SearchResults { orders: SearchOrder[]; customers: SearchCustomer[]; companies: SearchCompany[]; }
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -21,6 +26,51 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const [unread, setUnread] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [globalQuery, setGlobalQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const q = globalQuery.trim();
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (q.length < 2) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`${API}/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) setSearchResults(await res.json());
+      } catch {
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [globalQuery]);
+
+  const goToOrder = (o: SearchOrder) => {
+    setSearchOpen(false);
+    setGlobalQuery('');
+    router.push(`/orders/${o.id}`);
+  };
+  const goToCustomer = (c: SearchCustomer) => {
+    setSearchOpen(false);
+    setGlobalQuery('');
+    router.push(`/customers?q=${encodeURIComponent(c.email)}`);
+  };
+  const goToCompany = (c: SearchCompany) => {
+    setSearchOpen(false);
+    setGlobalQuery('');
+    router.push(`/customers?q=${encodeURIComponent(c.name)}`);
+  };
+
+  const hasResults = !!searchResults && (searchResults.orders.length + searchResults.customers.length + searchResults.companies.length > 0);
 
   useEffect(() => {
     const load = async () => {
@@ -124,6 +174,88 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Global search */}
+          <div style={{ flex: 1, maxWidth: '420px', minWidth: '120px', position: 'relative' }}>
+            <input
+              value={globalQuery}
+              onChange={e => { setGlobalQuery(e.target.value); setSearchOpen(true); }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder="Search orders, customers, companies…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'var(--bg-input)', border: '1px solid var(--border)',
+                borderRadius: '8px', padding: '9px 13px', fontSize: '12px',
+                color: 'var(--text-primary)', outline: 'none',
+              }}
+            />
+            {searchOpen && globalQuery.trim().length >= 2 && (
+              <div style={{
+                position: 'absolute', left: 0, top: '44px', width: '360px', maxWidth: 'calc(100vw - 32px)',
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 100,
+                maxHeight: '420px', overflowY: 'auto',
+              }}>
+                {searching && !searchResults ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Searching…</div>
+                ) : !hasResults ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>No results found</div>
+                ) : (
+                  <>
+                    {searchResults!.orders.length > 0 && (
+                      <div>
+                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Orders</div>
+                        {searchResults!.orders.map(o => (
+                          <div key={o.id} onClick={() => goToOrder(o)}
+                            style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{o.poNumber}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {o.customerFullName || o.storeName || '—'}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{o.status.replace(/_/g, ' ')}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults!.customers.length > 0 && (
+                      <div>
+                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customers</div>
+                        {searchResults!.customers.map(c => (
+                          <div key={c.id} onClick={() => goToCustomer(c)}
+                            style={{ padding: '9px 14px', cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.storeName || `${c.firstName} ${c.lastName}`}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.email}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults!.companies.length > 0 && (
+                      <div>
+                        <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Companies</div>
+                        {searchResults!.companies.map(c => (
+                          <div key={c.id} onClick={() => goToCompany(c)}
+                            style={{ padding: '9px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            {c.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
@@ -266,6 +398,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
       </div>
 
       {showNotifs && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowNotifs(false)} />}
+      {searchOpen && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setSearchOpen(false)} />}
     </div>
   );
 };

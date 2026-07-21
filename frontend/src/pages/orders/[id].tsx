@@ -422,7 +422,7 @@ export default function OrderDetail() {
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
-  const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; createdAt: string }[]>([]);
+  const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; note?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
@@ -2062,7 +2062,12 @@ export default function OrderDetail() {
                       {ev.action.replace(/_/g, ' ')}
                       {ev.fromStatus && ev.toStatus && ` · ${ev.fromStatus} → ${ev.toStatus}`}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {ev.note && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
+                        {ev.note}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {ev.userEmail} · {new Date(ev.createdAt).toLocaleString()}
                     </div>
                   </div>

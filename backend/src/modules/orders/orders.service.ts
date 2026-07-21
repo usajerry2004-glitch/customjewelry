@@ -28,6 +28,27 @@ const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail'
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
 const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer'];
 
+// Fields worth diffing into the audit log when changed via PUT /orders/:id —
+// price, spec, customer details, and the committed ship date. Human-readable
+// labels used in the logged note.
+const TRACKED_FIELD_LABELS: Record<string, string> = {
+  quotedCost: 'Price',
+  committedShipDate: 'Ship date',
+  metalType: 'Metal type',
+  metalColor: 'Metal color',
+  size: 'Size',
+  quantity: 'Quantity',
+  stamping: 'Stamping',
+  diamondType: 'Diamond type',
+  diamondQuality: 'Diamond quality',
+  centerStoneShape: 'Center stone shape',
+  approximateCaratWeight: 'Carat weight',
+  storeName: 'Store name',
+  customerFullName: 'Customer name',
+  customerEmail: 'Customer email',
+  phoneNumber: 'Phone number',
+};
+
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS],
   [OrderStatus.CAD_IN_PROGRESS]: [OrderStatus.VPO_ISSUED],
@@ -92,6 +113,25 @@ export class OrdersService implements OnModuleInit {
       note,
     });
     this.eventRepo.save(ev).catch(() => {});
+  }
+
+  // Compares incoming dto values against the current order for every tracked
+  // field and returns a list of "Label: old → new" strings for whichever
+  // actually changed. undefined dto values mean "not part of this edit" and
+  // are skipped; null/'' are treated as real values so clearing a field logs too.
+  private diffTrackedFields(order: Order, dto: Partial<Order>): string[] {
+    const changes: string[] = [];
+    for (const [key, label] of Object.entries(TRACKED_FIELD_LABELS)) {
+      const next = (dto as any)[key];
+      if (next === undefined) continue;
+      const prev = (order as any)[key];
+      const prevStr = prev === null || prev === undefined ? '' : String(prev);
+      const nextStr = next === null ? '' : String(next);
+      if (prevStr !== nextStr) {
+        changes.push(`${label}: ${prevStr || '—'} → ${nextStr || '—'}`);
+      }
+    }
+    return changes;
   }
 
   async getEvents(orderId: string): Promise<OrderEvent[]> {
@@ -210,7 +250,7 @@ export class OrdersService implements OnModuleInit {
     if (filters.search) {
       const escaped = filters.search.replace(/[%_\\]/g, c => `\\${c}`);
       qb.andWhere(
-        '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s OR order.customerFullName LIKE :s OR order.customerEmail LIKE :s)',
+        '(order.poNumber LIKE :s OR order.storeName LIKE :s OR order.kiraSkuNumber LIKE :s OR order.customerFullName LIKE :s OR order.customerEmail LIKE :s OR order.vendorName LIKE :s)',
         { s: `%${escaped}%` },
       );
     }
@@ -387,8 +427,17 @@ export class OrdersService implements OnModuleInit {
     if (ADMIN_ONLY_KEYS.some(k => (dto as any)[k] !== undefined) && dto.status === undefined && user?.role !== UserRole.ADMIN) {
       throw new ForbiddenException('Only Admin can edit this field.');
     }
+
+    // Diff price/spec/customer/ship-date fields before they're overwritten, so the
+    // audit log captures *what* changed on this edit, not just that an edit happened.
+    const changes = this.diffTrackedFields(order, dto);
+
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
+
+    if (changes.length) {
+      this.logEvent(id, 'ORDER_UPDATED', user, undefined, undefined, changes.join('\n'));
+    }
 
     // When quoted price is saved on CAD_IN_PROGRESS order (not yet sent/approved) → auto-send to customer
     if (dto.quotedCost && Number(dto.quotedCost) > 0

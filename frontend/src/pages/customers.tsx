@@ -114,6 +114,14 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Deep link from the topbar global search (?q=email-or-name) — prefill once
+  // the router's query params are ready.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.q;
+    if (typeof q === 'string' && q) setSearch(q);
+  }, [router.isReady, router.query.q]);
+
   const allFiltered = useMemo(() => customers
     .filter(c => {
       if (search && !`${c.storeName || ''} ${formatName(c.firstName, c.lastName)} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
