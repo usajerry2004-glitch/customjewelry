@@ -290,6 +290,60 @@ export class UsersService {
     }
   }
 
+  // One-off admin tool: folds every company whose name is a case/whitespace-
+  // insensitive duplicate of another's into a single company, moving every
+  // teammate and their already-placed orders onto the surviving record.
+  // Dry-run unless apply=true. A group is left for manual review when its
+  // companies disagree on which Sales Rep is assigned (silently picking one
+  // could misattribute a rep's book of business), or when it's the
+  // "Kira Jewels" name, which looks like internal/test accounts.
+  async mergeDuplicateCompanies(apply: boolean): Promise<{ merged: string[]; skipped: string[] }> {
+    const merged: string[] = [];
+    const skipped: string[] = [];
+
+    const groups = new Map<string, Company[]>();
+    for (const co of await this.companyRepo.find()) {
+      const key = co.name.trim().toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(co);
+    }
+
+    for (const [key, group] of groups) {
+      if (group.length < 2) continue;
+      if (key === 'kira jewels') {
+        skipped.push(`"${key}" (${group.length} companies) — internal/test accounts, review manually`);
+        continue;
+      }
+      const repIds = [...new Set(group.map(g => g.salesRepId).filter(Boolean))];
+      if (repIds.length > 1) {
+        skipped.push(`"${group[0].name}" (${group.length} companies) — different Sales Reps assigned, review manually`);
+        continue;
+      }
+
+      group.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const primary = group.find(g => g.salesRepId) || group[0];
+      const secondaries = group.filter(g => g.id !== primary.id);
+      const repPatch = await this.buildOrderRepPatch(primary.salesRepId);
+
+      const moves: string[] = [];
+      for (const sec of secondaries) {
+        const users = await this.userRepo.find({ where: { companyId: sec.id } });
+        moves.push(`${users.length} account(s): ${users.map(u => u.email).join(', ') || '(none)'}`);
+        if (apply) {
+          await this.userRepo.update({ companyId: sec.id }, { companyId: primary.id, storeName: primary.name, salesRepId: repPatch.salesRepId as any });
+          for (const u of users) {
+            await this.orderRepo.update({ customerId: u.id }, { companyId: primary.id, storeName: primary.name, ...repPatch });
+            await this.orderRepo.update({ customerEmail: u.email }, { companyId: primary.id, storeName: primary.name, ...repPatch });
+          }
+          await this.companyRepo.delete(sec.id);
+        }
+      }
+      merged.push(`"${primary.name}" — kept ${primary.id}, folded in ${secondaries.map(s => s.id).join(', ')} (${moves.join('; ')})`);
+    }
+
+    return { merged, skipped };
+  }
+
   async togglePriority(id: string): Promise<User> {
     const user = await this.findOne(id);
     user.isPriority = !user.isPriority;

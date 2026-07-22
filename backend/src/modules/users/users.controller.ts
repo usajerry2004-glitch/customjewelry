@@ -89,4 +89,11 @@ export class UsersController {
   getTeammates(@Param('id') id: string) {
     return this.usersService.getCompanyTeammates(id);
   }
+
+  @Post('admin/merge-duplicate-companies')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: merge companies sharing the same name, cascading to teammates and orders. Dry-run unless ?apply=true.' })
+  mergeDuplicateCompanies(@Query('apply') apply?: string) {
+    return this.usersService.mergeDuplicateCompanies(apply === 'true');
+  }
 }
