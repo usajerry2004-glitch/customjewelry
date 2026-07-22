@@ -368,7 +368,12 @@ export default function OrdersPage() {
         setRefFiles([]);
         setRefLink('');
         load();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
       }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
     } finally { setSaving(false); }
   };
 
