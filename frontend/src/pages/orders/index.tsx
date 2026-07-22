@@ -483,7 +483,27 @@ export default function OrdersPage() {
               <label style={labelStyle}>Company Name *</label>
               <select
                 value={contact.companyName}
-                onChange={e => { setC('companyName', e.target.value); if (e.target.value !== 'Other') setC('companyNameOther', ''); }}
+                onChange={e => {
+                  const val = e.target.value;
+                  setC('companyName', val);
+                  if (val !== 'Other') setC('companyNameOther', '');
+                  // Picking a known company here looks like it links the order, but on
+                  // its own it only sets a text field — the backend still requires an
+                  // actual customerId for Sales Rep/Authorizer orders. Auto-link to a
+                  // matching account so this control alone is enough; the contact name/
+                  // email already typed above stay untouched. The search box below
+                  // still exists to link a specific teammate by email if needed.
+                  if (val && val !== 'Other') {
+                    const match = customers.find(c => c.storeName === val);
+                    if (match) {
+                      setSelectedCustomer(match);
+                      setCustomerSearch(match.storeName || formatName(match.firstName, match.lastName));
+                    }
+                  } else {
+                    setSelectedCustomer(null);
+                    setCustomerSearch('');
+                  }
+                }}
                 style={{ ...inputStyle, width: '100%' }}
               >
                 <option value="">Select company…</option>
