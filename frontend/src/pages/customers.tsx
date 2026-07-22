@@ -78,6 +78,8 @@ export default function CustomersPage() {
   const [teammateForm, setTeammateForm] = useState({ firstName: '', lastName: '', email: '' });
   const [savingTeammate, setSavingTeammate] = useState(false);
   const [teammateError, setTeammateError] = useState('');
+  const [addingExisting, setAddingExisting] = useState(false);
+  const [existingSearch, setExistingSearch] = useState('');
 
   useEffect(() => {
     try {
@@ -230,6 +232,8 @@ export default function CustomersPage() {
     setShowTeamTop(Math.min(Math.max(rawTop, 12), vh - mh - 12));
     setShowTeamH(mh);
     setAddingTeammate(false);
+    setAddingExisting(false);
+    setExistingSearch('');
     setTeammateError('');
     setTeammateForm({ firstName: '', lastName: '', email: '' });
     const res = await apiFetch(`${API}/users/${customer.id}/teammates`);
@@ -278,6 +282,38 @@ export default function CustomersPage() {
       }
     } catch {
       setTeammateError('Failed to add teammate — check your connection and try again.');
+    } finally {
+      setSavingTeammate(false);
+    }
+  };
+
+  // Merges an already-existing Customer account into this company — e.g.
+  // two separate invites that turned out to be the same business.
+  const addExistingTeammate = async (customerId: string) => {
+    if (!showTeam?.customer.companyId) {
+      setTeammateError('Could not set up this company — please close and try again.');
+      return;
+    }
+    setSavingTeammate(true);
+    setTeammateError('');
+    try {
+      const res = await apiFetch(`${API}/users/${customerId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ companyId: showTeam.customer.companyId }),
+      });
+      if (res.ok) {
+        const teamRes = await apiFetch(`${API}/users/${showTeam.customer.id}/teammates`);
+        if (teamRes.ok) setShowTeam({ customer: showTeam.customer, teammates: await teamRes.json() });
+        setAddingExisting(false);
+        setExistingSearch('');
+        toast.success('Customer added to this company.');
+        await load();
+      } else {
+        const d = await res.json().catch(() => null);
+        setTeammateError(getErrorMessage(d, 'Failed to add this customer to the company.'));
+      }
+    } catch {
+      setTeammateError('Failed to add this customer — check your connection and try again.');
     } finally {
       setSavingTeammate(false);
     }
@@ -782,11 +818,62 @@ export default function CustomersPage() {
                   </button>
                 </div>
               </div>
+            ) : addingExisting ? (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>Add an Existing Customer</div>
+                <input
+                  value={existingSearch}
+                  onChange={e => setExistingSearch(e.target.value)}
+                  placeholder="Search by name or email…"
+                  autoFocus
+                  style={{ ...INPUT, marginBottom: '8px' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', marginBottom: '10px' }}>
+                  {customers
+                    .filter(c => c.id !== showTeam.customer.id && !showTeam.teammates.some(t => t.id === c.id))
+                    .filter(c => {
+                      if (!existingSearch.trim()) return false;
+                      const q = existingSearch.toLowerCase();
+                      const name = (c.storeName || formatName(c.firstName, c.lastName)).toLowerCase();
+                      return name.includes(q) || c.email.toLowerCase().includes(q);
+                    })
+                    .slice(0, 8)
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => addExistingTeammate(c.id)}
+                        disabled={savingTeammate}
+                        style={{ textAlign: 'left', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 12px', cursor: savingTeammate ? 'not-allowed' : 'pointer', opacity: savingTeammate ? 0.6 : 1 }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{c.storeName || formatName(c.firstName, c.lastName)}</div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{c.email}{c.companyId && c.companyId !== showTeam.customer.companyId ? ' — currently with another company' : ''}</div>
+                      </button>
+                    ))}
+                  {existingSearch.trim() && customers.filter(c => {
+                    if (c.id === showTeam.customer.id || showTeam.teammates.some(t => t.id === c.id)) return false;
+                    const q = existingSearch.toLowerCase();
+                    const name = (c.storeName || formatName(c.firstName, c.lastName)).toLowerCase();
+                    return name.includes(q) || c.email.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '4px 2px' }}>No matching customer found.</div>
+                  )}
+                </div>
+                {teammateError && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '10px' }}>{teammateError}</div>}
+                <button onClick={() => { setAddingExisting(false); setExistingSearch(''); setTeammateError(''); }} style={{ width: '100%', padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
             ) : (
-              <button onClick={() => setAddingTeammate(true)}
-                style={{ width: '100%', background: 'transparent', border: '1px solid var(--accent)', borderRadius: '8px', padding: '9px', color: 'var(--accent-dark)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                + Add Teammate
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setAddingTeammate(true)}
+                  style={{ flex: 1, background: 'transparent', border: '1px solid var(--accent)', borderRadius: '8px', padding: '9px', color: 'var(--accent-dark)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  + Invite New Teammate
+                </button>
+                <button onClick={() => setAddingExisting(true)}
+                  style={{ flex: 1, background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  + Add Existing Customer
+                </button>
+              </div>
             )}
           </div>
         </>,

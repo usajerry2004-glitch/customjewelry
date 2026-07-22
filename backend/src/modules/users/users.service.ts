@@ -56,6 +56,10 @@ export class UpdateUserDto {
   @IsString() @IsOptional() salesRepId?: string;
   @IsEnum(Factory) @IsOptional() assignedFactory?: Factory | null;
   @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource | null;
+  // Admin-only: move an already-existing Customer account into a different
+  // (or newly-created) company — e.g. merging two accounts that turned out
+  // to be the same business, entered as separate invites.
+  @IsString() @IsOptional() companyId?: string;
 }
 
 @Injectable()
@@ -187,6 +191,20 @@ export class UsersService {
       if (user.companyId) {
         await this.companyRepo.update(user.companyId, { salesRepId: nextSalesRepId });
         await this.userRepo.update({ companyId: user.companyId }, { salesRepId: nextSalesRepId });
+      }
+    }
+    if (dto.companyId !== undefined) {
+      if (dto.companyId) {
+        const company = await this.companyRepo.findOne({ where: { id: dto.companyId } });
+        if (!company) throw new BadRequestException('Company not found.');
+        user.companyId = company.id;
+        // Adopt the target company's name and Sales Rep — a merged-in
+        // account shouldn't show a different company name or rep than
+        // the teammates it just joined.
+        user.storeName = company.name;
+        user.salesRepId = company.salesRepId || undefined;
+      } else {
+        user.companyId = null;
       }
     }
     return this.userRepo.save(user);
