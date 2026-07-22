@@ -126,8 +126,8 @@ export default function CustomersPage() {
     if (typeof q === 'string' && q) setSearch(q);
   }, [router.isReady, router.query.q]);
 
-  const allFiltered = useMemo(() => customers
-    .filter(c => {
+  const allFiltered = useMemo(() => {
+    const matched = customers.filter(c => {
       // A Sales Rep only manages their own book of customers here — Admin
       // and Authorizer still see everyone. This doesn't affect who they can
       // place an order for; the order form's customer picker is a separate,
@@ -140,12 +140,37 @@ export default function CustomersPage() {
       if (filterPriority === 'regular' && c.isPriority) return false;
       if (filterSalesRep && c.salesRepId !== filterSalesRep) return false;
       return true;
-    })
-    .sort((a, b) => {
+    });
+
+    // Teammates share a companyId and are all real, separate logins — the
+    // list still shows just one row per company (use "Team" to see/manage
+    // the rest) so the same business doesn't appear as duplicate rows.
+    // Prefer whichever teammate has a real name over import artifacts
+    // like "#N/A", then whoever's been around longest, as the row shown.
+    const hasRealName = (c: Customer) => {
+      const f = (c.firstName || '').trim();
+      return !!f && f !== '#N/A' && f !== '#NAME?';
+    };
+    const ranked = [...matched].sort((a, b) => {
+      const av = hasRealName(a) ? 0 : 1;
+      const bv = hasRealName(b) ? 0 : 1;
+      if (av !== bv) return av - bv;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    const seenCompany = new Set<string>();
+    const deduped = ranked.filter(c => {
+      if (!c.companyId) return true;
+      if (seenCompany.has(c.companyId)) return false;
+      seenCompany.add(c.companyId);
+      return true;
+    });
+
+    return deduped.sort((a, b) => {
       const nameA = (a.storeName || formatName(a.firstName, a.lastName)).toLowerCase();
       const nameB = (b.storeName || formatName(b.firstName, b.lastName)).toLowerCase();
       return nameA.localeCompare(nameB);
-    }), [customers, search, filterStatus, filterPriority, filterSalesRep, userRole, currentUserId]);
+    });
+  }, [customers, search, filterStatus, filterPriority, filterSalesRep, userRole, currentUserId]);
 
   // Team size per company, computed from the already-fetched customer list
   // — no extra request needed just to show a "2 people" badge per row.
