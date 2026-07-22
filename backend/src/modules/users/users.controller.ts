@@ -96,4 +96,11 @@ export class UsersController {
   mergeDuplicateCompanies(@Query('apply') apply?: string) {
     return this.usersService.mergeDuplicateCompanies(apply === 'true');
   }
+
+  @Get('admin/duplicate-display-names')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Read-only: groups Customers by their displayed name (storeName or person name), including accounts never linked to a Company row.' })
+  findDuplicateDisplayNames() {
+    return this.usersService.findDuplicateDisplayNames();
+  }
 }

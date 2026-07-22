@@ -344,6 +344,31 @@ export class UsersService {
     return { merged, skipped };
   }
 
+  // Read-only diagnostic: groups CUSTOMER accounts by the same display name
+  // the Customers page shows (storeName, falling back to the person's name)
+  // rather than by the companies table — this also catches accounts that
+  // predate the companies feature and were never linked into a Company row
+  // at all, which mergeDuplicateCompanies() can't see since it only scans
+  // existing Company records.
+  async findDuplicateDisplayNames(): Promise<{ name: string; members: { id: string; email: string; companyId: string | null; salesRepId: string | null }[] }[]> {
+    const customers = await this.userRepo.find({ where: { role: UserRole.CUSTOMER } });
+    const groups = new Map<string, User[]>();
+    for (const u of customers) {
+      const name = (u.storeName?.trim() || `${u.firstName} ${u.lastName}`.trim() || u.email).toLowerCase();
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name)!.push(u);
+    }
+    const result: { name: string; members: { id: string; email: string; companyId: string | null; salesRepId: string | null }[] }[] = [];
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      result.push({
+        name: members[0].storeName?.trim() || `${members[0].firstName} ${members[0].lastName}`.trim(),
+        members: members.map(m => ({ id: m.id, email: m.email, companyId: m.companyId, salesRepId: m.salesRepId })),
+      });
+    }
+    return result;
+  }
+
   async togglePriority(id: string): Promise<User> {
     const user = await this.findOne(id);
     user.isPriority = !user.isPriority;
