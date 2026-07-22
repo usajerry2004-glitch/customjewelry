@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -452,7 +452,11 @@ export class UsersService {
 
     for (const g of groups) {
       const emails = g.emails.map(e => e.toLowerCase().trim());
-      const users = await this.userRepo.find({ where: { email: In(emails) } });
+      // Some legacy accounts still have their original mixed/upper-case
+      // email stored as-is — match case-insensitively, not with In().
+      const users = await this.userRepo.createQueryBuilder('u')
+        .where('LOWER(u.email) IN (:...emails)', { emails })
+        .getMany();
       if (users.length < 2) {
         resolved.push(`SKIPPED (${g.emails.join(', ')}) — only found ${users.length} matching account(s), need at least 2`);
         continue;
