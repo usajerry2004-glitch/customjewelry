@@ -212,7 +212,10 @@ export class OrdersService implements OnModuleInit {
       // whose customer was later merged into (or reassigned within) this
       // rep's company shouldn't disappear from their queue.
       qb.andWhere(
-        '(order.salesRepId = :salesRepId OR (order.companyId IS NOT NULL AND order.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :salesRepId)))',
+        // companyId is stored as varchar, not uuid — cast c.id or Postgres
+        // rejects the IN() comparison outright ("operator does not exist:
+        // character varying = uuid").
+        '(order.salesRepId = :salesRepId OR (order.companyId IS NOT NULL AND order.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :salesRepId)))',
         { salesRepId: user.id },
       );
     } else if (user?.role === 'CAD_DESIGNER') {
@@ -918,7 +921,7 @@ export class OrdersService implements OnModuleInit {
       if (allowed) q.andWhere('o.status IN (:...rs)', { rs: allowed });
       if (role === UserRole.SALES_REP && user.id) {
         q.andWhere(
-          '(o.salesRepId = :uid OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :uid)))',
+          '(o.salesRepId = :uid OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :uid)))',
           { uid: user.id },
         );
       }
@@ -1019,7 +1022,7 @@ export class OrdersService implements OnModuleInit {
       const q = this.orderRepo.createQueryBuilder('o').where('o.isArchived = false');
       if (user?.role === 'SALES_REP') {
         q.andWhere(
-          '(o.salesRepId = :salesRepId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :salesRepId)))',
+          '(o.salesRepId = :salesRepId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :salesRepId)))',
           { salesRepId: user.id },
         );
       } else if (user?.role === 'CAD_DESIGNER') {
