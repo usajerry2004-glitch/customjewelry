@@ -281,6 +281,11 @@ export default function CustomersPage() {
     await load();
   };
 
+  const reactivate = async (id: string) => {
+    await apiFetch(`${API}/users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: true }) });
+    await load();
+  };
+
   const togglePriority = async (id: string) => {
     await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
     await load();
@@ -476,6 +481,11 @@ export default function CustomersPage() {
                     {isAdmin && c.isActive && (
                       <button onClick={() => deactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(220,38,38,0.3)', background: 'transparent', color: '#DC2626', fontSize: '11px', cursor: 'pointer' }}>
                         Deactivate
+                      </button>
+                    )}
+                    {isAdmin && !c.isActive && (
+                      <button onClick={() => reactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(5,150,105,0.3)', background: 'transparent', color: '#059669', fontSize: '11px', cursor: 'pointer' }}>
+                        Reactivate
                       </button>
                     )}
                   </div>

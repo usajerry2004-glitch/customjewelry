@@ -2,18 +2,26 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { IsString, IsEmail, MinLength, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Order, Factory, SupplySource } from '../../database/entities/order.entity';
 import { Company } from '../../database/entities/company.entity';
 
+// A brand-new Customer invite (no companyId — the invite is what creates the
+// company) names the company, not necessarily a specific contact, so the
+// person's name becomes optional and the company name becomes required.
+// Every other case (staff roles, or a teammate joining an existing company
+// via companyId) keeps names required and storeName irrelevant/optional.
+const isNewCustomerCompany = (o: { role?: UserRole; companyId?: string }) =>
+  (o.role || UserRole.CUSTOMER) === UserRole.CUSTOMER && !o.companyId;
+
 export class CreateUserDto {
-  @IsString() firstName: string;
-  @IsString() lastName: string;
+  @ValidateIf(o => !isNewCustomerCompany(o)) @IsString() firstName?: string;
+  @ValidateIf(o => !isNewCustomerCompany(o)) @IsString() lastName?: string;
   @IsEmail() email: string;
   @IsString() @MinLength(6) password: string;
   @IsEnum(UserRole) @IsOptional() role?: UserRole;
-  @IsString() @IsOptional() storeName?: string;
+  @ValidateIf(o => isNewCustomerCompany(o)) @IsString() @IsNotEmpty() storeName?: string;
   @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() salesRepId?: string;
   @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
@@ -24,10 +32,11 @@ export class CreateUserDto {
 }
 
 export class InviteUserDto {
-  @IsString() firstName: string;
-  @IsString() lastName: string;
+  @ValidateIf(o => !isNewCustomerCompany(o)) @IsString() firstName?: string;
+  @ValidateIf(o => !isNewCustomerCompany(o)) @IsString() lastName?: string;
   @IsEmail() email: string;
   @IsEnum(UserRole) role: UserRole;
+  @ValidateIf(o => isNewCustomerCompany(o)) @IsString() @IsNotEmpty() storeName?: string;
   @IsString() @IsOptional() salesRepId?: string;
   @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
   @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
@@ -114,8 +123,8 @@ export class UsersService {
     }
 
     const user = this.userRepo.create({
-      firstName: dto.firstName,
-      lastName: dto.lastName,
+      firstName: dto.firstName || '',
+      lastName: dto.lastName || '',
       email,
       passwordHash,
       role,

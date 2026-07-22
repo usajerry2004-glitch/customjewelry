@@ -67,7 +67,7 @@ const inp: React.CSSProperties = {
 };
 
 const emptyForm = {
-  firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '',
+  firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '', storeName: '',
   assignedFactory: '' as Factory | '', assignedSupplySource: '' as SupplySource | '',
 };
 
@@ -148,6 +148,10 @@ export default function SettingsPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.role === UserRole.CUSTOMER && !form.storeName.trim()) {
+      setError('Please enter a company name for this customer.');
+      return;
+    }
     if (form.role === UserRole.CUSTOMER && !form.salesRepId) {
       setError('Please select a Sales Rep for this customer.');
       return;
@@ -158,6 +162,7 @@ export default function SettingsPage() {
       const payload: any = { ...form };
       if (!payload.assignedFactory) delete payload.assignedFactory;
       if (!payload.assignedSupplySource) delete payload.assignedSupplySource;
+      if (!payload.storeName) delete payload.storeName;
       const res = await apiFetch(`${API}/users/invite`, {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -273,9 +278,11 @@ export default function SettingsPage() {
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>Invite a New Team Member</div>
             <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
               <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>First Name</label>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                  First Name{form.role === UserRole.CUSTOMER ? ' (optional)' : ''}
+                </label>
                 <input
-                  required
+                  required={form.role !== UserRole.CUSTOMER}
                   value={form.firstName}
                   onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
                   placeholder="Jane"
@@ -283,9 +290,11 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Last Name</label>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                  Last Name{form.role === UserRole.CUSTOMER ? ' (optional)' : ''}
+                </label>
                 <input
-                  required
+                  required={form.role !== UserRole.CUSTOMER}
                   value={form.lastName}
                   onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
                   placeholder="Smith"
@@ -322,19 +331,31 @@ export default function SettingsPage() {
               </div>
             </div>
             {form.role === UserRole.CUSTOMER && (
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Sales Rep (required)</label>
-                <select
-                  required
-                  value={form.salesRepId}
-                  onChange={e => setForm(f => ({ ...f, salesRepId: e.target.value }))}
-                  style={{ ...inp, cursor: 'pointer' }}
-                >
-                  <option value="">— Select a Sales Rep —</option>
-                  {salesReps.map(r => (
-                    <option key={r.id} value={r.id}>{formatName(r.firstName, r.lastName)}</option>
-                  ))}
-                </select>
+              <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Company Name (required)</label>
+                  <input
+                    required
+                    value={form.storeName}
+                    onChange={e => setForm(f => ({ ...f, storeName: e.target.value }))}
+                    placeholder="Diamonds Direct"
+                    style={inp}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Sales Rep (required)</label>
+                  <select
+                    required
+                    value={form.salesRepId}
+                    onChange={e => setForm(f => ({ ...f, salesRepId: e.target.value }))}
+                    style={{ ...inp, cursor: 'pointer' }}
+                  >
+                    <option value="">— Select a Sales Rep —</option>
+                    {salesReps.map(r => (
+                      <option key={r.id} value={r.id}>{formatName(r.firstName, r.lastName)}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
             {(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.STONE_MANAGER) && (

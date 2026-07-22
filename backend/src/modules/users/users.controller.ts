@@ -50,7 +50,7 @@ export class UsersController {
     const { user, tempPassword } = await this.usersService.inviteStaff(dto, caller);
     await this.emailService.sendStaffInvite({
       to: user.email,
-      firstName: user.firstName,
+      firstName: user.firstName || user.storeName || 'there',
       role: user.role,
       tempPassword,
     });
