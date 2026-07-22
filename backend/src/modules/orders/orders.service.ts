@@ -205,7 +205,14 @@ export class OrdersService implements OnModuleInit {
         { email: user.email, uid: user.id, companyId: user.companyId ?? null },
       );
     } else if (user?.role === 'SALES_REP') {
-      qb.andWhere('order.salesRepId = :salesRepId', { salesRepId: user.id });
+      // Falls back to company membership, not just the order's own salesRepId
+      // stamp — that field is denormalized at creation time, so an order
+      // whose customer was later merged into (or reassigned within) this
+      // rep's company shouldn't disappear from their queue.
+      qb.andWhere(
+        '(order.salesRepId = :salesRepId OR (order.companyId IS NOT NULL AND order.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :salesRepId)))',
+        { salesRepId: user.id },
+      );
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
     } else if (user?.role === 'FACTORY_MANAGER') {
@@ -282,7 +289,15 @@ export class OrdersService implements OnModuleInit {
     }
 
     if (user?.role === 'SALES_REP' && user.id && order.salesRepId !== user.id) {
-      throw new NotFoundException(`Order ${id} not found`);
+      // Same company-membership fallback as findAll() — order.salesRepId is
+      // a denormalized stamp, so also allow via a teammate whose salesRepId
+      // (kept in sync per company) matches this rep.
+      const viaCompany = order.companyId
+        ? await this.userRepo.findOne({ where: { companyId: order.companyId, salesRepId: user.id } })
+        : null;
+      if (!viaCompany) {
+        throw new NotFoundException(`Order ${id} not found`);
+      }
     }
 
     // Invisible until Admin/Authorizer assigns this order to this user's factory.
@@ -881,7 +896,12 @@ export class OrdersService implements OnModuleInit {
       const q = this.orderRepo.createQueryBuilder('o').where('o.isArchived = false');
       const allowed = ROLE_STATUSES[role];
       if (allowed) q.andWhere('o.status IN (:...rs)', { rs: allowed });
-      if (role === UserRole.SALES_REP && user.id) q.andWhere('o.salesRepId = :uid', { uid: user.id });
+      if (role === UserRole.SALES_REP && user.id) {
+        q.andWhere(
+          '(o.salesRepId = :uid OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :uid)))',
+          { uid: user.id },
+        );
+      }
       if (role === UserRole.STONE_MANAGER) {
         q.andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
       }
@@ -978,7 +998,10 @@ export class OrdersService implements OnModuleInit {
     const buildBase = () => {
       const q = this.orderRepo.createQueryBuilder('o').where('o.isArchived = false');
       if (user?.role === 'SALES_REP') {
-        q.andWhere('o.salesRepId = :salesRepId', { salesRepId: user.id });
+        q.andWhere(
+          '(o.salesRepId = :salesRepId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id FROM companies c WHERE c."salesRepId" = :salesRepId)))',
+          { salesRepId: user.id },
+        );
       } else if (user?.role === 'CAD_DESIGNER') {
         q.andWhere('o.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
       } else if (user?.role === 'FACTORY_MANAGER') {
