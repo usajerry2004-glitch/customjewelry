@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -435,6 +435,57 @@ export class UsersService {
     }
 
     return { merged, skipped };
+  }
+
+  // One-off admin tool for the cases mergeDuplicateCompanies()/
+  // mergeDuplicateDisplayNames() correctly refused to guess at — groups
+  // whose accounts disagree on Sales Rep. Takes an explicit, human-decided
+  // list of {emails, salesRepId} groups: finds the accounts by email,
+  // merges them onto whichever of them already has a Company (adopting the
+  // chosen rep there too — lets e.g. two already-separately-merged
+  // companies for the same real business be folded into one), or creates a
+  // fresh company if none of them has one yet. Cascades to orders.
+  async resolveDuplicateGroups(
+    groups: { emails: string[]; salesRepId?: string | null; companyName?: string }[],
+  ): Promise<{ resolved: string[] }> {
+    const resolved: string[] = [];
+
+    for (const g of groups) {
+      const emails = g.emails.map(e => e.toLowerCase().trim());
+      const users = await this.userRepo.find({ where: { email: In(emails) } });
+      if (users.length < 2) {
+        resolved.push(`SKIPPED (${g.emails.join(', ')}) — only found ${users.length} matching account(s), need at least 2`);
+        continue;
+      }
+      if (g.salesRepId) {
+        const rep = await this.userRepo.findOne({ where: { id: g.salesRepId } });
+        if (!rep || rep.role !== UserRole.SALES_REP) {
+          resolved.push(`SKIPPED (${g.emails.join(', ')}) — salesRepId does not reference an existing Sales Rep`);
+          continue;
+        }
+      }
+
+      const linkedElsewhere = users.find(u => u.companyId);
+      const existingCompany = linkedElsewhere ? await this.companyRepo.findOne({ where: { id: linkedElsewhere.companyId! } }) : null;
+
+      const nextSalesRepId = (g.salesRepId ?? existingCompany?.salesRepId ?? null) as any;
+      const company = existingCompany
+        ? await this.companyRepo.save({ ...existingCompany, salesRepId: nextSalesRepId })
+        : await this.companyRepo.save(this.companyRepo.create({
+            name: g.companyName?.trim() || users[0].storeName?.trim() || `${users[0].firstName} ${users[0].lastName}`.trim(),
+            salesRepId: nextSalesRepId,
+          }));
+
+      const repPatch = await this.buildOrderRepPatch(company.salesRepId);
+      for (const u of users) {
+        await this.userRepo.update(u.id, { companyId: company.id, storeName: company.name, salesRepId: company.salesRepId as any });
+        await this.orderRepo.update({ customerId: u.id }, { companyId: company.id, storeName: company.name, ...repPatch });
+        await this.orderRepo.update({ customerEmail: u.email }, { companyId: company.id, storeName: company.name, ...repPatch });
+      }
+      resolved.push(`"${company.name}" — ${users.length} account(s) merged onto company ${company.id} with rep ${company.salesRepId || '(none)'}`);
+    }
+
+    return { resolved };
   }
 
   async togglePriority(id: string): Promise<User> {

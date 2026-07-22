@@ -110,4 +110,11 @@ export class UsersController {
   findDuplicateDisplayNames() {
     return this.usersService.findDuplicateDisplayNames();
   }
+
+  @Post('admin/resolve-duplicate-groups')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: merge specific named groups of accounts (by email) onto a shared company with a chosen Sales Rep — for cases the automatic merges skipped over a rep disagreement.' })
+  resolveDuplicateGroups(@Body() body: { groups: { emails: string[]; salesRepId?: string; companyName?: string }[] }) {
+    return this.usersService.resolveDuplicateGroups(body.groups);
+  }
 }
