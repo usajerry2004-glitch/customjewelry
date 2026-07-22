@@ -187,10 +187,18 @@ export class UsersService {
       }
       const nextSalesRepId = (dto.salesRepId || null) as any;
       user.salesRepId = nextSalesRepId;
-      // One Sales Rep per company — changing it here changes it for every teammate.
+      const repPatch = await this.buildOrderRepPatch(nextSalesRepId);
+      // One Sales Rep per company — changing it here changes it for every
+      // teammate, and for every order already placed (otherwise their past
+      // orders stay attributed to the old rep and silently vanish from the
+      // new rep's queue, which only filters by salesRepId).
       if (user.companyId) {
         await this.companyRepo.update(user.companyId, { salesRepId: nextSalesRepId });
         await this.userRepo.update({ companyId: user.companyId }, { salesRepId: nextSalesRepId });
+        await this.orderRepo.update({ companyId: user.companyId }, repPatch);
+      } else {
+        await this.orderRepo.update({ customerId: user.id }, repPatch);
+        await this.orderRepo.update({ customerEmail: user.email }, repPatch);
       }
     }
     if (dto.companyId !== undefined) {
@@ -203,6 +211,12 @@ export class UsersService {
         // the teammates it just joined.
         user.storeName = company.name;
         user.salesRepId = company.salesRepId || undefined;
+        // Pull this person's own already-placed orders into the merged
+        // company (and onto its Sales Rep) too, or teammates and the rep
+        // won't see anything they placed before today's merge.
+        const orderPatch = { companyId: company.id, storeName: company.name, ...(await this.buildOrderRepPatch(company.salesRepId)) };
+        await this.orderRepo.update({ customerId: user.id }, orderPatch);
+        await this.orderRepo.update({ customerEmail: user.email }, orderPatch);
       } else {
         user.companyId = null;
       }
@@ -210,8 +224,23 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  // Denormalized rep fields on Order (salesRepId/Name/Email) are written at
+  // order-creation time, not joined live — so any time a company or user's
+  // Sales Rep changes, existing orders need the same patch or they fall out
+  // of that rep's `salesRepId`-filtered queue.
+  private async buildOrderRepPatch(salesRepId: string | null | undefined): Promise<Partial<Order>> {
+    const rep = salesRepId ? await this.userRepo.findOne({ where: { id: salesRepId } }) : null;
+    if (!rep) return { salesRepId: null, salesRepName: null, salesRepEmail: null } as any;
+    return {
+      salesRepId: rep.id,
+      salesRepName: `${rep.firstName} ${rep.lastName}`.trim(),
+      salesRepEmail: rep.email,
+    };
+  }
+
   async getCustomerOrders(customerId: string): Promise<{ orders: Order[]; total: number }> {
     const user = await this.findOne(customerId);
+    if (user.companyId) await this.healCompanyOrders(user.companyId);
     // Companies share order visibility — this shows every teammate's orders,
     // not just the ones this specific person placed. The customerId/email
     // clauses stay as a fallback for orders placed before companies existed.
@@ -238,7 +267,27 @@ export class UsersService {
       user.companyId = company.id;
       await this.userRepo.save(user);
     }
+    await this.healCompanyOrders(user.companyId);
     return this.userRepo.find({ where: { companyId: user.companyId }, order: { createdAt: 'ASC' } });
+  }
+
+  // Orders denormalize companyId/storeName/salesRep* at creation time. If two
+  // accounts get merged into one company (or a company's rep changes) after
+  // orders already exist, those orders keep pointing at the old company/rep
+  // until something re-syncs them — otherwise they silently stay invisible
+  // to teammates and drop out of the rep's queue. Re-applied every time
+  // anyone views this company's team or orders, keyed off each member's own
+  // customerId/email rather than the order's (possibly stale) companyId, so
+  // it heals regardless of which side of the merge an order was on.
+  private async healCompanyOrders(companyId: string): Promise<void> {
+    const company = await this.companyRepo.findOne({ where: { id: companyId } });
+    if (!company) return;
+    const teammates = await this.userRepo.find({ where: { companyId } });
+    const patch = { companyId: company.id, storeName: company.name, ...(await this.buildOrderRepPatch(company.salesRepId)) };
+    for (const t of teammates) {
+      await this.orderRepo.update({ customerId: t.id }, patch);
+      await this.orderRepo.update({ customerEmail: t.email }, patch);
+    }
   }
 
   async togglePriority(id: string): Promise<User> {
