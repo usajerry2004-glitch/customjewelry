@@ -68,6 +68,7 @@ export default function CustomersPage() {
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [currentUserId, setCurrentUserId] = useState('');
   const [refImage, setRefImage] = useState<File | null>(null);
   const refImageRef = useRef<HTMLInputElement>(null);
   const [showTeam, setShowTeam] = useState<{ customer: Customer; teammates: Customer[] } | null>(null);
@@ -85,6 +86,7 @@ export default function CustomersPage() {
         const parsed = JSON.parse(u);
         setIsAdmin(parsed.role === 'ADMIN');
         setUserRole(parsed.role || '');
+        setCurrentUserId(parsed.id || '');
       }
     } catch {}
   }, []);
@@ -124,6 +126,11 @@ export default function CustomersPage() {
 
   const allFiltered = useMemo(() => customers
     .filter(c => {
+      // A Sales Rep only manages their own book of customers here — Admin
+      // and Authorizer still see everyone. This doesn't affect who they can
+      // place an order for; the order form's customer picker is a separate,
+      // unfiltered fetch.
+      if (userRole === 'SALES_REP' && c.salesRepId !== currentUserId) return false;
       if (search && !`${c.storeName || ''} ${formatName(c.firstName, c.lastName)} ${c.email}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterStatus === 'active' && !c.isActive) return false;
       if (filterStatus === 'inactive' && c.isActive) return false;
@@ -136,7 +143,7 @@ export default function CustomersPage() {
       const nameA = (a.storeName || formatName(a.firstName, a.lastName)).toLowerCase();
       const nameB = (b.storeName || formatName(b.firstName, b.lastName)).toLowerCase();
       return nameA.localeCompare(nameB);
-    }), [customers, search, filterStatus, filterPriority, filterSalesRep]);
+    }), [customers, search, filterStatus, filterPriority, filterSalesRep, userRole, currentUserId]);
 
   // Team size per company, computed from the already-fetched customer list
   // — no extra request needed just to show a "2 people" badge per row.
@@ -344,7 +351,7 @@ export default function CustomersPage() {
           <option value="priority">Priority</option>
           <option value="regular">Regular</option>
         </select>
-        {Object.keys(salesRepMap).length > 0 && (
+        {userRole !== 'SALES_REP' && Object.keys(salesRepMap).length > 0 && (
           <select
             value={filterSalesRep}
             onChange={e => { setFilterSalesRep(e.target.value); resetPage(); }}
