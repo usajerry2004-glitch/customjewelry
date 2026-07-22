@@ -9,6 +9,7 @@ import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity'
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { Sku } from '../../database/entities/sku.entity';
+import { Company } from '../../database/entities/company.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
@@ -72,6 +73,7 @@ export class OrdersService implements OnModuleInit {
     @InjectRepository(OrderEvent)   private readonly eventRepo: Repository<OrderEvent>,
     @InjectRepository(OrderMessage) private readonly messageRepo: Repository<OrderMessage>,
     @InjectRepository(Sku)          private readonly skuRepo: Repository<Sku>,
+    @InjectRepository(Company)      private readonly companyRepo: Repository<Company>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
   ) {}
@@ -380,7 +382,16 @@ export class OrdersService implements OnModuleInit {
       if (customer?.isPriority) data.isPriorityCustomer = true;
       if (!data.salesRepId && customer?.salesRepId) data.salesRepId = customer.salesRepId;
       // So every teammate at the same company can see this order, not just
-      // whoever personally placed it.
+      // whoever personally placed it. Self-heals a Company row for legacy
+      // accounts that predate the companies feature — same fallback
+      // getCompanyTeammates() already does — so this guarantee doesn't
+      // depend on someone happening to have opened "Team" for them first.
+      if (customer && !customer.companyId) {
+        const name = customer.storeName?.trim() || `${customer.firstName} ${customer.lastName}`.trim() || customer.email;
+        const company = await this.companyRepo.save(this.companyRepo.create({ name, salesRepId: customer.salesRepId || null }));
+        await this.userRepo.update(customer.id, { companyId: company.id });
+        customer.companyId = company.id;
+      }
       data.companyId = customer?.companyId ?? null;
     }
 
