@@ -357,6 +357,18 @@ export class OrdersService implements OnModuleInit {
     // what gives company-wide order sharing and Sales Rep attribution — but
     // not required: any staff role with order-creation access can place an
     // order from the typed contact fields alone, same as Admin already could.
+    //
+    // If nothing was linked but the typed email matches an existing
+    // customer account anyway, resolve it regardless — otherwise an order
+    // placed "for" a real customer by staff who just didn't use the picker
+    // stays invisible in that customer's own portal.
+    if (!data.customerId && data.customerEmail) {
+      const matched = await this.userRepo.createQueryBuilder('u')
+        .where('LOWER(u.email) = LOWER(:email)', { email: data.customerEmail })
+        .andWhere('u.role = :role', { role: UserRole.CUSTOMER })
+        .getOne();
+      if (matched) data.customerId = matched.id;
+    }
 
     // Mark order with customer's priority status, and — if no sales rep is
     // already attributed (i.e. the customer placed this order themselves,
