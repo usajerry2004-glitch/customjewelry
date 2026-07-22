@@ -369,6 +369,74 @@ export class UsersService {
     return result;
   }
 
+  // Companion to mergeDuplicateCompanies(): handles the accounts that method
+  // can't see because they were never linked to a Company row at all — two+
+  // Customer accounts that just happen to carry the same display name text.
+  // Groups them onto a shared company (creating one if none of them has one
+  // yet, otherwise adopting whichever one already does), cascading to their
+  // orders. Same skip rules: "Kira Jewels" and Sales Rep disagreements are
+  // left for manual review. Dry-run unless apply=true.
+  async mergeDuplicateDisplayNames(apply: boolean): Promise<{ merged: string[]; skipped: string[] }> {
+    const merged: string[] = [];
+    const skipped: string[] = [];
+
+    const customers = await this.userRepo.find({ where: { role: UserRole.CUSTOMER } });
+    const groups = new Map<string, User[]>();
+    for (const u of customers) {
+      const key = (u.storeName?.trim() || `${u.firstName} ${u.lastName}`.trim() || u.email).toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(u);
+    }
+
+    for (const [key, members] of groups) {
+      if (members.length < 2) continue;
+      const displayName = members[0].storeName?.trim() || `${members[0].firstName} ${members[0].lastName}`.trim();
+
+      if (key === 'kira jewels') {
+        skipped.push(`"${displayName}" (${members.length} accounts) — internal/test accounts, review manually`);
+        continue;
+      }
+
+      // mergeDuplicateCompanies() already handles members that already share
+      // a Company row — only act on the ones still standing alone here.
+      const loose = members.filter(m => !m.companyId);
+      if (loose.length < 2) continue;
+
+      const linkedElsewhere = members.find(m => m.companyId);
+      const existingCompany = linkedElsewhere ? await this.companyRepo.findOne({ where: { id: linkedElsewhere.companyId! } }) : null;
+
+      let salesRepId: string | null;
+      if (existingCompany) {
+        salesRepId = existingCompany.salesRepId;
+      } else {
+        const repIds = [...new Set(loose.map(m => m.salesRepId).filter(Boolean))];
+        if (repIds.length > 1) {
+          skipped.push(`"${displayName}" (${loose.length} accounts) — different Sales Reps assigned, review manually`);
+          continue;
+        }
+        salesRepId = repIds[0] || null;
+      }
+      const repPatch = await this.buildOrderRepPatch(salesRepId);
+
+      merged.push(
+        existingCompany
+          ? `"${displayName}" — linking ${loose.length} account(s) into existing company ${existingCompany.id} (${loose.map(m => m.email).join(', ')})`
+          : `"${displayName}" — new company for ${loose.length} account(s) (${loose.map(m => m.email).join(', ')})`,
+      );
+
+      if (apply) {
+        const company = existingCompany || await this.companyRepo.save(this.companyRepo.create({ name: displayName, salesRepId }));
+        for (const m of loose) {
+          await this.userRepo.update(m.id, { companyId: company.id, storeName: company.name, salesRepId: salesRepId as any });
+          await this.orderRepo.update({ customerId: m.id }, { companyId: company.id, storeName: company.name, ...repPatch });
+          await this.orderRepo.update({ customerEmail: m.email }, { companyId: company.id, storeName: company.name, ...repPatch });
+        }
+      }
+    }
+
+    return { merged, skipped };
+  }
+
   async togglePriority(id: string): Promise<User> {
     const user = await this.findOne(id);
     user.isPriority = !user.isPriority;

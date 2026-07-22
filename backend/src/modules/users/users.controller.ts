@@ -97,6 +97,13 @@ export class UsersController {
     return this.usersService.mergeDuplicateCompanies(apply === 'true');
   }
 
+  @Post('admin/merge-duplicate-display-names')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: merge Customers sharing the same display name but never linked to a Company row. Dry-run unless ?apply=true.' })
+  mergeDuplicateDisplayNames(@Query('apply') apply?: string) {
+    return this.usersService.mergeDuplicateDisplayNames(apply === 'true');
+  }
+
   @Get('admin/duplicate-display-names')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Read-only: groups Customers by their displayed name (storeName or person name), including accounts never linked to a Company row.' })
