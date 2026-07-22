@@ -352,14 +352,11 @@ export class OrdersService implements OnModuleInit {
     } else if (user?.role === 'SALES_REP') {
       data.salesRepId = user.id;
       data.salesRepEmail = user.email;
-      if (!data.customerId) {
-        throw new BadRequestException('customerId is required. Orders must be placed for an existing customer.');
-      }
-    } else if (user?.role === 'AUTHORIZER') {
-      if (!data.customerId) {
-        throw new BadRequestException('customerId is required. Orders must be placed for an existing customer.');
-      }
     }
+    // Linking to an existing customer (via the picker) is encouraged — it's
+    // what gives company-wide order sharing and Sales Rep attribution — but
+    // not required: any staff role with order-creation access can place an
+    // order from the typed contact fields alone, same as Admin already could.
 
     // Mark order with customer's priority status, and — if no sales rep is
     // already attributed (i.e. the customer placed this order themselves,
