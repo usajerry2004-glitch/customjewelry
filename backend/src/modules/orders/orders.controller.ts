@@ -164,6 +164,22 @@ export class OrdersController {
     return this.ordersService.getEvents(id);
   }
 
+  @Delete('bulk')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Permanently delete multiple orders and all related records (Admin/Authorizer only)' })
+  async bulkRemove(
+    @Body() body: BulkOrderIdsDto,
+    @Request() req: any,
+  ) {
+    const results = await Promise.allSettled(
+      body.orderIds.map(id => this.ordersService.remove(id, req.user)),
+    );
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    return { succeeded, failed };
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

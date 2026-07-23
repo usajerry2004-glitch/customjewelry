@@ -206,6 +206,7 @@ export default function OrdersPage() {
 
   const isFactoryManager = userRole === 'FACTORY_MANAGER';
   const canBulkCancel = ['ADMIN', 'AUTHORIZER', 'SALES_REP'].includes(userRole);
+  const canBulkDelete = ['ADMIN', 'AUTHORIZER'].includes(userRole);
 
   const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()); setStoneSubFilter(''); };
 
@@ -233,6 +234,36 @@ export default function OrdersPage() {
         toast.warning(`${data.succeeded} order(s) cancelled. ${data.failed} failed.`);
       } else {
         toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} cancelled.`);
+      }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally { setBulkLoading(false); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Permanently delete ${selectedIds.size} order${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await apiFetch(`${API}/orders/bulk`, {
+        method: 'DELETE',
+        body: JSON.stringify({ orderIds: Array.from(selectedIds) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
+        return;
+      }
+      if (data.succeeded === 0) {
+        toast.error(`${data.failed} order(s) could not be deleted.`, 'Could not delete orders');
+        return;
+      }
+      exitSelectMode();
+      load(page);
+      if (data.failed > 0) {
+        toast.warning(`${data.succeeded} order(s) deleted. ${data.failed} failed.`);
+      } else {
+        toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} deleted.`);
       }
     } catch {
       toast.error('Cannot connect to server. Please check your connection.');
@@ -1128,7 +1159,7 @@ export default function OrdersPage() {
               {selectedIds.size} order{selectedIds.size > 1 ? 's' : ''} selected
             </span>
             <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '11px' }}>
-              {isFactoryManager ? 'Mark all as Manufactured?' : 'Cancel all selected orders?'}
+              {isFactoryManager ? 'Mark all as Manufactured?' : 'Cancel or delete selected orders?'}
             </span>
           </div>
           <div className="bulk-bar-spacer" style={{ flex: 1 }} />
@@ -1149,6 +1180,16 @@ export default function OrdersPage() {
               ? (bulkLoading ? 'Marking…' : '✓ Mark as Manufactured')
               : (bulkLoading ? 'Cancelling…' : '✕ Cancel Orders')}
           </button>
+          {!isFactoryManager && canBulkDelete && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+              className="bulk-bar-btn"
+              style={{ background: 'transparent', border: '1px solid #DC2626', borderRadius: '7px', padding: '8px 20px', color: '#DC2626', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
+            >
+              {bulkLoading ? 'Deleting…' : '🗑 Delete Orders'}
+            </button>
+          )}
         </div>
       )}
 
