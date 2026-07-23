@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
-import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG } from '../utils/types';
+import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission, PERMISSION_LABELS } from '../utils/types';
 import { toast } from '../utils/toast';
 import { formatName, getInitials } from '../utils/name';
 
@@ -14,6 +14,7 @@ interface StaffUser {
   role: UserRole;
   isActive: boolean;
   emailNotificationsEnabled: boolean;
+  extraPermissions?: Permission[];
   createdAt: string;
 }
 
@@ -82,7 +83,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', role: UserRole.SALES_REP as UserRole, emailNotificationsEnabled: true });
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', email: '', role: UserRole.SALES_REP as UserRole, emailNotificationsEnabled: true, extraPermissions: [] as Permission[] });
   const [savingEdit, setSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -213,7 +214,7 @@ export default function SettingsPage() {
 
   const handleEditClick = (u: StaffUser) => {
     setEditingId(u.id);
-    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, emailNotificationsEnabled: u.emailNotificationsEnabled });
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role, emailNotificationsEnabled: u.emailNotificationsEnabled, extraPermissions: u.extraPermissions || [] });
   };
 
   const handleCancelEdit = () => setEditingId(null);
@@ -547,19 +548,46 @@ export default function SettingsPage() {
                     </td>
                     <td style={{ padding: '12px 18px' }}>
                       {isEditing ? (
-                        <select
-                          value={editForm.role}
-                          onChange={e => setEditForm(f => ({ ...f, role: e.target.value as UserRole }))}
-                          style={{ ...inp, cursor: 'pointer', width: 'auto' }}
-                        >
-                          {STAFF_ROLES.map(r => (
-                            <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            value={editForm.role}
+                            onChange={e => setEditForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                            style={{ ...inp, cursor: 'pointer', width: 'auto' }}
+                          >
+                            {STAFF_ROLES.map(r => (
+                              <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
+                            ))}
+                          </select>
+                          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Extra Permissions</div>
+                            {(Object.values(Permission) as Permission[]).map(p => (
+                              <label key={p} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={editForm.extraPermissions.includes(p)}
+                                  onChange={e => setEditForm(f => ({
+                                    ...f,
+                                    extraPermissions: e.target.checked
+                                      ? [...f.extraPermissions, p]
+                                      : f.extraPermissions.filter(x => x !== p),
+                                  }))}
+                                />
+                                {PERMISSION_LABELS[p]}
+                              </label>
+                            ))}
+                          </div>
+                        </>
                       ) : (
-                        <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
-                          {ROLE_LABELS[u.role] || u.role}
-                        </span>
+                        <>
+                          <span style={{ background: `${ROLE_COLORS[u.role] || '#6B7280'}15`, color: ROLE_COLORS[u.role] || '#6B7280', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>
+                            {ROLE_LABELS[u.role] || u.role}
+                          </span>
+                          {(u.extraPermissions || []).length > 0 && (
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                              + {u.extraPermissions!.map(p => PERMISSION_LABELS[p] || p).join(', ')}
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td style={{ padding: '12px 18px' }}>

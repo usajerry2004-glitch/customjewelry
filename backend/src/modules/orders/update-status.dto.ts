@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 
@@ -29,4 +29,11 @@ export class AssignSupplierDto {
     message: `supplySource must be one of: ${Object.values(SupplySource).join(', ')}`,
   })
   supplySource: SupplySource;
+}
+
+export class BulkAssignSupplierDto extends AssignSupplierDto {
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1)
+  orderIds: string[];
 }

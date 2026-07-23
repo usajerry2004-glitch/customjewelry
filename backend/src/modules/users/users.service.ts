@@ -2,10 +2,11 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf, IsArray } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Order, Factory, SupplySource } from '../../database/entities/order.entity';
 import { Company } from '../../database/entities/company.entity';
+import { Permission } from '../../common/permissions';
 
 // A brand-new Customer invite (no companyId — the invite is what creates the
 // company) names the company, not necessarily a specific contact, so the
@@ -60,6 +61,9 @@ export class UpdateUserDto {
   // (or newly-created) company — e.g. merging two accounts that turned out
   // to be the same business, entered as separate invites.
   @IsString() @IsOptional() companyId?: string;
+  // Admin-only: extra capabilities this specific account gets beyond its
+  // role — see common/permissions.ts. Additive; never removes role access.
+  @IsArray() @IsEnum(Permission, { each: true }) @IsOptional() extraPermissions?: Permission[];
 }
 
 @Injectable()
@@ -178,6 +182,7 @@ export class UsersService {
     }
     if (dto.assignedFactory !== undefined) user.assignedFactory = dto.assignedFactory;
     if (dto.assignedSupplySource !== undefined) user.assignedSupplySource = dto.assignedSupplySource;
+    if (dto.extraPermissions !== undefined) user.extraPermissions = dto.extraPermissions;
     if (dto.salesRepId !== undefined) {
       if (dto.salesRepId) {
         const rep = await this.userRepo.findOne({ where: { id: dto.salesRepId } });

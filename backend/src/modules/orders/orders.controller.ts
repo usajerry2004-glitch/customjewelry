@@ -3,9 +3,11 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
-import { UpdateStatusDto, AssignSupplierDto } from './update-status.dto';
+import { UpdateStatusDto, AssignSupplierDto, BulkAssignSupplierDto } from './update-status.dto';
 import { UpdateQuoteOptionsDto } from './dto/quote-options.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresPermission } from '../../common/decorators/permission.decorator';
+import { Permission } from '../../common/permissions';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
 import { FactoryRedactionInterceptor } from '../../common/interceptors/factory-redaction.interceptor';
@@ -83,9 +85,10 @@ export class OrdersController {
   }
 
   @Patch('bulk/status')
-  @Roles(UserRole.FACTORY_MANAGER)
+  @Roles(UserRole.FACTORY_MANAGER, UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.BULK_STATUS_NUDGE)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Bulk mark orders as Manufactured (Factory Manager only)' })
+  @ApiOperation({ summary: 'Bulk move orders to a status (Factory Manager: Manufactured only; Admin/Authorizer: any allowed transition, same rules as the single-order endpoint)' })
   async bulkUpdateStatus(
     @Body() body: BulkStatusDto,
     @Request() req: any,
@@ -128,6 +131,7 @@ export class OrdersController {
 
   @Patch(':id/assign-supplier')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.ASSIGN_SUPPLIER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Assign a factory and stone supplier to a VPO-issued order — only then is it visible to the assigned Factory/Stone Manager' })
   assignSupplier(
@@ -136,6 +140,23 @@ export class OrdersController {
     @Request() req: any,
   ) {
     return this.ordersService.assignSupplier(id, body.factory, body.supplySource, req.user);
+  }
+
+  @Patch('bulk/assign-supplier')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.ASSIGN_SUPPLIER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Bulk assign a factory and stone supplier to multiple VPO-issued orders (Admin/Authorizer only)' })
+  async bulkAssignSupplier(
+    @Body() body: BulkAssignSupplierDto,
+    @Request() req: any,
+  ) {
+    const results = await Promise.allSettled(
+      body.orderIds.map(id => this.ordersService.assignSupplier(id, body.factory, body.supplySource, req.user)),
+    );
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+    return { succeeded, failed };
   }
 
   @Patch(':id/quote-options')
@@ -166,6 +187,7 @@ export class OrdersController {
 
   @Delete('bulk')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.BULK_DELETE_ORDERS)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Permanently delete multiple orders and all related records (Admin/Authorizer only)' })
   async bulkRemove(
@@ -182,6 +204,7 @@ export class OrdersController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.BULK_DELETE_ORDERS)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Permanently delete an order and all related records (Admin/Authorizer only)' })
   remove(@Param('id') id: string, @Request() req: any) {

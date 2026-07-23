@@ -75,6 +75,13 @@ export class User {
   @Column({ default: false })
   isPriority: boolean;
 
+  // Per-user overrides that grant a specific extra capability beyond this
+  // account's role (e.g. a Sales Rep who's also allowed to bulk-delete
+  // orders) — see backend/src/common/permissions.ts for the fixed catalog.
+  // Additive only: never removes anything the role already grants.
+  @Column({ type: 'simple-array', default: '' })
+  extraPermissions: string[];
+
   @Column({ nullable: true })
   lastLoginAt: Date;
 

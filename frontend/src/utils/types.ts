@@ -25,6 +25,19 @@ export enum Factory {
   UNIQUE_DESIGNS = 'UNIQUE_DESIGNS',
 }
 
+// Per-user permission overrides — mirrors backend/src/common/permissions.ts.
+export enum Permission {
+  ASSIGN_SUPPLIER = 'ASSIGN_SUPPLIER',
+  BULK_DELETE_ORDERS = 'BULK_DELETE_ORDERS',
+  BULK_STATUS_NUDGE = 'BULK_STATUS_NUDGE',
+}
+
+export const PERMISSION_LABELS: Record<string, string> = {
+  [Permission.ASSIGN_SUPPLIER]: 'Assign factory / stone supplier to orders',
+  [Permission.BULK_DELETE_ORDERS]: 'Permanently delete orders',
+  [Permission.BULK_STATUS_NUDGE]: 'Bulk-move orders between stages',
+};
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   SALES_REP = 'SALES_REP',

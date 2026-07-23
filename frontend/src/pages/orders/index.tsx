@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
-import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
@@ -130,6 +130,7 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [extraPermissions, setExtraPermissions] = useState<Permission[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [cadSubFilter, setCadSubFilter] = useState('');
   const [stoneSubFilter, setStoneSubFilter] = useState('');
@@ -143,6 +144,10 @@ export default function OrdersPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [reassignFactory, setReassignFactory] = useState<Factory | ''>('');
+  const [reassignSupplySource, setReassignSupplySource] = useState<SupplySource | ''>('');
+  const [nudgeStatus, setNudgeStatus] = useState<OrderStatus | ''>('');
 
   // Sync statusFilter when URL query changes (Next.js router)
   useEffect(() => {
@@ -159,6 +164,7 @@ export default function OrdersPage() {
         const parsed = JSON.parse(u);
         setIsAdmin(parsed.role === 'ADMIN');
         setUserRole(parsed.role || '');
+        setExtraPermissions(parsed.extraPermissions || []);
       }
     } catch {}
   }, []);
@@ -206,7 +212,9 @@ export default function OrdersPage() {
 
   const isFactoryManager = userRole === 'FACTORY_MANAGER';
   const canBulkCancel = ['ADMIN', 'AUTHORIZER', 'SALES_REP'].includes(userRole);
-  const canBulkDelete = ['ADMIN', 'AUTHORIZER'].includes(userRole);
+  const canBulkDelete = ['ADMIN', 'AUTHORIZER'].includes(userRole) || extraPermissions.includes(Permission.BULK_DELETE_ORDERS);
+  const canBulkReassignFactory = ['ADMIN', 'AUTHORIZER'].includes(userRole) || extraPermissions.includes(Permission.ASSIGN_SUPPLIER);
+  const canBulkStatusNudge = ['ADMIN', 'AUTHORIZER'].includes(userRole) || extraPermissions.includes(Permission.BULK_STATUS_NUDGE);
 
   const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()); setStoneSubFilter(''); };
 
@@ -297,6 +305,104 @@ export default function OrdersPage() {
     } catch {
       toast.error('Cannot connect to server. Please check your connection.');
     } finally { setBulkLoading(false); }
+  };
+
+  const handleBulkReassignFactory = async () => {
+    if (selectedIds.size === 0 || !reassignFactory || !reassignSupplySource) return;
+    setBulkLoading(true);
+    try {
+      const res = await apiFetch(`${API}/orders/bulk/assign-supplier`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orderIds: Array.from(selectedIds), factory: reassignFactory, supplySource: reassignSupplySource }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
+        return;
+      }
+      if (data.succeeded === 0) {
+        toast.error(`${data.failed} order(s) could not be reassigned. Make sure they all have VPO Issued status.`, 'Could not reassign factory');
+        return;
+      }
+      setShowReassignModal(false);
+      setReassignFactory('');
+      setReassignSupplySource('');
+      exitSelectMode();
+      load(page);
+      if (data.failed > 0) {
+        toast.warning(`${data.succeeded} order(s) reassigned. ${data.failed} failed.`);
+      } else {
+        toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} reassigned.`);
+      }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally { setBulkLoading(false); }
+  };
+
+  const handleBulkStatusNudge = async () => {
+    if (selectedIds.size === 0 || !nudgeStatus) return;
+    setBulkLoading(true);
+    try {
+      const res = await apiFetch(`${API}/orders/bulk/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ orderIds: Array.from(selectedIds), status: nudgeStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(getErrorMessage(data, `Request failed (${res.status}). Please try again.`));
+        return;
+      }
+      if (data.succeeded === 0) {
+        toast.error(`${data.failed} order(s) could not be moved. That status change may not be valid from their current stage.`, 'Could not move orders');
+        return;
+      }
+      setNudgeStatus('');
+      exitSelectMode();
+      load(page);
+      if (data.failed > 0) {
+        toast.warning(`${data.succeeded} order(s) moved. ${data.failed} skipped (invalid from current stage).`);
+      } else {
+        toast.success(`${data.succeeded} order${data.succeeded > 1 ? 's' : ''} moved.`);
+      }
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally { setBulkLoading(false); }
+  };
+
+  const exportOrdersCsv = () => {
+    const source = selectedIds.size > 0 ? orders.filter(o => selectedIds.has(o.id!)) : orders;
+    if (source.length === 0) { toast.error('No orders to export.'); return; }
+    const columns: { key: string; label: string }[] = [
+      { key: 'poNumber', label: 'PO Number' },
+      { key: 'status', label: 'Status' },
+      { key: 'orderType', label: 'Order Type' },
+      { key: 'metalType', label: 'Metal Type' },
+      { key: 'metalColor', label: 'Metal Color' },
+      { key: 'storeName', label: 'Store' },
+      { key: 'customerFullName', label: 'Customer' },
+      { key: 'quotedCost', label: 'Quoted Cost' },
+      { key: 'assignedFactory', label: 'Factory' },
+      { key: 'supplySource', label: 'Supply Source' },
+      { key: 'salesRepName', label: 'Sales Rep' },
+      { key: 'createdAt', label: 'Created' },
+    ];
+    const escapeCell = (v: any) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [
+      columns.map(c => escapeCell(c.label)).join(','),
+      ...source.map(o => columns.map(c => escapeCell((o as any)[c.key])).join(',')),
+    ];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const applyMonth = (year: number, month: number) => {
@@ -421,7 +527,7 @@ export default function OrdersPage() {
       subtitle={`${total} total orders`}
       actions={
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {(isFactoryManager || canBulkCancel) && (
+          {(isFactoryManager || canBulkCancel || canBulkDelete || canBulkReassignFactory || canBulkStatusNudge) && (
             <button
               onClick={() => {
                 if (selectMode) {
@@ -447,6 +553,13 @@ export default function OrdersPage() {
               {selectMode ? '✕ Exit Select' : '☑ Select'}
             </button>
           )}
+          <button
+            onClick={exportOrdersCsv}
+            title={selectedIds.size > 0 ? `Export ${selectedIds.size} selected order(s)` : 'Export all currently loaded orders'}
+            style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            ⬇ Export CSV
+          </button>
           <button
             onClick={openNewOrderModal}
             style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
@@ -1170,16 +1283,50 @@ export default function OrdersPage() {
           >
             Dismiss
           </button>
-          <button
-            onClick={isFactoryManager ? handleBulkManufactured : handleBulkCancel}
-            disabled={bulkLoading}
-            className="bulk-bar-btn"
-            style={{ background: isFactoryManager ? 'var(--accent)' : '#DC2626', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
-          >
-            {isFactoryManager
-              ? (bulkLoading ? 'Marking…' : '✓ Mark as Manufactured')
-              : (bulkLoading ? 'Cancelling…' : '✕ Cancel Orders')}
-          </button>
+          {!isFactoryManager && canBulkReassignFactory && (
+            <button
+              onClick={() => setShowReassignModal(true)}
+              disabled={bulkLoading}
+              className="bulk-bar-btn"
+              style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: bulkLoading ? 'not-allowed' : 'pointer' }}
+            >
+              🏭 Reassign Factory
+            </button>
+          )}
+          {!isFactoryManager && canBulkStatusNudge && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <select
+                value={nudgeStatus}
+                onChange={e => setNudgeStatus(e.target.value as OrderStatus | '')}
+                style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 10px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                <option value="" style={{ color: '#000' }}>Move to…</option>
+                <option value={OrderStatus.CAD_IN_PROGRESS} style={{ color: '#000' }}>CAD In Progress</option>
+                <option value={OrderStatus.MANUFACTURED} style={{ color: '#000' }}>Manufactured</option>
+                <option value={OrderStatus.COMPLETED} style={{ color: '#000' }}>Completed</option>
+              </select>
+              <button
+                onClick={handleBulkStatusNudge}
+                disabled={bulkLoading || !nudgeStatus}
+                className="bulk-bar-btn"
+                style={{ background: 'var(--accent)', border: 'none', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: (bulkLoading || !nudgeStatus) ? 'not-allowed' : 'pointer', opacity: (bulkLoading || !nudgeStatus) ? 0.6 : 1 }}
+              >
+                {bulkLoading ? 'Moving…' : 'Apply'}
+              </button>
+            </div>
+          )}
+          {(isFactoryManager || canBulkCancel) && (
+            <button
+              onClick={isFactoryManager ? handleBulkManufactured : handleBulkCancel}
+              disabled={bulkLoading}
+              className="bulk-bar-btn"
+              style={{ background: isFactoryManager ? 'var(--accent)' : '#DC2626', border: 'none', borderRadius: '7px', padding: '8px 20px', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: bulkLoading ? 'not-allowed' : 'pointer', opacity: bulkLoading ? 0.7 : 1, letterSpacing: '0.2px' }}
+            >
+              {isFactoryManager
+                ? (bulkLoading ? 'Marking…' : '✓ Mark as Manufactured')
+                : (bulkLoading ? 'Cancelling…' : '✕ Cancel Orders')}
+            </button>
+          )}
           {!isFactoryManager && canBulkDelete && (
             <button
               onClick={handleBulkDelete}
@@ -1190,6 +1337,53 @@ export default function OrdersPage() {
               {bulkLoading ? 'Deleting…' : '🗑 Delete Orders'}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Bulk Reassign Factory modal */}
+      {showReassignModal && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, background: 'rgba(26,39,64,0.5)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '440px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Reassign Factory
+              </div>
+              <button onClick={() => setShowReassignModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '18px' }}>
+              Assigns a factory and stone supplier to all {selectedIds.size} selected order{selectedIds.size > 1 ? 's' : ''}. Only orders with VPO Issued status can be reassigned.
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Factory *</label>
+              <select value={reassignFactory} onChange={e => setReassignFactory(e.target.value as Factory)} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">Select factory…</option>
+                {(Object.values(Factory) as Factory[]).map(f => (
+                  <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Stone Supplier *</label>
+              <select value={reassignSupplySource} onChange={e => setReassignSupplySource(e.target.value as SupplySource)} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">Select supplier…</option>
+                {(Object.values(SupplySource) as SupplySource[]).map(s => (
+                  <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={() => setShowReassignModal(false)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkReassignFactory}
+                disabled={bulkLoading || !reassignFactory || !reassignSupplySource}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: (bulkLoading || !reassignFactory || !reassignSupplySource) ? 'not-allowed' : 'pointer', fontSize: '13px', opacity: (bulkLoading || !reassignFactory || !reassignSupplySource) ? 0.6 : 1 }}
+              >
+                {bulkLoading ? 'Reassigning…' : 'Reassign'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
