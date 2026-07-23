@@ -1073,7 +1073,7 @@ export default function OrdersPage() {
                   ? order.stoneStatus === StoneStatus.STONE_RECEIVED
                   : order.status !== OrderStatus.CANCELLED && order.status !== OrderStatus.COMPLETED;
                 return (
-                  <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
+                  <div key={order.id} style={{ position: 'relative', height: '100%', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
                     onClick={selectMode ? (e) => {
                       if (!isSelectable) return;
                       e.preventDefault();

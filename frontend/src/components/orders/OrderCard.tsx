@@ -41,6 +41,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
         display: 'flex',
         gap: '14px',
         alignItems: 'stretch',
+        height: '100%',
+        minHeight: compact ? undefined : '218px',
+        boxSizing: 'border-box',
       }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)';
@@ -54,7 +57,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
       }}
     >
       {/* Main content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--navy)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.3px' }}>
@@ -129,7 +132,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
         </div>
 
         {(order.salesRepName || order.salesRepEmail) && (
-          <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: 'auto', paddingTop: '8px', fontSize: '10px', color: 'var(--text-muted)' }}>
             Created by <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{order.salesRepName || order.salesRepEmail}</span>
           </div>
         )}
