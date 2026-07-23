@@ -485,6 +485,8 @@ export class EmailService {
     });
   }
 
+  // Account-security email — must reach the user even if they've opted out
+  // of general notifications, or they'd be locked out with no way to recover.
   async sendPasswordResetEmail(opts: { to: string; token: string }) {
     const resetUrl = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(opts.token)}`;
     return this.send({
@@ -497,9 +499,11 @@ export class EmailService {
         <a href="${resetUrl}" style="${btnStyle('#C09B58')}">Reset Password →</a>
         <p style="margin-top:24px;font-size:12px;color:#9CA3AF">If you didn't request this, you can safely ignore this email — your password won't change.</p>
       `),
+      bypassOptOut: true,
     });
   }
 
+  // Account-security email (login code) — same reasoning as password reset above.
   async sendOtpCode(opts: { to: string; firstName: string; otp: string }) {
     return this.send({
       to: opts.to,
@@ -513,9 +517,12 @@ export class EmailService {
         </div>
         <p style="margin-top:24px;font-size:12px;color:#9CA3AF">If you didn't request this, you can safely ignore this email — your account is still secure.</p>
       `),
+      bypassOptOut: true,
     });
   }
 
+  // Account-security email (delivers login credentials) — same reasoning as
+  // password reset / OTP above: without it a new staff member has no way in.
   async sendStaffInvite(opts: {
     to: string;
     firstName: string;
@@ -543,6 +550,7 @@ export class EmailService {
           <a href="${this.frontendUrl}/forgot-password" style="${btnStyle('#C09B58')}">Set My Password →</a>
         </div>
       `),
+      bypassOptOut: true,
     });
   }
 

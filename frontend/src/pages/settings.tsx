@@ -89,6 +89,7 @@ export default function SettingsPage() {
   const [salesReps, setSalesReps] = useState<StaffUser[]>([]);
   const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [staffSearch, setStaffSearch] = useState('');
 
   const toggleSort = (key: typeof sortKey) => {
     if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -113,6 +114,15 @@ export default function SettingsPage() {
       }
     });
   }, [staff, sortKey, sortDir]);
+
+  const displayedStaff = useMemo(() => {
+    const q = staffSearch.trim().toLowerCase();
+    if (!q) return sortedStaff;
+    return sortedStaff.filter(u =>
+      formatName(u.firstName, u.lastName).toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    );
+  }, [sortedStaff, staffSearch]);
 
   const reload = async () => {
     setLoading(true);
@@ -262,14 +272,30 @@ export default function SettingsPage() {
 
       {/* Team Members */}
       <div style={{ ...card, overflow: 'hidden' }}>
-        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
           <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Team Members</h2>
-          <button
-            onClick={() => { setShowForm(f => !f); setError(null); setSuccessEmail(null); }}
-            style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            {showForm ? 'Cancel' : '+ Invite Member'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+            <div style={{ position: 'relative', flex: '0 1 260px', minWidth: '160px' }}>
+              <input
+                value={staffSearch}
+                onChange={e => setStaffSearch(e.target.value)}
+                placeholder="Search by name or email…"
+                style={{ ...inp, paddingRight: staffSearch ? '28px' : '10px' }}
+              />
+              {staffSearch && (
+                <button
+                  onClick={() => setStaffSearch('')}
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: 0, lineHeight: 1 }}
+                >✕</button>
+              )}
+            </div>
+            <button
+              onClick={() => { setShowForm(f => !f); setError(null); setSuccessEmail(null); }}
+              style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              {showForm ? 'Cancel' : '+ Invite Member'}
+            </button>
+          </div>
         </div>
 
         {/* Invite form */}
@@ -456,10 +482,17 @@ export default function SettingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedStaff.map((u, i) => {
+                {displayedStaff.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '28px 18px', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      No team members match "{staffSearch}".
+                    </td>
+                  </tr>
+                )}
+                {displayedStaff.map((u, i) => {
                   const isEditing = editingId === u.id;
                   return (
-                  <tr key={u.id} style={{ borderBottom: i < sortedStaff.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <tr key={u.id} style={{ borderBottom: i < displayedStaff.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <td style={{ padding: '12px 18px' }}>
                       {isEditing ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
