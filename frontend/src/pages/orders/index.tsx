@@ -369,42 +369,6 @@ export default function OrdersPage() {
     } finally { setBulkLoading(false); }
   };
 
-  const exportOrdersCsv = () => {
-    const source = selectedIds.size > 0 ? orders.filter(o => selectedIds.has(o.id!)) : orders;
-    if (source.length === 0) { toast.error('No orders to export.'); return; }
-    const columns: { key: string; label: string }[] = [
-      { key: 'poNumber', label: 'PO Number' },
-      { key: 'status', label: 'Status' },
-      { key: 'orderType', label: 'Order Type' },
-      { key: 'metalType', label: 'Metal Type' },
-      { key: 'metalColor', label: 'Metal Color' },
-      { key: 'storeName', label: 'Store' },
-      { key: 'customerFullName', label: 'Customer' },
-      { key: 'quotedCost', label: 'Quoted Cost' },
-      { key: 'assignedFactory', label: 'Factory' },
-      { key: 'supplySource', label: 'Supply Source' },
-      { key: 'salesRepName', label: 'Sales Rep' },
-      { key: 'createdAt', label: 'Created' },
-    ];
-    const escapeCell = (v: any) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const rows = [
-      columns.map(c => escapeCell(c.label)).join(','),
-      ...source.map(o => columns.map(c => escapeCell((o as any)[c.key])).join(',')),
-    ];
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const applyMonth = (year: number, month: number) => {
     const key = `${year}-${String(month).padStart(2, '0')}`;
     const from = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -553,13 +517,6 @@ export default function OrdersPage() {
               {selectMode ? '✕ Exit Select' : '☑ Select'}
             </button>
           )}
-          <button
-            onClick={exportOrdersCsv}
-            title={selectedIds.size > 0 ? `Export ${selectedIds.size} selected order(s)` : 'Export all currently loaded orders'}
-            style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            ⬇ Export CSV
-          </button>
           <button
             onClick={openNewOrderModal}
             style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
