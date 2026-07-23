@@ -7,7 +7,6 @@ import { Factory } from '../../database/entities/order.entity';
 // and none should ever be auto-created for them.
 const CREATIONS_RECIPIENTS: string[] = [
   'deepali@creationjewel.co.in',
-  'gaurav@creationjewel.co.in',
   'specialorderdesign@creationjewel.co.in',
   'SpecialorderCAD@creationjewel.co.in',
   'rajendra@creationjewel.co.in',

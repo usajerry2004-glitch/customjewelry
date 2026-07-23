@@ -806,16 +806,25 @@ export class OrdersService implements OnModuleInit {
       ...factoryUsers.map(u => u.email).filter(Boolean),
       ...(STANDING_FACTORY_RECIPIENTS[factory] || []),
     ]));
-    this.buildFactoryOrderPdfAttachment(saved).then(attachments =>
-      this.emailService.sendFactoryAssignedAlert({
-        to: factoryEmails,
-        poNumber: saved.poNumber,
-        orderType: saved.orderType || '—',
-        orderId: saved.id,
-        isPriorityCustomer: saved.isPriorityCustomer,
-        attachments,
-      }),
-    ).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
+    // A failure building attachments must never take the email down with it —
+    // fall back to sending with no attachments rather than silently skipping
+    // the notification (this is what actually happens if buildFactoryOrderPdfAttachment
+    // rejects: the .then() below would never run and the factory team gets nothing).
+    this.buildFactoryOrderPdfAttachment(saved)
+      .catch(err => {
+        this.logger.warn(`Factory order attachment build failed for ${saved.poNumber}:`, err);
+        return [];
+      })
+      .then(attachments =>
+        this.emailService.sendFactoryAssignedAlert({
+          to: factoryEmails,
+          poNumber: saved.poNumber,
+          orderType: saved.orderType || '—',
+          orderId: saved.id,
+          isPriorityCustomer: saved.isPriorityCustomer,
+          attachments,
+        }),
+      ).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
 
     const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
     this.emailService.sendStoneSupplierAssignedAlert({
@@ -848,7 +857,12 @@ export class OrdersService implements OnModuleInit {
       this.logger.warn(`Factory order PDF generation failed for ${order.poNumber}:`, err);
     }
 
-    const cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
+    let cadFiles: { designerNotes?: string | null; filePath: string; originalName: string }[] = [];
+    try {
+      cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
+    } catch (err) {
+      this.logger.warn(`Failed to load CAD files for ${order.poNumber}:`, err);
+    }
     const designFiles = cadFiles.filter(c => !c.designerNotes || !OrdersService.REFERENCE_NOTE_TAGS.has(c.designerNotes));
     for (const cad of designFiles) {
       try {
