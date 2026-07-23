@@ -12,6 +12,30 @@ import { OrderConversation } from '../../components/OrderConversation';
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
 
+// A plain cross-origin <a href> to the API domain is unreliable on mobile —
+// browsers there often try to preview the file in-tab instead of saving it
+// (especially for CAD formats they can't render), and there's no visible sign
+// the tap did anything. Fetch with the same auth apiFetch already uses, then
+// force a save via a same-origin blob URL, which mobile browsers handle as an
+// actual download consistently.
+async function downloadCadFile(id: string, filename: string) {
+  try {
+    const res = await apiFetch(`${API}/cad/${id}/download`);
+    if (!res.ok) { toast.error('Failed to download file. Please try again.'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Cannot connect to server. Please check your connection.');
+  }
+}
+
 // ── CAD types ────────────────────────────────────────────────────────────
 interface CadFile {
   id: string; orderId: string; originalName: string; fileName: string;
@@ -144,6 +168,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
           {!(ext === '3dm' && userRole === UserRole.CUSTOMER) && (
             <a
               href={`${API}/cad/${cad.id}/download`}
+              onClick={e => { e.preventDefault(); downloadCadFile(cad.id, cad.originalName); }}
               style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
             >
               ↓ Download
@@ -217,6 +242,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
               Preview not available for .{ext} files
             </div>
             <a href={`${API}/cad/${cad.id}/download`}
+              onClick={e => { e.preventDefault(); downloadCadFile(cad.id, cad.originalName); }}
               style={{ background: 'var(--accent)', color: '#fff', padding: '9px 22px', borderRadius: '8px', textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
               ↓ Download File
             </a>
