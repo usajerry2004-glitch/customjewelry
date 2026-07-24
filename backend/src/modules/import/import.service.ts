@@ -67,6 +67,20 @@ function str(val: any): string | null {
   return s || null;
 }
 
+// Case-insensitive header lookup — sheet authors vary column casing/wording
+// (e.g. "Engraving" vs "engraving" vs "Engraving Text"), so an exact-key
+// `row['Engraving']` lookup would silently miss the value.
+function getCI(row: any, ...names: string[]): string | null {
+  const targets = names.map(n => n.trim().toLowerCase());
+  for (const key of Object.keys(row)) {
+    if (targets.includes(key.trim().toLowerCase())) {
+      const v = str(row[key]);
+      if (v) return v;
+    }
+  }
+  return null;
+}
+
 function money(val: any): number | null {
   const s = String(val ?? '').replace(/[$,\s]/g, '');
   const n = parseFloat(s);
@@ -105,9 +119,71 @@ function buildDesignSpecNotes(row: any): string | null {
 
   const ringPreferences = str(row['Ring Preferences Notes']);
   if (ringPreferences) parts.push(`Ring Preferences: ${ringPreferences}`);
-  const engraving = str(row['Engraving Text']);
-  if (engraving) parts.push(`Engraving: "${engraving}"`);
 
+  return parts.length ? parts.join('\n') : null;
+}
+
+// These columns exist as Order DB fields but have no field anywhere in the
+// portal UI to view or edit them — staff would set them via import and then
+// never see them again. Folded into customerNotes instead, alongside the
+// other note-only columns, so the data isn't silently invisible.
+const PORTAL_INVISIBLE_COLUMNS: { header: string[]; label: string }[] = [
+  { header: ['Head Style', 'Prong/Head Style'],       label: 'Head Style' },
+  { header: ['Shank Style', 'Band Style'],             label: 'Shank Style' },
+  { header: ['Time Frame', 'Time Frame (weeks)'],      label: 'Time Frame' },
+  { header: ['Vendor Name'],                           label: 'Vendor Name' },
+];
+
+function buildPortalInvisibleNotes(row: any): string | null {
+  const parts = PORTAL_INVISIBLE_COLUMNS
+    .map(({ header, label }) => {
+      const v = header.map(h => str(row[h])).find(Boolean);
+      return v ? `${label}: ${v}` : null;
+    })
+    .filter((v): v is string => !!v);
+  return parts.length ? parts.join('\n') : null;
+}
+
+// "Engraving" (any casing/wording) maps to the real, portal-visible
+// `stamping` field rather than notes — it's the same concept under a
+// different name in design-spec exports.
+const ENGRAVING_HEADERS = ['Engraving', 'Engraving Text', 'Engraving Notes', 'Custom Engraving'];
+
+// Every header the mapping below already reads, lowercased — used to detect
+// columns a sheet author added that we don't otherwise recognize, so they
+// land in customerNotes instead of being silently dropped. Keep this in sync
+// with every `row['...']` / getCI(...) lookup elsewhere in this file.
+const RECOGNIZED_HEADERS = new Set([
+  'po #', 'order reference',
+  'store name', 'customer full name', 'customer name', 'email (final)', 'email',
+  'sales rep email', 'phone number',
+  'type', 'metal type', 'metal karat', 'metal color', 'size', 'ring size',
+  'natural or lab', 'dia quality', 'center stone shape',
+  'approximate carat weight', 'center stone carat', 'center stone ratio', 'stone ratio',
+  'reference weblink', 'reference image link', 'reference image filename',
+  'stock no# (if from inventory)',
+  'status', 'kira quoted cost', 'kira sku #', 'gold lock',
+  'customer email contact approval', 'processed date', 'tracking',
+  'invoice #', 'ship method', 'rc order #', 'rc job bag #', 'rc vpo #',
+  'vpo order details', 'factory status',
+  'ref customer po#', 'customer po# / reference no#',
+  'send to rc', 'archive', 'customer comments', 'ring preferences notes',
+  'stamping', ...ENGRAVING_HEADERS.map(h => h.toLowerCase()),
+  ...NOTE_ONLY_COLUMNS.map(c => c.header.toLowerCase()),
+  ...PORTAL_INVISIBLE_COLUMNS.flatMap(c => c.header.map(h => h.toLowerCase())),
+]);
+
+// Catch-all for any column a sheet author added that isn't one of the ones
+// above — rather than a growing hardcoded list being the only thing standing
+// between a new column and it being silently dropped, anything unrecognized
+// with a value gets folded into notes under its own header text.
+function buildUnknownColumnNotes(row: any): string | null {
+  const parts: string[] = [];
+  for (const key of Object.keys(row)) {
+    if (RECOGNIZED_HEADERS.has(key.trim().toLowerCase())) continue;
+    const v = str(row[key]);
+    if (v) parts.push(`${key.trim()}: ${v}`);
+  }
   return parts.length ? parts.join('\n') : null;
 }
 
@@ -185,9 +261,15 @@ export class ImportService {
         if (!isNaN(d.getTime())) processedDate = d;
       }
 
-      // Design-spec columns with no dedicated Order field get folded into the
-      // notes, alongside whatever the plain "Customer Comments" column held.
-      const notes = [str(row['Customer Comments']), buildDesignSpecNotes(row)].filter(Boolean).join('\n\n') || null;
+      // Design-spec columns, portal-invisible columns, and any column we
+      // don't otherwise recognize get folded into the notes, alongside
+      // whatever the plain "Customer Comments" column held.
+      const notes = [
+        str(row['Customer Comments']),
+        buildDesignSpecNotes(row),
+        buildPortalInvisibleNotes(row),
+        buildUnknownColumnNotes(row),
+      ].filter(Boolean).join('\n\n') || null;
 
       try {
         const order = this.orderRepo.create({
@@ -207,6 +289,7 @@ export class ImportService {
           diamondType:             str(row['Natural or Lab']),
           diamondQuality:          str(row['Dia Quality']),
           centerStoneShape:        str(row['Center Stone Shape']),
+          stamping:                getCI(row, 'Stamping') || getCI(row, ...ENGRAVING_HEADERS),
           approximateCaratWeight:  str(row['Approximate Carat Weight']) || str(row['Center Stone Carat']),
           centerStoneRatio:        str(row['Center Stone Ratio']) || str(row['Stone Ratio']),
           referenceWeblink:        str(row['Reference Weblink']) || str(row['Reference Image Link']),
@@ -216,15 +299,11 @@ export class ImportService {
           goldLockPrice:           money(row['Gold Lock']),
           invoiceNumber:           str(row['Invoice #']),
           shipMethod:              str(row['Ship Method']),
-          vendorName:              str(row['Vendor Name']),
           rcOrderNumber:           str(row['RC Order #']),
           rcJobBagNumber:          str(row['RC Job Bag #']),
           rcVpoNumber:             str(row['RC VPO #']),
           vpoOrderDetails:         str(row['VPO order details']),
           factoryStatus:           str(row['Factory Status']),
-          headStyle:               str(row['Head Style']) || str(row['Prong/Head Style']),
-          shankStyle:              str(row['Shank Style']) || str(row['Band Style']),
-          timeFrame:               str(row['Time Frame']) || str(row['Time Frame (weeks)']),
           phoneNumber:             str(row['Phone Number']),
           refCustomerPo:           str(row['Ref Customer PO#']) || str(row['Customer PO# / Reference No#']),
           customerEmailApproval:   custApproved,
