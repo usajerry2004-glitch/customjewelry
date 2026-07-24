@@ -17,6 +17,7 @@ export enum StoneStatus {
 export enum SupplySource {
   STONE_CREATIONS = 'STONE_CREATIONS',
   KIRA            = 'KIRA',
+  KIRA_JEWELS_USA = 'KIRA_JEWELS_USA',
 }
 
 export enum Factory {
@@ -118,8 +119,9 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
 };
 
 export const SUPPLY_SOURCE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  STONE_CREATIONS: { label: 'Creations', color: '#B45309', bg: '#FEF3C7' },
-  KIRA:            { label: 'Kira',      color: '#9333EA', bg: '#F3E8FF' },
+  STONE_CREATIONS: { label: 'Creations',      color: '#B45309', bg: '#FEF3C7' },
+  KIRA:            { label: 'Kira',           color: '#9333EA', bg: '#F3E8FF' },
+  KIRA_JEWELS_USA: { label: 'Kira Jewels Usa', color: '#0D9488', bg: '#CCFBF1' },
 };
 
 export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {

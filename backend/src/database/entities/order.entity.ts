@@ -27,6 +27,7 @@ export enum StoneStatus {
 export enum SupplySource {
   STONE_CREATIONS = 'STONE_CREATIONS',
   KIRA            = 'KIRA',
+  KIRA_JEWELS_USA = 'KIRA_JEWELS_USA',
 }
 
 export enum Factory {
