@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [actions, setActions]     = useState<Priority[]>([]);
   const [recent, setRecent]       = useState<RecentOrder[]>([]);
   const [myOrderTotal, setMyOrderTotal] = useState<number>(0);
+  const [myVpoTotal, setMyVpoTotal] = useState<number>(0);
+  const [myManufacturedTotal, setMyManufacturedTotal] = useState<number>(0);
   const [loading, setLoading]         = useState(true);
   const [userRole, setUserRole]   = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
@@ -49,16 +51,24 @@ export default function Dashboard() {
   useEffect(() => {
     const sevenAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const load = async () => {
-      // Fetch role-filtered total (used by Sales Rep and other roles) alongside
-      // everything else — it was a separate sequential round trip before.
-      const [mRes, priRes, rRes, myRes] = await Promise.all([
+      // Fetch role-filtered totals (used by Sales Rep, Stone Manager, Factory
+      // Manager, etc.) alongside everything else — /orders/metrics below is a
+      // GLOBAL count across every supplier/factory, unscoped to the current
+      // user, so Stone/Factory Manager KPI tiles need these instead (the
+      // plain /orders list endpoint already applies each role's own scoping
+      // — own assigned supply source / factory — server-side).
+      const [mRes, priRes, rRes, myRes, vpoRes, manufacturedRes] = await Promise.all([
         apiFetch(`${API}/orders/metrics`),
         apiFetch(`${API}/orders/priority`),
         apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
         apiFetch(`${API}/orders?limit=1`),
+        apiFetch(`${API}/orders?limit=1&status=VPO_ISSUED`),
+        apiFetch(`${API}/orders?limit=1&status=MANUFACTURED`),
       ]);
       if (mRes.ok)  setMetrics(await mRes.json());
       if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
+      if (vpoRes.ok) { const d = await vpoRes.json(); setMyVpoTotal(d.total || 0); }
+      if (manufacturedRes.ok) { const d = await manufacturedRes.json(); setMyManufacturedTotal(d.total || 0); }
       let ids: string[] = [];
       if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
       if (rRes.ok)   { const d = await rRes.json(); const l = d.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
@@ -207,8 +217,8 @@ export default function Dashboard() {
   const roleConfigs: Record<string, any> = {
     SALES_REP:       { subtitle: 'My Orders',        kpis: [{ label: 'My Active Orders', value: myOrderTotal, color: NAVY, sub: 'my customers only', link: '/orders' }, { label: 'New This Week', value: recent.length, color: '#0891B2', sub: 'last 7 days', link: '/orders' }, { label: 'Priority Actions', value: actions.length, color: '#7C3AED', sub: 'needs attention', link: '/todos' }] },
     CAD_DESIGNER:    { subtitle: 'CAD Queue',         kpis: [{ label: 'In CAD Queue', value: sc('CAD_IN_PROGRESS'), color: '#6366F1', sub: 'awaiting design', link: '/orders?status=CAD_IN_PROGRESS' }, { label: 'Revision Needed', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('revision')).length, color: '#DC2626', sub: 'customer requested', link: '/todos' }, { label: 'Awaiting Quote', value: actions.filter((a: any) => a.priorityReason?.toLowerCase().includes('quote')).length, color: GOLD_DARK, sub: 'approved, needs price', link: '/todos' }] },
-    FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: sc('VPO_ISSUED'), color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'Manufactured', value: sc('MANUFACTURED'), color: '#8B5CF6', sub: 'done, en route to US', link: '/orders?status=MANUFACTURED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
-    STONE_MANAGER:   { subtitle: 'Stone Queue',       kpis: [{ label: 'Pending Stone', value: sc('VPO_ISSUED'), color: '#7C3AED', sub: 'awaiting dispatch', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#DC2626', sub: '> 1 day overdue', link: '/todos' }] },
+    FACTORY_MANAGER: { subtitle: 'Production Queue',  kpis: [{ label: 'VPO Active', value: myVpoTotal, color: '#0891B2', sub: 'in production', link: '/orders?status=VPO_ISSUED' }, { label: 'Manufactured', value: myManufacturedTotal, color: '#8B5CF6', sub: 'done, en route to US', link: '/orders?status=MANUFACTURED' }, { label: 'Priority', value: actions.length, color: '#DC2626', sub: 'need attention', link: '/todos' }] },
+    STONE_MANAGER:   { subtitle: 'Stone Queue',       kpis: [{ label: 'Pending Stone', value: myOrderTotal, color: '#7C3AED', sub: 'awaiting dispatch', link: '/orders?status=VPO_ISSUED' }, { label: 'Priority Tasks', value: actions.length, color: '#DC2626', sub: '> 1 day overdue', link: '/todos' }] },
     CUSTOMER:        { subtitle: 'My Orders',         kpis: [{ label: 'Active Orders', value: activeOrders, color: NAVY, sub: 'in progress', link: '/orders' }, { label: 'Shipped', value: sc('SHIPPED'), color: '#3B82F6', sub: 'on the way', link: '/orders?status=SHIPPED' }, { label: 'Completed', value: sc('COMPLETED'), color: '#10B981', sub: 'delivered', link: '/orders?status=COMPLETED' }] },
   };
 
