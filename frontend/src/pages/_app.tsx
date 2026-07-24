@@ -41,6 +41,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <ErrorBoundary>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <link rel="icon" href="/favicon.png" type="image/png" />
       </Head>
       <Component {...pageProps} />
       <Toaster />
