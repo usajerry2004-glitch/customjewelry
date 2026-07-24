@@ -109,23 +109,19 @@ export default function CADPage() {
         byOrder.get(orderId)!.push(file);
       });
       const results = await Promise.allSettled(
-        Array.from(byOrder.entries()).map(async ([orderId, files]) => {
+        Array.from(byOrder.entries()).map(([orderId, files]) => {
           const fd = new FormData();
           files.forEach(f => fd.append('files', f));
           if (notes) fd.append('designerNotes', notes);
           fd.append('cadPersonName', cadPersonName.trim());
           fd.append('verifiedByName', verifiedByName.trim());
-          const res = await apiFetch(`${API}/cad/upload/${orderId}`, { method: 'POST', body: fd });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            const po = orders.find(o => o.id === orderId)?.poNumber || orderId;
-            throw new Error(`${po}: ${err?.message || `HTTP ${res.status}`}`);
-          }
+          return apiFetch(`${API}/cad/upload/${orderId}`, { method: 'POST', body: fd }).then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          });
         }),
       );
       const succeeded = results.filter(r => r.status === 'fulfilled').length;
-      const failedResults = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-      const failed = failedResults.length;
+      const failed = results.filter(r => r.status === 'rejected').length;
       if (succeeded > 0) {
         setBulkItems([]);
         setNotes('');
@@ -135,16 +131,10 @@ export default function CADPage() {
       }
       if (failed === 0) {
         toast.success(`Uploaded to ${succeeded} order${succeeded > 1 ? 's' : ''}.`);
+      } else if (succeeded === 0) {
+        toast.error(`Upload failed for all ${failed} order${failed > 1 ? 's' : ''}. Please try again.`);
       } else {
-        if (succeeded === 0) {
-          toast.error(`Upload failed for all ${failed} order${failed > 1 ? 's' : ''}.`);
-        } else {
-          toast.warning(`Uploaded to ${succeeded} order${succeeded > 1 ? 's' : ''}. ${failed} failed.`);
-        }
-        // Surface the actual reason (e.g. the render-mesh check) instead of
-        // making the designer guess — this is usually the whole point of
-        // the failure, not a generic network hiccup.
-        failedResults.forEach(r => toast.error(r.reason?.message || 'Upload failed.'));
+        toast.warning(`Uploaded to ${succeeded} order${succeeded > 1 ? 's' : ''}. ${failed} failed.`);
       }
     } catch {
       toast.error('Cannot connect to server. Please check your connection.');

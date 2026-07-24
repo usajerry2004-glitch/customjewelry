@@ -9,7 +9,6 @@ import { CadTimeLog } from '../../database/entities/cad-time-log.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
-import { checkRenderMesh, RENDER_MESH_HELP_MESSAGE, RENDER_MESH_UNREADABLE_MESSAGE } from './render-mesh-check.util';
 
 const MAX_REFERENCE_IMAGES = 4;
 
@@ -115,16 +114,6 @@ export class CadService {
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     if (!cadPersonName?.trim() || !verifiedByName?.trim()) {
       throw new BadRequestException('CAD Person Name and Verified By Name are both required.');
-    }
-
-    if (file.originalname.toLowerCase().endsWith('.3dm')) {
-      const meshCheck = await checkRenderMesh(file.buffer);
-      if (!meshCheck.parsed) {
-        throw new BadRequestException(RENDER_MESH_UNREADABLE_MESSAGE);
-      }
-      if (meshCheck.meshCount === 0) {
-        throw new BadRequestException(RENDER_MESH_HELP_MESSAGE);
-      }
     }
 
     const existing = await this.cadRepo.find({ where: { orderId } });
