@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
+import { UserRole } from '../../database/entities/user.entity';
+
+// Admin's bell icon is scoped to just these two things — being @mentioned, or
+// a customer/factory posting a message that needs a response — rather than
+// every internal status-change notification other roles get, so it doesn't
+// drown in order-lifecycle noise. Other roles are unaffected.
+const ADMIN_VISIBLE_TYPES = [NotificationType.MENTION, NotificationType.CUSTOMER_MESSAGE, NotificationType.FACTORY_MESSAGE];
 
 @Injectable()
 export class NotificationsService {
@@ -14,12 +21,11 @@ export class NotificationsService {
     return this.notifRepo.save(notif);
   }
 
-  async findAll(userId: string): Promise<Notification[]> {
-    return this.notifRepo.createQueryBuilder('n')
-      .where('n.targetUserId = :uid', { uid: userId })
-      .orderBy('n.createdAt', 'DESC')
-      .take(50)
-      .getMany();
+  async findAll(userId: string, role?: string): Promise<Notification[]> {
+    const qb = this.notifRepo.createQueryBuilder('n')
+      .where('n.targetUserId = :uid', { uid: userId });
+    if (role === UserRole.ADMIN) qb.andWhere('n.type IN (:...types)', { types: ADMIN_VISIBLE_TYPES });
+    return qb.orderBy('n.createdAt', 'DESC').take(50).getMany();
   }
 
   async markRead(id: string, userId: string): Promise<Notification> {
@@ -41,10 +47,11 @@ export class NotificationsService {
     await this.notifRepo.delete({ id, targetUserId: userId });
   }
 
-  async unreadCount(userId: string): Promise<number> {
-    return this.notifRepo.createQueryBuilder('n')
+  async unreadCount(userId: string, role?: string): Promise<number> {
+    const qb = this.notifRepo.createQueryBuilder('n')
       .where('n.targetUserId = :uid', { uid: userId })
-      .andWhere('n.isRead = :r', { r: false })
-      .getCount();
+      .andWhere('n.isRead = :r', { r: false });
+    if (role === UserRole.ADMIN) qb.andWhere('n.type IN (:...types)', { types: ADMIN_VISIBLE_TYPES });
+    return qb.getCount();
   }
 }

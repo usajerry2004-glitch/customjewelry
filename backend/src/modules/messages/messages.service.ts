@@ -133,21 +133,45 @@ export class MessagesService {
     const saved = await this.msgRepo.save(msg);
 
     if (isCustomer) {
-      const [authorizers, order] = await Promise.all([
+      const [authorizers, admins, order] = await Promise.all([
         this.userRepo.find({ where: { role: 'AUTHORIZER' as any } }),
+        this.userRepo.find({ where: { role: UserRole.ADMIN } }),
         this.orderRepo.findOne({ where: { id: orderId } }),
       ]);
-      await Promise.all(authorizers.map(auth =>
+      await Promise.all([...authorizers, ...admins].map(u =>
         this.notificationsService.create(
           NotificationType.CUSTOMER_MESSAGE,
           'Customer message — action required',
           `${authorName} left a message on an order and may need a response.`,
           orderId,
-          auth.id,
+          u.id,
           order?.isPriorityCustomer,
         ),
       ));
-    } else if (dto.mentions?.length) {
+    }
+
+    // Admin bell notifications are scoped to just mentions + customer/factory
+    // messages (not every internal status update) — this is the "factory
+    // messages something" half of that; the mention branch below still fires
+    // independently even if the factory manager also @mentioned someone.
+    if (user.role === UserRole.FACTORY_MANAGER) {
+      const [admins, order] = await Promise.all([
+        this.userRepo.find({ where: { role: UserRole.ADMIN } }),
+        this.orderRepo.findOne({ where: { id: orderId } }),
+      ]);
+      await Promise.all(admins.map(admin =>
+        this.notificationsService.create(
+          NotificationType.FACTORY_MESSAGE,
+          'Factory message — action required',
+          `${authorName} left a message on an order and may need a response.`,
+          orderId,
+          admin.id,
+          order?.isPriorityCustomer,
+        ),
+      ));
+    }
+
+    if (dto.mentions?.length) {
       const preview = saved.content ? `"${saved.content.substring(0, 100)}"` : `an attachment (${attachment?.attachmentName})`;
       const [mentionedUsers, order] = await Promise.all([
         this.userRepo.find({ where: { id: In(dto.mentions) } }),

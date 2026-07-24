@@ -332,7 +332,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                         CAD_UPLOADED: '📐', CAD_SENT_FOR_APPROVAL: '📤', CAD_APPROVED: '✅', CAD_REJECTED: '❌',
                         ORDER_CREATED: '🆕', ORDER_AUTHORIZED: '✔', SKU_GENERATED: '🏷️',
                         ORDER_IN_MANUFACTURING: '🏭', ORDER_SHIPPED: '📦', READY_TO_SHIP: '🚚',
-                        STATUS_CHANGED: '🔄', CUSTOMER_MESSAGE: '💬', MENTION: '@', SLA_OVERDUE: '⏰',
+                        STATUS_CHANGED: '🔄', CUSTOMER_MESSAGE: '💬', FACTORY_MESSAGE: '🏭', MENTION: '@', SLA_OVERDUE: '⏰',
                       };
                       const icon = typeIcon[n.type] || '🔔';
                       const clickable = !!n.orderId;

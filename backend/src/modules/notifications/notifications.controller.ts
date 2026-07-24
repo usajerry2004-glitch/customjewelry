@@ -12,14 +12,14 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get notifications for current user' })
   findAll(@Request() req: any) {
     if (!req.user?.id) throw new UnauthorizedException();
-    return this.notifService.findAll(req.user.id);
+    return this.notifService.findAll(req.user.id, req.user.role);
   }
 
   @Get('unread-count')
   @ApiOperation({ summary: 'Get unread notification count' })
   async unreadCount(@Request() req: any) {
     if (!req.user?.id) return { count: 0 };
-    const count = await this.notifService.unreadCount(req.user.id);
+    const count = await this.notifService.unreadCount(req.user.id, req.user.role);
     return { count };
   }
 
