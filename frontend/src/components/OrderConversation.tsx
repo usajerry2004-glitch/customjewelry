@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch, API } from '../utils/apiFetch';
+import { getSocket } from '../utils/socket';
 import { OrderMessage } from '../utils/types';
 import { formatName } from '../utils/name';
+
+interface ReadReceipt { userId: string; name: string; lastReadAt: string }
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN:          '#C09B58',
@@ -76,6 +79,19 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   const [attachError, setAttachError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Inline "@" typeahead — null means no trigger is active. mentionQueryStart
+  // is the index of the triggering '@' in `content`, used to splice the typed
+  // query back out once a name is picked.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionQueryStart, setMentionQueryStart] = useState(-1);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+
+  const [replyTo, setReplyTo] = useState<OrderMessage | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const [reads, setReads] = useState<ReadReceipt[]>([]);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = () =>
     apiFetch(`${API}/orders/${orderId}/messages`)
@@ -92,6 +108,56 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
       .then(users => { setMentionableUsers(users); setMentionableLoading(false); });
   }, [orderId, isCustomer]);
 
+  useEffect(() => {
+    apiFetch(`${API}/orders/${orderId}/messages/reads`).then(r => r.ok ? r.json() : []).then(setReads).catch(() => {});
+  }, [orderId]);
+
+  // Opening the thread counts as reading it — re-marked whenever a new
+  // message shows up while it's open, not just on first mount.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    apiFetch(`${API}/orders/${orderId}/messages/read`, { method: 'PATCH' }).catch(() => {});
+  }, [orderId, messages.length]);
+
+  // Live updates: join this order's room for as long as the thread is
+  // mounted, and leave on unmount/order change so typing/read broadcasts
+  // don't keep going to a chat the user has navigated away from.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    socket.emit('order:join', orderId);
+
+    const onNewMessage = (msg: OrderMessage) => {
+      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
+    };
+    const onTyping = (data: { userId: string; userName: string; isTyping: boolean }) => {
+      if (data.userId === currentUserId) return;
+      setTypingUsers(prev => {
+        const next = { ...prev };
+        if (data.isTyping) next[data.userId] = data.userName; else delete next[data.userId];
+        return next;
+      });
+    };
+    const onRead = (data: { userId: string; userName: string; lastReadAt: string }) => {
+      setReads(prev => [...prev.filter(r => r.userId !== data.userId), { userId: data.userId, name: data.userName, lastReadAt: data.lastReadAt }]);
+    };
+
+    socket.on('message:new', onNewMessage);
+    socket.on('typing', onTyping);
+    socket.on('message:read', onRead);
+
+    return () => {
+      socket.emit('order:leave', orderId);
+      socket.off('message:new', onNewMessage);
+      socket.off('typing', onTyping);
+      socket.off('message:read', onRead);
+    };
+  }, [orderId, currentUserId]);
+
+  const emitTyping = (isTyping: boolean) => {
+    getSocket()?.emit('typing', { orderId, isTyping });
+  };
+
   const mentionNameById = (id: string) => {
     const u = mentionableUsers.find(u => u.id === id);
     return u ? formatName(u.firstName, u.lastName) : 'Unknown user';
@@ -99,6 +165,53 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
 
   const toggleMention = (id: string) =>
     setMentions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const mentionMatches = mentionQuery === null
+    ? []
+    : mentionableUsers.filter(u => formatName(u.firstName, u.lastName).toLowerCase().includes(mentionQuery.toLowerCase()));
+  const mentionActiveSafe = mentionMatches.length ? mentionActiveIndex % mentionMatches.length : 0;
+
+  const closeMentionTypeahead = () => { setMentionQuery(null); setMentionQueryStart(-1); };
+
+  // Fires on every keystroke — looks at the text immediately before the
+  // caret (not the whole message) so an "@" earlier in an already-typed
+  // sentence doesn't reopen the picker while editing later in the message.
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setContent(value);
+
+    emitTyping(true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => emitTyping(false), 2000);
+
+    if (isCustomer) return;
+    const cursor = e.target.selectionStart ?? value.length;
+    const beforeCursor = value.slice(0, cursor);
+    const match = /(?:^|\s)@([a-zA-Z]*)$/.exec(beforeCursor);
+    if (match) {
+      setMentionQueryStart(cursor - match[1].length - 1);
+      setMentionQuery(match[1]);
+      setMentionActiveIndex(0);
+    } else {
+      closeMentionTypeahead();
+    }
+  };
+
+  const selectMention = (u: MentionableUser) => {
+    if (mentionQueryStart < 0) return;
+    const cursor = textareaRef.current?.selectionStart ?? content.length;
+    const before = content.slice(0, mentionQueryStart);
+    const after = content.slice(cursor);
+    const inserted = `@${formatName(u.firstName, u.lastName)} `;
+    setContent(before + inserted + after);
+    setMentions(prev => prev.includes(u.id) ? prev : [...prev, u.id]);
+    closeMentionTypeahead();
+    requestAnimationFrame(() => {
+      const pos = before.length + inserted.length;
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(pos, pos);
+    });
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -114,10 +227,13 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
   const send = async () => {
     if (!content.trim() && !attachedFile) return;
     setSending(true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    emitTyping(false);
     const formData = new FormData();
     formData.append('content', content.trim());
     formData.append('isInternal', String(isInternal));
     formData.append('mentions', JSON.stringify(mentions));
+    if (replyTo) formData.append('parentMessageId', replyTo.id);
     if (attachedFile) formData.append('file', attachedFile);
     await apiFetch(`${API}/orders/${orderId}/messages`, {
       method: 'POST',
@@ -127,6 +243,8 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
     setMentions([]);
     setIsInternal(false);
     setShowMentions(false);
+    closeMentionTypeahead();
+    setReplyTo(null);
     setAttachedFile(null);
     setAttachError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -134,7 +252,13 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
     setSending(false);
   };
 
-  const handleKey = (e: React.KeyboardEvent) => {
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery !== null && mentionMatches.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionActiveIndex(i => (i + 1) % mentionMatches.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionActiveIndex(i => (i - 1 + mentionMatches.length) % mentionMatches.length); return; }
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); selectMention(mentionMatches[mentionActiveSafe]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closeMentionTypeahead(); return; }
+    }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
   };
 
@@ -143,6 +267,16 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
     (acc[date] = acc[date] || []).push(msg);
     return acc;
   }, {});
+
+  // "Seen by" is only worth showing on the most recent message — readers
+  // whose last visit landed after it was sent have necessarily seen every
+  // earlier one too, so repeating this per-message would just be noise.
+  const lastMessage = messages[messages.length - 1];
+  const seenByNames = lastMessage
+    ? reads.filter(r => r.userId !== lastMessage.authorId && new Date(r.lastReadAt) >= new Date(lastMessage.createdAt)).map(r => r.name)
+    : [];
+
+  const typingNames = Object.values(typingUsers);
 
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
@@ -208,6 +342,13 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                    <button
+                      onClick={() => setReplyTo(msg)}
+                      title="Reply"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '11px', padding: '0 2px', opacity: 0.7 }}
+                    >
+                      ↩
+                    </button>
                   </div>
                   <div style={{
                     maxWidth: '75%',
@@ -216,6 +357,14 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                     borderRadius: '10px', padding: '10px 14px', fontSize: '13px',
                     color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   }}>
+                    {msg.parentPreview && (
+                      <div style={{
+                        marginBottom: '6px', paddingLeft: '8px', borderLeft: '2px solid var(--border)',
+                        fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'normal',
+                      }}>
+                        <span style={{ fontWeight: 600 }}>{msg.parentPreview.authorName}</span>: {msg.parentPreview.content}
+                      </div>
+                    )}
                     {msg.content}
                     {msg.attachmentUrl && (
                       <a
@@ -248,8 +397,19 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             })}
           </div>
         ))}
+        {seenByNames.length > 0 && (
+          <div style={{ textAlign: 'right', fontSize: '10px', color: 'var(--text-muted)', marginTop: '-4px', marginBottom: '4px' }}>
+            Seen by {seenByNames.join(', ')}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
+
+      {typingNames.length > 0 && (
+        <div style={{ padding: '0 18px 8px', fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          {typingNames.join(', ')} {typingNames.length > 1 ? 'are' : 'is'} typing…
+        </div>
+      )}
 
       {/* Input */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-input)' }}>
@@ -313,6 +473,22 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           </div>
         )}
 
+        {replyTo && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-hover)', border: '1px solid var(--border)', fontSize: '12px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Replying to <strong style={{ color: 'var(--text-primary)' }}>{replyTo.authorName}</strong>:</span>
+            <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              {replyTo.content || (replyTo.attachmentName ? `📎 ${replyTo.attachmentName}` : '')}
+            </span>
+            <button
+              onClick={() => setReplyTo(null)}
+              style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: 0 }}
+              aria-label="Cancel reply"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {attachedFile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '5px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border)', fontSize: '12px' }}>
             <PaperclipIcon />
@@ -331,7 +507,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           <div style={{ fontSize: '11px', color: '#EF4444', marginBottom: '8px' }}>{attachError}</div>
         )}
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
           <input
             ref={fileInputRef}
             type="file"
@@ -352,9 +528,11 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             <PaperclipIcon size={16} />
           </button>
           <textarea
+            ref={textareaRef}
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={handleContentChange}
             onKeyDown={handleKey}
+            onBlur={closeMentionTypeahead}
             placeholder={isCustomer ? 'Send a message to the team…' : isInternal ? 'Internal note (not visible to customer)…' : 'Reply to customer or add a note…'}
             rows={2}
             style={{
@@ -364,6 +542,33 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
               resize: 'none', outline: 'none', fontFamily: 'inherit',
             }}
           />
+          {mentionQuery !== null && !isCustomer && (
+            <div style={{
+              position: 'absolute', bottom: '100%', left: '44px', marginBottom: '6px',
+              background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px',
+              padding: '6px', zIndex: 20, minWidth: '220px', maxHeight: '200px', overflowY: 'auto',
+              boxShadow: 'var(--shadow-md)',
+            }}>
+              {mentionMatches.length === 0 ? (
+                <div style={{ padding: '6px 10px', fontSize: '12px', color: 'var(--text-muted)' }}>No matches</div>
+              ) : mentionMatches.map((u, i) => (
+                <div
+                  key={u.id}
+                  onMouseDown={e => { e.preventDefault(); selectMention(u); }}
+                  onMouseEnter={() => setMentionActiveIndex(i)}
+                  style={{
+                    padding: '6px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '12px',
+                    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px',
+                    color: i === mentionActiveSafe ? '#2563EB' : 'var(--text-secondary)',
+                    background: i === mentionActiveSafe ? 'rgba(37,99,235,0.08)' : 'transparent',
+                  }}
+                >
+                  <span>{formatName(u.firstName, u.lastName)}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0 }}>{roleLabel(u.role)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <button
             onClick={send}
             disabled={sending || (!content.trim() && !attachedFile)}

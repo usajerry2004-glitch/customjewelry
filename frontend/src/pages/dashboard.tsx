@@ -17,8 +17,8 @@ const GOLD = '#C09B58';
 const GOLD_DARK = '#A07C3A';
 
 const card: React.CSSProperties = {
-  background: '#fff', border: '1px solid #E8E0D4',
-  borderRadius: 16, boxShadow: '0 2px 12px rgba(26,39,64,0.06)',
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  borderRadius: 16, boxShadow: 'var(--shadow-sm)',
 };
 
 const PIPELINE_ORDER: OrderStatus[] = [

@@ -104,6 +104,8 @@ export interface OrderMessage {
   attachmentName?: string | null;
   attachmentSize?: number | null;
   attachmentMimeType?: string | null;
+  parentMessageId?: string | null;
+  parentPreview?: { id: string; authorName: string; content: string } | null;
   createdAt: string;
 }
 

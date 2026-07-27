@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, ILike, In, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -342,6 +342,51 @@ export class ReportsService {
       });
     }
     return records;
+  }
+
+  // Global, cross-order view of order_events — the same rows the per-order
+  // timeline (GET /orders/:id/events) already shows, just not scoped to one
+  // order. poNumber isn't stored on the event row itself, so it's joined in
+  // after the fact from a batch order lookup.
+  async getAuditLog(filters: {
+    userEmail?: string; action?: string; poNumber?: string; dateFrom?: string; dateTo?: string;
+    limit?: number; offset?: number;
+  }): Promise<{ events: any[]; total: number }> {
+    const limit = Math.min(filters.limit ?? 50, 200);
+    const offset = filters.offset ?? 0;
+
+    const where: any = {};
+    if (filters.action) where.action = filters.action;
+    if (filters.userEmail) where.userEmail = ILike(`%${filters.userEmail}%`);
+    if (filters.dateFrom || filters.dateTo) {
+      const from = filters.dateFrom ? new Date(filters.dateFrom) : new Date('1970-01-01');
+      const to = filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`) : new Date();
+      where.createdAt = Between(from, to);
+    }
+
+    if (filters.poNumber) {
+      const matches = await this.orderRepo.find({ where: { poNumber: ILike(`%${filters.poNumber}%`) }, select: ['id'] });
+      if (matches.length === 0) return { events: [], total: 0 };
+      where.orderId = In(matches.map(o => o.id));
+    }
+
+    const [events, total] = await this.eventRepo.findAndCount({
+      where, order: { createdAt: 'DESC' }, take: limit, skip: offset,
+    });
+
+    const orderIds = Array.from(new Set(events.map(e => e.orderId)));
+    const orders = orderIds.length
+      ? await this.orderRepo.find({ where: { id: In(orderIds) }, select: ['id', 'poNumber', 'storeName', 'customerFullName'] })
+      : [];
+    const orderById = new Map(orders.map(o => [o.id, o]));
+
+    return {
+      total,
+      events: events.map(e => {
+        const order = orderById.get(e.orderId);
+        return { ...e, poNumber: order?.poNumber ?? null, storeName: order?.storeName ?? null, customerFullName: order?.customerFullName ?? null };
+      }),
+    };
   }
 
   private async computeCustomerGroups(start: Date, end: Date) {

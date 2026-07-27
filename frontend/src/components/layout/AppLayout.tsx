@@ -4,13 +4,15 @@ import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
+import { ThemeToggle } from '../ThemeToggle';
 
 interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; isPriority?: boolean; }
 
 interface SearchOrder { id: string; poNumber: string; storeName?: string; customerFullName?: string; status: string; }
 interface SearchCustomer { id: string; firstName: string; lastName: string; email: string; storeName: string | null; }
 interface SearchCompany { id: string; name: string; }
-interface SearchResults { orders: SearchOrder[]; customers: SearchCustomer[]; companies: SearchCompany[]; }
+interface SearchMessage { id: string; orderId: string; content: string; authorName: string; createdAt: string; poNumber: string | null; storeName: string | null; }
+interface SearchResults { orders: SearchOrder[]; customers: SearchCustomer[]; companies: SearchCompany[]; messages: SearchMessage[]; }
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -25,6 +27,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showNotifPrefs, setShowNotifPrefs] = useState(false);
+  const [prefs, setPrefs] = useState<{ emailNotificationsEnabled: boolean; notifyPriorityOnly: boolean; mutedOrderIds: string[] } | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [globalQuery, setGlobalQuery] = useState('');
@@ -70,8 +75,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
     setGlobalQuery('');
     router.push(`/customers?q=${encodeURIComponent(c.name)}`);
   };
+  const goToMessage = (m: SearchMessage) => {
+    setSearchOpen(false);
+    setGlobalQuery('');
+    router.push(`/orders/${m.orderId}`);
+  };
 
-  const hasResults = !!searchResults && (searchResults.orders.length + searchResults.customers.length + searchResults.companies.length > 0);
+  const hasResults = !!searchResults && (searchResults.orders.length + searchResults.customers.length + searchResults.companies.length + searchResults.messages.length > 0);
 
   // Shared between the desktop inline search box and the mobile full-width
   // overlay — same results, just anchored differently by the caller.
@@ -137,6 +147,26 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               ))}
             </div>
           )}
+          {searchResults!.messages.length > 0 && (
+            <div>
+              <div style={{ padding: '10px 14px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Messages</div>
+              {searchResults!.messages.map(m => (
+                <div key={m.id} onClick={() => goToMessage(m)}
+                  style={{ padding: '9px 14px', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,155,88,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                    <span>{m.authorName}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>{m.poNumber || ''}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -168,6 +198,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
     await apiFetch(`${API}/notifications/read-all`, { method: 'PATCH' });
     setUnread(0);
     setNotifs(p => p.map(n => ({ ...n, isRead: true })));
+  };
+
+  const openNotifPrefs = async () => {
+    setShowNotifPrefs(true);
+    if (prefs) return;
+    setPrefsLoading(true);
+    try {
+      const res = await apiFetch(`${API}/notifications/preferences`);
+      if (res.ok) setPrefs(await res.json());
+    } finally { setPrefsLoading(false); }
+  };
+
+  const updateNotifPref = async (patch: Partial<{ emailNotificationsEnabled: boolean; notifyPriorityOnly: boolean }>) => {
+    setPrefs(p => p ? { ...p, ...patch } : p);
+    await apiFetch(`${API}/notifications/preferences`, { method: 'PATCH', body: JSON.stringify(patch) });
+  };
+
+  const unmuteAllOrders = async () => {
+    if (!prefs) return;
+    const ids = prefs.mutedOrderIds;
+    setPrefs({ ...prefs, mutedOrderIds: [] });
+    await Promise.all(ids.map(oid => apiFetch(`${API}/notifications/mute/${oid}`, { method: 'DELETE' })));
   };
 
   const dismissNotif = async (e: React.MouseEvent, n: Notification) => {
@@ -202,7 +254,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           background: 'var(--topbar-bg)',
           borderBottom: '2px solid var(--border-light)',
           borderBottomColor: 'var(--border-light)',
-          backgroundImage: 'linear-gradient(180deg, #FDFCFA 0%, #F9F6F1 100%)',
+          backgroundImage: 'linear-gradient(180deg, var(--topbar-bg) 0%, var(--bg-hover) 100%)',
           padding: '0 28px',
           height: '66px',
           display: 'flex',
@@ -285,6 +337,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
               🔍
             </button>
 
+            <ThemeToggle size={36} />
+
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
               <button
@@ -317,13 +371,55 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                   maxWidth: 'calc(100vw - 32px)',
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
-                    {unread > 0 && (
-                      <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
-                        Mark all read
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {showNotifPrefs ? 'Notification Settings' : 'Notifications'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      {!showNotifPrefs && unread > 0 && (
+                        <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                          Mark all read
+                        </button>
+                      )}
+                      <button
+                        onClick={() => showNotifPrefs ? setShowNotifPrefs(false) : openNotifPrefs()}
+                        title="Notification settings"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: showNotifPrefs ? 'var(--accent)' : 'var(--text-muted)', fontSize: '13px', padding: 0 }}
+                      >
+                        {showNotifPrefs ? '✕' : '⚙'}
                       </button>
-                    )}
+                    </div>
                   </div>
+                  {showNotifPrefs ? (
+                    <div style={{ padding: '16px' }}>
+                      {prefsLoading || !prefs ? (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Loading…</div>
+                      ) : (
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px', fontSize: '12px', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                            Email notifications
+                            <input type="checkbox" checked={prefs.emailNotificationsEnabled} onChange={e => updateNotifPref({ emailNotificationsEnabled: e.target.checked })} />
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '14px', fontSize: '12px', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                            Priority orders only
+                            <input type="checkbox" checked={prefs.notifyPriorityOnly} onChange={e => updateNotifPref({ notifyPriorityOnly: e.target.checked })} />
+                          </label>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.5 }}>
+                            To mute a specific order, use the 🔔 Mute button on that order's page.
+                          </div>
+                          {prefs.mutedOrderIds.length > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-light)' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {prefs.mutedOrderIds.length} order{prefs.mutedOrderIds.length > 1 ? 's' : ''} muted
+                              </span>
+                              <button onClick={unmuteAllOrders} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                                Unmute all
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : (
                   <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
                     {notifs.length === 0 ? (
                       <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No notifications</div>
@@ -377,6 +473,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                       );
                     })}
                   </div>
+                  )}
                 </div>
               )}
             </div>

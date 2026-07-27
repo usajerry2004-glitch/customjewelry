@@ -75,6 +75,13 @@ export class User {
   @Column({ default: false })
   isPriority: boolean;
 
+  // Self-service in-app bell filter: when true, this user's bell only gets
+  // notifications for orders flagged isPriorityCustomer — everything else is
+  // skipped at creation time in NotificationsService.create(). Separate from
+  // emailNotificationsEnabled above, which only gates the email channel.
+  @Column({ default: false })
+  notifyPriorityOnly: boolean;
+
   // Per-user overrides that grant a specific extra capability beyond this
   // account's role (e.g. a Sales Rep who's also allowed to bulk-delete
   // orders) — see backend/src/common/permissions.ts for the fixed catalog.

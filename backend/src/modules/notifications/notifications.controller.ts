@@ -1,6 +1,12 @@
-import { Controller, Get, Patch, Delete, Param, Request, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Delete, Post, Param, Request, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { IsBoolean, IsOptional } from 'class-validator';
 import { NotificationsService } from './notifications.service';
+
+class UpdatePreferencesDto {
+  @IsBoolean() @IsOptional() emailNotificationsEnabled?: boolean;
+  @IsBoolean() @IsOptional() notifyPriorityOnly?: boolean;
+}
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -42,5 +48,33 @@ export class NotificationsController {
   dismiss(@Param('id') id: string, @Request() req: any) {
     if (!req.user?.id) throw new UnauthorizedException();
     return this.notifService.dismiss(id, req.user.id);
+  }
+
+  @Get('preferences')
+  @ApiOperation({ summary: "Get the current user's own notification preferences" })
+  getPreferences(@Request() req: any) {
+    if (!req.user?.id) throw new UnauthorizedException();
+    return this.notifService.getPreferences(req.user.id);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: "Update the current user's own notification preferences" })
+  updatePreferences(@Body() dto: UpdatePreferencesDto, @Request() req: any) {
+    if (!req.user?.id) throw new UnauthorizedException();
+    return this.notifService.updatePreferences(req.user.id, dto);
+  }
+
+  @Post('mute/:orderId')
+  @ApiOperation({ summary: 'Mute bell notifications for one order (current user only)' })
+  muteOrder(@Param('orderId') orderId: string, @Request() req: any) {
+    if (!req.user?.id) throw new UnauthorizedException();
+    return this.notifService.muteOrder(req.user.id, orderId);
+  }
+
+  @Delete('mute/:orderId')
+  @ApiOperation({ summary: 'Unmute bell notifications for one order (current user only)' })
+  unmuteOrder(@Param('orderId') orderId: string, @Request() req: any) {
+    if (!req.user?.id) throw new UnauthorizedException();
+    return this.notifService.unmuteOrder(req.user.id, orderId);
   }
 }

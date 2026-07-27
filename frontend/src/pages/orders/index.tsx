@@ -67,6 +67,38 @@ const modalSectionTitle: React.CSSProperties = {
 
 interface Customer { id: string; firstName: string; lastName: string; email: string; storeName?: string; phoneNumber?: string; }
 
+interface SavedFilterPreset {
+  id: string;
+  name: string;
+  search: string;
+  statusFilter: string;
+  cadSubFilter: string;
+  stoneSubFilter: string;
+  factoryFilter: string;
+  supplySourceFilter: string;
+  dateFrom: string;
+  dateTo: string;
+  activeMonth: string;
+  customerFilterInput: string;
+}
+
+// Namespaced per user so one person's saved views don't show up for the next
+// person who logs into the same browser/machine.
+const presetsStorageKey = (userId: string) => `jf_order_filter_presets_${userId}`;
+
+function loadPresets(userId: string): SavedFilterPreset[] {
+  if (!userId || typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(presetsStorageKey(userId));
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePresets(userId: string, presets: SavedFilterPreset[]) {
+  if (!userId || typeof window === 'undefined') return;
+  localStorage.setItem(presetsStorageKey(userId), JSON.stringify(presets));
+}
+
 const ROLES_NEED_CUSTOMER = ['SALES_REP', 'AUTHORIZER', 'ADMIN'];
 
 const ORDER_TYPES_MODAL = ['Earring', 'Ring', 'Pendant', 'Necklace', 'Bracelet', 'Other'];
@@ -130,7 +162,12 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [userId, setUserId] = useState('');
   const [extraPermissions, setExtraPermissions] = useState<Permission[]>([]);
+  const [filterPresets, setFilterPresets] = useState<SavedFilterPreset[]>([]);
+  const [activePresetId, setActivePresetId] = useState('');
+  const [showSavePresetInput, setShowSavePresetInput] = useState(false);
+  const [presetNameInput, setPresetNameInput] = useState('');
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [cadSubFilter, setCadSubFilter] = useState('');
   const [stoneSubFilter, setStoneSubFilter] = useState('');
@@ -165,6 +202,10 @@ export default function OrdersPage() {
         setIsAdmin(parsed.role === 'ADMIN');
         setUserRole(parsed.role || '');
         setExtraPermissions(parsed.extraPermissions || []);
+        if (parsed.id) {
+          setUserId(parsed.id);
+          setFilterPresets(loadPresets(parsed.id));
+        }
       }
     } catch {}
   }, []);
@@ -380,6 +421,45 @@ export default function OrdersPage() {
   };
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
+
+  const applyFilterPreset = (p: SavedFilterPreset) => {
+    setSearch(p.search);
+    setStatusFilter(p.statusFilter);
+    setCadSubFilter(p.cadSubFilter);
+    setStoneSubFilter(p.stoneSubFilter);
+    setFactoryFilter(p.factoryFilter);
+    setSupplySourceFilter(p.supplySourceFilter);
+    setDateFrom(p.dateFrom);
+    setDateTo(p.dateTo);
+    setActiveMonth(p.activeMonth);
+    setCustomerFilterInput(p.customerFilterInput);
+    setCustomerFilter(p.customerFilterInput);
+    setActivePresetId(p.id);
+  };
+
+  const saveCurrentFiltersAsPreset = () => {
+    const name = presetNameInput.trim();
+    if (!name || !userId) return;
+    const preset: SavedFilterPreset = {
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      name,
+      search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+      dateFrom, dateTo, activeMonth, customerFilterInput,
+    };
+    const next = [...filterPresets, preset];
+    setFilterPresets(next);
+    savePresets(userId, next);
+    setActivePresetId(preset.id);
+    setPresetNameInput('');
+    setShowSavePresetInput(false);
+  };
+
+  const deleteFilterPreset = (id: string) => {
+    const next = filterPresets.filter(p => p.id !== id);
+    setFilterPresets(next);
+    savePresets(userId, next);
+    if (activePresetId === id) setActivePresetId('');
+  };
 
   // Debounce the search box so typing doesn't fire a request per keystroke
   useEffect(() => {
@@ -867,6 +947,59 @@ export default function OrdersPage() {
         </div>
         );
       })()}
+
+      {/* Saved filter views — e.g. "My overdue orders", "This week's VPOs" */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {filterPresets.map(p => (
+          <div key={p.id} style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              onClick={() => applyFilterPreset(p)}
+              style={{
+                padding: '5px 6px 5px 12px', borderRadius: '20px 0 0 20px', fontSize: '12px', cursor: 'pointer',
+                fontWeight: activePresetId === p.id ? 600 : 400,
+                background: activePresetId === p.id ? 'var(--accent)' : 'var(--bg-card)',
+                color: activePresetId === p.id ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${activePresetId === p.id ? 'var(--accent)' : 'var(--border)'}`,
+                borderRight: 'none',
+              }}
+            >
+              ⭐ {p.name}
+            </button>
+            <button
+              onClick={() => deleteFilterPreset(p.id)}
+              title="Delete this saved view"
+              style={{
+                padding: '5px 10px 5px 6px', borderRadius: '0 20px 20px 0', fontSize: '12px', cursor: 'pointer',
+                background: activePresetId === p.id ? 'var(--accent)' : 'var(--bg-card)',
+                color: activePresetId === p.id ? '#fff' : 'var(--text-muted)',
+                border: `1px solid ${activePresetId === p.id ? 'var(--accent)' : 'var(--border)'}`,
+              }}
+            >✕</button>
+          </div>
+        ))}
+        {showSavePresetInput ? (
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <input
+              autoFocus
+              value={presetNameInput}
+              onChange={e => setPresetNameInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveCurrentFiltersAsPreset(); if (e.key === 'Escape') { setShowSavePresetInput(false); setPresetNameInput(''); } }}
+              placeholder="View name…"
+              style={{ ...inputStyle, padding: '5px 10px', fontSize: '12px', width: '140px' }}
+            />
+            <button onClick={saveCurrentFiltersAsPreset} disabled={!presetNameInput.trim()}
+              style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: presetNameInput.trim() ? 'pointer' : 'default', background: 'var(--navy)', color: '#fff', border: 'none', opacity: presetNameInput.trim() ? 1 : 0.6 }}
+            >Save</button>
+            <button onClick={() => { setShowSavePresetInput(false); setPresetNameInput(''); }}
+              style={{ padding: '5px 10px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >Cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setShowSavePresetInput(true)}
+            style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
+          >+ Save current filters</button>
+        )}
+      </div>
 
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>

@@ -46,4 +46,22 @@ export class ReportsController {
     await this.reportsService.sendWeeklyReport(weekStart, weekEnd);
     return { sent: true };
   }
+
+  @Get('audit-log')
+  @ApiOperation({ summary: 'Global audit log across all orders — who changed what, when (Admin only)' })
+  auditLog(
+    @Query('userEmail') userEmail?: string,
+    @Query('action') action?: string,
+    @Query('poNumber') poNumber?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.reportsService.getAuditLog({
+      userEmail, action, poNumber, dateFrom, dateTo,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
 }

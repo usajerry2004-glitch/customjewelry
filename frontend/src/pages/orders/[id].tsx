@@ -450,6 +450,8 @@ export default function OrderDetail() {
   const [sendingReminder, setSendingReminder] = useState(false);
   const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; note?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [muteLoading, setMuteLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -479,6 +481,23 @@ export default function OrderDetail() {
       .then(d => { if (d) setTimerRunning(!!d.running); })
       .catch(() => {});
   }, [id, currentUser]);
+
+  const toggleMute = async () => {
+    if (!id) return;
+    setMuteLoading(true);
+    try {
+      const res = await apiFetch(`${API}/notifications/mute/${id}`, { method: isMuted ? 'DELETE' : 'POST' });
+      if (res.ok) {
+        setIsMuted(m => !m);
+      } else {
+        toast.error('Failed to update notification mute.');
+      }
+    } catch {
+      toast.error('Failed to update notification mute — check your connection and try again.');
+    } finally {
+      setMuteLoading(false);
+    }
+  };
 
   const toggleTimer = async () => {
     if (!id) return;
@@ -510,6 +529,10 @@ export default function OrderDetail() {
 
     // Load audit events in parallel (non-blocking)
     apiFetch(`${API}/orders/${id}/events`).then(r => r.ok ? r.json() : []).then(setEvents).catch(() => {});
+
+    // Whether the current user has muted bell notifications for this order
+    apiFetch(`${API}/notifications/preferences`).then(r => r.ok ? r.json() : null)
+      .then(p => { if (p) setIsMuted((p.mutedOrderIds || []).includes(id)); }).catch(() => {});
 
     const fetchOrder = apiFetch(`${API}/orders/${id}`, { signal })
       .then(async (oRes) => {
@@ -990,6 +1013,20 @@ export default function OrderDetail() {
               🖨 Job Bag
             </button>
           )}
+          <button
+            onClick={toggleMute}
+            disabled={muteLoading}
+            title={isMuted ? 'Unmute bell notifications for this order' : 'Mute bell notifications for this order'}
+            style={{
+              background: isMuted ? 'rgba(220,38,38,0.08)' : 'var(--bg-input)',
+              border: `1px solid ${isMuted ? 'rgba(220,38,38,0.3)' : 'var(--border)'}`,
+              borderRadius: '8px', padding: '7px 16px',
+              color: isMuted ? '#DC2626' : 'var(--text-secondary)',
+              fontSize: '12px', cursor: 'pointer', fontWeight: 600, opacity: muteLoading ? 0.7 : 1,
+            }}
+          >
+            {isMuted ? '🔕 Muted' : '🔔 Mute'}
+          </button>
           <button
             onClick={() => router.push('/orders')}
             style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
