@@ -66,6 +66,7 @@ export default function CustomersPage() {
   const [showOrdersH, setShowOrdersH] = useState(400);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
@@ -100,20 +101,33 @@ export default function CustomersPage() {
   });
 
   const load = async () => {
-    const [uRes, sRes, rRes] = await Promise.all([
-      apiFetch(`${API}/users?role=CUSTOMER`),
-      apiFetch(`${API}/users/stats`),
-      apiFetch(`${API}/users?role=SALES_REP`),
-    ]);
-    if (uRes.ok) setCustomers(await uRes.json());
-    if (sRes.ok) setStats(await sRes.json());
-    if (rRes.ok) {
-      const reps: any[] = await rRes.json();
-      const map: Record<string, string> = {};
-      reps.forEach(r => { map[r.id] = formatName(r.firstName, r.lastName); });
-      setSalesRepMap(map);
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [uRes, sRes, rRes] = await Promise.all([
+        apiFetch(`${API}/users?role=CUSTOMER`),
+        apiFetch(`${API}/users/stats`),
+        apiFetch(`${API}/users?role=SALES_REP`),
+      ]);
+      if (uRes.ok) setCustomers(await uRes.json());
+      if (sRes.ok) setStats(await sRes.json());
+      if (rRes.ok) {
+        const reps: any[] = await rRes.json();
+        const map: Record<string, string> = {};
+        reps.forEach(r => { map[r.id] = formatName(r.firstName, r.lastName); });
+        setSalesRepMap(map);
+      }
+      if (!uRes.ok || !sRes.ok || !rRes.ok) {
+        setLoadError('Some customer data failed to load. Try refreshing.');
+      }
+    } catch {
+      // A rejected fetch (network error, timeout, CORS) rather than just a
+      // non-2xx status — without this catch, loading stayed true forever
+      // and the page never left "Loading…" (nothing below the try ever ran).
+      setLoadError('Cannot connect to the server. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -384,7 +398,7 @@ export default function CustomersPage() {
   return (
     <AppLayout
       title="Customers"
-      subtitle={stats ? `${stats.totalCustomers} customers · ${stats.activeCustomers} active` : 'Loading…'}
+      subtitle={stats ? `${stats.totalCustomers} customers · ${stats.activeCustomers} active` : loading ? 'Loading…' : (loadError || '')}
     >
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -450,6 +464,18 @@ export default function CustomersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</td></tr>
+            ) : loadError ? (
+              <tr>
+                <td colSpan={7} style={{ padding: '48px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--danger)', marginBottom: '10px' }}>{loadError}</div>
+                  <button
+                    onClick={load}
+                    style={{ padding: '7px 18px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Retry
+                  </button>
+                </td>
+              </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ padding: '48px', textAlign: 'center' }}>
