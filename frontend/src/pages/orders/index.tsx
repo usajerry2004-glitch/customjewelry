@@ -80,6 +80,7 @@ interface SavedFilterPreset {
   dateTo: string;
   activeMonth: string;
   customerFilterInput: string;
+  customerTextedFilter?: boolean;
 }
 
 // Namespaced per user so one person's saved views don't show up for the next
@@ -175,6 +176,7 @@ export default function OrdersPage() {
   const [supplySourceFilter, setSupplySourceFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [customerFilterInput, setCustomerFilterInput] = useState('');
+  const [customerTextedFilter, setCustomerTextedFilter] = useState(false);
   const [showFilterDrop, setShowFilterDrop] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -233,6 +235,7 @@ export default function OrdersPage() {
       if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
+      if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -434,6 +437,7 @@ export default function OrdersPage() {
     setActiveMonth(p.activeMonth);
     setCustomerFilterInput(p.customerFilterInput);
     setCustomerFilter(p.customerFilterInput);
+    setCustomerTextedFilter(p.customerTextedFilter ?? false);
     setActivePresetId(p.id);
   };
 
@@ -444,7 +448,7 @@ export default function OrdersPage() {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       name,
       search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
-      dateFrom, dateTo, activeMonth, customerFilterInput,
+      dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter,
     };
     const next = [...filterPresets, preset];
     setFilterPresets(next);
@@ -467,7 +471,7 @@ export default function OrdersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo]);
+  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
   useEffect(() => { load(page); }, [page]);
 
   const openNewOrderModal = async () => {
@@ -1057,6 +1061,20 @@ export default function OrdersPage() {
               {f.label}
             </button>
           ))}
+          <button
+            onClick={() => setCustomerTextedFilter(v => !v)}
+            title="Only show orders where the customer has sent a chat message"
+            style={{
+              padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+              fontWeight: customerTextedFilter ? 600 : 400,
+              background: customerTextedFilter ? 'var(--navy)' : 'var(--bg-card)',
+              color: customerTextedFilter ? '#fff' : 'var(--text-secondary)',
+              border: `1px solid ${customerTextedFilter ? 'var(--navy)' : 'var(--border)'}`,
+              transition: 'all 0.15s',
+            }}
+          >
+            💬 Customer Text
+          </button>
         </div>
 
         {/* Mobile: dropdown select */}

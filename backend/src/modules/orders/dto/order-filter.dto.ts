@@ -10,6 +10,7 @@ export class OrderFilterDto {
   @IsOptional() @IsString() dateTo?: string;
   @IsOptional() @IsString() cadSubFilter?: string;
   @IsOptional() @IsString() stoneSubFilter?: string;
+  @IsOptional() @IsString() hasCustomerMessage?: string;
   @IsOptional() @IsEnum(Factory) assignedFactory?: Factory;
   @IsOptional() @IsEnum(SupplySource) supplySource?: SupplySource;
   @IsOptional() @IsNumber() @Min(0) @Type(() => Number) offset?: number;

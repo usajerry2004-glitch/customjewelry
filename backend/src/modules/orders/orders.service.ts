@@ -259,6 +259,15 @@ export class OrdersService implements OnModuleInit {
     if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
     if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
 
+    // "Customer texted" — orders where the customer has posted at least one
+    // chat message (not just internal staff notes), so someone can find
+    // orders that may need a reply.
+    if (filters.hasCustomerMessage === 'true') {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId" = order.id AND om."authorRole" = 'CUSTOMER')`,
+      );
+    }
+
     if (filters.search) {
       const escaped = filters.search.replace(/[%_\\]/g, c => `\\${c}`);
       qb.andWhere(
