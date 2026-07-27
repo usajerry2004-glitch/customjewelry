@@ -263,8 +263,11 @@ export class OrdersService implements OnModuleInit {
     // chat message (not just internal staff notes), so someone can find
     // orders that may need a reply.
     if (filters.hasCustomerMessage === 'true') {
+      // order_messages.orderId is varchar while orders.id is uuid — same
+      // mismatch as order.companyId vs companies.id above, needs an
+      // explicit cast or Postgres rejects the comparison outright.
       qb.andWhere(
-        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId" = order.id AND om."authorRole" = 'CUSTOMER')`,
+        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId" = order.id::text AND om."authorRole" = 'CUSTOMER')`,
       );
     }
 

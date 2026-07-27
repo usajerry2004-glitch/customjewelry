@@ -132,6 +132,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Partial<Order>[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
@@ -220,6 +221,7 @@ export default function OrdersPage() {
 
   const load = async (pageNum = 0) => {
     setLoading(true);
+    setLoadError('');
     setSelectedIds(new Set());
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageNum * PAGE_SIZE) });
@@ -250,7 +252,19 @@ export default function OrdersPage() {
             .then(map => setThumbnails(map))
             .catch(() => {});
         }
+      } else {
+        // Leaving the previous (now stale/mismatched) list on screen with no
+        // indication anything failed is exactly how a broken filter query
+        // used to look identical to "no results" or "unfiltered" — clear it
+        // and say so instead.
+        setOrders([]);
+        setTotal(0);
+        setLoadError('Failed to load orders. Try adjusting your filters or reloading.');
       }
+    } catch {
+      setOrders([]);
+      setTotal(0);
+      setLoadError('Cannot connect to the server. Check your connection and try again.');
     } finally { setLoading(false); }
   };
 
@@ -1246,6 +1260,18 @@ export default function OrdersPage() {
           : orders;
 
         if (loading) return <SkeletonOrderGrid count={8} />;
+
+        if (loadError) return (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '10px' }}>{loadError}</div>
+            <button
+              onClick={() => load(page)}
+              style={{ padding: '7px 18px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Retry
+            </button>
+          </div>
+        );
 
         if (displayOrders.length === 0) return (
           <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>
