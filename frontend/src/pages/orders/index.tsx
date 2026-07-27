@@ -1073,7 +1073,7 @@ export default function OrdersPage() {
               transition: 'all 0.15s',
             }}
           >
-            💬 Customer Text
+            Customer Text
           </button>
         </div>
 
