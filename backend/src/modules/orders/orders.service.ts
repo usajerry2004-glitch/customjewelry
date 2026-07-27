@@ -323,6 +323,53 @@ export class OrdersService implements OnModuleInit {
     return order;
   }
 
+  // Reuses findOne()'s per-role visibility checks (it throws NotFoundException
+  // for anything the user shouldn't see) instead of re-deriving the rules —
+  // used by the chat gateway to gate room joins to orders the socket's user
+  // can actually access.
+  async canUserAccessOrder(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<boolean> {
+    try {
+      await this.findOne(id, user);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Order IDs this user is allowed to see, or null if their role has no extra
+  // restriction (Admin/Authorizer see everything) — same scoping as findAll()'s
+  // role branch above, factored out for reuse by global message search.
+  async getVisibleOrderIds(user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<string[] | null> {
+    if (!user) return null;
+    const qb = this.orderRepo.createQueryBuilder('order').select('order.id', 'id');
+
+    if (user.role === 'CUSTOMER') {
+      qb.andWhere(
+        '(order.customerEmail = :email OR order.customerId = :uid OR (order.companyId IS NOT NULL AND order.companyId = :companyId))',
+        { email: user.email, uid: user.id, companyId: user.companyId ?? null },
+      );
+    } else if (user.role === 'SALES_REP') {
+      qb.andWhere(
+        '(order.salesRepId = :salesRepId OR (order.companyId IS NOT NULL AND order.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :salesRepId)))',
+        { salesRepId: user.id },
+      );
+    } else if (user.role === 'CAD_DESIGNER') {
+      qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
+    } else if (user.role === 'FACTORY_MANAGER') {
+      qb.andWhere('order.status IN (:...factoryStatuses)', { factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED] });
+      qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
+    } else if (user.role === 'STONE_MANAGER') {
+      qb.andWhere('order.status = :vpoStatus', { vpoStatus: OrderStatus.VPO_ISSUED });
+      qb.andWhere('(order.stoneStatus = :pendingStone OR order.stoneStatus IS NULL)', { pendingStone: 'PENDING_STONE' });
+      qb.andWhere('order.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
+    } else {
+      return null; // ADMIN, AUTHORIZER, and any other unlisted role: unrestricted
+    }
+
+    const rows = await qb.getRawMany();
+    return rows.map(r => r.id);
+  }
+
   // New style: "C00001", "C00002", ... Legacy "CO#####" orders (and the
   // embedded "KJ-2026-XXXX (CO#####)" format) are a separate, frozen
   // sequence — this only continues the highest existing "C#####" number.

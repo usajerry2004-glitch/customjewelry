@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import * as compression from 'compression';
@@ -20,6 +21,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const logger = new Logger('Bootstrap');
+
+  // The order-chat gateway (typing indicators, live messages, read receipts)
+  // rides on the same HTTP server as the REST API via socket.io.
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Security
   app.use(helmet());

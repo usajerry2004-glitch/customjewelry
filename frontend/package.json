@@ -37,6 +37,7 @@
     "recharts": "^2.10.3",
     "rhino3dm": "^8.0.1",
     "sharp": "^0.35.3",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.2.0",
     "three": "^0.184.0",
     "zod": "^3.22.4",

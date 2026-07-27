@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Company } from '../../database/entities/company.entity';
 import { OrdersService } from '../orders/orders.service';
+import { MessagesService } from '../messages/messages.service';
 
 const RESULT_LIMIT = 6;
 const MIN_QUERY_LENGTH = 2;
@@ -17,6 +18,7 @@ export interface GlobalSearchResult {
   orders: any[];
   customers: { id: string; firstName: string; lastName: string; email: string; storeName: string | null }[];
   companies: { id: string; name: string }[];
+  messages: any[];
 }
 
 @Injectable()
@@ -25,6 +27,7 @@ export class SearchService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
     private readonly ordersService: OrdersService,
+    private readonly messagesService: MessagesService,
   ) {}
 
   async search(
@@ -32,12 +35,15 @@ export class SearchService {
     user: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: any; assignedSupplySource?: any },
   ): Promise<GlobalSearchResult> {
     const term = (q || '').trim();
-    if (term.length < MIN_QUERY_LENGTH) return { orders: [], customers: [], companies: [] };
+    if (term.length < MIN_QUERY_LENGTH) return { orders: [], customers: [], companies: [], messages: [] };
 
     // Reuses OrdersService's existing role-scoped visibility (Sales Rep only
     // sees their own orders, Factory/Stone Manager only their assigned ones, etc.)
     // instead of re-implementing it here.
-    const { orders } = await this.ordersService.findAll({ search: term, limit: RESULT_LIMIT } as any, user as any);
+    const [{ orders }, messages] = await Promise.all([
+      this.ordersService.findAll({ search: term, limit: RESULT_LIMIT } as any, user as any),
+      this.messagesService.searchMessages(term, user as any),
+    ]);
 
     let customers: User[] = [];
     let companies: Company[] = [];
@@ -65,6 +71,7 @@ export class SearchService {
       orders,
       customers: customers.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email, storeName: c.storeName || null })),
       companies: companies.map(c => ({ id: c.id, name: c.name })),
+      messages,
     };
   }
 }

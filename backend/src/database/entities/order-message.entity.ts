@@ -27,6 +27,10 @@ export class OrderMessage {
   @Column('simple-array', { nullable: true, default: '' })
   mentions: string[];
 
+  // Threaded replies — the message this one is quoting/replying to, if any.
+  @Column({ nullable: true })
+  parentMessageId: string | null;
+
   @Column({ nullable: true })
   attachmentUrl: string;
 

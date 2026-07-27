@@ -9,6 +9,7 @@ import { CadFile } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { Sku } from '../../database/entities/sku.entity';
+import { Company } from '../../database/entities/company.entity';
 import { EmailService } from '../email/email.service';
 import { SkuService } from '../sku/sku.service';
 
@@ -62,6 +63,7 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(OrderEvent),   useValue: makeRepo() },
         { provide: getRepositoryToken(OrderMessage), useValue: makeRepo() },
         { provide: getRepositoryToken(Sku),          useValue: makeRepo() },
+        { provide: getRepositoryToken(Company),      useValue: makeRepo() },
         { provide: EmailService, useValue: {
           sendOrderInProduction:      jest.fn().mockResolvedValue(true),
           sendVpoIssuedNotice:        jest.fn().mockResolvedValue(true),
