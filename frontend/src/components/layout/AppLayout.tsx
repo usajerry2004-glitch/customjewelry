@@ -4,7 +4,6 @@ import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/auth.store';
 import { UserRole } from '../../utils/types';
 import { apiFetch, API } from '../../utils/apiFetch';
-import { ThemeToggle } from '../ThemeToggle';
 
 interface Notification { id: string; title: string; message: string; isRead: boolean; createdAt: string; type: string; orderId?: string; isPriority?: boolean; }
 
@@ -254,7 +253,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
           background: 'var(--topbar-bg)',
           borderBottom: '2px solid var(--border-light)',
           borderBottomColor: 'var(--border-light)',
-          backgroundImage: 'linear-gradient(180deg, var(--topbar-bg) 0%, var(--bg-hover) 100%)',
+          backgroundImage: 'linear-gradient(180deg, #FDFCFA 0%, #F9F6F1 100%)',
           padding: '0 28px',
           height: '66px',
           display: 'flex',
@@ -336,8 +335,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             >
               🔍
             </button>
-
-            <ThemeToggle size={36} />
 
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>

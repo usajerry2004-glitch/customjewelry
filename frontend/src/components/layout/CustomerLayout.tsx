@@ -1,7 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '../../store/auth.store';
-import { ThemeToggle } from '../ThemeToggle';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -59,7 +58,6 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <ThemeToggle size={32} variant="on-dark" />
           {user && (
             <>
               <div style={{
