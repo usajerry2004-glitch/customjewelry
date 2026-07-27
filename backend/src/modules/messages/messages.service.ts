@@ -152,9 +152,10 @@ export class MessagesService {
 
     // Admin bell notifications are scoped to just mentions + customer/factory
     // messages (not every internal status update) — this is the "factory
-    // messages something" half of that; the mention branch below still fires
-    // independently even if the factory manager also @mentioned someone.
-    if (user.role === UserRole.FACTORY_MANAGER) {
+    // messages something" half of that. Skipped when the message already
+    // @mentions someone: that's a targeted message, not a broadcast, so only
+    // the mentioned user(s) should be notified (via the mention branch below).
+    if (user.role === UserRole.FACTORY_MANAGER && !dto.mentions?.length) {
       const [admins, order] = await Promise.all([
         this.userRepo.find({ where: { role: UserRole.ADMIN } }),
         this.orderRepo.findOne({ where: { id: orderId } }),
