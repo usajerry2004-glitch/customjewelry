@@ -265,9 +265,12 @@ export class OrdersService implements OnModuleInit {
     if (filters.hasCustomerMessage === 'true') {
       // order_messages.orderId is varchar while orders.id is uuid — same
       // mismatch as order.companyId vs companies.id above, needs an
-      // explicit cast or Postgres rejects the comparison outright.
+      // explicit cast or Postgres rejects the comparison outright. Casting
+      // both sides to text (not just the uuid side) so this doesn't assume
+      // orderId's exact column type, which has drifted between environments
+      // before on this project.
       qb.andWhere(
-        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId" = order.id::text AND om."authorRole" = 'CUSTOMER')`,
+        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId"::text = order.id::text AND om."authorRole" = 'CUSTOMER')`,
       );
     }
 
