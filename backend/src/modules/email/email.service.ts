@@ -607,6 +607,32 @@ export class EmailService {
       `),
     });
   }
+
+  // One recipient per call — sent from inside the mention-handling loop in
+  // MessagesService.postMessage, once per mentioned Sales Rep on the message.
+  async sendMentionAlert(opts: {
+    to: string;
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    orderId: string;
+    mentionedByName: string;
+    messagePreview: string;
+    isPriorityCustomer?: boolean;
+  }) {
+    return this.send({
+      to: opts.to,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Mentioned] ${opts.poNumber} — please check & respond`,
+      html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
+        <h2 style="color:#0369A1;margin:0 0 16px">You Were Tagged in an Order Chat</h2>
+        <p><strong>${escapeHtml(opts.mentionedByName)}</strong> tagged you on the order below. The team has tagged you — please check and respond.</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <p style="margin:16px 0;padding:12px 16px;background:#F9F8F6;border-left:3px solid #0369A1;color:#4B5563;font-size:13px;font-style:italic">${escapeHtml(opts.messagePreview)}</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#0369A1')}">Open Order →</a>
+      `),
+    });
+  }
 }
 
 // ── HTML helpers ────────────────────────────────────────────────────────────
@@ -661,4 +687,17 @@ function orderCard(poNumber: string, customerName: string, orderType: string, ex
 
 function btnStyle(color: string): string {
   return `display:inline-block;background:${color};color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;margin-top:8px`;
+}
+
+// Chat message content is free-form user input, unlike the other fields
+// interpolated into these templates — escape it before embedding in HTML
+// so a message containing "<"/"&" etc. can't break the layout or inject
+// markup into a recipient's mail client.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

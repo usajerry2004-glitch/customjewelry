@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { SpacesService } from '../spaces/spaces.service';
 import { OrdersService } from '../orders/orders.service';
+import { EmailService } from '../email/email.service';
 import { MessagesGateway } from './messages.gateway';
 import { isMessageVisible } from './message-visibility';
 
@@ -46,6 +47,7 @@ export class MessagesService {
     private notificationsService: NotificationsService,
     private spacesService: SpacesService,
     private ordersService: OrdersService,
+    private emailService: EmailService,
     private gateway: MessagesGateway,
   ) {}
 
@@ -252,7 +254,8 @@ export class MessagesService {
         this.userRepo.find({ where: { id: In(dto.mentions) } }),
         this.orderRepo.findOne({ where: { id: orderId } }),
       ]);
-      await Promise.all(mentionedUsers.filter(u => u.id !== user.id).map(u =>
+      const recipients = mentionedUsers.filter(u => u.id !== user.id);
+      await Promise.all(recipients.map(u =>
         this.notificationsService.create(
           NotificationType.MENTION,
           `You were mentioned on an order`,
@@ -262,6 +265,24 @@ export class MessagesService {
           order?.isPriorityCustomer,
         ),
       ));
+
+      // Sales Reps aren't necessarily watching the bell for every order —
+      // give them an email too, since a mention usually means the team is
+      // waiting on them specifically to check and respond.
+      if (order) {
+        await Promise.all(recipients.filter(u => u.role === UserRole.SALES_REP).map(u =>
+          this.emailService.sendMentionAlert({
+            to: u.email,
+            poNumber: order.poNumber,
+            customerName: order.customerFullName || order.storeName || '—',
+            orderType: order.orderType || '—',
+            orderId: order.id,
+            mentionedByName: authorName,
+            messagePreview: preview,
+            isPriorityCustomer: order.isPriorityCustomer,
+          }),
+        ));
+      }
     }
 
     return saved;
