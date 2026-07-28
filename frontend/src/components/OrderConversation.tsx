@@ -268,13 +268,31 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
     return acc;
   }, {});
 
-  // "Seen by" is only worth showing on the most recent message — readers
-  // whose last visit landed after it was sent have necessarily seen every
-  // earlier one too, so repeating this per-message would just be noise.
-  const lastMessage = messages[messages.length - 1];
-  const seenByNames = lastMessage
-    ? reads.filter(r => r.userId !== lastMessage.authorId && new Date(r.lastReadAt) >= new Date(lastMessage.createdAt)).map(r => r.name)
-    : [];
+  // "Seen by" is only worth showing once, on the most recent message that
+  // someone else has actually read — readers whose last visit landed after
+  // it was sent have necessarily seen every earlier one too, so repeating
+  // this per-message would just be noise. Walking backward (rather than
+  // always checking only the literal last message) means the indicator
+  // still shows up as soon as any message has been read, instead of
+  // disappearing entirely the moment a newest message goes out that nobody
+  // has reopened the thread to see yet.
+  let seenAtMessageId: string | null = null;
+  let seenByNames: string[] = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    // CAD event system messages render in a separate branch below that
+    // never checks seenAtMessageId, so anchoring the indicator to one would
+    // make it silently vanish instead of attaching to the nearest real bubble.
+    if (CAD_EVENT_PREFIX.exec(m.content)) continue;
+    const names = reads
+      .filter(r => r.userId !== m.authorId && r.userId !== currentUserId && new Date(r.lastReadAt) >= new Date(m.createdAt))
+      .map(r => r.name);
+    if (names.length > 0) {
+      seenAtMessageId = m.id;
+      seenByNames = names;
+      break;
+    }
+  }
 
   const typingNames = Object.values(typingUsers);
 
@@ -392,16 +410,16 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                       </div>
                     )}
                   </div>
+                  {msg.id === seenAtMessageId && (
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                      Seen by {seenByNames.join(', ')}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         ))}
-        {seenByNames.length > 0 && (
-          <div style={{ textAlign: 'right', fontSize: '10px', color: 'var(--text-muted)', marginTop: '-4px', marginBottom: '4px' }}>
-            Seen by {seenByNames.join(', ')}
-          </div>
-        )}
         <div ref={bottomRef} />
       </div>
 
