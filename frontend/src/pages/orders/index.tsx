@@ -486,9 +486,12 @@ export default function OrdersPage() {
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().slice(0, 10);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `vpo-issued-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = (dateFrom || dateTo)
+        ? `vpo-issued-orders-${dateFrom || today}-${dateTo || today}.csv`
+        : `vpo-issued-orders-${today}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();

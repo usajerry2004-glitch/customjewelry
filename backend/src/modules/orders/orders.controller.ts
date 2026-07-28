@@ -75,7 +75,10 @@ export class OrdersController {
     @Res() res: Response,
   ) {
     const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo);
-    const filename = `vpo-issued-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = dateFrom || dateTo
+      ? `vpo-issued-orders-${dateFrom || today}-${dateTo || today}.csv`
+      : `vpo-issued-orders-${today}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
