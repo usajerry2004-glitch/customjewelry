@@ -468,6 +468,38 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
+  // Exports the current VPO Issued list — the date range (if set) filters
+  // by vpoIssuedAt on the backend, not createdAt, so it matches "orders
+  // approved in this window" rather than "orders placed in this window".
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      const res = await apiFetch(`${API}/orders/export/csv?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to export CSV'));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vpo-issued-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Export failed — check your connection and try again.');
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
   const applyFilterPreset = (p: SavedFilterPreset) => {
     setSearch(p.search);
     setStatusFilter(p.statusFilter);
@@ -1088,6 +1120,20 @@ export default function OrdersPage() {
           <button onClick={() => setShowSavePresetInput(true)}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
           >+ Save current filters</button>
+        )}
+        {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER'].includes(userRole) && (
+          <button
+            onClick={handleExportCsv}
+            disabled={exportingCsv}
+            title="Export the VPO Issued list as CSV"
+            style={{
+              marginLeft: 'auto', padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+              cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',
+              opacity: exportingCsv ? 0.7 : 1,
+            }}
+          >
+            {exportingCsv ? 'Exporting…' : '⬇ Export CSV'}
+          </button>
         )}
       </div>
 

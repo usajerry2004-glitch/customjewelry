@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Response } from 'express';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
@@ -62,6 +63,22 @@ export class OrdersController {
   @ApiOperation({ summary: 'Order metrics' })
   metrics() {
     return this.ordersService.getMetrics();
+  }
+
+  @Get('export/csv')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Export VPO Issued orders as CSV (Admin/Authorizer only) — date range filters on vpoIssuedAt, not createdAt' })
+  async exportCsv(
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo') dateTo: string | undefined,
+    @Res() res: Response,
+  ) {
+    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo);
+    const filename = `vpo-issued-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
   }
 
   @Get(':id')

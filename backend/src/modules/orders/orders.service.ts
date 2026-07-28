@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Between } from 'typeorm';
 import { randomBytes } from 'crypto';
 import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
@@ -29,6 +29,24 @@ const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail'
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
 const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer'];
+
+// Human-readable labels for the CSV export — mirrors STATUS_CONFIG/
+// SUPPLY_SOURCE_CONFIG/FACTORY_CONFIG in frontend/src/utils/types.ts, since
+// the export should read the way the order detail page reads.
+const CSV_STATUS_LABELS: Record<string, string> = {
+  NEW: 'New', CAD_IN_PROGRESS: 'CAD In Progress', VPO_ISSUED: 'VPO Issued', MANUFACTURED: 'Manufactured',
+  SHIPPED: 'Shipped', REPAIR: 'Repair', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+};
+const CSV_SUPPLY_SOURCE_LABELS: Record<string, string> = {
+  STONE_CREATIONS: 'Creations', KIRA: 'Kira', KIRA_JEWELS_USA: 'Kira Jewels Usa',
+};
+const CSV_FACTORY_LABELS: Record<string, string> = {
+  KAMA_JEWELRY: 'Kama Jewelry', CREATIONS: 'Creations', UNIQUE_DESIGNS: 'Unique Designs',
+};
+
+function csvEscape(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
 
 // Fields worth diffing into the audit log when changed via PUT /orders/:id —
 // price, spec, customer details, and the committed ship date. Human-readable
@@ -300,6 +318,64 @@ export class OrdersService implements OnModuleInit {
       .take(filters.limit || 50);
     const [orders, total] = await qb.getManyAndCount();
     return { orders, total };
+  }
+
+  // Admin/Authorizer export of the VPO Issued list — mirrors what's on the
+  // order detail page (product specs, customer info, pricing, assignment,
+  // timeline) but never reference images, CAD design files, or the
+  // conversation thread, since those live in separate tables entirely and
+  // aren't part of the Order row this reads from. The date filter applies to
+  // vpoIssuedAt, not createdAt — this list is about when an order was
+  // approved into production, not when it was first placed.
+  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string): Promise<string> {
+    const where: any = { status: OrderStatus.VPO_ISSUED };
+    if (dateFrom || dateTo) {
+      const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date('1970-01-01');
+      const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : new Date();
+      where.vpoIssuedAt = Between(from, to);
+    }
+    const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
+
+    const columns: { header: string; value: (o: Order) => string }[] = [
+      { header: 'PO Number', value: o => o.poNumber || '' },
+      { header: 'Customer PO#', value: o => o.refCustomerPo || '' },
+      { header: 'Kira SKU', value: o => o.kiraSkuNumber || '' },
+      { header: 'Order Type', value: o => o.orderType || '' },
+      { header: 'Manufacturing Path', value: o => o.manufacturingPath || '' },
+      { header: 'Stone Supplier', value: o => CSV_SUPPLY_SOURCE_LABELS[o.supplySource || ''] || o.supplySource || '' },
+      { header: 'Factory', value: o => CSV_FACTORY_LABELS[o.assignedFactory || ''] || o.assignedFactory || '' },
+      { header: 'Reference Link', value: o => o.referenceWeblink || '' },
+      { header: 'Store Name', value: o => o.storeName || '' },
+      { header: 'Customer Name', value: o => o.customerFullName || '' },
+      { header: 'Customer Email', value: o => o.customerEmail || '' },
+      { header: 'Phone', value: o => o.phoneNumber || '' },
+      { header: 'Metal Type', value: o => o.metalType || '' },
+      { header: 'Metal Color', value: o => o.metalColor || '' },
+      { header: 'Size', value: o => o.size || '' },
+      { header: 'Quantity', value: o => String(o.quantity ?? '') },
+      { header: 'Stamping', value: o => o.stamping || '' },
+      { header: 'Diamond Type', value: o => o.diamondType || '' },
+      { header: 'Diamond Quality', value: o => o.diamondQuality || '' },
+      { header: 'Stone Shape', value: o => o.centerStoneShape || '' },
+      { header: 'Carat Weight', value: o => o.approximateCaratWeight || '' },
+      { header: 'Customer Notes', value: o => o.customerNotes || '' },
+      { header: 'Current Status', value: o => CSV_STATUS_LABELS[o.status] || o.status },
+      { header: 'Priority', value: o => o.isPriorityCustomer ? 'Priority' : 'Regular' },
+      { header: 'Stone Status', value: o => o.stoneStatus === StoneStatus.STONE_RECEIVED ? 'Stone Received' : o.stoneStatus === StoneStatus.PENDING_STONE ? 'Pending Stone' : '' },
+      { header: 'Quoted Price', value: o => o.quotedCost != null ? String(o.quotedCost) : '' },
+      { header: 'Quote Options', value: o => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; ') },
+      { header: 'Committed Ship Date', value: o => o.committedShipDate || '' },
+      { header: 'Created By', value: o => o.salesRepName || o.salesRepEmail || '' },
+      { header: 'Created Date', value: o => o.createdAt ? o.createdAt.toISOString() : '' },
+      { header: 'Updated Date', value: o => o.updatedAt ? o.updatedAt.toISOString() : '' },
+      { header: 'VPO Issued Date', value: o => o.vpoIssuedAt ? new Date(o.vpoIssuedAt).toISOString() : '' },
+    ];
+
+    const lines = [
+      columns.map(c => csvEscape(c.header)).join(','),
+      ...orders.map(o => columns.map(c => csvEscape(c.value(o))).join(',')),
+    ];
+    return lines.join('\n');
   }
 
   async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
