@@ -452,6 +452,7 @@ export default function OrderDetail() {
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [muteLoading, setMuteLoading] = useState(false);
+  const [resendingFactoryAlert, setResendingFactoryAlert] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -957,7 +958,6 @@ export default function OrderDetail() {
     }
   };
 
-  const [resendingFactoryAlert, setResendingFactoryAlert] = useState(false);
   const handleResendFactoryAlert = async () => {
     if (!order?.id) return;
     setResendingFactoryAlert(true);
