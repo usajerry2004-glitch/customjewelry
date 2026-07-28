@@ -644,6 +644,16 @@ export class OrdersService implements OnModuleInit {
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);
       }
+      // This is also how staff approve the CAD "on behalf of the customer" via
+      // the Move to Stage shortcut — a separate path from the dedicated CAD
+      // approve endpoint (CadService.approve()). Without this, the order
+      // advances to VPO_ISSUED while its CAD file(s) stay SENT_FOR_APPROVAL
+      // forever, which the order detail page renders as a permanently stuck
+      // "Awaiting Approval" badge even though the order has already moved on.
+      await this.cadRepo.update(
+        { orderId: id, status: CadFileStatus.SENT_FOR_APPROVAL },
+        { status: CadFileStatus.APPROVED, approvedAt: new Date(), approvedBy: user?.email },
+      );
       const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, vpoIssuedAt: new Date() }, user);
       this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
@@ -962,6 +972,27 @@ export class OrdersService implements OnModuleInit {
     });
 
     return { sent: !!sent, recipientCount: recipients.length, recipients };
+  }
+
+  // One-time cleanup for orders approved before the fix above existed: staff
+  // approving a CAD "on behalf of the customer" via Move to Stage → VPO
+  // Issued advanced the order without ever updating the CadFile row, leaving
+  // it stuck on SENT_FOR_APPROVAL ("Awaiting Approval" in the UI) even though
+  // the order had already moved well past that stage. Safe to re-run — only
+  // touches CAD files that are still SENT_FOR_APPROVAL on an order that's
+  // already progressed beyond CAD_IN_PROGRESS.
+  async backfillStuckCadApprovals(): Promise<{ updated: number }> {
+    const advancedOrders = await this.orderRepo.find({
+      where: { status: In([OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.SHIPPED, OrderStatus.COMPLETED]) },
+      select: ['id'],
+    });
+    if (!advancedOrders.length) return { updated: 0 };
+
+    const result = await this.cadRepo.update(
+      { orderId: In(advancedOrders.map(o => o.id)), status: CadFileStatus.SENT_FOR_APPROVAL },
+      { status: CadFileStatus.APPROVED, approvedAt: new Date(), approvedBy: 'backfill' },
+    );
+    return { updated: result.affected || 0 };
   }
 
   // Reference/customer photos are for internal and customer-facing use only —

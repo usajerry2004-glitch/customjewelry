@@ -151,6 +151,14 @@ export class OrdersController {
     return this.ordersService.resendFactoryAssignedAlert(id);
   }
 
+  @Post('backfill-cad-approvals')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'One-time fix: mark stuck CAD files APPROVED on orders that already advanced past CAD_IN_PROGRESS (Admin-only, safe to re-run)' })
+  backfillCadApprovals() {
+    return this.ordersService.backfillStuckCadApprovals();
+  }
+
   @Patch('bulk/assign-supplier')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @RequiresPermission(Permission.ASSIGN_SUPPLIER)
