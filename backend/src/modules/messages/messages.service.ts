@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { IsString, IsBoolean, IsOptional, IsArray } from 'class-validator';
+import * as Sentry from '@sentry/node';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { OrderConversationRead } from '../../database/entities/order-conversation-read.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -39,6 +40,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     @InjectRepository(OrderMessage) private msgRepo: Repository<OrderMessage>,
     @InjectRepository(OrderConversationRead) private readRepo: Repository<OrderConversationRead>,
@@ -93,6 +96,10 @@ export class MessagesService {
   }
 
   async markRead(orderId: string, user: { id: string; firstName?: string; lastName?: string; email: string }): Promise<void> {
+    if (!user?.id) {
+      this.logger.warn(`markRead called with no user id for order ${orderId} — skipping (would have written unusable data to order_conversation_reads)`);
+      return;
+    }
     await this.readRepo.upsert({ userId: user.id, orderId }, ['userId', 'orderId']);
     const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
     this.gateway.broadcastRead(orderId, user.id, userName, new Date());
@@ -104,9 +111,26 @@ export class MessagesService {
   async getReads(orderId: string): Promise<{ userId: string; name: string; lastReadAt: Date }[]> {
     const reads = await this.readRepo.find({ where: { orderId } });
     if (!reads.length) return [];
-    const users = await this.userRepo.find({ where: { id: In(reads.map(r => r.userId)) } });
+
+    // userId is a free-text column, not a foreign key — a single malformed
+    // value (from old/bad data) makes Postgres reject the whole IN() clause
+    // against users.id's uuid column ("invalid input syntax for type uuid"),
+    // which took down this entire endpoint for every order that had one.
+    // Confirmed against a local Postgres instance: this is exactly what a
+    // non-UUID value in that column does, regardless of the other rows.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validReads = reads.filter(r => UUID_RE.test(r.userId));
+    if (validReads.length < reads.length) {
+      const bad = reads.filter(r => !UUID_RE.test(r.userId)).map(r => r.userId);
+      const msg = `order_conversation_reads has ${bad.length} malformed userId value(s) for order ${orderId}: ${bad.join(', ')}`;
+      this.logger.error(msg);
+      Sentry.captureMessage(msg, 'error');
+    }
+    if (!validReads.length) return [];
+
+    const users = await this.userRepo.find({ where: { id: In(validReads.map(r => r.userId)) } });
     const nameById = new Map(users.map(u => [u.id, [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email]));
-    return reads.map(r => ({ userId: r.userId, name: nameById.get(r.userId) || 'Unknown user', lastReadAt: r.lastReadAt }));
+    return validReads.map(r => ({ userId: r.userId, name: nameById.get(r.userId) || 'Unknown user', lastReadAt: r.lastReadAt }));
   }
 
   // Keyword search across message content — ILIKE substring match, same
