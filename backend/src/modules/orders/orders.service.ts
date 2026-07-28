@@ -269,8 +269,12 @@ export class OrdersService implements OnModuleInit {
       // both sides to text (not just the uuid side) so this doesn't assume
       // orderId's exact column type, which has drifted between environments
       // before on this project.
+      // order.id::text (cast glued directly onto the column) defeats
+      // TypeORM's reserved-word alias quoting for "order", sending the bare
+      // keyword straight to Postgres and causing a syntax error. Parenthesizing
+      // the column keeps a terminator right after it so TypeORM still quotes it.
       qb.andWhere(
-        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId"::text = order.id::text AND om."authorRole" = 'CUSTOMER')`,
+        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId"::text = (order.id)::text AND om."authorRole" = 'CUSTOMER')`,
       );
     }
 
