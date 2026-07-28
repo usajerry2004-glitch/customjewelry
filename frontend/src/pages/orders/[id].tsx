@@ -915,6 +915,7 @@ export default function OrderDetail() {
     ? validNextStatuses
     : allowedStatuses.filter(s => validNextStatuses.includes(s) && !(isAdminOnlyRevert && s === OrderStatus.CAD_IN_PROGRESS));
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
+  const canManageSupplier = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
 
   const handleUploadFiles = async () => {
     if (!order?.id || !uploadFiles.length || !uploadCadPerson.trim() || !uploadVerifiedBy.trim()) return;
@@ -953,6 +954,25 @@ export default function OrderDetail() {
       router.back();
     } else {
       router.push('/orders');
+    }
+  };
+
+  const [resendingFactoryAlert, setResendingFactoryAlert] = useState(false);
+  const handleResendFactoryAlert = async () => {
+    if (!order?.id) return;
+    setResendingFactoryAlert(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/resend-factory-alert`, { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        toast.success(`Resent to ${data.recipientCount} recipient${data.recipientCount === 1 ? '' : 's'}.`);
+      } else {
+        toast.error(getErrorMessage(data, 'Failed to resend factory notification'));
+      }
+    } catch {
+      toast.error('Resend failed — check your connection and try again.');
+    } finally {
+      setResendingFactoryAlert(false);
     }
   };
 
@@ -1038,6 +1058,16 @@ export default function OrderDetail() {
           >
             {isMuted ? '🔕 Muted' : '🔔 Mute'}
           </button>
+          {canManageSupplier && order.assignedFactory && (
+            <button
+              onClick={handleResendFactoryAlert}
+              disabled={resendingFactoryAlert}
+              title="Re-send the factory-assignment email — use this if the factory says they never got notified"
+              style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: '8px', padding: '7px 16px', color: '#D97706', fontSize: '12px', cursor: 'pointer', fontWeight: 600, opacity: resendingFactoryAlert ? 0.7 : 1 }}
+            >
+              {resendingFactoryAlert ? 'Sending…' : '✉ Resend Factory Alert'}
+            </button>
+          )}
           <button
             onClick={goBackToOrders}
             style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}

@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadReq
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomBytes } from 'crypto';
+import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
@@ -872,6 +873,16 @@ export class OrdersService implements OnModuleInit {
       ...factoryUsers.map(u => u.email).filter(Boolean),
       ...(STANDING_FACTORY_RECIPIENTS[factory] || []),
     ]));
+    // A factory with no tagged FACTORY_MANAGER and no STANDING_FACTORY_RECIPIENTS
+    // entry produces an empty `to` list, which EmailService used to treat as a
+    // silent no-op — the assignment would save fine (so the portal shows it)
+    // while the factory never got an email, with nothing logged anywhere. Flag
+    // it loudly here too, right where the data gap actually is.
+    if (!factoryEmails.length) {
+      const msg = `Order ${saved.poNumber} assigned to factory "${factory}" but no email recipients are configured for it (no tagged FACTORY_MANAGER, no STANDING_FACTORY_RECIPIENTS entry).`;
+      this.logger.error(msg);
+      Sentry.captureMessage(msg, 'error');
+    }
     // A failure building attachments must never take the email down with it —
     // fall back to sending with no attachments rather than silently skipping
     // the notification (this is what actually happens if buildFactoryOrderPdfAttachment
@@ -890,7 +901,14 @@ export class OrdersService implements OnModuleInit {
           isPriorityCustomer: saved.isPriorityCustomer,
           attachments,
         }),
-      ).catch(err => this.logger.warn('Factory assigned alert email failed:', err));
+      ).catch(err => {
+        this.logger.warn('Factory assigned alert email failed:', err);
+        Sentry.captureException(err);
+        this.emailService.sendInternalFailureAlert(
+          'Factory assigned alert email failed',
+          `Order ${saved.poNumber} (factory "${factory}") — sendFactoryAssignedAlert threw: ${(err as Error)?.message ?? err}`,
+        );
+      });
 
     const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
     this.emailService.sendStoneSupplierAssignedAlert({
@@ -899,9 +917,51 @@ export class OrdersService implements OnModuleInit {
       orderType: saved.orderType || '—',
       orderId: saved.id,
       isPriorityCustomer: saved.isPriorityCustomer,
-    }).catch(err => this.logger.warn('Stone supplier assigned alert email failed:', err));
+    }).catch(err => {
+      this.logger.warn('Stone supplier assigned alert email failed:', err);
+      Sentry.captureException(err);
+      this.emailService.sendInternalFailureAlert(
+        'Stone supplier assigned alert email failed',
+        `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert threw: ${(err as Error)?.message ?? err}`,
+      );
+    });
 
     return saved;
+  }
+
+  // Manual recovery lever for exactly the failure class assignSupplier's
+  // fire-and-forget email can hit silently (see the empty-recipients check
+  // and Sentry wiring above) — lets staff re-send the "order issued to your
+  // factory" alert for an already-assigned order, awaited this time, so the
+  // caller gets an immediate, honest success/failure result instead of a
+  // detached promise nobody is watching.
+  async resendFactoryAssignedAlert(id: string): Promise<{ sent: boolean; recipientCount: number; recipients: string[] }> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+    if (!order.assignedFactory) {
+      throw new BadRequestException(`Order ${order.poNumber} has no assigned factory to notify.`);
+    }
+
+    const factoryUsers = await this.userRepo.find({ where: { assignedFactory: order.assignedFactory } });
+    const recipients = Array.from(new Set([
+      ...factoryUsers.map(u => u.email).filter(Boolean),
+      ...(STANDING_FACTORY_RECIPIENTS[order.assignedFactory] || []),
+    ]));
+    if (!recipients.length) {
+      throw new BadRequestException(`No email recipients configured for factory "${order.assignedFactory}" — add one to STANDING_FACTORY_RECIPIENTS or tag a FACTORY_MANAGER to it.`);
+    }
+
+    const attachments = await this.buildFactoryOrderPdfAttachment(order);
+    const sent = await this.emailService.sendFactoryAssignedAlert({
+      to: recipients,
+      poNumber: order.poNumber,
+      orderType: order.orderType || '—',
+      orderId: order.id,
+      isPriorityCustomer: order.isPriorityCustomer,
+      attachments,
+    });
+
+    return { sent: !!sent, recipientCount: recipients.length, recipients };
   }
 
   // Reference/customer photos are for internal and customer-facing use only —

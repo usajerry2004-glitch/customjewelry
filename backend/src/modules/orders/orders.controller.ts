@@ -142,6 +142,15 @@ export class OrdersController {
     return this.ordersService.assignSupplier(id, body.factory, body.supplySource, req.user);
   }
 
+  @Post(':id/resend-factory-alert')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @RequiresPermission(Permission.ASSIGN_SUPPLIER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Re-send the "order issued to your factory" email for an already-assigned order — recovery lever for when the original send failed silently' })
+  resendFactoryAlert(@Param('id') id: string) {
+    return this.ordersService.resendFactoryAssignedAlert(id);
+  }
+
   @Patch('bulk/assign-supplier')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @RequiresPermission(Permission.ASSIGN_SUPPLIER)

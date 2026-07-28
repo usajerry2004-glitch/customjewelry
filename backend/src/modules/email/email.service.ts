@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
+import * as Sentry from '@sentry/node';
 import { User } from '../../database/entities/user.entity';
 
 export interface EmailPayload {
@@ -76,6 +77,7 @@ export class EmailService {
       return true;
     } catch (err) {
       this.logger.error('Email send failed:', (err as Error)?.message);
+      Sentry.captureException(err);
       return false;
     }
   }
@@ -88,6 +90,38 @@ export class EmailService {
 
   trackUrl(token: string) {
     return `${this.frontendUrl}/track/${token}`;
+  }
+
+  // A bulk-recipient template with an empty `to` array resolves successfully
+  // and sends nothing — no exception, nothing for a caller's .catch() to see.
+  // This was the actual root cause behind factories never getting notified
+  // of an assignment (portal showed it; the email silently no-op'd): every
+  // bulk-send method below must call this instead of a bare early return.
+  private warnNoRecipients(method: string, poNumber?: string) {
+    const message = `Email skipped — no recipients for ${method} (PO ${poNumber ?? 'unknown'})`;
+    this.logger.error(message);
+    Sentry.captureMessage(message, 'error');
+    this.sendInternalFailureAlert('No email recipients', message);
+  }
+
+  // Sentry isn't configured with a DSN in this deployment, so logger.error/
+  // captureMessage calls above only land in raw application logs that nobody
+  // actively watches — exactly as unnoticed as the original silent bug this
+  // was written to fix. This sends a real email to a human instead, over the
+  // same Gmail SMTP already proven to work, so a failure actually gets seen.
+  // Deliberately does not get called from inside its own failure path —
+  // a broken transporter must not alert-loop trying to report itself broken.
+  sendInternalFailureAlert(subject: string, details: string) {
+    const opsEmail = this.config.get<string>('OPS_ALERT_EMAIL', 'dashboard@kirajewels.one');
+    this.send({
+      to: opsEmail,
+      subject: `[JewelFlow Alert] ${subject}`,
+      html: emailLayout(`
+        <h2 style="color:#DC2626;margin:0 0 16px">Notification Failure</h2>
+        <p>${details}</p>
+      `),
+      bypassOptOut: true,
+    });
   }
 
   // Passwordless entry point: prefills the customer's email and OTP mode on
@@ -106,7 +140,7 @@ export class EmailService {
     orderId: string;
     isPriorityCustomer?: boolean;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendNewOrderToAuthorizers', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New Order] ${opts.poNumber} — Authorization Required`,
@@ -127,7 +161,7 @@ export class EmailService {
     orderId: string;
     isPriorityCustomer?: boolean;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendPendingCadToDesigners', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New CAD Job] ${opts.poNumber} is in your queue`,
@@ -148,7 +182,7 @@ export class EmailService {
     orderId: string;
     isPriorityCustomer?: boolean;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendCadSentForApprovalToAuthorizers', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[CAD Ready] ${opts.poNumber} — Needs Your Review`,
@@ -169,7 +203,7 @@ export class EmailService {
     orderId: string;
     isPriorityCustomer?: boolean;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendCustomerApprovedCadToTeam', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Approved ✓] Customer approved CAD — ${opts.poNumber}`,
@@ -189,7 +223,7 @@ export class EmailService {
     orderType: string;
     orderId: string;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendOrderReadyToShipToTeam', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `[Ready to Ship] ${opts.poNumber}`,
@@ -210,7 +244,7 @@ export class EmailService {
     trackingNumber?: string;
     orderId: string;
   }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendOrderShippedToTeam', opts.poNumber); return; }
     const trackRow = opts.trackingNumber
       ? `<tr><td style="padding:10px 16px;color:#6B7280;font-size:13px">Tracking #</td><td style="padding:10px 16px;font-weight:700;color:#1A2740">${opts.trackingNumber}</td></tr>`
       : '';
@@ -371,7 +405,7 @@ export class EmailService {
   // VPO just issued — order is approved but not yet routed to any factory/stone
   // supplier. Only Admin/Authorizer can see it until they assign it.
   async sendAssignSupplierAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendAssignSupplierAlert', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Assign Supplier] ${opts.poNumber} — VPO Issued`,
@@ -387,7 +421,7 @@ export class EmailService {
   // Sent only to the Factory Manager(s) tagged to the factory this order was just
   // routed to — not a blanket "all factory managers" notice.
   async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean; attachments?: { filename: string; content: Buffer }[] }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendFactoryAssignedAlert', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New Order] ${opts.poNumber} issued to your factory`,
@@ -404,7 +438,7 @@ export class EmailService {
   // Sent only to the Stone Manager(s) tagged to the supply source this order was
   // just routed to — not a blanket "all stone managers" notice.
   async sendStoneSupplierAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendStoneSupplierAssignedAlert', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Stones Needed] ${opts.poNumber}`,
@@ -420,7 +454,7 @@ export class EmailService {
   // Sent to Admin + Authorizer when an order is marked Manufactured — mirrors
   // the Admin+Authorizer alert already sent when the VPO is issued.
   async sendOrderManufacturedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
-    if (!opts.to.length) return;
+    if (!opts.to.length) { this.warnNoRecipients('sendOrderManufacturedAlert', opts.poNumber); return; }
     return this.send({
       to: opts.to,
       subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Manufactured] ${opts.poNumber}`,
