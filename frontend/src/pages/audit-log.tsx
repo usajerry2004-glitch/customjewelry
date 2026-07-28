@@ -48,14 +48,17 @@ export default function AuditLogPage() {
   const [action, setAction] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     try {
       const u = localStorage.getItem('jf_user');
       const parsed = u ? JSON.parse(u) : null;
-      // Sidebar already hides this link from non-admins — enforced again
-      // here so direct navigation can't bypass it.
-      if (parsed?.role !== UserRole.ADMIN) {
+      // Non-admin staff can still view this page — the backend scopes their
+      // results down to their own actions. Customers get none of this data
+      // and are redirected, same as a direct nav around the sidebar link.
+      setIsAdmin(parsed?.role === UserRole.ADMIN);
+      if (!parsed || parsed.role === UserRole.CUSTOMER) {
         router.replace('/dashboard');
       }
     } catch {
@@ -99,14 +102,21 @@ export default function AuditLogPage() {
   const hasFilters = userEmail || poNumber || action || dateFrom || dateTo;
 
   return (
-    <AppLayout title="Audit Log" subtitle="Every status change, supplier assignment, and edit — across all orders">
+    <AppLayout
+      title="Audit Log"
+      subtitle={isAdmin
+        ? 'Every status change, supplier assignment, and edit — across all orders'
+        : 'Every status change, supplier assignment, and edit you’ve made'}
+    >
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          value={userEmail}
-          onChange={e => setUserEmail(e.target.value)}
-          placeholder="Filter by user email…"
-          style={{ ...inputStyle, flex: '1 1 180px', maxWidth: '260px' }}
-        />
+        {isAdmin && (
+          <input
+            value={userEmail}
+            onChange={e => setUserEmail(e.target.value)}
+            placeholder="Filter by user email…"
+            style={{ ...inputStyle, flex: '1 1 180px', maxWidth: '260px' }}
+          />
+        )}
         <input
           value={poNumber}
           onChange={e => setPoNumber(e.target.value)}

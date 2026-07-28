@@ -5,7 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
-import { User } from '../../database/entities/user.entity';
+import { User, UserRole } from '../../database/entities/user.entity';
 import { EmailService } from '../email/email.service';
 import { buildWeeklyReportPdf, WeeklyStats } from './weekly-report-pdf.util';
 
@@ -351,13 +351,20 @@ export class ReportsService {
   async getAuditLog(filters: {
     userEmail?: string; action?: string; poNumber?: string; dateFrom?: string; dateTo?: string;
     limit?: number; offset?: number;
-  }): Promise<{ events: any[]; total: number }> {
+  }, caller?: { email: string; role: UserRole }): Promise<{ events: any[]; total: number }> {
     const limit = Math.min(filters.limit ?? 50, 200);
     const offset = filters.offset ?? 0;
 
     const where: any = {};
     if (filters.action) where.action = filters.action;
-    if (filters.userEmail) where.userEmail = ILike(`%${filters.userEmail}%`);
+    if (caller && caller.role !== UserRole.ADMIN) {
+      // Non-admins can only ever see their own actions — the userEmail
+      // filter is ignored for them rather than let it be used to page
+      // through other users' entries.
+      where.userEmail = caller.email;
+    } else if (filters.userEmail) {
+      where.userEmail = ILike(`%${filters.userEmail}%`);
+    }
     if (filters.dateFrom || filters.dateTo) {
       const from = filters.dateFrom ? new Date(filters.dateFrom) : new Date('1970-01-01');
       const to = filters.dateTo ? new Date(`${filters.dateTo}T23:59:59.999`) : new Date();

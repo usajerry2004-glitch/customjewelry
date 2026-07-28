@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -27,12 +27,12 @@ function resolveWeekRange(weekStartParam?: string): { weekStart: Date; weekEnd: 
 @ApiTags('Reports')
 @ApiBearerAuth()
 @Controller('reports')
-@Roles(UserRole.ADMIN)
 @UseGuards(RolesGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('weekly/preview')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Preview the computed weekly stats as JSON, without sending an email (Admin only)' })
   async preview(@Query('weekStart') weekStartParam?: string) {
     const { weekStart, weekEnd } = resolveWeekRange(weekStartParam);
@@ -40,6 +40,7 @@ export class ReportsController {
   }
 
   @Post('weekly/send')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Build and email the weekly operations report now, for testing (Admin only)' })
   async sendNow(@Query('weekStart') weekStartParam?: string) {
     const { weekStart, weekEnd } = resolveWeekRange(weekStartParam);
@@ -48,8 +49,10 @@ export class ReportsController {
   }
 
   @Get('audit-log')
-  @ApiOperation({ summary: 'Global audit log across all orders — who changed what, when (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @ApiOperation({ summary: 'Audit log of status changes, supplier assignments, and edits — admins see every order, other staff see only their own actions (not available to customers)' })
   auditLog(
+    @Request() req: any,
     @Query('userEmail') userEmail?: string,
     @Query('action') action?: string,
     @Query('poNumber') poNumber?: string,
@@ -62,6 +65,6 @@ export class ReportsController {
       userEmail, action, poNumber, dateFrom, dateTo,
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
-    });
+    }, req.user);
   }
 }
