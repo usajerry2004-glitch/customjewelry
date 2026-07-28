@@ -208,8 +208,18 @@ export default function OrdersPage() {
   const [reassignSupplySource, setReassignSupplySource] = useState<SupplySource | ''>('');
   const [nudgeStatus, setNudgeStatus] = useState<OrderStatus | ''>('');
 
-  // Sync statusFilter when URL query changes (Next.js router)
+  // Sync statusFilter when URL query changes without a remount (e.g.
+  // clicking between two ?status= links while staying on this page).
+  // Skip the very first run — on mount, the lazy useState initializers
+  // above already picked the right value (URL query, else a restored
+  // snapshot), and re-deriving from router.query here would clobber a
+  // restored filter back to '' whenever the URL has no ?status= param.
+  const skipInitialStatusSync = useRef(true);
   useEffect(() => {
+    if (skipInitialStatusSync.current) {
+      skipInitialStatusSync.current = false;
+      return;
+    }
     const s = (router.query.status as string) || '';
     setStatusFilter(s);
     setCadSubFilter('');
