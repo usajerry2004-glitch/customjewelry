@@ -1062,21 +1062,24 @@ export default function OrdersPage() {
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
             <button
               key={f.value}
-              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); }}
+              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); }}
               style={{
                 padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                fontWeight: statusFilter === f.value ? 600 : 400,
-                background: statusFilter === f.value ? 'var(--navy)' : 'var(--bg-card)',
-                color: statusFilter === f.value ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${statusFilter === f.value ? 'var(--navy)' : 'var(--border)'}`,
+                fontWeight: statusFilter === f.value && !customerTextedFilter ? 600 : 400,
+                background: statusFilter === f.value && !customerTextedFilter ? 'var(--navy)' : 'var(--bg-card)',
+                color: statusFilter === f.value && !customerTextedFilter ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${statusFilter === f.value && !customerTextedFilter ? 'var(--navy)' : 'var(--border)'}`,
                 transition: 'all 0.15s',
               }}
             >
               {f.label}
             </button>
           ))}
+          {/* A tab like the others, not a combinable toggle — selecting it
+              clears the status filter (it applies across all statuses), and
+              selecting any status tab clears it back out. */}
           <button
-            onClick={() => setCustomerTextedFilter(v => !v)}
+            onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
             title="Only show orders where the customer has sent a chat message"
             style={{
               padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
