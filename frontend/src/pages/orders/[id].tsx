@@ -945,6 +945,17 @@ export default function OrderDetail() {
     }
   };
 
+  // Goes back in history (so the Orders list restores its filters/page/
+  // scroll position — see orders/index.tsx) rather than pushing a fresh
+  // /orders navigation, which would reset the list to a blank default.
+  const goBackToOrders = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/orders');
+    }
+  };
+
   const handleDeleteOrder = async () => {
     if (!order?.id || deleteConfirmInput !== order.poNumber) return;
     setDeleting(true);
@@ -1028,7 +1039,7 @@ export default function OrderDetail() {
             {isMuted ? '🔕 Muted' : '🔔 Mute'}
           </button>
           <button
-            onClick={() => router.push('/orders')}
+            onClick={goBackToOrders}
             style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
           >
             ← Back to Orders

@@ -4,6 +4,9 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const nextConfig = {
   reactStrictMode: false,
   output: 'standalone',
+  // Restores the browser's native scroll position on back/forward
+  // navigation instead of Next.js resetting scroll to the top of the page.
+  experimental: { scrollRestoration: true },
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   images: {

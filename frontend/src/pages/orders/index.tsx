@@ -8,6 +8,20 @@ import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
 
+// Remembers filters, pagination, and scroll position across a visit to an
+// order's detail page, so clicking "Back to Orders" lands where the user
+// left off instead of resetting to a blank list.
+const ORDERS_RETURN_STATE_KEY = 'jf_orders_list_state';
+function readOrdersReturnState(): any {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(ORDERS_RETURN_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 const ALL_STATUS_FILTERS = [
   { label: 'All',             value: '' },
   { label: 'New',             value: OrderStatus.NEW },
@@ -133,19 +147,22 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState(() => readOrdersReturnState()?.search ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => readOrdersReturnState()?.search ?? '');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
+  // if present — an explicit link always wins over a remembered filter —
+  // otherwise fall back to whatever was showing before the user left.
   const [statusFilter, setStatusFilter] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('status') || '';
+      const fromUrl = params.get('status');
+      if (fromUrl !== null) return fromUrl;
     }
-    return '';
+    return readOrdersReturnState()?.statusFilter ?? '';
   });
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [activeMonth, setActiveMonth] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => readOrdersReturnState()?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(() => readOrdersReturnState()?.dateTo ?? '');
+  const [activeMonth, setActiveMonth] = useState(() => readOrdersReturnState()?.activeMonth ?? '');
   const [showNew, setShowNew] = useState(false);
   const [newOrder, setNewOrder] = useState({
     orderType: '', size: '', metalType: '', metalColor: '',
@@ -171,19 +188,21 @@ export default function OrdersPage() {
   const [showSavePresetInput, setShowSavePresetInput] = useState(false);
   const [presetNameInput, setPresetNameInput] = useState('');
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  const [cadSubFilter, setCadSubFilter] = useState('');
-  const [stoneSubFilter, setStoneSubFilter] = useState('');
-  const [factoryFilter, setFactoryFilter] = useState('');
-  const [supplySourceFilter, setSupplySourceFilter] = useState('');
-  const [customerFilter, setCustomerFilter] = useState('');
-  const [customerFilterInput, setCustomerFilterInput] = useState('');
-  const [customerTextedFilter, setCustomerTextedFilter] = useState(false);
+  const [cadSubFilter, setCadSubFilter] = useState(() => readOrdersReturnState()?.cadSubFilter ?? '');
+  const [stoneSubFilter, setStoneSubFilter] = useState(() => readOrdersReturnState()?.stoneSubFilter ?? '');
+  const [factoryFilter, setFactoryFilter] = useState(() => readOrdersReturnState()?.factoryFilter ?? '');
+  const [supplySourceFilter, setSupplySourceFilter] = useState(() => readOrdersReturnState()?.supplySourceFilter ?? '');
+  const [customerFilter, setCustomerFilter] = useState(() => readOrdersReturnState()?.customerFilter ?? '');
+  const [customerFilterInput, setCustomerFilterInput] = useState(() => readOrdersReturnState()?.customerFilterInput ?? '');
+  const [customerTextedFilter, setCustomerTextedFilter] = useState(() => readOrdersReturnState()?.customerTextedFilter ?? false);
   const [showFilterDrop, setShowFilterDrop] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(() => readOrdersReturnState()?.page ?? 0);
   const PAGE_SIZE = 50;
+  const skipInitialFilterReset = useRef(true);
+  const scrollRestored = useRef(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [reassignFactory, setReassignFactory] = useState<Factory | ''>('');
   const [reassignSupplySource, setReassignSupplySource] = useState<SupplySource | ''>('');
@@ -485,8 +504,51 @@ export default function OrdersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(0); load(0); }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
+  useEffect(() => {
+    // On mount, filters may already be non-default (restored from a saved
+    // visit or a ?status= link) — that's not a user-driven filter change,
+    // so don't reset back to page 0. The [page] effect below handles the
+    // actual initial load, using whatever page was restored.
+    if (skipInitialFilterReset.current) {
+      skipInitialFilterReset.current = false;
+      return;
+    }
+    setPage(0);
+    load(0);
+  }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
   useEffect(() => { load(page); }, [page]);
+
+  // Remember filters/pagination on every change, so returning here (e.g.
+  // via "Back to Orders") restores the same view instead of resetting it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({
+        search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+        customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page,
+      }));
+    } catch {}
+  }, [search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page]);
+
+  // Capture scroll position when leaving the page (merged into whatever
+  // filter snapshot was last written above) and restore it once, after the
+  // first restored load finishes rendering.
+  useEffect(() => {
+    return () => {
+      if (typeof window === 'undefined') return;
+      try {
+        const snap = readOrdersReturnState() || {};
+        sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({ ...snap, scrollY: window.scrollY }));
+      } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || scrollRestored.current) return;
+    scrollRestored.current = true;
+    const savedScrollY = readOrdersReturnState()?.scrollY;
+    if (savedScrollY) requestAnimationFrame(() => window.scrollTo(0, savedScrollY));
+  }, [loading]);
 
   const openNewOrderModal = async () => {
     setShowNew(true);
