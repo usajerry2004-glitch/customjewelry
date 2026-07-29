@@ -26,7 +26,6 @@ import { CadModule } from './modules/cad/cad.module';
 import { SkuModule } from './modules/sku/sku.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ManufacturingModule } from './modules/manufacturing/manufacturing.module';
-import { ShippingModule } from './modules/shipping/shipping.module';
 import { UsersModule } from './modules/users/users.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { ImportModule } from './modules/import/import.module';
@@ -91,7 +90,6 @@ import { HealthController } from './health.controller';
     SkuModule,
     NotificationsModule,
     ManufacturingModule,
-    ShippingModule,
     UsersModule,
     MessagesModule,
     ImportModule,
