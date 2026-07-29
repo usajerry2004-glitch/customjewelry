@@ -1270,18 +1270,24 @@ export class OrdersService implements OnModuleInit {
       (!c.designerNotes || !OrdersService.REFERENCE_NOTE_TAGS.has(c.designerNotes))
       && OrdersService.ATTACHABLE_FILE_RE.test(c.originalName),
     );
-    for (const cad of designFiles) {
-      try {
-        // Without a timeout, an unresponsive file host hangs this fetch (and
-        // everything downstream of it — the factory alert never sends, and
-        // since this whole chain is fire-and-forget, nothing ever logs it).
-        const res = await fetch(cad.filePath, { signal: AbortSignal.timeout(CAD_FILE_FETCH_TIMEOUT_MS) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        attachments.push({ filename: cad.originalName, content: Buffer.from(await res.arrayBuffer()) });
-      } catch (err) {
-        this.logger.warn(`Failed to fetch CAD file "${cad.originalName}" for ${order.poNumber}:`, err);
+    // Fetched in parallel, not one at a time — the overall step is capped at
+    // FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS, so with many design files a
+    // sequential loop could exhaust that budget after only the first few,
+    // silently dropping the rest even though they'd have succeeded. Each
+    // fetch still has its own timeout so one slow/unresponsive file host
+    // can't hang the others.
+    const fetchResults = await Promise.allSettled(designFiles.map(async cad => {
+      const res = await fetch(cad.filePath, { signal: AbortSignal.timeout(CAD_FILE_FETCH_TIMEOUT_MS) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { filename: cad.originalName, content: Buffer.from(await res.arrayBuffer()) };
+    }));
+    fetchResults.forEach((result, i) => {
+      if (result.status === 'fulfilled') {
+        attachments.push(result.value);
+      } else {
+        this.logger.warn(`Failed to fetch CAD file "${designFiles[i].originalName}" for ${order.poNumber}:`, result.reason);
       }
-    }
+    });
 
     return attachments;
   }

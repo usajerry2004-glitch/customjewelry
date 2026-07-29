@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf, IsArray } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -83,7 +83,13 @@ export class UsersService {
     } else {
       qb.orderBy('u.createdAt', 'DESC');
     }
-    return qb.getMany();
+    // The Customers page still does its own filtering/dedup-by-company/
+    // pagination client-side over the full result, so this isn't true
+    // pagination — just a safety ceiling so the query can't grow truly
+    // unbounded as the customer list grows. Comfortably above any real
+    // customer count today; revisit with real server-side pagination if
+    // this is ever actually hit.
+    return qb.take(5000).getMany();
   }
 
   async findOne(id: string): Promise<User> {
@@ -314,10 +320,16 @@ export class UsersService {
     const company = await this.companyRepo.findOne({ where: { id: companyId } });
     if (!company) return;
     const teammates = await this.userRepo.find({ where: { companyId } });
+    if (!teammates.length) return;
     const patch = { companyId: company.id, storeName: company.name, ...(await this.buildOrderRepPatch(company.salesRepId)) };
-    for (const t of teammates) {
-      await this.orderRepo.update({ customerId: t.id }, patch);
-      await this.orderRepo.update({ customerEmail: t.email }, patch);
+    // Batched instead of two updates per teammate — this runs on every
+    // customer order-list view and every "Team" panel open, so a company
+    // with N teammates was previously 2N sequential round trips to Postgres
+    // before the actual read query could even run.
+    await this.orderRepo.update({ customerId: In(teammates.map(t => t.id)) }, patch);
+    const teammateEmails = teammates.map(t => t.email).filter(Boolean);
+    if (teammateEmails.length) {
+      await this.orderRepo.update({ customerEmail: In(teammateEmails) }, patch);
     }
   }
 

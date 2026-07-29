@@ -49,6 +49,9 @@ export enum Factory {
 @Index(['isArchived'])
 @Index(['salesRepId'])
 @Index(['customerEmail'])
+@Index(['companyId'])
+@Index(['assignedFactory'])
+@Index(['supplySource'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
