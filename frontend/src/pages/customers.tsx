@@ -39,7 +39,7 @@ const ORDER_FIELDS = [
   { key: 'metalType', label: 'Metal Type', type: 'select', options: ['14K', '18K', '10K', 'Platinum', 'Silver'] },
   { key: 'metalColor', label: 'Metal Color', type: 'select', options: ['YG-Yellow', 'WG-White', 'RG-Rose', 'WY-White & Yellow', 'Two-Tone'] },
   { key: 'size', label: 'Size / Ring Size', type: 'text', placeholder: 'e.g. Ring - 6.5' },
-  { key: 'diamondType', label: 'Diamond Type', type: 'select', options: ['Certified Lab Grown Diamond', 'Non Certified (CVD)', 'Non Certified (HPHT)'] },
+  { key: 'diamondType', label: 'Diamond Type', type: 'select', options: ['Certified Lab Grown Diamond', 'Non Certified (CVD)', 'Non Certified (HPHT)', 'Natural'] },
   { key: 'diamondQuality', label: 'Diamond Quality', type: 'text', placeholder: 'e.g. F+VS+' },
   { key: 'centerStoneShape', label: 'Center Stone Shape', type: 'select', options: ['Round', 'Oval', 'Cushion', 'Emerald', 'Pear', 'Princess', 'Radiant', 'Marquise', 'Asscher', 'Heart', 'Other'] },
   { key: 'approximateCaratWeight', label: 'Approx. Carat Weight', type: 'text', placeholder: 'e.g. 1.5' },
@@ -201,8 +201,8 @@ export default function CustomersPage() {
   const resetPage = () => setPage(1);
 
   const placeOrder = async () => {
-    if (!showOrder || !newOrder.orderType || !newOrder.metalType || !newOrder.metalColor) {
-      setError('Order Type, Metal Type, and Metal Color are required.'); return;
+    if (!showOrder || !newOrder.orderType || !newOrder.metalType || !newOrder.metalColor || !newOrder.diamondType) {
+      setError('Order Type, Metal Type, Metal Color, and Diamond Type are required.'); return;
     }
     setSaving(true); setError('');
     try {

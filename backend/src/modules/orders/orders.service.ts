@@ -61,11 +61,36 @@ const CSV_SUPPLY_SOURCE_LABELS: Record<string, string> = {
   STONE_CREATIONS: 'Creations', KIRA: 'Kira', KIRA_JEWELS_USA: 'Kira Jewels Usa',
 };
 const CSV_FACTORY_LABELS: Record<string, string> = {
-  KAMA_JEWELRY: 'Kama Jewelry', CREATIONS: 'Creations', UNIQUE_DESIGNS: 'Unique Designs',
+  KAMA_JEWELRY: 'Kama Jewelry', CREATIONS: 'Creations', UNIQUE_DESIGNS: 'Unique Designs', JEWEL_ONE: 'Jewel One',
 };
 
 function csvEscape(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+// Every diamondType option before "Natural" was added was some flavor of
+// lab-grown (e.g. "Certified Lab Grown Diamond", "Lab grown") — so treating
+// anything NOT explicitly containing "natural" as lab-grown is a safe
+// default across old and new orders alike, not just a guess.
+function isNaturalDiamond(diamondType: string | null | undefined): boolean {
+  return /natural/i.test(diamondType || '');
+}
+
+// Single-line human-readable spec summary for the "For RightClick" SKU
+// export's interchange_description column — every populated spec field,
+// comma-joined, in the same order they'd read on the order detail page.
+function buildOrderSpecDescription(o: Order): string {
+  const parts = [
+    o.metalType && o.metalColor ? `${o.metalType} ${o.metalColor}` : (o.metalType || o.metalColor),
+    o.orderType,
+    o.size ? `Size ${o.size}` : null,
+    o.centerStoneShape,
+    o.approximateCaratWeight ? `${o.approximateCaratWeight}ct` : null,
+    o.diamondType,
+    o.diamondQuality,
+    o.stamping,
+  ];
+  return parts.filter(Boolean).join(', ');
 }
 
 // Shared column set for every order CSV export (Admin/Authorizer VPO export,
@@ -434,18 +459,58 @@ export class OrdersService implements OnModuleInit {
   // FactoryRedactionInterceptor hides everywhere else (pricing, customer
   // identity), plus the reference link, since that's the closest thing to a
   // "reference image" this row has.
-  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }): Promise<string> {
+  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }, orderIds?: string[]): Promise<string> {
     const isFactory = user?.role === UserRole.FACTORY_MANAGER;
 
     const where: any = { status: OrderStatus.VPO_ISSUED };
     if (isFactory) where.assignedFactory = user?.assignedFactory ?? null;
-    if (dateFrom || dateTo) {
+    if (orderIds?.length) {
+      // An explicit selection overrides the date range — the caller picked
+      // exactly which orders they want, regardless of when the VPO was issued.
+      where.id = In(orderIds);
+    } else if (dateFrom || dateTo) {
       const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date('1970-01-01');
       const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : new Date();
       where.vpoIssuedAt = Between(from, to);
     }
     const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
     return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
+  }
+
+  // "For RightClick" — one row per selected order, in the shape our ERP's
+  // "New SKU" import expects. companycode/inventorylocationcode branch on
+  // whether the order's diamond is natural or lab-grown; vendor_no is looked
+  // up per assigned factory.
+  private static readonly FACTORY_VENDOR_CODES: Record<Factory, string> = {
+    [Factory.CREATIONS]:      'V00252',
+    [Factory.KAMA_JEWELRY]:   'V16206',
+    [Factory.UNIQUE_DESIGNS]: 'V00057',
+    [Factory.JEWEL_ONE]:      'V00064',
+  };
+
+  async exportOrderSkuCsv(orderIds: string[]): Promise<string> {
+    const orders = orderIds.length
+      ? await this.orderRepo.find({ where: { id: In(orderIds) } })
+      : [];
+
+    const columns: { header: string; value: (o: Order) => string }[] = [
+      {
+        header: 'interchange_companycode',
+        value: o => isNaturalDiamond(o.diamondType) ? 'KJI-N' : 'KJI-J',
+      },
+      {
+        header: 'interchange_inventorylocationcode',
+        value: o => isNaturalDiamond(o.diamondType) ? 'CUS-NAT' : 'CUS',
+      },
+      { header: 'interchange_code', value: o => o.kiraSkuNumber || '' },
+      { header: 'interchange_description', value: o => buildOrderSpecDescription(o) },
+      {
+        header: 'interchange_vendor_no',
+        value: o => (o.assignedFactory && OrdersService.FACTORY_VENDOR_CODES[o.assignedFactory]) || '',
+      },
+    ];
+
+    return ordersToCsv(orders, columns);
   }
 
   // Runs every day at 8:00 PM America/New_York — sends each factory (any
@@ -609,6 +674,9 @@ export class OrdersService implements OnModuleInit {
   }
 
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
+    if (!dto.diamondType) {
+      throw new BadRequestException('Diamond Type is required.');
+    }
     const data: Partial<Order> = { ...dto };
 
     // Always auto-generate PO number and tracking token — ignore any client-supplied values

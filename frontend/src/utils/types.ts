@@ -24,6 +24,7 @@ export enum Factory {
   KAMA_JEWELRY   = 'KAMA_JEWELRY',
   CREATIONS      = 'CREATIONS',
   UNIQUE_DESIGNS = 'UNIQUE_DESIGNS',
+  JEWEL_ONE      = 'JEWEL_ONE',
 }
 
 // Per-user permission overrides — mirrors backend/src/common/permissions.ts.
@@ -130,6 +131,7 @@ export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: 
   KAMA_JEWELRY:   { label: 'Kama Jewelry',   color: '#0EA5E9', bg: '#E0F2FE' },
   CREATIONS:      { label: 'Creations',      color: '#B45309', bg: '#FEF3C7' },
   UNIQUE_DESIGNS: { label: 'Unique Designs', color: '#059669', bg: '#D1FAE5' },
+  JEWEL_ONE:      { label: 'Jewel One',      color: '#7C3AED', bg: '#EDE9FE' },
 };
 
 export const ROLE_ACTION_COLOR: Record<string, string> = {

@@ -228,7 +228,7 @@ export default function ExclusiveCustomDesignsPage() {
                   <label style={label}>Diamond Type</label>
                   <select value={form.diamondType} onChange={set('diamondType')} style={{ ...inp, cursor: 'pointer' }}>
                     <option value="">Select…</option>
-                    <option>Certified Lab Grown Diamond</option><option>Non Certified (CVD)</option><option>Non Certified (HPHT)</option>
+                    <option>Certified Lab Grown Diamond</option><option>Non Certified (CVD)</option><option>Non Certified (HPHT)</option><option>Natural</option>
                   </select>
                 </div>
                 <div><label style={label}>Diamond Quality</label><input value={form.diamondQuality} onChange={set('diamondQuality')} placeholder="e.g. F+, VS+" style={inp} /></div>

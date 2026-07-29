@@ -125,7 +125,7 @@ const RING_SIZES_MODAL = [
 const PENDANT_SIZES_MODAL = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
 const BRACELET_SIZES_MODAL = ['5 inches', '5.5 inches', '6 inches', '6.5 inches', '7 inches', '7.5 inches', '8 inches', '8.5 inches'];
 const METAL_TYPES_MODAL   = ['10K', '14K', '18K', 'Platinum'];
-const DIAMOND_TYPES_MODAL = ['Lab grown', 'Gemstone lab grown'];
+const DIAMOND_TYPES_MODAL = ['Lab grown', 'Gemstone lab grown', 'Natural'];
 const DIAMOND_QUALITY_MODAL = ['F+VS+', 'F+VVS+'];
 
 function getModalAutoSize(orderType: string): string {
@@ -504,6 +504,65 @@ export default function OrdersPage() {
     }
   };
 
+  const downloadCsvBlob = async (res: Response, filename: string) => {
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export menu for the bulk-selection bar — "Normal Export" reuses the same
+  // VPO Issued CSV as the toolbar button above, just scoped to the selected
+  // orders instead of the current date range. "For RightClick" is the
+  // separate new-SKU format our ERP's import expects.
+  const [showBulkExportMenu, setShowBulkExportMenu] = useState(false);
+  const [exportingBulkCsv, setExportingBulkCsv] = useState(false);
+
+  const handleBulkExportNormal = async () => {
+    if (selectedIds.size === 0) return;
+    setShowBulkExportMenu(false);
+    setExportingBulkCsv(true);
+    try {
+      const params = new URLSearchParams({ orderIds: Array.from(selectedIds).join(',') });
+      const res = await apiFetch(`${API}/orders/export/csv?${params}`);
+      if (!res.ok) {
+        toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to export CSV'));
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      await downloadCsvBlob(res, `vpo-issued-orders-selected-${today}.csv`);
+    } catch {
+      toast.error('Export failed — check your connection and try again.');
+    } finally {
+      setExportingBulkCsv(false);
+    }
+  };
+
+  const handleBulkExportRightClick = async () => {
+    if (selectedIds.size === 0) return;
+    setShowBulkExportMenu(false);
+    setExportingBulkCsv(true);
+    try {
+      const params = new URLSearchParams({ orderIds: Array.from(selectedIds).join(',') });
+      const res = await apiFetch(`${API}/orders/export/sku-csv?${params}`);
+      if (!res.ok) {
+        toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to export CSV'));
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      await downloadCsvBlob(res, `new-sku-rightclick-${today}.csv`);
+    } catch {
+      toast.error('Export failed — check your connection and try again.');
+    } finally {
+      setExportingBulkCsv(false);
+    }
+  };
+
   const applyFilterPreset = (p: SavedFilterPreset) => {
     setSearch(p.search);
     setStatusFilter(p.statusFilter);
@@ -743,7 +802,7 @@ export default function OrdersPage() {
         const sizeOpts = getModalSizeOptions(newOrder.orderType);
         const isAutoSize = newOrder.orderType === 'Earring' || newOrder.orderType === 'Other';
         const resolvedCompany = contact.companyName === 'Other' ? contact.companyNameOther : contact.companyName;
-        const canSubmit = !saving && newOrder.orderType && newOrder.metalType && newOrder.size &&
+        const canSubmit = !saving && newOrder.orderType && newOrder.metalType && newOrder.size && newOrder.diamondType &&
           contact.firstName && contact.lastName && (resolvedCompany) && contact.email;
 
         // All unique store names from the loaded customers list
@@ -1551,6 +1610,38 @@ export default function OrdersPage() {
             >
               🏭 Reassign Factory
             </button>
+          )}
+          {!isFactoryManager && ['ADMIN', 'AUTHORIZER'].includes(userRole) && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowBulkExportMenu(v => !v)}
+                disabled={exportingBulkCsv}
+                className="bulk-bar-btn"
+                style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '7px', padding: '7px 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: exportingBulkCsv ? 'not-allowed' : 'pointer' }}
+              >
+                {exportingBulkCsv ? 'Exporting…' : '⬇ Export CSV ▾'}
+              </button>
+              {showBulkExportMenu && (
+                <div style={{
+                  position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, minWidth: '180px',
+                  background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px',
+                  boxShadow: 'var(--shadow-lg)', overflow: 'hidden', zIndex: 501,
+                }}>
+                  <button
+                    onClick={handleBulkExportNormal}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Normal Export
+                  </button>
+                  <button
+                    onClick={handleBulkExportRightClick}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    For RightClick
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           {!isFactoryManager && canBulkStatusNudge && (
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

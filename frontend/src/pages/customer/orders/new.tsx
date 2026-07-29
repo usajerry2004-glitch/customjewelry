@@ -38,7 +38,7 @@ const RING_SIZES = [
 const PENDANT_SIZES = ['16 inches', '16 +1 extender', '16 +2 extender', '18 inches'];
 const BRACELET_SIZES = ['5 inches', '5.5 inches', '6 inches', '6.5 inches', '7 inches', '7.5 inches', '8 inches', '8.5 inches'];
 const METAL_TYPES = ['10K', '14K', '18K', 'Platinum'];
-const DIAMOND_TYPES = ['Lab grown', 'Gemstone lab grown'];
+const DIAMOND_TYPES = ['Lab grown', 'Gemstone lab grown', 'Natural'];
 const DIAMOND_QUALITY = ['F+VS+', 'F+VVS+'];
 
 function getAutoSize(orderType: string): string {
@@ -109,6 +109,7 @@ export default function NewOrderPage() {
     if (!form.orderType) { setError('Please select an Order Type.'); return; }
     if (!form.metalType) { setError('Please select a Metal Type.'); return; }
     if (!form.size) { setError('Please select a Size.'); return; }
+    if (!form.diamondType) { setError('Please select a Diamond Type.'); return; }
     setSaving(true);
     setError('');
     try {

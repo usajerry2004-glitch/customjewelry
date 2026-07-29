@@ -34,6 +34,7 @@ export enum Factory {
   KAMA_JEWELRY   = 'KAMA_JEWELRY',
   CREATIONS      = 'CREATIONS',
   UNIQUE_DESIGNS = 'UNIQUE_DESIGNS',
+  JEWEL_ONE      = 'JEWEL_ONE',
 }
 
 @Entity('orders')

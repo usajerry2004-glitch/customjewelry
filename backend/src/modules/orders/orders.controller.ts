@@ -68,23 +68,43 @@ export class OrdersController {
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Export VPO Issued orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Date range filters on vpoIssuedAt, not createdAt' })
+  @ApiOperation({ summary: 'Export VPO Issued orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Date range filters on vpoIssuedAt, not createdAt. Pass orderIds (comma-separated) to export just those orders instead of the date range.' })
   async exportCsv(
     @Query('dateFrom') dateFrom: string | undefined,
     @Query('dateTo') dateTo: string | undefined,
+    @Query('orderIds') orderIdsParam: string | undefined,
     @Request() req: any,
     @Res() res: Response,
   ) {
-    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user);
+    const orderIds = orderIdsParam ? orderIdsParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user, orderIds);
     const today = new Date().toISOString().slice(0, 10);
     const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
       ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
       : '';
-    const filename = dateFrom || dateTo
-      ? `vpo-issued-orders${factorySuffix}-${dateFrom || today}-${dateTo || today}.csv`
-      : `vpo-issued-orders${factorySuffix}-${today}.csv`;
+    const filename = orderIds
+      ? `vpo-issued-orders${factorySuffix}-selected-${today}.csv`
+      : (dateFrom || dateTo
+        ? `vpo-issued-orders${factorySuffix}-${dateFrom || today}-${dateTo || today}.csv`
+        : `vpo-issued-orders${factorySuffix}-${today}.csv`);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  }
+
+  @Get('export/sku-csv')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: '"For RightClick" — export selected orders as new-SKU rows for ERP import (interchange_companycode/inventorylocationcode/code/description/vendor_no). Admin/Authorizer only.' })
+  async exportSkuCsv(
+    @Query('orderIds') orderIdsParam: string,
+    @Res() res: Response,
+  ) {
+    const orderIds = (orderIdsParam || '').split(',').map(s => s.trim()).filter(Boolean);
+    const csv = await this.ordersService.exportOrderSkuCsv(orderIds);
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="new-sku-rightclick-${today}.csv"`);
     res.send(csv);
   }
 
