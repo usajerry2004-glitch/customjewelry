@@ -358,19 +358,34 @@ export default function CustomersPage() {
     }
   };
 
+  // Optimistic local update, same pattern as changeSalesRep below — a single
+  // boolean flip shouldn't refetch the entire customer list (+ stats + sales
+  // rep list) just to re-render one row. Only reload on actual failure.
   const deactivate = async (id: string) => {
-    await apiFetch(`${API}/users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: false }) });
-    await load();
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, isActive: false } : c));
+    const res = await apiFetch(`${API}/users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: false }) });
+    if (!res.ok) {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to deactivate customer.'));
+      await load();
+    }
   };
 
   const reactivate = async (id: string) => {
-    await apiFetch(`${API}/users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: true }) });
-    await load();
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, isActive: true } : c));
+    const res = await apiFetch(`${API}/users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: true }) });
+    if (!res.ok) {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to reactivate customer.'));
+      await load();
+    }
   };
 
   const togglePriority = async (id: string) => {
-    await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
-    await load();
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, isPriority: !c.isPriority } : c));
+    const res = await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
+    if (!res.ok) {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to update priority.'));
+      await load();
+    }
   };
 
   const changeSalesRep = async (customerId: string, salesRepId: string) => {
