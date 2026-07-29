@@ -22,6 +22,25 @@ export { OrderFilterDto };
 
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
+// Caps for buildFactoryOrderPdfAttachment: an unresponsive file host must
+// degrade the factory-assigned email (fewer/no attachments) rather than
+// block it forever — the per-file cap bounds one slow fetch, the overall cap
+// bounds the whole step in case there are many files.
+const CAD_FILE_FETCH_TIMEOUT_MS = 15_000;
+const FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS = 45_000;
+const TIMED_OUT = Symbol('TIMED_OUT');
+
+// Races a promise against a hard deadline. The loser keeps running in the
+// background — nothing here cancels it — but the caller stops waiting for
+// it, which is what actually matters for an un-awaited, fire-and-forget
+// notification chain that must never hang indefinitely.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  return Promise.race([
+    promise,
+    new Promise<typeof TIMED_OUT>(resolve => setTimeout(() => resolve(TIMED_OUT), ms)),
+  ]);
+}
+
 // Product spec fields — editable via PUT /orders/:id, Admin/Authorizer only
 const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
@@ -1069,32 +1088,56 @@ export class OrdersService implements OnModuleInit {
       this.logger.error(msg);
       Sentry.captureMessage(msg, 'error');
     }
-    // A failure building attachments must never take the email down with it —
-    // fall back to sending with no attachments rather than silently skipping
-    // the notification (this is what actually happens if buildFactoryOrderPdfAttachment
-    // rejects: the .then() below would never run and the factory team gets nothing).
-    this.buildFactoryOrderPdfAttachment(saved)
-      .catch(err => {
+    // A failure — or a hang — building attachments must never take the email
+    // down with it: fall back to sending with no attachments rather than
+    // silently skipping the notification. buildFactoryOrderPdfAttachment
+    // rejecting is one way that used to happen; it hanging indefinitely
+    // (e.g. an unresponsive file host mid-fetch) was another, worse one —
+    // nothing downstream of a hung, un-awaited promise ever runs, so neither
+    // the email nor any error log ever appears. The timeout below bounds it.
+    (async () => {
+      let attachments: { filename: string; content: Buffer }[];
+      try {
+        const result = await withTimeout(this.buildFactoryOrderPdfAttachment(saved), FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS);
+        if (result === TIMED_OUT) {
+          const msg = `Factory order attachment build timed out after ${FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS}ms for ${saved.poNumber} — sending the factory alert without attachments rather than blocking it indefinitely.`;
+          this.logger.warn(msg);
+          Sentry.captureMessage(msg, 'warning');
+          attachments = [];
+        } else {
+          attachments = result;
+        }
+      } catch (err) {
         this.logger.warn(`Factory order attachment build failed for ${saved.poNumber}:`, err);
-        return [];
-      })
-      .then(attachments =>
-        this.emailService.sendFactoryAssignedAlert({
-          to: factoryEmails,
-          poNumber: saved.poNumber,
-          orderType: saved.orderType || '—',
-          orderId: saved.id,
-          isPriorityCustomer: saved.isPriorityCustomer,
-          attachments,
-        }),
-      ).catch(err => {
-        this.logger.warn('Factory assigned alert email failed:', err);
-        Sentry.captureException(err);
-        this.emailService.sendInternalFailureAlert(
-          'Factory assigned alert email failed',
-          `Order ${saved.poNumber} (factory "${factory}") — sendFactoryAssignedAlert threw: ${(err as Error)?.message ?? err}`,
-        );
+        attachments = [];
+      }
+
+      const sent = await this.emailService.sendFactoryAssignedAlert({
+        to: factoryEmails,
+        poNumber: saved.poNumber,
+        orderType: saved.orderType || '—',
+        orderId: saved.id,
+        isPriorityCustomer: saved.isPriorityCustomer,
+        attachments,
       });
+      // sendFactoryAssignedAlert already alerts ops when `to` is empty
+      // (`sent` is undefined then). `sent === false` is every other way the
+      // send can fail (SMTP rejection, oversized attachment, etc.) — those
+      // used to only ever reach a raw log line nobody watches.
+      if (sent === false) {
+        this.emailService.sendInternalFailureAlert(
+          'Factory assigned alert failed to send',
+          `Order ${saved.poNumber} (factory "${factory}") — sendFactoryAssignedAlert returned false; see the preceding "Email send failed" log line for the underlying error.`,
+        );
+      }
+    })().catch(err => {
+      this.logger.warn('Factory assigned alert pipeline failed:', err);
+      Sentry.captureException(err);
+      this.emailService.sendInternalFailureAlert(
+        'Factory assigned alert pipeline failed',
+        `Order ${saved.poNumber} (factory "${factory}") — unexpected error: ${(err as Error)?.message ?? err}`,
+      );
+    });
 
     const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
     this.emailService.sendStoneSupplierAssignedAlert({
@@ -1103,6 +1146,13 @@ export class OrdersService implements OnModuleInit {
       orderType: saved.orderType || '—',
       orderId: saved.id,
       isPriorityCustomer: saved.isPriorityCustomer,
+    }).then(sent => {
+      if (sent === false) {
+        this.emailService.sendInternalFailureAlert(
+          'Stone supplier assigned alert failed to send',
+          `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert returned false; see the preceding "Email send failed" log line for the underlying error.`,
+        );
+      }
     }).catch(err => {
       this.logger.warn('Stone supplier assigned alert email failed:', err);
       Sentry.captureException(err);
@@ -1137,7 +1187,11 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException(`No email recipients configured for factory "${order.assignedFactory}" — add one to STANDING_FACTORY_RECIPIENTS or tag a FACTORY_MANAGER to it.`);
     }
 
-    const attachments = await this.buildFactoryOrderPdfAttachment(order);
+    const attachmentResult = await withTimeout(this.buildFactoryOrderPdfAttachment(order), FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS);
+    if (attachmentResult === TIMED_OUT) {
+      this.logger.warn(`Factory order attachment build timed out after ${FACTORY_ATTACHMENT_BUILD_TIMEOUT_MS}ms for ${order.poNumber} (manual resend) — sending without attachments.`);
+    }
+    const attachments = attachmentResult === TIMED_OUT ? [] : attachmentResult;
     const sent = await this.emailService.sendFactoryAssignedAlert({
       to: recipients,
       poNumber: order.poNumber,
@@ -1175,11 +1229,17 @@ export class OrdersService implements OnModuleInit {
   // the factory needs the actual uploaded CAD design files, not a reference photo.
   private static readonly REFERENCE_NOTE_TAGS = new Set(['Reference image', 'Customer reference image']);
 
+  // Raw CAD source files (.3dm, .stl, .obj, etc.) are large binary model
+  // files, not something a factory needs opened in an inbox — they're also
+  // what was actually timing out / bloating this email past deliverable
+  // size. Only images and PDFs get attached.
+  private static readonly ATTACHABLE_FILE_RE = /\.(jpe?g|png|gif|webp|bmp|tiff?|svg|pdf)$/i;
+
   // Builds the product-detail PDF (no customer name/company/pricing — same
-  // redaction as the Factory Manager portal view) plus every uploaded CAD
-  // design file — any file type, the factory needs the actual source file —
-  // attached to the factory-assigned email. A failure on any single piece
-  // (PDF render or one file fetch) shouldn't block the rest of the email.
+  // redaction as the Factory Manager portal view) plus every APPROVED CAD
+  // design image/PDF — attached to the factory-assigned email. A failure on
+  // any single piece (PDF render or one file fetch) shouldn't block the rest
+  // of the email.
   private async buildFactoryOrderPdfAttachment(order: Order): Promise<{ filename: string; content: Buffer }[]> {
     const attachments: { filename: string; content: Buffer }[] = [];
 
@@ -1192,14 +1252,20 @@ export class OrdersService implements OnModuleInit {
 
     let cadFiles: { designerNotes?: string | null; filePath: string; originalName: string }[] = [];
     try {
-      cadFiles = await this.cadRepo.find({ where: { orderId: order.id } });
+      cadFiles = await this.cadRepo.find({ where: { orderId: order.id, status: CadFileStatus.APPROVED } });
     } catch (err) {
       this.logger.warn(`Failed to load CAD files for ${order.poNumber}:`, err);
     }
-    const designFiles = cadFiles.filter(c => !c.designerNotes || !OrdersService.REFERENCE_NOTE_TAGS.has(c.designerNotes));
+    const designFiles = cadFiles.filter(c =>
+      (!c.designerNotes || !OrdersService.REFERENCE_NOTE_TAGS.has(c.designerNotes))
+      && OrdersService.ATTACHABLE_FILE_RE.test(c.originalName),
+    );
     for (const cad of designFiles) {
       try {
-        const res = await fetch(cad.filePath);
+        // Without a timeout, an unresponsive file host hangs this fetch (and
+        // everything downstream of it — the factory alert never sends, and
+        // since this whole chain is fire-and-forget, nothing ever logs it).
+        const res = await fetch(cad.filePath, { signal: AbortSignal.timeout(CAD_FILE_FETCH_TIMEOUT_MS) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         attachments.push({ filename: cad.originalName, content: Buffer.from(await res.arrayBuffer()) });
       } catch (err) {
