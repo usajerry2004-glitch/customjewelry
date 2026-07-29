@@ -796,7 +796,12 @@ export class OrdersService implements OnModuleInit {
 
     // Manual cancellation by admin/authorizer → deactivate (allowed from any active status)
     if (status === OrderStatus.CANCELLED) {
-      return this.update(id, { status: OrderStatus.CANCELLED, isArchived: true }, user);
+      const beforeCancel = await this.findOne(id);
+      const cancelled = await this.update(id, { status: OrderStatus.CANCELLED, isArchived: true }, user);
+      // Recorded so reactivateOrder() below knows what to restore — this
+      // transition previously wasn't logged at all, unlike every other one.
+      this.logEvent(id, 'STATUS_CHANGE', user, beforeCancel.status, OrderStatus.CANCELLED);
+      return cancelled;
     }
 
     // ── Status transition guard — prevent stage-skipping ─────────────────
@@ -1025,6 +1030,28 @@ export class OrdersService implements OnModuleInit {
     }
 
     return updated;
+  }
+
+  // Admin-only: un-cancels an order, restoring whichever status it was in
+  // immediately before cancellation (read off the STATUS_CHANGE event
+  // updateStatus() logs when cancelling) rather than asking the caller to
+  // pick one — falls back to NEW only for orders cancelled before that
+  // event logging existed, which have no such record.
+  async reactivateOrder(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
+    const order = await this.findOne(id);
+    if (order.status !== OrderStatus.CANCELLED) {
+      throw new BadRequestException(`Order ${order.poNumber} is not cancelled.`);
+    }
+
+    const lastCancelEvent = await this.eventRepo.findOne({
+      where: { orderId: id, action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED },
+      order: { createdAt: 'DESC' },
+    });
+    const restoredStatus = (lastCancelEvent?.fromStatus as OrderStatus) || OrderStatus.NEW;
+
+    const reactivated = await this.update(id, { status: restoredStatus, isArchived: false }, user);
+    this.logEvent(id, 'STATUS_CHANGE', user, OrderStatus.CANCELLED, restoredStatus, 'Reactivated by Admin');
+    return reactivated;
   }
 
   // Admin/Authorizer only — routes an already-approved (VPO_ISSUED) order to a

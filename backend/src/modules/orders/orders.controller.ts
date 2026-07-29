@@ -153,6 +153,14 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor);
   }
 
+  @Patch(':id/reactivate')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Admin only — un-cancels an order, restoring whichever status it was in immediately before cancellation' })
+  reactivate(@Param('id') id: string, @Request() req: any) {
+    return this.ordersService.reactivateOrder(id, req.user);
+  }
+
   @Patch(':id/assign-supplier')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @RequiresPermission(Permission.ASSIGN_SUPPLIER)
