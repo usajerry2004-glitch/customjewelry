@@ -202,6 +202,26 @@ export class CadService {
     }
   }
 
+  // Admin-only manual correction: force every non-reference CAD design file
+  // on an order to SENT_FOR_APPROVAL ("Awaiting Approval" in the UI), status
+  // only — unlike sendToCustomer() above, this never emails the customer and
+  // never touches the order's sentToCustomer/lastApprovalEmailAt fields. For
+  // fixing a stuck/incorrect status on an order that's already past the
+  // normal CAD approval stage, not for actually sending anything.
+  async markAwaitingApproval(orderId: string): Promise<{ updated: number }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+    const allCads = await this.cadRepo.find({ where: { orderId } });
+    const designFileIds = allCads.filter(
+      c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image',
+    ).map(c => c.id);
+    if (!designFileIds.length) return { updated: 0 };
+
+    const result = await this.cadRepo.update({ id: In(designFileIds) }, { status: CadFileStatus.SENT_FOR_APPROVAL });
+    return { updated: result.affected || 0 };
+  }
+
   // Admin/Authorizer manually nudges a customer who hasn't approved/rejected yet.
   // Rate-limited to once per 24h (checked against the last approval or reminder email).
   async sendApprovalReminder(orderId: string): Promise<{ sent: true }> {

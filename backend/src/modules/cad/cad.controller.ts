@@ -77,6 +77,14 @@ export class CadController {
     return { sent: true };
   }
 
+  @Patch('order/:orderId/mark-awaiting-approval')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Manual correction: force every non-reference CAD design file on this order to SENT_FOR_APPROVAL — status only, no customer email (Admin only)' })
+  async markAwaitingApproval(@Param('orderId') orderId: string) {
+    return this.cadService.markAwaitingApproval(orderId);
+  }
+
   @Patch('order/:orderId/send-reminder')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
