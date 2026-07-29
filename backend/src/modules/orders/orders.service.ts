@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Cron } from '@nestjs/schedule';
 import { Repository, In, Between } from 'typeorm';
 import { randomBytes } from 'crypto';
 import * as Sentry from '@sentry/node';
@@ -46,6 +47,76 @@ const CSV_FACTORY_LABELS: Record<string, string> = {
 
 function csvEscape(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+// Shared column set for every order CSV export (Admin/Authorizer VPO export,
+// the Factory Manager's own-orders export, and the daily factory digest).
+// `factoryVisible: false` marks the fields FactoryRedactionInterceptor also
+// hides everywhere else (pricing, customer identity) plus the reference
+// link — the closest thing to a "reference image" on this row. CAD files and
+// the conversation thread are never in here since they live in separate
+// tables never joined into this query.
+function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; value: (o: Order) => string }[] {
+  return ([
+    { header: 'PO Number', value: (o: Order) => o.poNumber || '' },
+    { header: 'Customer PO#', value: (o: Order) => o.refCustomerPo || '' },
+    { header: 'Kira SKU', value: (o: Order) => o.kiraSkuNumber || '' },
+    { header: 'Order Type', value: (o: Order) => o.orderType || '' },
+    { header: 'Manufacturing Path', value: (o: Order) => o.manufacturingPath || '' },
+    { header: 'Stone Supplier', value: (o: Order) => CSV_SUPPLY_SOURCE_LABELS[o.supplySource || ''] || o.supplySource || '' },
+    { header: 'Factory', value: (o: Order) => CSV_FACTORY_LABELS[o.assignedFactory || ''] || o.assignedFactory || '' },
+    { header: 'Reference Link', value: (o: Order) => o.referenceWeblink || '', factoryVisible: false },
+    { header: 'Store Name', value: (o: Order) => o.storeName || '', factoryVisible: false },
+    { header: 'Customer Name', value: (o: Order) => o.customerFullName || '', factoryVisible: false },
+    { header: 'Customer Email', value: (o: Order) => o.customerEmail || '', factoryVisible: false },
+    { header: 'Phone', value: (o: Order) => o.phoneNumber || '', factoryVisible: false },
+    { header: 'Metal Type', value: (o: Order) => o.metalType || '' },
+    { header: 'Metal Color', value: (o: Order) => o.metalColor || '' },
+    { header: 'Size', value: (o: Order) => o.size || '' },
+    { header: 'Quantity', value: (o: Order) => String(o.quantity ?? '') },
+    { header: 'Stamping', value: (o: Order) => o.stamping || '' },
+    { header: 'Diamond Type', value: (o: Order) => o.diamondType || '' },
+    { header: 'Diamond Quality', value: (o: Order) => o.diamondQuality || '' },
+    { header: 'Stone Shape', value: (o: Order) => o.centerStoneShape || '' },
+    { header: 'Carat Weight', value: (o: Order) => o.approximateCaratWeight || '' },
+    { header: 'Customer Notes', value: (o: Order) => o.customerNotes || '' },
+    { header: 'Current Status', value: (o: Order) => CSV_STATUS_LABELS[o.status] || o.status },
+    { header: 'Priority', value: (o: Order) => o.isPriorityCustomer ? 'Priority' : 'Regular' },
+    { header: 'Stone Status', value: (o: Order) => o.stoneStatus === StoneStatus.STONE_RECEIVED ? 'Stone Received' : o.stoneStatus === StoneStatus.PENDING_STONE ? 'Pending Stone' : '' },
+    { header: 'Quoted Price', value: (o: Order) => o.quotedCost != null ? String(o.quotedCost) : '', factoryVisible: false },
+    { header: 'Quote Options', value: (o: Order) => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; '), factoryVisible: false },
+    { header: 'Committed Ship Date', value: (o: Order) => o.committedShipDate || '' },
+    { header: 'Created By', value: (o: Order) => o.salesRepName || o.salesRepEmail || '' },
+    { header: 'Created Date', value: (o: Order) => o.createdAt ? o.createdAt.toISOString() : '' },
+    { header: 'Updated Date', value: (o: Order) => o.updatedAt ? o.updatedAt.toISOString() : '' },
+    { header: 'VPO Issued Date', value: (o: Order) => o.vpoIssuedAt ? new Date(o.vpoIssuedAt).toISOString() : '' },
+  ] as { header: string; value: (o: Order) => string; factoryVisible?: boolean }[])
+    .filter(c => !restrictForFactory || c.factoryVisible !== false);
+}
+
+function ordersToCsv(orders: Order[], columns: { header: string; value: (o: Order) => string }[]): string {
+  const lines = [
+    columns.map(c => csvEscape(c.header)).join(','),
+    ...orders.map(o => columns.map(c => csvEscape(c.value(o))).join(',')),
+  ];
+  return lines.join('\n');
+}
+
+// Bounds of `at`'s calendar day in the given IANA time zone, as actual UTC
+// instants — used to pick out "assigned today" by New York wall-clock time
+// regardless of what time zone the server itself runs in.
+function zonedDayBoundsUtc(timeZone: string, at: Date): { start: Date; end: Date } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(at).reduce((acc: Record<string, string>, p) => { acc[p.type] = p.value; return acc; }, {});
+  const hour = parts.hour === '24' ? '00' : parts.hour;
+  const zonedAsUtc = new Date(`${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${parts.second}.000Z`);
+  const offsetMs = zonedAsUtc.getTime() - at.getTime();
+  const dayStartZonedAsUtc = new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00.000Z`);
+  const start = new Date(dayStartZonedAsUtc.getTime() - offsetMs);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
 }
 
 // Fields worth diffing into the audit log when changed via PUT /orders/:id —
@@ -344,47 +415,67 @@ export class OrdersService implements OnModuleInit {
       where.vpoIssuedAt = Between(from, to);
     }
     const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
+    return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
+  }
 
-    const columns: { header: string; value: (o: Order) => string; factoryVisible?: boolean }[] = [
-      { header: 'PO Number', value: o => o.poNumber || '' },
-      { header: 'Customer PO#', value: o => o.refCustomerPo || '' },
-      { header: 'Kira SKU', value: o => o.kiraSkuNumber || '' },
-      { header: 'Order Type', value: o => o.orderType || '' },
-      { header: 'Manufacturing Path', value: o => o.manufacturingPath || '' },
-      { header: 'Stone Supplier', value: o => CSV_SUPPLY_SOURCE_LABELS[o.supplySource || ''] || o.supplySource || '' },
-      { header: 'Factory', value: o => CSV_FACTORY_LABELS[o.assignedFactory || ''] || o.assignedFactory || '' },
-      { header: 'Reference Link', value: o => o.referenceWeblink || '', factoryVisible: false },
-      { header: 'Store Name', value: o => o.storeName || '', factoryVisible: false },
-      { header: 'Customer Name', value: o => o.customerFullName || '', factoryVisible: false },
-      { header: 'Customer Email', value: o => o.customerEmail || '', factoryVisible: false },
-      { header: 'Phone', value: o => o.phoneNumber || '', factoryVisible: false },
-      { header: 'Metal Type', value: o => o.metalType || '' },
-      { header: 'Metal Color', value: o => o.metalColor || '' },
-      { header: 'Size', value: o => o.size || '' },
-      { header: 'Quantity', value: o => String(o.quantity ?? '') },
-      { header: 'Stamping', value: o => o.stamping || '' },
-      { header: 'Diamond Type', value: o => o.diamondType || '' },
-      { header: 'Diamond Quality', value: o => o.diamondQuality || '' },
-      { header: 'Stone Shape', value: o => o.centerStoneShape || '' },
-      { header: 'Carat Weight', value: o => o.approximateCaratWeight || '' },
-      { header: 'Customer Notes', value: o => o.customerNotes || '' },
-      { header: 'Current Status', value: o => CSV_STATUS_LABELS[o.status] || o.status },
-      { header: 'Priority', value: o => o.isPriorityCustomer ? 'Priority' : 'Regular' },
-      { header: 'Stone Status', value: o => o.stoneStatus === StoneStatus.STONE_RECEIVED ? 'Stone Received' : o.stoneStatus === StoneStatus.PENDING_STONE ? 'Pending Stone' : '' },
-      { header: 'Quoted Price', value: o => o.quotedCost != null ? String(o.quotedCost) : '', factoryVisible: false },
-      { header: 'Quote Options', value: o => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; '), factoryVisible: false },
-      { header: 'Committed Ship Date', value: o => o.committedShipDate || '' },
-      { header: 'Created By', value: o => o.salesRepName || o.salesRepEmail || '' },
-      { header: 'Created Date', value: o => o.createdAt ? o.createdAt.toISOString() : '' },
-      { header: 'Updated Date', value: o => o.updatedAt ? o.updatedAt.toISOString() : '' },
-      { header: 'VPO Issued Date', value: o => o.vpoIssuedAt ? new Date(o.vpoIssuedAt).toISOString() : '' },
-    ].filter(c => !isFactory || c.factoryVisible !== false);
+  // Runs every day at 8:00 PM America/New_York — sends each factory (any
+  // Factory enum value with at least one order assigned to it "today", by NY
+  // wall-clock) a CSV of just those orders, to the same recipients who get
+  // the "order assigned to your factory" alert in assignSupplier() (tagged
+  // FACTORY_MANAGER users + STANDING_FACTORY_RECIPIENTS). "Assigned today" is
+  // read off the SUPPLIER_ASSIGNED order_event, not vpoIssuedAt — an order
+  // can sit VPO_ISSUED unassigned for days before someone runs
+  // assignSupplier, so vpoIssuedAt alone would misattribute the digest date.
+  @Cron('0 20 * * *', { timeZone: 'America/New_York' })
+  async sendScheduledDailyFactoryDigest(): Promise<void> {
+    await this.sendDailyFactoryDigest(new Date());
+  }
 
-    const lines = [
-      columns.map(c => csvEscape(c.header)).join(','),
-      ...orders.map(o => columns.map(c => csvEscape(c.value(o))).join(',')),
-    ];
-    return lines.join('\n');
+  async sendDailyFactoryDigest(at: Date): Promise<void> {
+    const { start, end } = zonedDayBoundsUtc('America/New_York', at);
+    const assignedEvents = await this.eventRepo.find({
+      where: { action: 'SUPPLIER_ASSIGNED', createdAt: Between(start, end) },
+    });
+    if (!assignedEvents.length) return;
+
+    const orderIds = Array.from(new Set(assignedEvents.map(e => e.orderId)));
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds) }, order: { poNumber: 'ASC' } });
+
+    const ordersByFactory = new Map<Factory, Order[]>();
+    for (const o of orders) {
+      if (!o.assignedFactory) continue;
+      if (!ordersByFactory.has(o.assignedFactory)) ordersByFactory.set(o.assignedFactory, []);
+      ordersByFactory.get(o.assignedFactory)!.push(o);
+    }
+
+    const dateLabel = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+    const columns = buildOrderCsvColumns(true);
+
+    for (const [factory, factoryOrders] of ordersByFactory) {
+      const factoryUsers = await this.userRepo.find({ where: { assignedFactory: factory } });
+      const recipients = Array.from(new Set([
+        ...factoryUsers.map(u => u.email).filter(Boolean),
+        ...(STANDING_FACTORY_RECIPIENTS[factory] || []),
+      ]));
+      if (!recipients.length) {
+        const msg = `Daily factory digest for "${factory}" has ${factoryOrders.length} order(s) but no email recipients configured (no tagged FACTORY_MANAGER, no STANDING_FACTORY_RECIPIENTS entry).`;
+        this.logger.error(msg);
+        Sentry.captureMessage(msg, 'error');
+        continue;
+      }
+
+      const csv = ordersToCsv(factoryOrders, columns);
+      const factoryLabel = CSV_FACTORY_LABELS[factory] || factory;
+      await this.emailService.send({
+        to: recipients,
+        subject: `${factoryLabel} — Orders Assigned Today (${dateLabel})`,
+        html: `<p style="font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:14px;color:#1A2740">${factoryOrders.length} order${factoryOrders.length === 1 ? '' : 's'} assigned to ${factoryLabel} today (${dateLabel}) — attached as CSV.</p>`,
+        attachments: [{ filename: `${factory.toLowerCase().replace(/_/g, '-')}-orders-${dateLabel}.csv`, content: Buffer.from(csv, 'utf-8') }],
+      }).catch(err => {
+        this.logger.warn(`Daily factory digest email failed for "${factory}":`, err);
+        Sentry.captureException(err);
+      });
+    }
   }
 
   async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
