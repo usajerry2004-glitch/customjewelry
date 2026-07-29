@@ -66,19 +66,23 @@ export class OrdersController {
   }
 
   @Get('export/csv')
-  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Export VPO Issued orders as CSV (Admin/Authorizer only) — date range filters on vpoIssuedAt, not createdAt' })
+  @ApiOperation({ summary: 'Export VPO Issued orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Date range filters on vpoIssuedAt, not createdAt' })
   async exportCsv(
     @Query('dateFrom') dateFrom: string | undefined,
     @Query('dateTo') dateTo: string | undefined,
+    @Request() req: any,
     @Res() res: Response,
   ) {
-    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo);
+    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user);
     const today = new Date().toISOString().slice(0, 10);
+    const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
+      ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
+      : '';
     const filename = dateFrom || dateTo
-      ? `vpo-issued-orders-${dateFrom || today}-${dateTo || today}.csv`
-      : `vpo-issued-orders-${today}.csv`;
+      ? `vpo-issued-orders${factorySuffix}-${dateFrom || today}-${dateTo || today}.csv`
+      : `vpo-issued-orders${factorySuffix}-${today}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);

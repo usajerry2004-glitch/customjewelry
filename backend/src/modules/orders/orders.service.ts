@@ -327,8 +327,17 @@ export class OrdersService implements OnModuleInit {
   // aren't part of the Order row this reads from. The date filter applies to
   // vpoIssuedAt, not createdAt — this list is about when an order was
   // approved into production, not when it was first placed.
-  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string): Promise<string> {
+  //
+  // A Factory Manager can also hit this — scoped to their own assignedFactory
+  // (same visibility rule as findAll()) and stripped of the same fields
+  // FactoryRedactionInterceptor hides everywhere else (pricing, customer
+  // identity), plus the reference link, since that's the closest thing to a
+  // "reference image" this row has.
+  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }): Promise<string> {
+    const isFactory = user?.role === UserRole.FACTORY_MANAGER;
+
     const where: any = { status: OrderStatus.VPO_ISSUED };
+    if (isFactory) where.assignedFactory = user?.assignedFactory ?? null;
     if (dateFrom || dateTo) {
       const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date('1970-01-01');
       const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : new Date();
@@ -336,7 +345,7 @@ export class OrdersService implements OnModuleInit {
     }
     const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
 
-    const columns: { header: string; value: (o: Order) => string }[] = [
+    const columns: { header: string; value: (o: Order) => string; factoryVisible?: boolean }[] = [
       { header: 'PO Number', value: o => o.poNumber || '' },
       { header: 'Customer PO#', value: o => o.refCustomerPo || '' },
       { header: 'Kira SKU', value: o => o.kiraSkuNumber || '' },
@@ -344,11 +353,11 @@ export class OrdersService implements OnModuleInit {
       { header: 'Manufacturing Path', value: o => o.manufacturingPath || '' },
       { header: 'Stone Supplier', value: o => CSV_SUPPLY_SOURCE_LABELS[o.supplySource || ''] || o.supplySource || '' },
       { header: 'Factory', value: o => CSV_FACTORY_LABELS[o.assignedFactory || ''] || o.assignedFactory || '' },
-      { header: 'Reference Link', value: o => o.referenceWeblink || '' },
-      { header: 'Store Name', value: o => o.storeName || '' },
-      { header: 'Customer Name', value: o => o.customerFullName || '' },
-      { header: 'Customer Email', value: o => o.customerEmail || '' },
-      { header: 'Phone', value: o => o.phoneNumber || '' },
+      { header: 'Reference Link', value: o => o.referenceWeblink || '', factoryVisible: false },
+      { header: 'Store Name', value: o => o.storeName || '', factoryVisible: false },
+      { header: 'Customer Name', value: o => o.customerFullName || '', factoryVisible: false },
+      { header: 'Customer Email', value: o => o.customerEmail || '', factoryVisible: false },
+      { header: 'Phone', value: o => o.phoneNumber || '', factoryVisible: false },
       { header: 'Metal Type', value: o => o.metalType || '' },
       { header: 'Metal Color', value: o => o.metalColor || '' },
       { header: 'Size', value: o => o.size || '' },
@@ -362,14 +371,14 @@ export class OrdersService implements OnModuleInit {
       { header: 'Current Status', value: o => CSV_STATUS_LABELS[o.status] || o.status },
       { header: 'Priority', value: o => o.isPriorityCustomer ? 'Priority' : 'Regular' },
       { header: 'Stone Status', value: o => o.stoneStatus === StoneStatus.STONE_RECEIVED ? 'Stone Received' : o.stoneStatus === StoneStatus.PENDING_STONE ? 'Pending Stone' : '' },
-      { header: 'Quoted Price', value: o => o.quotedCost != null ? String(o.quotedCost) : '' },
-      { header: 'Quote Options', value: o => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; ') },
+      { header: 'Quoted Price', value: o => o.quotedCost != null ? String(o.quotedCost) : '', factoryVisible: false },
+      { header: 'Quote Options', value: o => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; '), factoryVisible: false },
       { header: 'Committed Ship Date', value: o => o.committedShipDate || '' },
       { header: 'Created By', value: o => o.salesRepName || o.salesRepEmail || '' },
       { header: 'Created Date', value: o => o.createdAt ? o.createdAt.toISOString() : '' },
       { header: 'Updated Date', value: o => o.updatedAt ? o.updatedAt.toISOString() : '' },
       { header: 'VPO Issued Date', value: o => o.vpoIssuedAt ? new Date(o.vpoIssuedAt).toISOString() : '' },
-    ];
+    ].filter(c => !isFactory || c.factoryVisible !== false);
 
     const lines = [
       columns.map(c => csvEscape(c.header)).join(','),

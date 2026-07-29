@@ -487,11 +487,12 @@ export default function OrdersPage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const today = new Date().toISOString().slice(0, 10);
+      const namePrefix = isFactoryManager ? 'vpo-issued-orders-mine' : 'vpo-issued-orders';
       const a = document.createElement('a');
       a.href = url;
       a.download = (dateFrom || dateTo)
-        ? `vpo-issued-orders-${dateFrom || today}-${dateTo || today}.csv`
-        : `vpo-issued-orders-${today}.csv`;
+        ? `${namePrefix}-${dateFrom || today}-${dateTo || today}.csv`
+        : `${namePrefix}-${today}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1124,11 +1125,11 @@ export default function OrdersPage() {
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
           >+ Save current filters</button>
         )}
-        {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER'].includes(userRole) && (
+        {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
           <button
             onClick={handleExportCsv}
             disabled={exportingCsv}
-            title="Export the VPO Issued list as CSV"
+            title={isFactoryManager ? 'Export your assigned VPO Issued orders as CSV' : 'Export the VPO Issued list as CSV'}
             style={{
               marginLeft: 'auto', padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
               cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',
