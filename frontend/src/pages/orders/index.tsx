@@ -1202,7 +1202,7 @@ export default function OrdersPage() {
               selecting any status tab clears it back out. */}
           <button
             onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
-            title="Only show orders where the customer has sent a chat message"
+            title="Only show orders with an unread customer chat message — clears once any staff member opens the conversation"
             style={{
               padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
               fontWeight: customerTextedFilter ? 600 : 400,

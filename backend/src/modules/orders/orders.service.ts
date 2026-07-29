@@ -368,23 +368,34 @@ export class OrdersService implements OnModuleInit {
     if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
     if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
 
-    // "Customer texted" — orders where the customer has posted at least one
-    // chat message (not just internal staff notes), so someone can find
-    // orders that may need a reply.
+    // "Customer texted" — orders with an UNREAD customer chat message: the
+    // customer has posted at least one, and no staff member has opened the
+    // conversation since. Team-wide, not per-viewer — once ANY staff member
+    // reads it (order_conversation_reads.lastReadAt, the same table "Seen by"
+    // reads from), it drops out of this filter for everyone, not just for
+    // whoever read it.
     if (filters.hasCustomerMessage === 'true') {
-      // order_messages.orderId is varchar while orders.id is uuid — same
-      // mismatch as order.companyId vs companies.id above, needs an
-      // explicit cast or Postgres rejects the comparison outright. Casting
-      // both sides to text (not just the uuid side) so this doesn't assume
-      // orderId's exact column type, which has drifted between environments
-      // before on this project.
+      // order_messages.orderId / order_conversation_reads.orderId are varchar
+      // while orders.id is uuid — same mismatch as order.companyId vs
+      // companies.id above, needs an explicit cast or Postgres rejects the
+      // comparison outright. Casting both sides to text (not just the uuid
+      // side) so this doesn't assume the exact column type, which has drifted
+      // between environments before on this project.
       // order.id::text (cast glued directly onto the column) defeats
       // TypeORM's reserved-word alias quoting for "order", sending the bare
       // keyword straight to Postgres and causing a syntax error. Parenthesizing
       // the column keeps a terminator right after it so TypeORM still quotes it.
-      qb.andWhere(
-        `EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId"::text = (order.id)::text AND om."authorRole" = 'CUSTOMER')`,
-      );
+      qb.andWhere(`
+        EXISTS (SELECT 1 FROM order_messages om WHERE om."orderId"::text = (order.id)::text AND om."authorRole" = 'CUSTOMER')
+        AND NOT EXISTS (
+          SELECT 1 FROM order_conversation_reads ocr
+          WHERE ocr."orderId"::text = (order.id)::text
+            AND ocr."lastReadAt" >= (
+              SELECT MAX(om2."createdAt") FROM order_messages om2
+              WHERE om2."orderId"::text = (order.id)::text AND om2."authorRole" = 'CUSTOMER'
+            )
+        )
+      `);
     }
 
     if (filters.search) {
