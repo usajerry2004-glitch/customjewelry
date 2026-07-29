@@ -60,6 +60,55 @@ export class CadService {
     return { running: !!open };
   }
 
+  // Read-only: nothing in the app has ever surfaced cad_time_logs data
+  // anywhere, so the only way to tell whether CAD staff actually use the
+  // Start/Stop timer is to look at the raw table directly.
+  async getTimeTrackingUsage(): Promise<{
+    totalSessions: number;
+    currentlyRunning: number;
+    firstSessionAt: Date | null;
+    lastSessionAt: Date | null;
+    byUser: { userId: string; name: string; email: string; sessionCount: number; totalDurationSeconds: number; lastSessionAt: Date }[];
+  }> {
+    const logs = await this.timeLogRepo.find();
+    if (!logs.length) {
+      return { totalSessions: 0, currentlyRunning: 0, firstSessionAt: null, lastSessionAt: null, byUser: [] };
+    }
+
+    const currentlyRunning = logs.filter(l => !l.stoppedAt).length;
+    const sortedByStart = [...logs].sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+    const firstSessionAt = sortedByStart[0].startedAt;
+    const lastSessionAt = sortedByStart[sortedByStart.length - 1].startedAt;
+
+    const byUserId = new Map<string, { sessionCount: number; totalDurationSeconds: number; lastSessionAt: Date }>();
+    for (const log of logs) {
+      const entry = byUserId.get(log.userId) || { sessionCount: 0, totalDurationSeconds: 0, lastSessionAt: log.startedAt };
+      entry.sessionCount += 1;
+      entry.totalDurationSeconds += log.durationSeconds || 0;
+      if (log.startedAt > entry.lastSessionAt) entry.lastSessionAt = log.startedAt;
+      byUserId.set(log.userId, entry);
+    }
+
+    const userIds = [...byUserId.keys()];
+    const users = await this.userRepo.find({ where: { id: In(userIds) } });
+    const userById = new Map(users.map(u => [u.id, u]));
+
+    const byUser = userIds.map(id => {
+      const u = userById.get(id);
+      const entry = byUserId.get(id)!;
+      return {
+        userId: id,
+        name: u ? `${u.firstName} ${u.lastName}`.trim() : 'Unknown user',
+        email: u?.email || 'unknown',
+        sessionCount: entry.sessionCount,
+        totalDurationSeconds: entry.totalDurationSeconds,
+        lastSessionAt: entry.lastSessionAt,
+      };
+    }).sort((a, b) => b.sessionCount - a.sessionCount);
+
+    return { totalSessions: logs.length, currentlyRunning, firstSessionAt, lastSessionAt, byUser };
+  }
+
   private async getTeamEmails(roles: UserRole[]): Promise<{ emails: string[]; users: User[] }> {
     const users = await this.userRepo.find({ where: { role: In(roles) } });
     return { emails: users.map(u => u.email).filter(Boolean), users };

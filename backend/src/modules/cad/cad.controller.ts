@@ -200,6 +200,14 @@ export class CadController {
     return this.cadService.getTimerStatus(orderId, req.user.id);
   }
 
+  @Get('admin/time-tracking-usage')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Read-only: aggregates cad_time_logs (total sessions, currently-running count, per-designer breakdown) to check whether the Start/Stop work timer is actually being used.' })
+  getTimeTrackingUsage() {
+    return this.cadService.getTimeTrackingUsage();
+  }
+
   @Patch(':id/revision')
   @ApiOperation({ summary: 'Request revision (Customer or Admin)' })
   async revision(@Param('id') id: string, @Body('feedback') feedback: string, @Request() req: any) {
