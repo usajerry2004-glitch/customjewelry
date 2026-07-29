@@ -117,4 +117,11 @@ export class UsersController {
   resolveDuplicateGroups(@Body() body: { groups: { emails: string[]; salesRepId?: string; companyName?: string }[] }) {
     return this.usersService.resolveDuplicateGroups(body.groups);
   }
+
+  @Get('admin/company-rep-drift')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Read-only: finds companies whose own salesRepId is missing or disagrees with a teammate\'s individually-set salesRepId — the same drift that left order C00204 invisible to its rep at Crockers Jewelers. Never writes anything.' })
+  findCompanyRepDrift() {
+    return this.usersService.findCompanyRepDrift();
+  }
 }

@@ -215,13 +215,39 @@ export class UsersService {
         // account shouldn't show a different company name or rep than
         // the teammates it just joined.
         user.storeName = company.name;
-        user.salesRepId = company.salesRepId || undefined;
+
+        // Normally the joining account adopts the company's existing rep.
+        // But if the company has none set yet while THIS account already
+        // does — e.g. a rep was assigned to them individually before they
+        // were ever linked to a company — overwriting it with the company's
+        // null would silently strip a real assignment. Instead, backfill
+        // upward: the company (and every other teammate/order already in
+        // it) adopts this account's rep. This is exactly the gap that left
+        // an order invisible to its rep at Crockers Jewelers (C00204): Mark
+        // was set on one teammate individually, but the company record
+        // itself, every other teammate, and pre-existing company orders
+        // never picked it up.
+        const resolvedSalesRepId = company.salesRepId || user.salesRepId || null;
+        const backfillingCompany = !company.salesRepId && !!resolvedSalesRepId;
+        if (backfillingCompany) {
+          await this.companyRepo.update(company.id, { salesRepId: resolvedSalesRepId });
+          await this.userRepo.update({ companyId: company.id }, { salesRepId: resolvedSalesRepId });
+        }
+        user.salesRepId = resolvedSalesRepId || undefined;
+
         // Pull this person's own already-placed orders into the merged
         // company (and onto its Sales Rep) too, or teammates and the rep
         // won't see anything they placed before today's merge.
-        const orderPatch = { companyId: company.id, storeName: company.name, ...(await this.buildOrderRepPatch(company.salesRepId)) };
+        const repPatch = await this.buildOrderRepPatch(resolvedSalesRepId);
+        const orderPatch = { companyId: company.id, storeName: company.name, ...repPatch };
         await this.orderRepo.update({ customerId: user.id }, orderPatch);
         await this.orderRepo.update({ customerEmail: user.email }, orderPatch);
+        // If the company's rep was just backfilled from this account, every
+        // other teammate's pre-existing orders need the same patch too —
+        // otherwise only this person's own orders would reflect it.
+        if (backfillingCompany) {
+          await this.orderRepo.update({ companyId: company.id }, repPatch);
+        }
       } else {
         user.companyId = null;
       }
@@ -372,6 +398,52 @@ export class UsersService {
       });
     }
     return result;
+  }
+
+  // Read-only diagnostic for the drift that left order C00204 invisible to
+  // its rep at Crockers Jewelers: a company whose own salesRepId is null (or
+  // disagrees) while one of its teammates carries a rep individually. Flags
+  // every company where that's currently true, with a suggested fix when
+  // there's exactly one candidate rep among the teammates, plus a count of
+  // that company's orders not already stamped with the suggested rep — so
+  // impact is visible before anyone applies a fix. Never writes anything.
+  async findCompanyRepDrift(): Promise<{
+    companyId: string;
+    companyName: string;
+    companySalesRepId: string | null;
+    teammates: { id: string; email: string; salesRepId: string | null }[];
+    suggestedSalesRepId: string | null;
+    affectedOrderCount: number | null;
+  }[]> {
+    const companies = await this.companyRepo.find();
+    const results: Awaited<ReturnType<UsersService['findCompanyRepDrift']>> = [];
+
+    for (const company of companies) {
+      const teammates = await this.userRepo.find({ where: { companyId: company.id } });
+      const distinctRepIds = [...new Set(teammates.map(t => t.salesRepId).filter((v): v is string => !!v))];
+
+      const disagreesWithCompany = company.salesRepId
+        ? distinctRepIds.some(id => id !== company.salesRepId)
+        : distinctRepIds.length > 0;
+      if (!disagreesWithCompany) continue;
+
+      const suggestedSalesRepId = !company.salesRepId && distinctRepIds.length === 1 ? distinctRepIds[0] : null;
+      let affectedOrderCount: number | null = null;
+      if (suggestedSalesRepId) {
+        const companyOrders = await this.orderRepo.find({ where: { companyId: company.id }, select: ['salesRepId'] });
+        affectedOrderCount = companyOrders.filter(o => o.salesRepId !== suggestedSalesRepId).length;
+      }
+
+      results.push({
+        companyId: company.id,
+        companyName: company.name,
+        companySalesRepId: company.salesRepId,
+        teammates: teammates.map(t => ({ id: t.id, email: t.email, salesRepId: t.salesRepId })),
+        suggestedSalesRepId,
+        affectedOrderCount,
+      });
+    }
+    return results;
   }
 
   // Companion to mergeDuplicateCompanies(): handles the accounts that method
