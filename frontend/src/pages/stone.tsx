@@ -10,6 +10,12 @@ export default function StonePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  useEffect(() => {
+    try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
+  }, []);
 
   const reload = async () => {
     setLoading(true);
@@ -28,6 +34,11 @@ export default function StonePage() {
 
   const pendingCount  = orders.filter(o => o.stoneStatus !== StoneStatus.STONE_RECEIVED).length;
   const receivedCount = orders.filter(o => o.stoneStatus === StoneStatus.STONE_RECEIVED).length;
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    const diff = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    return sortOrder === 'asc' ? diff : -diff;
+  });
 
   const markStoneSent = async (id: string) => {
     setActionLoading(id);
@@ -63,9 +74,22 @@ export default function StonePage() {
       <div style={{ ...card, overflow: 'hidden' }}>
         <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Stone Queue</h2>
-          <button onClick={reload} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}>
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {userRole === 'ADMIN' && (
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
+                title="Sort by date"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 10px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            )}
+            <button onClick={reload} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '6px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}>
+              Refresh
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -78,7 +102,7 @@ export default function StonePage() {
           </div>
         ) : (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {orders.map(order => {
+            {sortedOrders.map(order => {
               const cfg = STATUS_CONFIG[order.status] || { label: order.status, color: '#6B7280' };
               const unassigned = !order.assignedFactory || !order.supplySource;
               const stonePending = order.stoneStatus !== StoneStatus.STONE_RECEIVED;
