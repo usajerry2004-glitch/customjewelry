@@ -426,7 +426,7 @@ export class OrdersService implements OnModuleInit {
     if (filters.search) {
       const escaped = filters.search.replace(/[%_\\]/g, c => `\\${c}`);
       qb.andWhere(
-        '(order.poNumber ILIKE :s OR order.storeName ILIKE :s OR order.kiraSkuNumber ILIKE :s OR order.customerFullName ILIKE :s OR order.customerEmail ILIKE :s OR order.vendorName ILIKE :s)',
+        '(order.poNumber ILIKE :s OR order.storeName ILIKE :s OR order.kiraSkuNumber ILIKE :s OR order.customerFullName ILIKE :s OR order.customerEmail ILIKE :s OR order.vendorName ILIKE :s OR order.refCustomerPo ILIKE :s)',
         { s: `%${escaped}%` },
       );
     }
