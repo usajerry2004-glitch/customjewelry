@@ -74,11 +74,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            {daysSinceCreated !== null && (
-              <span title={`Created ${daysSinceCreated === 0 ? 'today' : `${daysSinceCreated} day${daysSinceCreated === 1 ? '' : 's'} ago`}`} style={{ background: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '3px 9px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                {String(daysSinceCreated).padStart(2, '0')}d
-              </span>
-            )}
             <span style={{
               background: cfg.bg,
               color: cfg.color,
@@ -91,6 +86,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
             }}>
               {cadSubLabel || cfg.label}
             </span>
+            {daysSinceCreated !== null && (
+              <span title={`Created ${daysSinceCreated === 0 ? 'today' : `${daysSinceCreated} day${daysSinceCreated === 1 ? '' : 's'} ago`}`} style={{ background: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '3px 9px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {String(daysSinceCreated).padStart(2, '0')}d
+              </span>
+            )}
           </div>
         </div>
 
