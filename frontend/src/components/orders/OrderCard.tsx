@@ -21,6 +21,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
   const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
   const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
   const priorityReason = calcPriorityReason(order);
+  const daysSinceCreated = order.createdAt ? Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86400000)) : null;
   const actionPending = currentUserRole ? needsActionFromRole(order as any, currentUserRole) : false;
   const actionColor = actionPending ? (ROLE_ACTION_COLOR[currentUserRole!] || '#6B7280') : null;
 
@@ -72,18 +73,25 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
               </span>
             )}
           </div>
-          <span style={{
-            background: cfg.bg,
-            color: cfg.color,
-            padding: '3px 9px',
-            borderRadius: '99px',
-            fontSize: '10px',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-            letterSpacing: '0.3px',
-          }}>
-            {cadSubLabel || cfg.label}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            {daysSinceCreated !== null && (
+              <span title={`Created ${daysSinceCreated === 0 ? 'today' : `${daysSinceCreated} day${daysSinceCreated === 1 ? '' : 's'} ago`}`} style={{ background: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '3px 9px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {String(daysSinceCreated).padStart(2, '0')}d
+              </span>
+            )}
+            <span style={{
+              background: cfg.bg,
+              color: cfg.color,
+              padding: '3px 9px',
+              borderRadius: '99px',
+              fontSize: '10px',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.3px',
+            }}>
+              {cadSubLabel || cfg.label}
+            </span>
+          </div>
         </div>
 
         {(order.storeName || order.customerFullName || !['FACTORY_MANAGER', 'STONE_MANAGER'].includes(currentUserRole || '')) && (
