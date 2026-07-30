@@ -439,7 +439,7 @@ export class OrdersService implements OnModuleInit {
       qb.andWhere('order.createdAt <= :dateTo', { dateTo: to });
     }
     qb.orderBy('order.isPriorityCustomer', 'DESC')
-      .addOrderBy('order.createdAt', 'DESC')
+      .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC')
       .skip(filters.offset || 0)
       .take(filters.limit || 50);
     const [orders, total] = await qb.getManyAndCount();

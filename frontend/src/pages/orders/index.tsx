@@ -94,6 +94,7 @@ interface SavedFilterPreset {
   activeMonth: string;
   customerFilterInput: string;
   customerTextedFilter?: boolean;
+  sortOrder?: 'asc' | 'desc';
 }
 
 // Namespaced per user so one person's saved views don't show up for the next
@@ -146,6 +147,7 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => readOrdersReturnState()?.sortOrder ?? 'desc');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
   // if present — an explicit link always wins over a remembered filter —
   // otherwise fall back to whatever was showing before the user left.
@@ -263,6 +265,7 @@ export default function OrdersPage() {
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
+      params.set('sortOrder', sortOrder);
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -571,6 +574,7 @@ export default function OrdersPage() {
     setCustomerFilterInput(p.customerFilterInput);
     setCustomerFilter(p.customerFilterInput);
     setCustomerTextedFilter(p.customerTextedFilter ?? false);
+    setSortOrder(p.sortOrder ?? 'desc');
     setActivePresetId(p.id);
   };
 
@@ -581,7 +585,7 @@ export default function OrdersPage() {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       name,
       statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
-      dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter,
+      dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter, sortOrder,
     };
     const next = [...filterPresets, preset];
     setFilterPresets(next);
@@ -609,7 +613,7 @@ export default function OrdersPage() {
     }
     setPage(0);
     load(0);
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, sortOrder]);
   useEffect(() => { load(page); }, [page]);
 
   // Remember filters/pagination on every change, so returning here (e.g.
@@ -619,10 +623,10 @@ export default function OrdersPage() {
     try {
       sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({
         statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
-        customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page,
+        customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder,
       }));
     } catch {}
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder]);
 
   // Capture scroll position when leaving the page (merged into whatever
   // filter snapshot was last written above) and restore it once, after the
@@ -1173,20 +1177,31 @@ export default function OrdersPage() {
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
           >+ Save current filters</button>
         )}
-        {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
-          <button
-            onClick={handleExportCsv}
-            disabled={exportingCsv}
-            title={isFactoryManager ? 'Export your assigned VPO Issued orders as CSV' : 'Export the VPO Issued list as CSV'}
-            style={{
-              marginLeft: 'auto', padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-              cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',
-              opacity: exportingCsv ? 0.7 : 1,
-            }}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
+            <button
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+              title={isFactoryManager ? 'Export your assigned VPO Issued orders as CSV' : 'Export the VPO Issued list as CSV'}
+              style={{
+                padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',
+                opacity: exportingCsv ? 0.7 : 1,
+              }}
+            >
+              {exportingCsv ? 'Exporting…' : '⬇ Export CSV'}
+            </button>
+          )}
+          <select
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
+            title="Sort by order created date"
+            style={{ ...inputStyle, padding: '5px 10px', fontSize: '12px', cursor: 'pointer' }}
           >
-            {exportingCsv ? 'Exporting…' : '⬇ Export CSV'}
-          </button>
-        )}
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+        </div>
       </div>
 
       {/* Filters */}
