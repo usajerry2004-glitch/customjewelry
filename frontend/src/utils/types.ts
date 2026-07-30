@@ -39,7 +39,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [Permission.ASSIGN_SUPPLIER]: 'Assign factory / stone supplier to orders',
   [Permission.BULK_DELETE_ORDERS]: 'Permanently delete orders',
   [Permission.BULK_STATUS_NUDGE]: 'Bulk-move orders between stages',
-  [Permission.MARK_STONE_RECEIVED]: 'Mark Stone Creations orders as stone received (any factory, not just their own)',
+  [Permission.MARK_STONE_RECEIVED]: 'Mark Stone Creations-supplied orders as stone received, even ones manufactured at a different factory',
 };
 
 export enum UserRole {
