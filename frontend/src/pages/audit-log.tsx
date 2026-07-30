@@ -125,14 +125,14 @@ export default function AuditLogPage() {
           placeholder="Filter by PO number…"
           style={{ ...inputStyle, flex: '1 1 160px', maxWidth: '220px' }}
         />
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputStyle, flex: '0 1 160px', fontSize: '12px', padding: '7px 10px' }} />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputStyle, flex: '0 1 160px', fontSize: '12px', padding: '7px 10px' }} />
         <select value={action} onChange={e => setAction(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
           <option value="">All actions</option>
           {Object.entries(ACTION_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }} />
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputStyle, fontSize: '12px', padding: '7px 10px' }} />
         {hasFilters && (
           <button onClick={clearFilters} style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'rgba(220,38,38,0.08)', color: '#DC2626', border: '1px solid rgba(220,38,38,0.2)', fontWeight: 500 }}>
             ✕ Clear
