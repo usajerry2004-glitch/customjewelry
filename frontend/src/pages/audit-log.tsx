@@ -24,6 +24,8 @@ const ACTION_LABELS: Record<string, string> = {
   SUPPLIER_ASSIGNED: 'Supplier Assigned',
   ORDER_UPDATED: 'Order Updated',
   QUOTE_OPTIONS_UPDATED: 'Quote Options Updated',
+  CAD_UPLOADED: 'CAD Uploaded',
+  STONE_RECEIVED: 'Stone Received',
 };
 
 const inputStyle: React.CSSProperties = {

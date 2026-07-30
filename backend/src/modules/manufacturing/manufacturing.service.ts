@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { OrderEvent } from '../../database/entities/order-event.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { Permission } from '../../common/permissions';
@@ -12,8 +13,14 @@ export class ManufacturingService {
   constructor(
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)  private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderEvent) private readonly eventRepo: Repository<OrderEvent>,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private logEvent(orderId: string, action: string, user?: { id?: string; email?: string }, fromStatus?: string, toStatus?: string, note?: string) {
+    const ev = this.eventRepo.create({ orderId, userId: user?.id, userEmail: user?.email || 'system', action, fromStatus, toStatus, note });
+    this.eventRepo.save(ev).catch(() => {});
+  }
 
   async getQueue(user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
     // Stone Manager / Factory Manager only ever see orders assigned to them
@@ -64,7 +71,7 @@ export class ManufacturingService {
     });
   }
 
-  async markStoneSent(id: string, user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
+  async markStoneSent(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (order.status !== OrderStatus.VPO_ISSUED) {
@@ -95,6 +102,8 @@ export class ManufacturingService {
     order.stoneStatus = StoneStatus.STONE_RECEIVED;
     const saved = await this.orderRepo.save(order);
 
+    this.logEvent(order.id, 'STONE_RECEIVED', user, undefined, undefined, 'Stone marked as received');
+
     // Notify only the Factory Manager(s) assigned to this order's factory — not every
     // Factory Manager account in the system.
     const factoryManagers = await this.userRepo.find({ where: { role: UserRole.FACTORY_MANAGER, assignedFactory: order.assignedFactory } });
@@ -114,7 +123,7 @@ export class ManufacturingService {
     return saved;
   }
 
-  async completeManufacturing(id: string, user?: { role?: string; assignedFactory?: Factory | null }) {
+  async completeManufacturing(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: Factory | null }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (user?.role === UserRole.FACTORY_MANAGER
@@ -127,9 +136,12 @@ export class ManufacturingService {
     if (order.stoneStatus !== StoneStatus.STONE_RECEIVED) {
       throw new BadRequestException('Stone must be received before marking order as manufactured');
     }
+    const statusBeforeComplete = order.status;
     order.status = OrderStatus.MANUFACTURED;
     order.processedDate = new Date();
     const saved = await this.orderRepo.save(order);
+
+    this.logEvent(order.id, 'STATUS_CHANGE', user, statusBeforeComplete, OrderStatus.MANUFACTURED);
 
     await this.notificationsService.create(
       NotificationType.ORDER_IN_MANUFACTURING,

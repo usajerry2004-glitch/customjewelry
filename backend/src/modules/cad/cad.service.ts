@@ -6,6 +6,7 @@ import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadTimeLog } from '../../database/entities/cad-time-log.entity';
+import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
@@ -27,6 +28,7 @@ export class CadService {
     @InjectRepository(User)       private readonly userRepo: Repository<User>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     @InjectRepository(CadTimeLog) private readonly timeLogRepo: Repository<CadTimeLog>,
+    @InjectRepository(OrderEvent) private readonly eventRepo: Repository<OrderEvent>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
     private readonly spacesService: SpacesService,
@@ -109,6 +111,11 @@ export class CadService {
     return { totalSessions: logs.length, currentlyRunning, firstSessionAt, lastSessionAt, byUser };
   }
 
+  private logEvent(orderId: string, action: string, user?: { id?: string; email?: string }, fromStatus?: string, toStatus?: string, note?: string) {
+    const ev = this.eventRepo.create({ orderId, userId: user?.id, userEmail: user?.email || 'system', action, fromStatus, toStatus, note });
+    this.eventRepo.save(ev).catch(() => {});
+  }
+
   private async getTeamEmails(roles: UserRole[]): Promise<{ emails: string[]; users: User[] }> {
     const users = await this.userRepo.find({ where: { role: In(roles) } });
     return { emails: users.map(u => u.email).filter(Boolean), users };
@@ -182,7 +189,9 @@ export class CadService {
       verifiedByName: verifiedByName.trim(),
       status: CadFileStatus.SENT_FOR_APPROVAL,
     });
-    return this.cadRepo.save(cad);
+    const saved = await this.cadRepo.save(cad);
+    this.logEvent(orderId, 'CAD_UPLOADED', { email: uploadedBy }, undefined, undefined, `${cadPersonName.trim()} uploaded "${file.originalname}"`);
+    return saved;
   }
 
   // Called once after all files in a batch are uploaded.
@@ -371,7 +380,7 @@ export class CadService {
     return saved;
   }
 
-  async approve(id: string, approvedBy: string): Promise<CadFile> {
+  async approve(id: string, approvedBy: string, approverId?: string): Promise<CadFile> {
     const cad = await this.findOne(id);
     cad.status = CadFileStatus.APPROVED;
     cad.approvedAt = new Date();
@@ -381,9 +390,17 @@ export class CadService {
 
     const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
+      const statusBeforeApproval = order.status;
       // Customer approval auto-generates the SKU and issues the VPO immediately — no manual SKU step.
       const sku = await this.skuService.generate(order.id, approvedBy);
       await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED, vpoIssuedAt: new Date() });
+
+      // This path bypasses OrdersService.update() entirely (the SKU/VPO fields
+      // are set directly above), so it needs its own audit entry — otherwise
+      // an order that reached VPO_ISSUED via customer approval shows no
+      // "who/when" for that transition in the Audit Log at all.
+      this.logEvent(order.id, 'STATUS_CHANGE', { id: approverId, email: approvedBy }, statusBeforeApproval, OrderStatus.VPO_ISSUED,
+        `Customer approved CAD — SKU ${sku.skuNumber} generated, VPO auto-issued`);
 
       // Order is VPO_ISSUED but not yet routed to any factory/stone supplier —
       // Admin/Authorizer must complete "Assign Supplier" before it's visible to
@@ -410,17 +427,24 @@ export class CadService {
     return saved;
   }
 
-  async reject(id: string, feedback: string): Promise<CadFile> {
+  async reject(id: string, feedback: string, rejectedBy?: string): Promise<CadFile> {
     const cad = await this.findOne(id);
     cad.status = CadFileStatus.REJECTED;
     cad.customerFeedback = feedback;
     const saved = await this.cadRepo.save(cad);
 
+    // Fetched before the update below so its .status still reflects what the
+    // order was in prior to cancellation — needed for the audit entry's
+    // fromStatus, and its poNumber/isPriorityCustomer are unaffected by the
+    // update, so this same fetch covers the notification below too.
+    const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
+
     // Customer rejection = order cancelled and deactivated
     await this.orderRepo.update(cad.orderId, { status: OrderStatus.CANCELLED, isArchived: true });
 
-    const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
+      this.logEvent(order.id, 'STATUS_CHANGE', { email: rejectedBy }, order.status, OrderStatus.CANCELLED, `CAD rejected: "${feedback}"`);
+
       const { authUsers, designer } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
       const users = designer ? [...authUsers, designer] : authUsers;
       if (users.length) {
@@ -434,16 +458,21 @@ export class CadService {
     return saved;
   }
 
-  async requestRevision(id: string, feedback: string): Promise<CadFile> {
+  async requestRevision(id: string, feedback: string, requestedBy?: string): Promise<CadFile> {
     const cad = await this.findOne(id);
     cad.status = CadFileStatus.REVISION_REQUESTED;
     cad.customerFeedback = feedback;
     const saved = await this.cadRepo.save(cad);
+
+    // Fetched before the update below, same reasoning as reject() above.
+    const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
+
     // Reset sentToCustomer — revised design must go through auth review before customer sees it
     await this.orderRepo.update(cad.orderId, { status: OrderStatus.CAD_IN_PROGRESS, customerEmailApproval: false, cadSubStatus: 'REVISION', sentToCustomer: false });
 
-    const order = await this.orderRepo.findOne({ where: { id: cad.orderId } });
     if (order) {
+      this.logEvent(order.id, 'STATUS_CHANGE', { email: requestedBy }, order.status, OrderStatus.CAD_IN_PROGRESS, `Revision requested: "${feedback}"`);
+
       const { authUsers, designer } = await this.getAuthorizersAndCadDesigner(cad.uploadedBy);
       const users = designer ? [...authUsers, designer] : authUsers;
       if (users.length) {

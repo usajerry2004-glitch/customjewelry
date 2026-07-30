@@ -7,13 +7,14 @@ import { Order } from '../../database/entities/order.entity';
 import { User } from '../../database/entities/user.entity';
 import { Notification } from '../../database/entities/notification.entity';
 import { CadTimeLog } from '../../database/entities/cad-time-log.entity';
+import { OrderEvent } from '../../database/entities/order-event.entity';
 import { CadService } from './cad.service';
 import { CadController } from './cad.controller';
 import { SkuModule } from '../sku/sku.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CadFile, Order, User, Notification, CadTimeLog]),
+    TypeOrmModule.forFeature([CadFile, Order, User, Notification, CadTimeLog, OrderEvent]),
     SkuModule,
     // Memory storage (not direct-to-S3 streaming) so the service layer has
     // the file buffer available to derive an image thumbnail before upload.

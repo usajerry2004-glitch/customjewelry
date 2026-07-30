@@ -153,7 +153,7 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    return this.cadService.approve(id, req.user?.email);
+    return this.cadService.approve(id, req.user?.email, req.user?.id);
   }
 
   @Patch(':id/reject')
@@ -164,7 +164,7 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    return this.cadService.reject(id, feedback || 'Rejected');
+    return this.cadService.reject(id, feedback || 'Rejected', req.user?.email);
   }
 
   @Delete(':id')
@@ -216,6 +216,6 @@ export class CadController {
     } else if (![UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(req.user?.role)) {
       throw new ForbiddenException('Not authorized');
     }
-    return this.cadService.requestRevision(id, feedback || 'Please revise');
+    return this.cadService.requestRevision(id, feedback || 'Please revise', req.user?.email);
   }
 }
