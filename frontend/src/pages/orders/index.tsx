@@ -84,7 +84,6 @@ interface Customer { id: string; firstName: string; lastName: string; email: str
 interface SavedFilterPreset {
   id: string;
   name: string;
-  search: string;
   statusFilter: string;
   cadSubFilter: string;
   stoneSubFilter: string;
@@ -147,8 +146,6 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [search, setSearch] = useState(() => readOrdersReturnState()?.search ?? '');
-  const [debouncedSearch, setDebouncedSearch] = useState(() => readOrdersReturnState()?.search ?? '');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
   // if present — an explicit link always wins over a remembered filter —
   // otherwise fall back to whatever was showing before the user left.
@@ -254,7 +251,6 @@ export default function OrdersPage() {
     setSelectedIds(new Set());
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageNum * PAGE_SIZE) });
-      if (search) params.set('search', search);
       if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
       if (isCadSubFilter) {
         params.set('status', 'CAD_IN_PROGRESS');
@@ -564,7 +560,6 @@ export default function OrdersPage() {
   };
 
   const applyFilterPreset = (p: SavedFilterPreset) => {
-    setSearch(p.search);
     setStatusFilter(p.statusFilter);
     setCadSubFilter(p.cadSubFilter);
     setStoneSubFilter(p.stoneSubFilter);
@@ -585,7 +580,7 @@ export default function OrdersPage() {
     const preset: SavedFilterPreset = {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       name,
-      search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+      statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
       dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter,
     };
     const next = [...filterPresets, preset];
@@ -603,12 +598,6 @@ export default function OrdersPage() {
     if (activePresetId === id) setActivePresetId('');
   };
 
-  // Debounce the search box so typing doesn't fire a request per keystroke
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
   useEffect(() => {
     // On mount, filters may already be non-default (restored from a saved
     // visit or a ?status= link) — that's not a user-driven filter change,
@@ -620,7 +609,7 @@ export default function OrdersPage() {
     }
     setPage(0);
     load(0);
-  }, [debouncedSearch, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter]);
   useEffect(() => { load(page); }, [page]);
 
   // Remember filters/pagination on every change, so returning here (e.g.
@@ -629,11 +618,11 @@ export default function OrdersPage() {
     if (typeof window === 'undefined') return;
     try {
       sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({
-        search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+        statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
         customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page,
       }));
     } catch {}
-  }, [search, statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page]);
 
   // Capture scroll position when leaving the page (merged into whatever
   // filter snapshot was last written above) and restore it once, after the
@@ -1200,15 +1189,8 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {/* Search + Filters */}
+      {/* Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search PO number, store, customer, SKU…"
-          style={{ ...inputStyle, flex: '1 1 200px', minWidth: '140px', maxWidth: '300px' }}
-        />
-
         {/* Factory names are other external manufacturing partners' business
             identities — only Admin gets to see the full list. A Factory
             Manager, Stone Manager, etc. has no legitimate reason to know who
@@ -1459,7 +1441,7 @@ export default function OrdersPage() {
 
         if (displayOrders.length === 0) return (
           <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '60px 0', textAlign: 'center' }}>
-            No orders found.{search || statusFilter || customerFilter || customerFilterInput ? ' Try clearing your filters.' : ''}
+            No orders found.{statusFilter || customerFilter || customerFilterInput ? ' Try clearing your filters.' : ''}
           </div>
         );
 
