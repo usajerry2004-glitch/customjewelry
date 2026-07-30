@@ -17,6 +17,10 @@ export class UpdateStatusDto {
   @IsOptional()
   @IsString()
   repairContractor?: string;
+
+  @IsOptional()
+  @IsString()
+  customerCode?: string;
 }
 
 export class AssignSupplierDto {

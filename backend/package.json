@@ -20,7 +20,8 @@
     "migration:generate": "typeorm migration:generate -d src/database/data-source.ts",
     "migration:run": "typeorm migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm migration:revert -d src/database/data-source.ts",
-    "clear:orders": "ts-node src/database/seeds/clear-all-orders.ts"
+    "clear:orders": "ts-node src/database/seeds/clear-all-orders.ts",
+    "import:customer-codes": "ts-node src/database/seeds/import-customer-codes.ts"
   },
   "jest": {
     "moduleFileExtensions": [

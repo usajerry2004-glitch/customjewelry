@@ -160,6 +160,16 @@ export class Order {
   @Column({ type: 'jsonb', nullable: true })
   quoteOptions: { label: string; price: number }[] | null;
 
+  // RightClick customer number this order bills to — required before a quoted
+  // price can be saved. customerCodeName is denormalized at write time (see
+  // salesRepName/salesRepEmail above) so the order tile/detail page never has
+  // to join back to customer_codes just to render the label.
+  @Column({ nullable: true })
+  customerCode: string;
+
+  @Column({ nullable: true })
+  customerCodeName: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   goldLockPrice: number;
 

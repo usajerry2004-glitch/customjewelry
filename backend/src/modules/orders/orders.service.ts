@@ -12,6 +12,7 @@ import { OrderEvent } from '../../database/entities/order-event.entity';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { Sku } from '../../database/entities/sku.entity';
 import { Company } from '../../database/entities/company.entity';
+import { CustomerCode } from '../../database/entities/customer-code.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
@@ -168,6 +169,7 @@ function zonedDayBoundsUtc(timeZone: string, at: Date): { start: Date; end: Date
 // labels used in the logged note.
 const TRACKED_FIELD_LABELS: Record<string, string> = {
   quotedCost: 'Price',
+  customerCode: 'Customer number',
   committedShipDate: 'Ship date',
   metalType: 'Metal type',
   metalColor: 'Metal color',
@@ -208,6 +210,7 @@ export class OrdersService implements OnModuleInit {
     @InjectRepository(OrderMessage) private readonly messageRepo: Repository<OrderMessage>,
     @InjectRepository(Sku)          private readonly skuRepo: Repository<Sku>,
     @InjectRepository(Company)      private readonly companyRepo: Repository<Company>,
+    @InjectRepository(CustomerCode) private readonly customerCodeRepo: Repository<CustomerCode>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
   ) {}
@@ -807,6 +810,22 @@ export class OrdersService implements OnModuleInit {
       throw new ForbiddenException('Only Admin can edit this field.');
     }
 
+    // Saving a quoted price requires a RightClick customer number to already be
+    // set on the order, or to be provided alongside this save.
+    if (dto.quotedCost !== undefined && Number(dto.quotedCost) > 0
+        && !(dto.customerCode !== undefined ? dto.customerCode : order.customerCode)) {
+      throw new BadRequestException('Select a customer number before saving a quote.');
+    }
+    if (dto.customerCode !== undefined && dto.customerCode !== order.customerCode) {
+      if (dto.customerCode) {
+        const match = await this.customerCodeRepo.findOne({ where: { code: dto.customerCode } });
+        if (!match) throw new BadRequestException('Unrecognized customer number.');
+        dto.customerCodeName = match.name;
+      } else {
+        dto.customerCodeName = null as any;
+      }
+    }
+
     // Diff price/spec/customer/ship-date fields before they're overwritten, so the
     // audit log captures *what* changed on this edit, not just that an edit happened.
     const changes = this.diffTrackedFields(order, dto);
@@ -857,6 +876,7 @@ export class OrdersService implements OnModuleInit {
     user?: { id?: string; email: string; role: string },
     quotedCost?: number,
     repairContractor?: string,
+    customerCode?: string,
   ): Promise<Order> {
     if (user?.role === 'CUSTOMER') {
       throw new ForbiddenException('Not authorized to change order status directly');
@@ -920,6 +940,10 @@ export class OrdersService implements OnModuleInit {
       if (!finalPrice || Number(finalPrice) <= 0) {
         throw new BadRequestException('Approximate quoted price is required before issuing the VPO.');
       }
+      const finalCustomerCode = customerCode ?? order.customerCode;
+      if (!finalCustomerCode) {
+        throw new BadRequestException('Select a customer number before issuing the VPO.');
+      }
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);
       }
@@ -933,7 +957,7 @@ export class OrdersService implements OnModuleInit {
         { orderId: id, status: CadFileStatus.SENT_FOR_APPROVAL },
         { status: CadFileStatus.APPROVED, approvedAt: new Date(), approvedBy: user?.email },
       );
-      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, vpoIssuedAt: new Date() }, user);
+      const vpoOrder = await this.update(id, { status, quotedCost: finalPrice, customerCode, vpoIssuedAt: new Date() }, user);
       this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
       // Email customer: design approved, in production

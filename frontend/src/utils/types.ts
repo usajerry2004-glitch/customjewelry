@@ -80,6 +80,8 @@ export interface Order {
   refCustomerPo?: string;
   quotedCost?: number;
   quoteOptions?: { label: string; price: number }[] | null;
+  customerCode?: string | null;
+  customerCodeName?: string | null;
   committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;

@@ -561,6 +561,10 @@ export default function OrderDetail() {
   const [assigningSupplier, setAssigningSupplier] = useState(false);
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+  const [customerCodeOptions, setCustomerCodeOptions] = useState<{ code: string; name: string }[]>([]);
+  const [customerCodeSelected, setCustomerCodeSelected] = useState('');
+  const [customerCodeInput, setCustomerCodeInput] = useState('');
+  const [showCustomerCodeDrop, setShowCustomerCodeDrop] = useState(false);
   const [customerPoInput, setCustomerPoInput] = useState('');
   const [savingPo, setSavingPo] = useState(false);
   const [shipDateInput, setShipDateInput] = useState('');
@@ -600,6 +604,13 @@ export default function OrderDetail() {
       if (raw) setCurrentUser(JSON.parse(raw));
     } catch {}
   }, []);
+
+  // Customer number dropdown options for the Quoted Price card — only the
+  // roles that can set a quote (and so must pick a customer number) need this.
+  useEffect(() => {
+    if (currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.AUTHORIZER) return;
+    apiFetch(`${API}/customer-codes`).then(r => r.ok ? r.json() : []).then(setCustomerCodeOptions).catch(() => {});
+  }, [currentUser]);
 
   // Work-time tracking — just enough state to render Start vs Stop; the
   // actual duration/log is never shown here, only recorded server-side.
@@ -671,6 +682,8 @@ export default function OrderDetail() {
           const o = await oRes.json();
           setOrder(o);
           setQuotedPriceInput(o.quotedCost ? String(o.quotedCost) : '');
+          setCustomerCodeSelected(o.customerCode || '');
+          setCustomerCodeInput(o.customerCode ? `${o.customerCodeName || ''} (${o.customerCode})` : '');
           setCustomerPoInput(o.refCustomerPo || '');
           setShipDateInput(o.committedShipDate ? String(o.committedShipDate).slice(0, 10) : '');
           const specs: Record<string, string> = {};
@@ -739,7 +752,7 @@ export default function OrderDetail() {
     setSummaryLoading(false);
   };
 
-  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string) => {
+  const moveStatus = async (newStatus: OrderStatus, quotedCost?: number, repairContractor?: string, customerCode?: string) => {
     if (!order?.id) return;
     // Admin reverting Manufactured -> VPO Issued — a corrective undo, not a fresh
     // approval, so skip the price modal entirely and just confirm.
@@ -765,6 +778,7 @@ export default function OrderDetail() {
     const body: any = { status: newStatus };
     if (quotedCost) body.quotedCost = quotedCost;
     if (repairContractor) body.repairContractor = repairContractor;
+    if (customerCode) body.customerCode = customerCode;
     const res = await apiFetch(`${API}/orders/${order.id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -796,10 +810,14 @@ export default function OrderDetail() {
   const saveQuotedPrice = async () => {
     const price = parseFloat(quotedPriceInput);
     if (!price || price <= 0 || !order?.id) return;
+    if (!customerCodeSelected) {
+      toast.error('Select a customer number before saving a quote.');
+      return;
+    }
     setSavingPrice(true);
     const res = await apiFetch(`${API}/orders/${order.id}`, {
       method: 'PUT',
-      body: JSON.stringify({ quotedCost: price }),
+      body: JSON.stringify({ quotedCost: price, customerCode: customerCodeSelected }),
     });
     if (res.ok && order.status === 'CAD_IN_PROGRESS' && !order.sentToCustomer) {
       // Auto-send CAD files to customer — moves label from Awaiting Quote → Awaiting Approval
@@ -808,6 +826,9 @@ export default function OrderDetail() {
     if (res.ok) {
       const fresh = await apiFetch(`${API}/orders/${order.id}`);
       if (fresh.ok) setOrder(await fresh.json());
+    } else {
+      const err = await res.json().catch(() => null);
+      toast.error(getErrorMessage(err, 'Failed to save quoted price.'));
     }
     setSavingPrice(false);
   };
@@ -966,8 +987,12 @@ export default function OrderDetail() {
   const confirmPriceAndMove = async () => {
     const price = parseFloat(pendingPrice);
     if (!price || price <= 0) return;
+    if (!order?.customerCode && !customerCodeSelected) {
+      toast.error('Select a customer number before issuing the VPO.');
+      return;
+    }
     setPriceModal(false);
-    await moveStatus(OrderStatus.VPO_ISSUED, price);
+    await moveStatus(OrderStatus.VPO_ISSUED, price, undefined, customerCodeSelected || undefined);
   };
 
   const confirmAssignSupplier = async () => {
@@ -1869,31 +1894,74 @@ export default function OrderDetail() {
                 Quoted Price
               </div>
               {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--text-muted)', pointerEvents: 'none' }}>$</span>
+                <>
+                  {/* Customer number — compulsory before a quoted price can be saved */}
+                  <div style={{ position: 'relative', marginBottom: '8px' }}>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={quotedPriceInput}
-                      onChange={e => setQuotedPriceInput(e.target.value)}
-                      placeholder="0.00"
-                      style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px 8px 22px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      value={customerCodeInput}
+                      onChange={e => { setCustomerCodeInput(e.target.value); setCustomerCodeSelected(''); setShowCustomerCodeDrop(true); }}
+                      onFocus={() => setShowCustomerCodeDrop(true)}
+                      onBlur={() => setTimeout(() => setShowCustomerCodeDrop(false), 150)}
+                      placeholder="Customer number… e.g. Diyora Diamond (C01234)"
+                      style={{ width: '100%', background: 'var(--bg-input)', border: `1px solid ${customerCodeSelected ? 'var(--border)' : 'rgba(220,38,38,0.4)'}`, borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
                     />
+                    {showCustomerCodeDrop && customerCodeInput && !customerCodeSelected && (() => {
+                      const q = customerCodeInput.toLowerCase();
+                      const matches = customerCodeOptions
+                        .filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q))
+                        .slice(0, 50);
+                      if (matches.length === 0) return null;
+                      return (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: 200, maxHeight: '220px', overflowY: 'auto' }}>
+                          {matches.map(c => (
+                            <div
+                              key={c.code}
+                              onMouseDown={e => { e.preventDefault(); setCustomerCodeSelected(c.code); setCustomerCodeInput(`${c.name} (${c.code})`); setShowCustomerCodeDrop(false); }}
+                              style={{ padding: '8px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                            >
+                              {c.name} <span style={{ color: 'var(--text-muted)' }}>({c.code})</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <button
-                    onClick={saveQuotedPrice}
-                    disabled={savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0}
-                    style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0) ? 0.5 : 1 }}
-                  >
-                    {savingPrice ? '…' : 'Save'}
-                  </button>
-                </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: 'var(--text-muted)', pointerEvents: 'none' }}>$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={quotedPriceInput}
+                        onChange={e => setQuotedPriceInput(e.target.value)}
+                        placeholder="0.00"
+                        style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px 8px 22px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <button
+                      onClick={saveQuotedPrice}
+                      disabled={savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0 || !customerCodeSelected}
+                      title={!customerCodeSelected ? 'Select a customer number first' : undefined}
+                      style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0 || !customerCodeSelected) ? 0.5 : 1 }}
+                    >
+                      {savingPrice ? '…' : 'Save'}
+                    </button>
+                  </div>
+                </>
               ) : (
-                <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
-                  {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
-                </div>
+                <>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
+                    {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
+                  </div>
+                  {order.customerCode && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {order.customerCodeName} ({order.customerCode})
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -2094,6 +2162,43 @@ export default function OrderDetail() {
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
               The customer has approved the CAD design. Please add an <strong>approximate quoted price</strong> before issuing the VPO — the SKU will be generated automatically. The customer will be notified. Stone supplier and factory are assigned in a separate step afterwards.
             </p>
+            {!order.customerCode && (
+              <div style={{ position: 'relative', marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+                  Customer Number
+                </label>
+                <input
+                  value={customerCodeInput}
+                  onChange={e => { setCustomerCodeInput(e.target.value); setCustomerCodeSelected(''); setShowCustomerCodeDrop(true); }}
+                  onFocus={() => setShowCustomerCodeDrop(true)}
+                  onBlur={() => setTimeout(() => setShowCustomerCodeDrop(false), 150)}
+                  placeholder="e.g. Diyora Diamond (C01234)"
+                  style={{ width: '100%', background: 'var(--bg-input)', border: `1px solid ${customerCodeSelected ? 'var(--border)' : 'rgba(220,38,38,0.4)'}`, borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+                {showCustomerCodeDrop && customerCodeInput && !customerCodeSelected && (() => {
+                  const q = customerCodeInput.toLowerCase();
+                  const matches = customerCodeOptions
+                    .filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q))
+                    .slice(0, 50);
+                  if (matches.length === 0) return null;
+                  return (
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: 'var(--shadow-lg)', zIndex: 200, maxHeight: '180px', overflowY: 'auto' }}>
+                      {matches.map(c => (
+                        <div
+                          key={c.code}
+                          onMouseDown={e => { e.preventDefault(); setCustomerCodeSelected(c.code); setCustomerCodeInput(`${c.name} (${c.code})`); setShowCustomerCodeDrop(false); }}
+                          style={{ padding: '8px 12px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)' }}
+                          onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                        >
+                          {c.name} <span style={{ color: 'var(--text-muted)' }}>({c.code})</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               Approximate Price ($)
             </label>
@@ -2115,8 +2220,8 @@ export default function OrderDetail() {
               </button>
               <button
                 onClick={confirmPriceAndMove}
-                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
+                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0 || (!order.customerCode && !customerCodeSelected)}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0 || (!order.customerCode && !customerCodeSelected)) ? 0.5 : 1 }}>
                 Confirm & Issue VPO
               </button>
             </div>
