@@ -450,6 +450,7 @@ export default function OrderDetail() {
   const [sendingReminder, setSendingReminder] = useState(false);
   const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; note?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [muteLoading, setMuteLoading] = useState(false);
   const [resendingFactoryAlert, setResendingFactoryAlert] = useState(false);
@@ -1252,18 +1253,33 @@ export default function OrderDetail() {
               );
             })}
 
-            {order.customerNotes && (
-              <div style={cardStyle}>
-                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px' }}>
-                  Customer Notes
-                </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>{order.customerNotes}</p>
-              </div>
-            )}
           </div>
 
           {/* ── Col 2: Reference Files + Design Files ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {order.customerNotes && (() => {
+            const NOTES_PREVIEW_LIMIT = 240;
+            const isLong = order.customerNotes.length > NOTES_PREVIEW_LIMIT;
+            const displayedNotes = notesExpanded || !isLong
+              ? order.customerNotes
+              : `${order.customerNotes.slice(0, NOTES_PREVIEW_LIMIT)}…`;
+            return (
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px' }}>
+                  Customer Notes
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere', margin: 0 }}>
+                  {displayedNotes}
+                </p>
+                {isLong && (
+                  <button onClick={() => setNotesExpanded(v => !v)}
+                    style={{ marginTop: '8px', background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    {notesExpanded ? 'Read less' : 'Read more'}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {(() => {
             const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
             const canUploadRef = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(userRole as UserRole);
@@ -1635,6 +1651,14 @@ export default function OrderDetail() {
             );
           })()}
 
+          {/* Audit Log button */}
+          {events.length > 0 && (
+            <button onClick={() => setShowAuditLog(true)}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
+              📋 Audit Log <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({events.length})</span>
+            </button>
+          )}
+
           {/* Priority — Admin can flag this specific order as priority regardless
               of whether the customer itself is marked priority. */}
           <div style={{ ...cardStyle, borderTop: order.isPriorityCustomer ? '3px solid var(--accent)' : undefined }}>
@@ -1914,15 +1938,6 @@ export default function OrderDetail() {
               )}
             </div>
           )}
-
-          {/* Audit Log button */}
-          {events.length > 0 && (
-            <button onClick={() => setShowAuditLog(true)}
-              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textAlign: 'left' }}>
-              📋 Audit Log <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({events.length})</span>
-            </button>
-          )}
-
 
           {/* Timeline */}
           <div style={cardStyle}>
