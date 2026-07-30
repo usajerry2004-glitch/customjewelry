@@ -110,7 +110,7 @@ export default function KanbanPage() {
     ? { ...rawSelectedCol!, orders: (rawSelectedCol?.orders || []).filter(o => getCadSubLabel(o as any) === CAD_SUB_LABELS.find(s => s.status === cadSubFilter)?.label) }
     : rawSelectedCol;
   const selectedCfg = STATUS_CONFIG[selected] || { label: selected, color: '#6B7280', bg: '#F3F4F6' };
-  const totalOrders = columns.reduce((sum, c) => sum + c.count, 0);
+  const totalOrders = columns.reduce((sum, c) => sum + (c.status === 'CANCELLED' ? 0 : c.count), 0);
   const nextStatus = COLUMN_ORDER[COLUMN_ORDER.indexOf(selected) + 1];
   const nextCfg = nextStatus ? STATUS_CONFIG[nextStatus] : null;
 

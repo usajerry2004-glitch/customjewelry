@@ -1543,7 +1543,12 @@ export class OrdersService implements OnModuleInit {
     const statuses = Object.values(OrderStatus);
 
     const buildBase = () => {
-      const q = this.orderRepo.createQueryBuilder('o').where('o.isArchived = false');
+      // Cancelling an order also archives it, so the blanket isArchived
+      // filter would hide the Cancelled column entirely — let cancelled
+      // orders through regardless of archive state so this board's count
+      // matches the Orders list's Cancelled filter.
+      const q = this.orderRepo.createQueryBuilder('o')
+        .where('(o.isArchived = false OR o.status = :cancelledStatus)', { cancelledStatus: OrderStatus.CANCELLED });
       if (user?.role === 'SALES_REP') {
         q.andWhere(
           '(o.salesRepId = :salesRepId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :salesRepId)))',
