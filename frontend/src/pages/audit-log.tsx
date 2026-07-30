@@ -127,7 +127,7 @@ export default function AuditLogPage() {
         />
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputStyle, flex: '0 1 160px', fontSize: '12px', padding: '7px 10px' }} />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputStyle, flex: '0 1 160px', fontSize: '12px', padding: '7px 10px' }} />
-        <select value={action} onChange={e => setAction(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+        <select value={action} onChange={e => setAction(e.target.value)} style={{ ...inputStyle, flex: '1 1 180px', maxWidth: '220px', cursor: 'pointer' }}>
           <option value="">All actions</option>
           {Object.entries(ACTION_LABELS).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
