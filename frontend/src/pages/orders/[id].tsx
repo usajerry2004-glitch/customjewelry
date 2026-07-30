@@ -63,14 +63,17 @@ interface ViewerProps {
   cads?: CadFile[];      // full list for prev/next navigation
   initialIndex?: number; // starting position in the list
   userRole: string; batchCount?: number;
+  refImages?: CadFile[]; // reference images to compare against — internal roles only
   onClose: () => void;
   onAction: (cadId: string, action: 'approve' | 'reject' | 'revision', feedback: string) => Promise<void>;
 }
 
-function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRole, batchCount = 1, onClose, onAction }: ViewerProps) {
+function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRole, batchCount = 1, refImages = [], onClose, onAction }: ViewerProps) {
   const [idx, setIdx] = useState(initialIndex);
   const [feedback, setFeedback] = useState('');
   const [acting, setActing] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const [refIdx, setRefIdx] = useState(0);
 
   const list = cads.length > 0 ? cads : [initialCad];
   const cad = list[idx] ?? initialCad;
@@ -91,6 +94,52 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
         return f.id !== cad.id && fBase === base && ['jpg','jpeg','png','webp'].includes(fExt);
       })
     : undefined;
+  const canCompare = userRole !== UserRole.CUSTOMER && refImages.length > 0;
+
+  // Condensed preview for a compare-mode pane — same file-type branching as
+  // the main stage below, minus the download CTA (the header's Download
+  // button already covers the active file).
+  const renderComparePreview = (file: CadFile, maxHeight: number) => {
+    const fExt = (file.originalName.split('.').pop() || '').toLowerCase();
+    const fIsImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fExt);
+    const fIsPdf   = fExt === 'pdf';
+    const fIsVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv'].includes(fExt);
+    const fIsJcd   = fExt === 'jcd';
+    const fUrl = file.filePath || `/uploads/cad/${file.fileName}`;
+    if (fIsImage) {
+      return (
+        <img src={fUrl} alt={file.originalName}
+          style={{ maxWidth: '100%', maxHeight, objectFit: 'contain', display: 'block' }}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+      );
+    }
+    if (fIsPdf) return <iframe src={`${fUrl}#toolbar=1&navpanes=0`} style={{ width: '100%', height: maxHeight, border: 'none' }} title={file.originalName} />;
+    if (fIsVideo) return <video src={fUrl} controls style={{ maxWidth: '100%', maxHeight, display: 'block' }} />;
+    if (fExt === '3dm') return <ThreeDmViewer fileUrl={fUrl} height={maxHeight} />;
+    if (fExt === 'stl') return <StlViewer fileUrl={fUrl} height={maxHeight} />;
+    if (fIsJcd) {
+      const companion = list.find(f => {
+        const base = file.originalName.replace(/\.jcd$/i, '');
+        const fBase = f.originalName.replace(/\.[^.]+$/, '');
+        const fcExt = (f.originalName.split('.').pop() || '').toLowerCase();
+        return f.id !== file.id && fBase === base && ['jpg', 'jpeg', 'png', 'webp'].includes(fcExt);
+      });
+      if (companion) {
+        return (
+          <img src={companion.filePath || `/uploads/cad/${companion.fileName}`} alt={file.originalName}
+            style={{ maxWidth: '100%', maxHeight, objectFit: 'contain', display: 'block' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        );
+      }
+    }
+    return (
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <div style={{ fontSize: '36px', marginBottom: '8px', opacity: 0.6 }}>{fIsJcd ? '💎' : '📎'}</div>
+        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)' }}>Preview not available</div>
+      </div>
+    );
+  };
+
   const cs = CAD_STATUS_CFG[cad.status] || { label: cad.status, color: '#6B7280', bg: '#F3F4F6' };
   const canAct  = CAD_ACTION_ROLES.includes(userRole as UserRole) && cad.status !== 'APPROVED';
 
@@ -145,6 +194,21 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
             {cs.label}
           </span>
         </div>
+        {canCompare && (
+          <button
+            onClick={() => setComparing(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: comparing ? 'var(--navy)' : 'var(--bg-card)',
+              border: `1px solid ${comparing ? 'var(--navy)' : 'var(--border)'}`,
+              color: comparing ? '#fff' : 'var(--text-secondary)',
+              fontSize: '12px', fontWeight: 700, padding: '7px 13px', borderRadius: '8px',
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            {comparing ? '✕ Exit Compare' : '⇄ Compare with Ref'}
+          </button>
+        )}
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px', alignItems: 'center' }}>
           {list.length > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px 6px' }}>
@@ -189,6 +253,69 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
       </div>
 
       {/* ── File Preview ── */}
+      {comparing && canCompare ? (
+        <div style={{ background: '#1a1a2e', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+          {/* Reference pane */}
+          <div style={{ display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.09)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>Reference · Customer</span>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{refImages.length} image{refImages.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', padding: '16px' }}>
+              {renderComparePreview(refImages[refIdx], 280)}
+              {refImages.length > 1 && (
+                <>
+                  <button onClick={() => setRefIdx(i => Math.max(0, i - 1))} disabled={refIdx === 0}
+                    style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '28px', height: '28px', borderRadius: '50%', border: 'none', cursor: refIdx === 0 ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', opacity: refIdx === 0 ? 0.3 : 1 }}>‹</button>
+                  <button onClick={() => setRefIdx(i => Math.min(refImages.length - 1, i + 1))} disabled={refIdx === refImages.length - 1}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '28px', height: '28px', borderRadius: '50%', border: 'none', cursor: refIdx === refImages.length - 1 ? 'default' : 'pointer', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', opacity: refIdx === refImages.length - 1 ? 0.3 : 1 }}>›</button>
+                </>
+              )}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.75)', padding: '0 16px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {refImages[refIdx]?.originalName}
+            </div>
+            {refImages.length > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '7px', paddingBottom: '14px' }}>
+                {refImages.map((_, i) => (
+                  <button key={i} onClick={() => setRefIdx(i)}
+                    style={{ width: '7px', height: '7px', borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === refIdx ? 'var(--accent)' : 'rgba(255,255,255,0.22)', transform: i === refIdx ? 'scale(1.3)' : 'none' }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CAD design pane — shares idx/setIdx with the header pager, so paging and dot-clicking stay in sync */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>CAD Design · Rev #{cad.revisionNumber}</span>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.35)' }}>{list.length} file{list.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', padding: '16px' }}>
+              {renderComparePreview(cad, 280)}
+              {list.length > 1 && (
+                <>
+                  <button onClick={() => setIdx(i => i - 1)} disabled={!hasPrev}
+                    style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '28px', height: '28px', borderRadius: '50%', border: 'none', cursor: hasPrev ? 'pointer' : 'default', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', opacity: hasPrev ? 1 : 0.3 }}>‹</button>
+                  <button onClick={() => setIdx(i => i + 1)} disabled={!hasNext}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '28px', height: '28px', borderRadius: '50%', border: 'none', cursor: hasNext ? 'pointer' : 'default', background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', opacity: hasNext ? 1 : 0.3 }}>›</button>
+                </>
+              )}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.75)', padding: '0 16px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {cad.originalName}
+            </div>
+            {list.length > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '7px', paddingBottom: '14px' }}>
+                {list.map((_, i) => (
+                  <button key={i} onClick={() => setIdx(i)}
+                    style={{ width: '7px', height: '7px', borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === idx ? 'var(--accent)' : 'rgba(255,255,255,0.22)', transform: i === idx ? 'scale(1.3)' : 'none' }} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div style={{ background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '260px', maxHeight: '480px', overflow: 'auto' }}>
         {isImage ? (
           <img
@@ -249,6 +376,7 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
           </div>
         )}
       </div>
+      )}
 
       {/* ── Notes + Actions ── */}
       <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-card)' }}>
@@ -1623,6 +1751,7 @@ export default function OrderDetail() {
                   initialIndex={viewingCadList.findIndex(c => c.id === viewingCad.id)}
                   userRole={userRole}
                   batchCount={cads.filter(c => c.status === 'SENT_FOR_APPROVAL').length}
+                  refImages={cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image')}
                   onClose={() => setViewingCad(null)}
                   onAction={handleCadAction}
                 />
