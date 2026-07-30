@@ -5,6 +5,7 @@ import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../da
 import { User, UserRole } from '../../database/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
+import { Permission } from '../../common/permissions';
 
 @Injectable()
 export class ManufacturingService {
@@ -14,7 +15,7 @@ export class ManufacturingService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async getQueue(user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
+  async getQueue(user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
     // Stone Manager / Factory Manager only ever see orders assigned to them
     // specifically — Admin/Authorizer see the full queue, including orders still
     // awaiting a supplier assignment.
@@ -27,11 +28,21 @@ export class ManufacturingService {
       return this.sortQueue(orders);
     }
     if (user?.role === UserRole.FACTORY_MANAGER) {
-      const orders = await this.orderRepo
+      const q = this.orderRepo
         .createQueryBuilder('o')
-        .where('o.status = :s', { s: OrderStatus.VPO_ISSUED })
-        .andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null })
-        .getMany();
+        .where('o.status = :s', { s: OrderStatus.VPO_ISSUED });
+      // MARK_STONE_RECEIVED override — this Factory Manager also receives
+      // stone on Stone Creations orders regardless of which factory is
+      // manufacturing them, not just their own assigned factory's orders.
+      if (user.extraPermissions?.includes(Permission.MARK_STONE_RECEIVED)) {
+        q.andWhere('(o.assignedFactory = :assignedFactory OR o.supplySource = :creations)', {
+          assignedFactory: user.assignedFactory ?? null,
+          creations: SupplySource.STONE_CREATIONS,
+        });
+      } else {
+        q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
+      }
+      const orders = await q.getMany();
       return this.sortQueue(orders);
     }
 
@@ -53,7 +64,7 @@ export class ManufacturingService {
     });
   }
 
-  async markStoneSent(id: string, user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
+  async markStoneSent(id: string, user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (order.status !== OrderStatus.VPO_ISSUED) {
@@ -63,12 +74,15 @@ export class ManufacturingService {
       throw new BadRequestException('Stone has already been marked as sent');
     }
     // Factory Manager may only mark receipt on their own Stone Creations orders —
-    // Kira-supply stones stay Stone Manager's job.
+    // Kira-supply stones stay Stone Manager's job. MARK_STONE_RECEIVED lifts the
+    // "own factory only" restriction for a Factory Manager who's specifically
+    // responsible for receiving Stone Creations diamonds across all factories.
     if (user?.role === UserRole.FACTORY_MANAGER) {
       if (order.supplySource !== SupplySource.STONE_CREATIONS) {
         throw new ForbiddenException('Only the Stone Manager can mark this order\'s stone as received.');
       }
-      if (!order.assignedFactory || order.assignedFactory !== user.assignedFactory) {
+      const canActAcrossFactories = user.extraPermissions?.includes(Permission.MARK_STONE_RECEIVED);
+      if (!canActAcrossFactories && (!order.assignedFactory || order.assignedFactory !== user.assignedFactory)) {
         throw new NotFoundException(`Order ${id} not found`);
       }
     }

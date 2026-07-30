@@ -32,12 +32,14 @@ export enum Permission {
   ASSIGN_SUPPLIER = 'ASSIGN_SUPPLIER',
   BULK_DELETE_ORDERS = 'BULK_DELETE_ORDERS',
   BULK_STATUS_NUDGE = 'BULK_STATUS_NUDGE',
+  MARK_STONE_RECEIVED = 'MARK_STONE_RECEIVED',
 }
 
 export const PERMISSION_LABELS: Record<string, string> = {
   [Permission.ASSIGN_SUPPLIER]: 'Assign factory / stone supplier to orders',
   [Permission.BULK_DELETE_ORDERS]: 'Permanently delete orders',
   [Permission.BULK_STATUS_NUDGE]: 'Bulk-move orders between stages',
+  [Permission.MARK_STONE_RECEIVED]: 'Mark Stone Creations orders as stone received (any factory, not just their own)',
 };
 
 export enum UserRole {
