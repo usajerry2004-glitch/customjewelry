@@ -396,11 +396,10 @@ export class CadService {
           `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated. Select a stone supplier and factory to release it to production.`,
           order.id, false, order.isPriorityCustomer);
       }
-      // Email only Admin — Authorizer still sees the in-app notification above but
-      // shouldn't be emailed to assign the supplier.
-      const assignerAdminEmails = assignerUsers.filter(u => u.role === UserRole.ADMIN).map(u => u.email).filter(Boolean);
+      // Email both Admin and Authorizer — either can complete the Assign Supplier step.
+      const assignerEmails = assignerUsers.map(u => u.email).filter(Boolean);
       this.emailService.sendAssignSupplierAlert({
-        to: assignerAdminEmails,
+        to: assignerEmails,
         poNumber: order.poNumber,
         orderType: order.orderType || '—',
         orderId: order.id,
