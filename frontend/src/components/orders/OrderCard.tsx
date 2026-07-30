@@ -29,7 +29,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
     <div
       onClick={() => onClick?.(order)}
       style={{
-        background: 'var(--bg-card)',
+        background: actionColor ? `${actionColor}12` : 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderLeft: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
