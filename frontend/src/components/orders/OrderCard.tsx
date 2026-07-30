@@ -63,6 +63,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
             {order.kiraSkuNumber && (
               <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{order.kiraSkuNumber}</span>
             )}
+            {order.refCustomerPo && (
+              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Cust PO# {order.refCustomerPo}</span>
+            )}
             {(order as any).isPriorityCustomer && (
               <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent-dark)', background: 'rgba(192,155,88,0.15)', border: '1px solid rgba(192,155,88,0.3)', borderRadius: '99px', padding: '1px 8px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 ★ Priority
