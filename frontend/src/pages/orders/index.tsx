@@ -1177,7 +1177,7 @@ export default function OrdersPage() {
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', background: 'none', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
           >+ Save current filters</button>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
           {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
             <button
               onClick={handleExportCsv}
@@ -1186,7 +1186,7 @@ export default function OrdersPage() {
               style={{
                 padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                 cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',
-                opacity: exportingCsv ? 0.7 : 1,
+                opacity: exportingCsv ? 0.7 : 1, whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
               {exportingCsv ? 'Exporting…' : '⬇ Export CSV'}
