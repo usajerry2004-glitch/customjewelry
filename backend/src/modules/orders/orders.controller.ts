@@ -95,7 +95,7 @@ export class OrdersController {
   @Get('export/sku-csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: '"For RightClick" — export selected orders as new-SKU rows for ERP import (interchange_companycode/inventorylocationcode/code/description/vendor_no). Admin/Authorizer only.' })
+  @ApiOperation({ summary: '"Right Click SKU" — export selected orders as new-SKU rows for ERP import (interchange_companycode/inventorylocationcode/code/description/vendor_no). Admin/Authorizer only.' })
   async exportSkuCsv(
     @Query('orderIds') orderIdsParam: string,
     @Res() res: Response,
@@ -105,6 +105,22 @@ export class OrdersController {
     const today = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="new-sku-rightclick-${today}.csv"`);
+    res.send(csv);
+  }
+
+  @Get('export/rightclick-orders-csv')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: '"RightClick Orders" — export selected orders as new-order rows for ERP import (interchange_customer_no/po/order_type/date/... /item/quantity/price). Admin/Authorizer only.' })
+  async exportRightClickOrdersCsv(
+    @Query('orderIds') orderIdsParam: string,
+    @Res() res: Response,
+  ) {
+    const orderIds = (orderIdsParam || '').split(',').map(s => s.trim()).filter(Boolean);
+    const csv = await this.ordersService.exportRightClickOrdersCsv(orderIds);
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="rightclick-orders-${today}.csv"`);
     res.send(csv);
   }
 

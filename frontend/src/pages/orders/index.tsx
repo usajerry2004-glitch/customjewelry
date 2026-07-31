@@ -562,6 +562,26 @@ export default function OrdersPage() {
     }
   };
 
+  const handleBulkExportRightClickOrders = async () => {
+    if (selectedIds.size === 0) return;
+    setShowBulkExportMenu(false);
+    setExportingBulkCsv(true);
+    try {
+      const params = new URLSearchParams({ orderIds: Array.from(selectedIds).join(',') });
+      const res = await apiFetch(`${API}/orders/export/rightclick-orders-csv?${params}`);
+      if (!res.ok) {
+        toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to export CSV'));
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      await downloadCsvBlob(res, `rightclick-orders-${today}.csv`);
+    } catch {
+      toast.error('Export failed — check your connection and try again.');
+    } finally {
+      setExportingBulkCsv(false);
+    }
+  };
+
   const applyFilterPreset = (p: SavedFilterPreset) => {
     setStatusFilter(p.statusFilter);
     setCadSubFilter(p.cadSubFilter);
@@ -1632,9 +1652,15 @@ export default function OrdersPage() {
                   </button>
                   <button
                     onClick={handleBulkExportRightClick}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Right Click SKU
+                  </button>
+                  <button
+                    onClick={handleBulkExportRightClickOrders}
                     style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                   >
-                    For RightClick
+                    RightClick Orders
                   </button>
                 </div>
               )}

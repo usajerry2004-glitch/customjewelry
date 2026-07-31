@@ -139,6 +139,14 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     .filter(c => !restrictForFactory || c.factoryVisible !== false);
 }
 
+// MM/DD/YYYY — the date format the ERP's "New Order" import expects for
+// interchange_date/interchange_ship_date.
+function formatDateMDY(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}/${dd}/${d.getFullYear()}`;
+}
+
 function ordersToCsv(orders: Order[], columns: { header: string; value: (o: Order) => string }[]): string {
   const lines = [
     columns.map(c => csvEscape(c.header)).join(','),
@@ -511,6 +519,39 @@ export class OrdersService implements OnModuleInit {
         header: 'interchange_vendor_no',
         value: o => (o.assignedFactory && OrdersService.FACTORY_VENDOR_CODES[o.assignedFactory]) || '',
       },
+    ];
+
+    return ordersToCsv(orders, columns);
+  }
+
+  // "RightClick Orders" — one row per selected order, in the shape the ERP's
+  // "New Order" import template expects. Fields marked "by default same
+  // always" in that template are hardcoded; interchange_date/ship_date are
+  // both just today's date (the file's own download date); interchange_line_no
+  // is always "1" since each order maps to a single SKU/line.
+  async exportRightClickOrdersCsv(orderIds: string[]): Promise<string> {
+    const orders = orderIds.length
+      ? await this.orderRepo.find({ where: { id: In(orderIds) } })
+      : [];
+
+    const todayMDY = formatDateMDY(new Date());
+
+    const columns: { header: string; value: (o: Order) => string }[] = [
+      { header: 'interchange_customer_no', value: o => o.customerCode || '' },
+      { header: 'interchange_po', value: o => o.poNumber || '' },
+      { header: 'interchange_reference', value: () => '' },
+      { header: 'interchange_order_type', value: () => 'Asset' },
+      { header: 'interchange_date', value: () => todayMDY },
+      { header: 'interchange_ship_date', value: () => todayMDY },
+      { header: 'interchange_shipviacode', value: () => 'PICKUP' },
+      { header: 'interchange_order_notes', value: o => buildOrderSpecDescription(o) },
+      { header: 'interchange_line_no', value: () => '1' },
+      { header: 'interchange_item', value: o => o.kiraSkuNumber || '' },
+      { header: 'interchange_item_quantity', value: o => String(o.quantity ?? '') },
+      { header: 'interchange_item_price', value: o => o.quotedCost != null ? String(o.quotedCost) : '' },
+      { header: 'interchange_item_discountpercent', value: () => '' },
+      { header: 'interchange_item_notes', value: () => '' },
+      { header: 'interchange_item_createpo', value: () => 'TRUE' },
     ];
 
     return ordersToCsv(orders, columns);
