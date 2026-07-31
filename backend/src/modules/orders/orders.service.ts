@@ -382,22 +382,50 @@ export class OrdersService implements OnModuleInit {
       d.setDate(monday.getDate() + i);
       return d;
     });
+    const weekEnd = new Date(days[4]);
+    weekEnd.setHours(23, 59, 59, 999);
 
-    return Promise.all(days.map(async day => {
-      const dayEnd = new Date(day);
-      dayEnd.setHours(23, 59, 59, 999);
-      const [received, approved, manufactured, cancelled] = await Promise.all([
-        this.orderRepo.count({ where: { createdAt: Between(day, dayEnd) } }),
-        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.VPO_ISSUED, createdAt: Between(day, dayEnd) } }),
-        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.MANUFACTURED, createdAt: Between(day, dayEnd) } }),
-        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED, createdAt: Between(day, dayEnd) } }),
-      ]);
+    // 3 grouped-by-day queries instead of 15 individual per-day counts —
+    // same result, one round trip per metric instead of one per metric
+    // per day.
+    const [receivedRows, approvedRows, manufacturedRows, cancelledRows] = await Promise.all([
+      this.orderRepo.createQueryBuilder('o')
+        .select(`to_char(o.createdAt, 'YYYY-MM-DD')`, 'day').addSelect('COUNT(*)', 'count')
+        .where('o.createdAt BETWEEN :start AND :end', { start: monday, end: weekEnd })
+        .groupBy('day').getRawMany(),
+      this.eventRepo.createQueryBuilder('e')
+        .select(`to_char(e.createdAt, 'YYYY-MM-DD')`, 'day').addSelect('COUNT(*)', 'count')
+        .where('e.action = :a', { a: 'STATUS_CHANGE' }).andWhere('e.toStatus = :s', { s: OrderStatus.VPO_ISSUED })
+        .andWhere('e.createdAt BETWEEN :start AND :end', { start: monday, end: weekEnd })
+        .groupBy('day').getRawMany(),
+      this.eventRepo.createQueryBuilder('e')
+        .select(`to_char(e.createdAt, 'YYYY-MM-DD')`, 'day').addSelect('COUNT(*)', 'count')
+        .where('e.action = :a', { a: 'STATUS_CHANGE' }).andWhere('e.toStatus = :s', { s: OrderStatus.MANUFACTURED })
+        .andWhere('e.createdAt BETWEEN :start AND :end', { start: monday, end: weekEnd })
+        .groupBy('day').getRawMany(),
+      this.eventRepo.createQueryBuilder('e')
+        .select(`to_char(e.createdAt, 'YYYY-MM-DD')`, 'day').addSelect('COUNT(*)', 'count')
+        .where('e.action = :a', { a: 'STATUS_CHANGE' }).andWhere('e.toStatus = :s', { s: OrderStatus.CANCELLED })
+        .andWhere('e.createdAt BETWEEN :start AND :end', { start: monday, end: weekEnd })
+        .groupBy('day').getRawMany(),
+    ]);
+    const toMap = (rows: any[]) => new Map(rows.map(r => [r.day, parseInt(r.count, 10)]));
+    const receivedByDay = toMap(receivedRows);
+    const approvedByDay = toMap(approvedRows);
+    const manufacturedByDay = toMap(manufacturedRows);
+    const cancelledByDay = toMap(cancelledRows);
+
+    return days.map(day => {
+      const key = day.toISOString().slice(0, 10);
       return {
-        date: day.toISOString().slice(0, 10),
+        date: key,
         dayLabel: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        received, approved, manufactured, cancelled,
+        received: receivedByDay.get(key) || 0,
+        approved: approvedByDay.get(key) || 0,
+        manufactured: manufacturedByDay.get(key) || 0,
+        cancelled: cancelledByDay.get(key) || 0,
       };
-    }));
+    });
   }
 
   // Top 5 customers for the given calendar month (defaults to current month),
@@ -435,25 +463,41 @@ export class OrdersService implements OnModuleInit {
     const start = new Date(year, mon - 1, 1);
     const end = new Date(year, mon, 0, 23, 59, 59, 999);
 
-    const reps = await this.userRepo.find({ where: { role: UserRole.SALES_REP } });
-    const results = await Promise.all(reps.map(async rep => {
-      const row = await this.orderRepo.createQueryBuilder('o')
-        .select('COUNT(*)', 'orderCount')
-        .addSelect(`COUNT(DISTINCT COALESCE(o.companyId, o.customerEmail, o.storeName))`, 'customerCount')
-        .where(
-          '(o.salesRepId = :repId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :repId)))',
-          { repId: rep.id },
-        )
-        .andWhere('o.createdAt BETWEEN :start AND :end', { start, end })
-        .getRawOne();
-      return {
-        repName: `${rep.firstName} ${rep.lastName}`.trim(),
-        orderCount: parseInt(row?.orderCount, 10) || 0,
-        customerCount: parseInt(row?.customerCount, 10) || 0,
-      };
-    }));
+    // Single grouped query instead of one round trip per sales rep — the
+    // "effective rep" per order is the same rule findAll() uses (a
+    // company's *current* salesRepId when the order has one, else the
+    // order's own stamped salesRepId), computed once per order via a
+    // correlated subquery rather than looped in application code.
+    const rows: { repId: string; orderCount: string; customerCount: string }[] = await this.orderRepo.query(
+      `WITH order_reps AS (
+         SELECT o.id, o."companyId", o."customerEmail", o."storeName",
+                COALESCE(
+                  (SELECT c."salesRepId" FROM companies c WHERE c.id::text = o."companyId"),
+                  o."salesRepId"
+                ) AS "repId"
+         FROM orders o
+         WHERE o."createdAt" BETWEEN $1 AND $2
+       )
+       SELECT "repId",
+              COUNT(*)::int AS "orderCount",
+              COUNT(DISTINCT COALESCE("companyId", "customerEmail", "storeName"))::int AS "customerCount"
+       FROM order_reps
+       WHERE "repId" IS NOT NULL
+       GROUP BY "repId"
+       ORDER BY "orderCount" DESC
+       LIMIT 5`,
+      [start, end],
+    );
+    if (!rows.length) return [];
 
-    return results.filter(r => r.orderCount > 0).sort((a, b) => b.orderCount - a.orderCount).slice(0, 5);
+    const reps = await this.userRepo.find({ where: { id: In(rows.map(r => r.repId)) } });
+    const nameById = new Map(reps.map(u => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
+
+    return rows.map(r => ({
+      repName: nameById.get(r.repId) || r.repId,
+      orderCount: Number(r.orderCount),
+      customerCount: Number(r.customerCount),
+    }));
   }
 
   async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
