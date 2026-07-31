@@ -174,7 +174,7 @@ export const ReportsSection: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              {weekly.map(d => <span key={d.date} style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>{d.dayLabel.split(',')[0]}</span>)}
+              {weekly.map(d => <span key={d.date} style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>{d.date.slice(5).split('-').join('/')}</span>)}
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><i style={{ width: '7px', height: '7px', borderRadius: '2px', background: INFO, display: 'inline-block' }} />Received</span>
