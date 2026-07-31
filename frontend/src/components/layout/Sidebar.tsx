@@ -23,7 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◈', label: 'Dashboard',      path: '/dashboard',       roles: Object.values(UserRole) as UserRole[] },
   { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[], countKey: 'orders' },
   { icon: '⊞', label: 'Pipeline Board', path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
-  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER], countKey: 'cadFiles' },
+  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER] },
   { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER], countKey: 'manufacturing' },
   { icon: '💎', label: 'Stone',         path: '/stone',           roles: [UserRole.ADMIN, UserRole.STONE_MANAGER], countKey: 'stone' },
   { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER], countKey: 'repairs' },
