@@ -118,47 +118,47 @@ export default function Dashboard() {
     const img = refImages[o.id];
     return (
       <div className="order-row-card" onClick={() => router.push(`/orders/${o.id}`)}
-        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', background: pc ? `${pc}06` : '#FAFAF8', border: `1px solid ${pc ? pc + '25' : '#EDE9E2'}`, borderLeft: `3px solid ${pc || GOLD}20`, borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', overflow: 'hidden' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 8px', background: pc ? `${pc}06` : '#FAFAF8', border: `1px solid ${pc ? pc + '25' : '#EDE9E2'}`, borderLeft: `3px solid ${pc || GOLD}20`, borderRadius: 7, cursor: 'pointer', transition: 'all 0.15s', overflow: 'hidden' }}
         onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}10` : '#F5F3EF'}
         onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = pc ? `${pc}06` : '#FAFAF8'}
       >
         {img
-          ? <Image className="order-row-img" src={img} alt="" width={28} height={28} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          : <div className="order-row-img" style={{ width: 28, height: 28, borderRadius: 6, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🖼</div>
+          ? <Image className="order-row-img" src={img} alt="" width={22} height={22} style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 5, flexShrink: 0, border: '1px solid #E8E0D4' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : <div className="order-row-img" style={{ width: 22, height: 22, borderRadius: 5, flexShrink: 0, background: '#F5F3EF', border: '1px dashed #D4CEC6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>🖼</div>
         }
         <div className="order-row-text" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-          <div className="order-row-name" style={{ fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 1, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
-          <div className="order-row-sub" style={{ fontSize: 10.5, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="order-row-name" style={{ fontSize: 11, fontWeight: 700, color: NAVY, marginBottom: 0, fontFamily: 'Cormorant Garamond, Georgia, serif' }}>{o.poNumber}</div>
+          <div className="order-row-sub" style={{ fontSize: 9.5, color: '#9BA8B5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.storeName || o.customerFullName || '—'}{o.orderType ? ` · ${o.orderType}` : ''}
             {o.priorityReason ? ` · ${o.priorityReason}` : ''}
           </div>
         </div>
         <div className="order-row-right" style={{ textAlign: 'right', flexShrink: 0 }}>
-          <span style={{ fontSize: 9.5, background: cfg.bg, color: cfg.color, padding: '2px 7px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 2 }}>{cfg.label}</span>
-          <span style={{ fontSize: 9.5, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span style={{ fontSize: 9, background: cfg.bg, color: cfg.color, padding: '1px 6px', borderRadius: 99, fontWeight: 600, display: 'block', marginBottom: 1 }}>{cfg.label}</span>
+          <span style={{ fontSize: 9, color: '#9BA8B5' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
       </div>
     );
   };
 
   const ActionSection = ({ title, subtitle, items, link, showMore, setShowMore }: any) => (
-    <div className="dash-action-card" style={{ ...card, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+    <div className="dash-action-card" style={{ ...card, padding: '10px 14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 16, fontWeight: 600, color: NAVY, margin: '0 0 2px' }}>{title}</h2>
-          {subtitle && <div style={{ fontSize: 10.5, color: '#9BA8B5' }}>{subtitle}</div>}
+          <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 14, fontWeight: 600, color: NAVY, margin: '0 0 1px' }}>{title}</h2>
+          {subtitle && <div style={{ fontSize: 10, color: '#9BA8B5' }}>{subtitle}</div>}
         </div>
-        <a href={link} style={{ fontSize: 11, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 2 }}>View all →</a>
+        <a href={link} style={{ fontSize: 10.5, color: GOLD, fontWeight: 600, textDecoration: 'none', marginTop: 1 }}>View all →</a>
       </div>
       {loading
-        ? <div style={{ color: '#9BA8B5', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>Loading…</div>
+        ? <div style={{ color: '#9BA8B5', fontSize: 11, textAlign: 'center', padding: '10px 0' }}>Loading…</div>
         : items.length === 0
-          ? <div style={{ textAlign: 'center', padding: '18px 0' }}>
-              <div style={{ fontSize: 20, marginBottom: 6 }}>✅</div>
-              <div style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>All clear</div>
+          ? <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ fontSize: 16, marginBottom: 4 }}>✅</div>
+              <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>All clear</div>
             </div>
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {items.slice(0, 5).map((o: any) => <OrderRow key={o.id} o={o} />)}
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {items.slice(0, 4).map((o: any) => <OrderRow key={o.id} o={o} />)}
             </div>
       }
     </div>
