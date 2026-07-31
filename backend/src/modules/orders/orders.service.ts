@@ -369,7 +369,7 @@ export class OrdersService implements OnModuleInit {
   // are read off order_events rather than the order's current status, since
   // an order's status can move on past VPO_ISSUED/CANCELLED by the time this
   // report runs — the event log is what actually happened *that day*.
-  async getWeeklyActivityReport(weekStart?: string): Promise<{ date: string; dayLabel: string; received: number; approved: number; cancelled: number }[]> {
+  async getWeeklyActivityReport(weekStart?: string): Promise<{ date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }[]> {
     const base = weekStart ? new Date(`${weekStart}T00:00:00`) : new Date();
     const dow = base.getDay();
     const mondayOffset = dow === 0 ? -6 : 1 - dow;
@@ -386,15 +386,16 @@ export class OrdersService implements OnModuleInit {
     return Promise.all(days.map(async day => {
       const dayEnd = new Date(day);
       dayEnd.setHours(23, 59, 59, 999);
-      const [received, approved, cancelled] = await Promise.all([
+      const [received, approved, manufactured, cancelled] = await Promise.all([
         this.orderRepo.count({ where: { createdAt: Between(day, dayEnd) } }),
         this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.VPO_ISSUED, createdAt: Between(day, dayEnd) } }),
+        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.MANUFACTURED, createdAt: Between(day, dayEnd) } }),
         this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED, createdAt: Between(day, dayEnd) } }),
       ]);
       return {
         date: day.toISOString().slice(0, 10),
         dayLabel: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        received, approved, cancelled,
+        received, approved, manufactured, cancelled,
       };
     }));
   }

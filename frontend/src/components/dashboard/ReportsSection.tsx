@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 
-interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; cancelled: number }
+interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }
 interface TopCustomer { name: string; orderCount: number; amount: number }
 interface TopSalesRep { repName: string; customerCount: number; orderCount: number }
 
 const INFO = '#0EA5E9';
+const MFG = '#8B5CF6';
 
 function mondayOfWeek(offsetWeeks: number): Date {
   const d = new Date();
@@ -32,12 +33,12 @@ function monthLabel(offsetMonths: number): { param: string; label: string } {
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-  boxShadow: 'var(--shadow-sm)', padding: '14px 18px', display: 'flex', flexDirection: 'column',
+  boxShadow: 'var(--shadow-sm)', padding: '16px 20px', display: 'flex', flexDirection: 'column',
 };
 
-const reportTitleStyle: React.CSSProperties = { fontSize: '12.5px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase', color: 'var(--text-secondary)' };
-const periodStyle: React.CSSProperties = { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' };
-const arrowBtnStyle: React.CSSProperties = { width: '16px', height: '16px', borderRadius: '4px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-secondary)', cursor: 'pointer', background: 'var(--bg-input)' };
+const reportTitleStyle: React.CSSProperties = { fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase', color: 'var(--text-secondary)' };
+const periodStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' };
+const arrowBtnStyle: React.CSSProperties = { width: '19px', height: '19px', borderRadius: '4px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', background: 'var(--bg-input)' };
 
 function ViewToggle({ view, setView }: { view: 'table' | 'graph'; setView: (v: 'table' | 'graph') => void }) {
   return (
@@ -49,7 +50,7 @@ function ViewToggle({ view, setView }: { view: 'table' | 'graph'; setView: (v: '
           style={{
             border: 'none', borderRight: v === 'table' ? '1px solid var(--border)' : 'none',
             background: view === v ? 'var(--navy)' : 'var(--bg-input)', color: view === v ? '#fff' : 'var(--text-muted)',
-            fontSize: '10px', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit',
+            fontSize: '12px', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
           {v === 'table' ? '▤ Table' : '📊 Graph'}
@@ -59,27 +60,27 @@ function ViewToggle({ view, setView }: { view: 'table' | 'graph'; setView: (v: '
   );
 }
 
-const thStyle: React.CSSProperties = { textAlign: 'left', fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '4px 6px', borderBottom: '1px solid var(--border)' };
-const tdStyle: React.CSSProperties = { padding: '5px 6px', borderBottom: '1px solid var(--border-light)', fontSize: '11px' };
+const thStyle: React.CSSProperties = { textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 8px', borderBottom: '1px solid var(--border)' };
+const tdStyle: React.CSSProperties = { padding: '8px 8px', borderBottom: '1px solid var(--border-light)', fontSize: '13px' };
 
 function RankBadge({ n }: { n: number }) {
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '15px', height: '15px',
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px',
       borderRadius: '4px', background: n === 1 ? 'var(--accent-light)' : 'var(--bg-input)',
-      color: n === 1 ? 'var(--accent-dark)' : 'var(--text-muted)', fontSize: '9px', fontWeight: 700, marginRight: '6px',
+      color: n === 1 ? 'var(--accent-dark)' : 'var(--text-muted)', fontSize: '11px', fontWeight: 700, marginRight: '7px',
     }}>{n}</span>
   );
 }
 
 function HBar({ label, value, max }: { label: string; value: number; max: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '7px' }}>
-      <div style={{ width: '92px', flexShrink: 0, fontSize: '10px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-      <div style={{ flex: 1, height: '10px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '9px' }}>
+      <div style={{ width: '100px', flexShrink: 0, fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ flex: 1, height: '11px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
         <div style={{ height: '100%', borderRadius: '4px', background: 'var(--accent)', width: `${max ? (value / max) * 100 : 0}%` }} />
       </div>
-      <div style={{ width: '32px', textAlign: 'right', flexShrink: 0, fontSize: '10px', fontWeight: 700 }}>{value}</div>
+      <div style={{ width: '36px', textAlign: 'right', flexShrink: 0, fontSize: '13px', fontWeight: 700 }}>{value}</div>
     </div>
   );
 }
@@ -113,8 +114,8 @@ export const ReportsSection: React.FC = () => {
 
   const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const weekRange = weekly.length ? `${shortDate(weekly[0].date)} – ${shortDate(weekly[weekly.length - 1].date)}` : '';
-  const weekTotals = weekly.reduce((acc, d) => ({ received: acc.received + d.received, approved: acc.approved + d.approved, cancelled: acc.cancelled + d.cancelled }), { received: 0, approved: 0, cancelled: 0 });
-  const weekMax = Math.max(1, ...weekly.map(d => Math.max(d.received, d.approved, d.cancelled)));
+  const weekTotals = weekly.reduce((acc, d) => ({ received: acc.received + d.received, approved: acc.approved + d.approved, manufactured: acc.manufactured + d.manufactured, cancelled: acc.cancelled + d.cancelled }), { received: 0, approved: 0, manufactured: 0, cancelled: 0 });
+  const weekMax = Math.max(1, ...weekly.map(d => Math.max(d.received, d.approved, d.manufactured, d.cancelled)));
   const custMax = Math.max(1, ...customers.map(c => customerSortBy === 'amount' ? c.amount : c.orderCount));
   const repMax = Math.max(1, ...reps.map(r => r.orderCount));
 
@@ -137,20 +138,22 @@ export const ReportsSection: React.FC = () => {
 
         {weeklyView === 'table' ? (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={thStyle}>Date</th><th style={{ ...thStyle, textAlign: 'right' }}>Received</th><th style={{ ...thStyle, textAlign: 'right' }}>Approved</th><th style={{ ...thStyle, textAlign: 'right' }}>Cancelled</th></tr></thead>
+            <thead><tr><th style={thStyle}>Date</th><th style={{ ...thStyle, textAlign: 'right' }}>Received</th><th style={{ ...thStyle, textAlign: 'right' }}>Approved</th><th style={{ ...thStyle, textAlign: 'right' }}>Manufactured</th><th style={{ ...thStyle, textAlign: 'right' }}>Cancelled</th></tr></thead>
             <tbody>
               {weekly.map(d => (
                 <tr key={d.date}>
                   <td style={tdStyle}>{d.dayLabel}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', color: INFO, fontWeight: 700 }}>{d.received}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--success)', fontWeight: 700 }}>{d.approved}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', color: MFG, fontWeight: 700 }}>{d.manufactured}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', color: 'var(--danger)', fontWeight: 700 }}>{d.cancelled}</td>
                 </tr>
               ))}
               <tr>
-                <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '9px' }}>Total</td>
+                <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
                 <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', color: INFO, fontWeight: 700 }}>{weekTotals.received}</td>
                 <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', color: 'var(--success)', fontWeight: 700 }}>{weekTotals.approved}</td>
+                <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', color: MFG, fontWeight: 700 }}>{weekTotals.manufactured}</td>
                 <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', color: 'var(--danger)', fontWeight: 700 }}>{weekTotals.cancelled}</td>
               </tr>
             </tbody>
@@ -162,20 +165,25 @@ export const ReportsSection: React.FC = () => {
                 <div key={d.date} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '2px', height: '100%' }}>
                   <div style={{ width: '6px', borderRadius: '2px 2px 0 0', background: INFO, height: `${(d.received / weekMax) * 100}%` }} />
                   <div style={{ width: '6px', borderRadius: '2px 2px 0 0', background: 'var(--success)', height: `${(d.approved / weekMax) * 100}%` }} />
+                  <div style={{ width: '6px', borderRadius: '2px 2px 0 0', background: MFG, height: `${(d.manufactured / weekMax) * 100}%` }} />
                   <div style={{ width: '6px', borderRadius: '2px 2px 0 0', background: 'var(--danger)', height: `${(d.cancelled / weekMax) * 100}%` }} />
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              {weekly.map(d => <span key={d.date} style={{ flex: 1, textAlign: 'center', fontSize: '9px', color: 'var(--text-muted)' }}>{d.dayLabel.split(',')[0]}</span>)}
+              {weekly.map(d => <span key={d.date} style={{ flex: 1, textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>{d.dayLabel.split(',')[0]}</span>)}
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '8px', fontSize: '9.5px', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><i style={{ width: '7px', height: '7px', borderRadius: '2px', background: INFO, display: 'inline-block' }} />Received</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><i style={{ width: '7px', height: '7px', borderRadius: '2px', background: 'var(--success)', display: 'inline-block' }} />Approved</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><i style={{ width: '7px', height: '7px', borderRadius: '2px', background: MFG, display: 'inline-block' }} />Manufactured</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><i style={{ width: '7px', height: '7px', borderRadius: '2px', background: 'var(--danger)', display: 'inline-block' }} />Cancelled</span>
             </div>
           </div>
         )}
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
+          Each column counts independently — Approved/Cancelled reflect orders reaching that point on this date, not a breakdown of the same day's Received orders.
+        </div>
       </div>
 
       {/* Top Customers */}
@@ -200,7 +208,7 @@ export const ReportsSection: React.FC = () => {
                 border: `1px solid ${customerSortBy === s ? 'var(--accent)' : 'var(--border)'}`,
                 background: customerSortBy === s ? 'var(--accent)' : 'var(--bg-input)',
                 color: customerSortBy === s ? '#fff' : 'var(--text-secondary)',
-                fontSize: '9.5px', fontWeight: 600, padding: '3px 9px', borderRadius: '99px', cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: '12px', fontWeight: 600, padding: '4px 11px', borderRadius: '99px', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
               {s === 'count' ? 'By Order Count' : 'By Amount'}
