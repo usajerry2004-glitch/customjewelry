@@ -47,13 +47,14 @@ function ViewToggle({ view, setView }: { view: 'table' | 'graph'; setView: (v: '
         <button
           key={v}
           onClick={() => setView(v)}
+          title={v === 'table' ? 'Table view' : 'Graph view'}
           style={{
             border: 'none', borderRight: v === 'table' ? '1px solid var(--border)' : 'none',
             background: view === v ? 'var(--navy)' : 'var(--bg-input)', color: view === v ? '#fff' : 'var(--text-muted)',
-            fontSize: '12px', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit',
+            fontSize: '13px', padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
           }}
         >
-          {v === 'table' ? '▤ Table' : '📊 Graph'}
+          {v === 'table' ? '▤' : '📊'}
         </button>
       ))}
     </div>
@@ -95,6 +96,7 @@ export const ReportsSection: React.FC = () => {
   const [customers, setCustomers] = useState<TopCustomer[]>([]);
   const [customersView, setCustomersView] = useState<'table' | 'graph'>('table');
 
+  const [repsMonthOffset, setRepsMonthOffset] = useState(0);
   const [reps, setReps] = useState<TopSalesRep[]>([]);
   const [repsView, setRepsView] = useState<'table' | 'graph'>('table');
 
@@ -109,8 +111,9 @@ export const ReportsSection: React.FC = () => {
   }, [monthOffset, customerSortBy]);
 
   useEffect(() => {
-    apiFetch(`${API}/orders/reports/top-sales-reps`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
-  }, []);
+    const { param } = monthLabel(repsMonthOffset);
+    apiFetch(`${API}/orders/reports/top-sales-reps?month=${param}`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
+  }, [repsMonthOffset]);
 
   const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const weekRange = weekly.length ? `${shortDate(weekly[0].date)} – ${shortDate(weekly[weekly.length - 1].date)}` : '';
@@ -218,16 +221,15 @@ export const ReportsSection: React.FC = () => {
 
         {customersView === 'table' ? (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={thStyle}>Customer</th><th style={{ ...thStyle, textAlign: 'right' }}>Orders</th><th style={{ ...thStyle, textAlign: 'right' }}>Amount</th></tr></thead>
+            <thead><tr><th style={thStyle}>Customer</th><th style={{ ...thStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? 'Amount' : 'Orders'}</th></tr></thead>
             <tbody>
               {customers.map((c, i) => (
                 <tr key={c.name}>
                   <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{c.name}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{c.orderCount}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>${c.amount.toLocaleString()}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? `$${c.amount.toLocaleString()}` : c.orderCount}</td>
                 </tr>
               ))}
-              {customers.length === 0 && <tr><td style={tdStyle} colSpan={3}>No orders this month.</td></tr>}
+              {customers.length === 0 && <tr><td style={tdStyle} colSpan={2}>No orders this month.</td></tr>}
             </tbody>
           </table>
         ) : (
@@ -244,7 +246,11 @@ export const ReportsSection: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
           <div>
             <div style={reportTitleStyle}>Top Sales Reps</div>
-            <div style={{ ...periodStyle, opacity: 0.6 }}>All time</div>
+            <div style={periodStyle}>
+              <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m - 1)}>‹</span>
+              {monthLabel(repsMonthOffset).label}
+              <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m + 1)}>›</span>
+            </div>
           </div>
           <ViewToggle view={repsView} setView={setRepsView} />
         </div>

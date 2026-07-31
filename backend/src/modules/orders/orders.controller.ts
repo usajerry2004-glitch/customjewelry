@@ -92,9 +92,9 @@ export class OrdersController {
   @Get('reports/top-sales-reps')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Dashboard report: top 5 sales reps by all-time total order count across their customers.' })
-  getTopSalesRepsReport() {
-    return this.ordersService.getTopSalesRepsReport();
+  @ApiOperation({ summary: 'Dashboard report: top 5 sales reps by total order count across their customers, for ?month (YYYY-MM, defaults to current month).' })
+  getTopSalesRepsReport(@Query('month') month?: string) {
+    return this.ordersService.getTopSalesRepsReport(month);
   }
 
   @Get('export/csv')

@@ -423,13 +423,18 @@ export class OrdersService implements OnModuleInit {
     return rows.map(r => ({ name: r.name, orderCount: parseInt(r.orderCount, 10), amount: parseFloat(r.amount) }));
   }
 
-  // Top 5 sales reps by all-time total order count across their customers.
-  // Mirrors the exact ownership rule findAll() uses for a Sales Rep's own
-  // order list (own salesRepId stamp, OR any order under a company whose
-  // *current* salesRepId is them) — a plain GROUP BY on order.salesRepId
-  // would undercount reps whose customers' companies were reassigned since
-  // those orders were placed.
-  async getTopSalesRepsReport(): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
+  // Top 5 sales reps by total order count across their customers, for the
+  // given calendar month (defaults to current month). Mirrors the exact
+  // ownership rule findAll() uses for a Sales Rep's own order list (own
+  // salesRepId stamp, OR any order under a company whose *current*
+  // salesRepId is them) — a plain GROUP BY on order.salesRepId would
+  // undercount reps whose customers' companies were reassigned since those
+  // orders were placed.
+  async getTopSalesRepsReport(month?: string): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
+    const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+    const start = new Date(year, mon - 1, 1);
+    const end = new Date(year, mon, 0, 23, 59, 59, 999);
+
     const reps = await this.userRepo.find({ where: { role: UserRole.SALES_REP } });
     const results = await Promise.all(reps.map(async rep => {
       const row = await this.orderRepo.createQueryBuilder('o')
@@ -439,6 +444,7 @@ export class OrdersService implements OnModuleInit {
           '(o.salesRepId = :repId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :repId)))',
           { repId: rep.id },
         )
+        .andWhere('o.createdAt BETWEEN :start AND :end', { start, end })
         .getRawOne();
       return {
         repName: `${rep.firstName} ${rep.lastName}`.trim(),
