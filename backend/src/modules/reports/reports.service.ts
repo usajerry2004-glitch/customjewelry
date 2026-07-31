@@ -195,16 +195,25 @@ export class ReportsService {
     // Grouped by cadPersonName (the free-text "CAD Person" field entered per
     // upload) rather than the uploadedBy account — several designers share
     // the same login (e.g. cad@kiradiam.com), so the account's own name
-    // doesn't identify who actually did the work.
-    const byDesigner = new Map<string, CadFile[]>();
+    // doesn't identify who actually did the work. Grouping key is
+    // case/whitespace-normalized ("Manoj" vs "manoj" is one person) — the
+    // display name is whichever exact casing was typed most often. This does
+    // NOT catch abbreviation variants (e.g. "Sayali Takke" vs "Sayali T.",
+    // "SG", "hl") since merging those needs a real identity, not a string
+    // rule; those still show as separate rows.
+    const byDesigner = new Map<string, { nameCounts: Map<string, number>; files: CadFile[] }>();
     for (const f of files) {
-      const key = f.cadPersonName?.trim() || f.uploadedBy || 'Unknown';
-      if (!byDesigner.has(key)) byDesigner.set(key, []);
-      byDesigner.get(key)!.push(f);
+      const raw = f.cadPersonName?.trim() || f.uploadedBy || 'Unknown';
+      const norm = raw.toLowerCase();
+      if (!byDesigner.has(norm)) byDesigner.set(norm, { nameCounts: new Map(), files: [] });
+      const entry = byDesigner.get(norm)!;
+      entry.files.push(f);
+      entry.nameCounts.set(raw, (entry.nameCounts.get(raw) || 0) + 1);
     }
 
-    return Array.from(byDesigner.entries())
-      .map(([name, list]) => {
+    return Array.from(byDesigner.values())
+      .map(({ nameCounts, files: list }) => {
+        const name = Array.from(nameCounts.entries()).sort((a, b) => b[1] - a[1])[0][0];
         const approved = list.filter(f => f.status === CadFileStatus.APPROVED).length;
         const turnarounds = list
           .filter(f => f.status === CadFileStatus.APPROVED && f.approvedAt)
@@ -217,6 +226,37 @@ export class ReportsService {
         };
       })
       .sort((a, b) => b.submitted - a.submitted);
+  }
+
+  // Diagnostic for the weekly report's per-designer table — one row per CAD
+  // file with its actual createdAt/approvedAt and computed turnaround, so an
+  // implausibly fast approval (seconds instead of hours/days) can be traced
+  // back to the specific order/file instead of guessed at from an average.
+  // Not used by the PDF — Admin-only, for investigating the numbers by hand.
+  async getDesignerFilesDetail(weekStart: Date, weekEnd: Date) {
+    const files = await this.cadRepo
+      .createQueryBuilder('c')
+      .where('c."createdAt" BETWEEN :start AND :end', { start: weekStart, end: weekEnd })
+      .andWhere('(c."designerNotes" IS NULL OR c."designerNotes" NOT IN (:...tags))', {
+        tags: Array.from(REFERENCE_NOTE_TAGS),
+      })
+      .getMany();
+
+    const orderIds = Array.from(new Set(files.map(f => f.orderId)));
+    const orders = orderIds.length ? await this.orderRepo.find({ where: { id: In(orderIds) } }) : [];
+    const poByOrderId = new Map(orders.map(o => [o.id, o.poNumber]));
+
+    return files
+      .map(f => ({
+        name: f.cadPersonName?.trim() || f.uploadedBy || 'Unknown',
+        poNumber: poByOrderId.get(f.orderId) || f.orderId,
+        status: f.status,
+        createdAt: f.createdAt,
+        approvedAt: f.approvedAt,
+        approvedBy: f.approvedBy,
+        turnaroundMs: f.approvedAt ? f.approvedAt.getTime() - f.createdAt.getTime() : null,
+      }))
+      .sort((a, b) => (a.turnaroundMs ?? Infinity) - (b.turnaroundMs ?? Infinity));
   }
 
   // Fetches every STATUS_CHANGE / SUPPLIER_ASSIGNED event for the given orders

@@ -48,6 +48,14 @@ export class ReportsController {
     return { sent: true };
   }
 
+  @Get('weekly/designer-files')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Diagnostic: every CAD file behind the weekly report\'s per-designer table, with actual createdAt/approvedAt/turnaround, sorted fastest-first — for tracing an implausible average back to specific orders (Admin only)' })
+  async designerFiles(@Query('weekStart') weekStartParam?: string) {
+    const { weekStart, weekEnd } = resolveWeekRange(weekStartParam);
+    return this.reportsService.getDesignerFilesDetail(weekStart, weekEnd);
+  }
+
   @Get('audit-log')
   @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
   @ApiOperation({ summary: 'Audit log of status changes, supplier assignments, and edits — admins see every order, other staff see only their own actions (not available to customers)' })
