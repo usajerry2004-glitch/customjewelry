@@ -82,6 +82,7 @@ export interface Order {
   quoteOptions?: { label: string; price: number }[] | null;
   customerCode?: string | null;
   customerCodeName?: string | null;
+  vpoIssuedAt?: string | null;
   committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
@@ -169,6 +170,38 @@ export function needsActionFromRole(order: Partial<Order> & { cadSubStatus?: str
     default:
       return false;
   }
+}
+
+// Mirrors the priority-level rules in OrdersService.findPriority() (backend)
+// so order tiles on the main Orders grid can carry the same coloring without
+// a second round trip — CRITICAL > HIGH > MEDIUM, first match wins. The main
+// list is already role-scoped server-side (a Stone Manager only ever sees
+// their own pending-stone orders, etc.), so no extra ownership check is
+// needed here — only which reasons are this role's concern at all.
+export const PRIORITY_LEVEL_COLOR: Record<'CRITICAL' | 'HIGH' | 'MEDIUM', string> = {
+  CRITICAL: '#7C3AED',
+  HIGH: '#DC2626',
+  MEDIUM: '#F59E0B',
+};
+
+export function getPriorityLevel(
+  order: Partial<Order> & { cadSubStatus?: string | null; stoneStatus?: string | null; vpoIssuedAt?: string | null },
+  role: string,
+): 'CRITICAL' | 'HIGH' | 'MEDIUM' | null {
+  const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
+  if (order.status === OrderStatus.CAD_IN_PROGRESS && order.cadSubStatus === 'REVISION') return 'CRITICAL';
+  if (order.isPriorityCustomer && order.status && !FINAL.includes(order.status)) return 'HIGH';
+
+  const vpoAgeMs = order.vpoIssuedAt ? Date.now() - new Date(order.vpoIssuedAt).getTime() : 0;
+  if ((role === 'ADMIN' || role === 'STONE_MANAGER')
+      && order.status === OrderStatus.VPO_ISSUED
+      && (!order.stoneStatus || order.stoneStatus === 'PENDING_STONE')
+      && order.vpoIssuedAt && vpoAgeMs > 2 * 86400000) return 'HIGH';
+  if ((role === 'ADMIN' || role === 'FACTORY_MANAGER')
+      && order.status === OrderStatus.VPO_ISSUED
+      && order.vpoIssuedAt && vpoAgeMs > 6 * 86400000) return 'MEDIUM';
+
+  return null;
 }
 
 // For orders in CAD_IN_PROGRESS, a sub-label reflects the actual stage

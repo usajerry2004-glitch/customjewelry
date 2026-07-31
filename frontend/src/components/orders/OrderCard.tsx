@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel, needsActionFromRole, ROLE_ACTION_COLOR, getPriorityLevel, PRIORITY_LEVEL_COLOR } from '../../utils/types';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -24,12 +24,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
   const daysSinceCreated = order.createdAt ? Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86400000)) : null;
   const actionPending = currentUserRole ? needsActionFromRole(order as any, currentUserRole) : false;
   const actionColor = actionPending ? (ROLE_ACTION_COLOR[currentUserRole!] || '#6B7280') : null;
+  const priorityLevel = currentUserRole ? getPriorityLevel(order as any, currentUserRole) : null;
+  const tintColor = priorityLevel ? PRIORITY_LEVEL_COLOR[priorityLevel] : actionColor;
 
   return (
     <div
       onClick={() => onClick?.(order)}
       style={{
-        background: actionColor ? `${actionColor}12` : 'var(--bg-card)',
+        background: tintColor ? `${tintColor}12` : 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderLeft: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
