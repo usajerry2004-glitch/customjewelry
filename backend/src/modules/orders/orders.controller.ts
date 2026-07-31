@@ -65,6 +65,14 @@ export class OrdersController {
     return this.ordersService.getMetrics();
   }
 
+  @Get('nav-counts')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Cheap unscoped counts for the sidebar nav badges (Admin/Authorizer only): total orders, CAD-stage (pending or revision), VPO Issued (manufacturing), pending-stone VPO Issued, and Repair-status orders.' })
+  getNavCounts() {
+    return this.ordersService.getNavCounts();
+  }
+
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)

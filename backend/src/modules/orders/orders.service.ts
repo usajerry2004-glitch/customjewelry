@@ -341,6 +341,29 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
+  // Sidebar nav badges — Admin/Authorizer only, so these are deliberately
+  // unscoped (no per-user/factory/supply-source narrowing needed, since that
+  // view already sees everything). "Stone" counts NULL alongside PENDING_STONE
+  // as still-pending, matching every other pending-stone check in this file —
+  // ManufacturingService.getMetrics()'s pendingStone omits the NULL case, which
+  // is an existing inconsistency there, not something replicated here.
+  async getNavCounts(): Promise<{ orders: number; cadFiles: number; manufacturing: number; stone: number; repairs: number }> {
+    const [orders, cadFiles, manufacturing, stone, repairs] = await Promise.all([
+      this.orderRepo.count(),
+      this.orderRepo.createQueryBuilder('o')
+        .where('o.status = :s', { s: OrderStatus.CAD_IN_PROGRESS })
+        .andWhere('(o.cadSubStatus IS NULL OR o.cadSubStatus = :r)', { r: 'REVISION' })
+        .getCount(),
+      this.orderRepo.count({ where: { status: OrderStatus.VPO_ISSUED } }),
+      this.orderRepo.createQueryBuilder('o')
+        .where('o.status = :s', { s: OrderStatus.VPO_ISSUED })
+        .andWhere('(o.stoneStatus IS NULL OR o.stoneStatus = :p)', { p: StoneStatus.PENDING_STONE })
+        .getCount(),
+      this.orderRepo.count({ where: { status: OrderStatus.REPAIR } }),
+    ]);
+    return { orders, cadFiles, manufacturing, stone, repairs };
+  }
+
   async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const qb = this.orderRepo.createQueryBuilder('order');
 

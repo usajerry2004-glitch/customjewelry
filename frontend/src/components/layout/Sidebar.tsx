@@ -1,22 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { UserRole } from '../../utils/types';
+import { apiFetch, API } from '../../utils/apiFetch';
 
 interface NavItem {
   icon: string;
   label: string;
   path: string;
   roles: UserRole[];
+  countKey?: keyof NavCounts;
+}
+
+interface NavCounts {
+  orders: number;
+  cadFiles: number;
+  manufacturing: number;
+  stone: number;
+  repairs: number;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { icon: '◈', label: 'Dashboard',      path: '/dashboard',       roles: Object.values(UserRole) as UserRole[] },
-  { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[] },
+  { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[], countKey: 'orders' },
   { icon: '⊞', label: 'Pipeline Board', path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
-  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER] },
-  { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER] },
-  { icon: '💎', label: 'Stone',         path: '/stone',           roles: [UserRole.ADMIN, UserRole.STONE_MANAGER] },
-  { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER] },
+  { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER], countKey: 'cadFiles' },
+  { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER], countKey: 'manufacturing' },
+  { icon: '💎', label: 'Stone',         path: '/stone',           roles: [UserRole.ADMIN, UserRole.STONE_MANAGER], countKey: 'stone' },
+  { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER], countKey: 'repairs' },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '↑', label: 'Import Orders',  path: '/import',          roles: [UserRole.ADMIN, UserRole.SALES_REP] },
   { icon: '✓', label: 'Priority Tasks',   path: '/todos',           roles: Object.values(UserRole) as UserRole[] },
@@ -33,6 +43,12 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, activePath = '/dashboard', isOpen = false, onClose }) => {
   const visibleItems = NAV_ITEMS.filter(item => item.roles.includes(activeRole));
+  const [navCounts, setNavCounts] = useState<NavCounts | null>(null);
+
+  useEffect(() => {
+    if (activeRole !== UserRole.ADMIN && activeRole !== UserRole.AUTHORIZER) return;
+    apiFetch(`${API}/orders/nav-counts`).then(r => r.ok ? r.json() : null).then(setNavCounts).catch(() => {});
+  }, [activeRole]);
 
   return (
     <>
@@ -84,6 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
         <nav style={{ padding: '16px 10px', flex: 1 }}>
           {visibleItems.map((item) => {
             const isActive = activePath === item.path || (item.path !== '/dashboard' && activePath?.startsWith(item.path));
+            const count = item.countKey && navCounts ? navCounts[item.countKey] : undefined;
             return (
               <a
                 key={item.path}
@@ -107,7 +124,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeRole = UserRole.ADMIN, a
                 }}
               >
                 <span style={{ fontSize: '13px', opacity: 0.8 }}>{item.icon}</span>
-                {item.label}
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {count !== undefined && (
+                  <span style={{
+                    background: isActive ? 'rgba(192,155,88,0.35)' : 'rgba(255,255,255,0.1)',
+                    color: isActive ? '#EDD48B' : 'rgba(255,255,255,0.55)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    borderRadius: '99px',
+                    padding: '1px 7px',
+                    minWidth: '10px',
+                    textAlign: 'center',
+                  }}>
+                    {count}
+                  </span>
+                )}
               </a>
             );
           })}
