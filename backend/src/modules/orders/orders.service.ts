@@ -364,6 +364,91 @@ export class OrdersService implements OnModuleInit {
     return { orders, cadFiles, manufacturing, stone, repairs };
   }
 
+  // Admin/Authorizer dashboard report — Mon-Fri of the week containing
+  // `weekStart` (defaults to the current week). "Approved" and "Cancelled"
+  // are read off order_events rather than the order's current status, since
+  // an order's status can move on past VPO_ISSUED/CANCELLED by the time this
+  // report runs — the event log is what actually happened *that day*.
+  async getWeeklyActivityReport(weekStart?: string): Promise<{ date: string; dayLabel: string; received: number; approved: number; cancelled: number }[]> {
+    const base = weekStart ? new Date(`${weekStart}T00:00:00`) : new Date();
+    const dow = base.getDay();
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(base);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() + mondayOffset);
+
+    const days = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+
+    return Promise.all(days.map(async day => {
+      const dayEnd = new Date(day);
+      dayEnd.setHours(23, 59, 59, 999);
+      const [received, approved, cancelled] = await Promise.all([
+        this.orderRepo.count({ where: { createdAt: Between(day, dayEnd) } }),
+        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.VPO_ISSUED, createdAt: Between(day, dayEnd) } }),
+        this.eventRepo.count({ where: { action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED, createdAt: Between(day, dayEnd) } }),
+      ]);
+      return {
+        date: day.toISOString().slice(0, 10),
+        dayLabel: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        received, approved, cancelled,
+      };
+    }));
+  }
+
+  // Top 5 customers for the given calendar month (defaults to current month),
+  // ranked by order count or total quoted amount. These can be two genuinely
+  // different sets of 5 (a customer with few but expensive orders can outrank
+  // a high-volume one by amount) — sortBy re-runs the query, it doesn't just
+  // reorder one fixed result set.
+  async getTopCustomersReport(month?: string, sortBy: 'count' | 'amount' = 'count'): Promise<{ name: string; orderCount: number; amount: number }[]> {
+    const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+    const start = new Date(year, mon - 1, 1);
+    const end = new Date(year, mon, 0, 23, 59, 59, 999);
+
+    const rows = await this.orderRepo.createQueryBuilder('o')
+      .select(`COALESCE(NULLIF(o.storeName, ''), NULLIF(o.customerFullName, ''), 'Unknown')`, 'name')
+      .addSelect('COUNT(*)', 'orderCount')
+      .addSelect('COALESCE(SUM(o.quotedCost), 0)', 'amount')
+      .where('o.createdAt BETWEEN :start AND :end', { start, end })
+      .groupBy(`COALESCE(NULLIF(o.storeName, ''), NULLIF(o.customerFullName, ''), 'Unknown')`)
+      .orderBy(sortBy === 'amount' ? 'amount' : '"orderCount"', 'DESC')
+      .limit(5)
+      .getRawMany();
+
+    return rows.map(r => ({ name: r.name, orderCount: parseInt(r.orderCount, 10), amount: parseFloat(r.amount) }));
+  }
+
+  // Top 5 sales reps by all-time total order count across their customers.
+  // Mirrors the exact ownership rule findAll() uses for a Sales Rep's own
+  // order list (own salesRepId stamp, OR any order under a company whose
+  // *current* salesRepId is them) — a plain GROUP BY on order.salesRepId
+  // would undercount reps whose customers' companies were reassigned since
+  // those orders were placed.
+  async getTopSalesRepsReport(): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
+    const reps = await this.userRepo.find({ where: { role: UserRole.SALES_REP } });
+    const results = await Promise.all(reps.map(async rep => {
+      const row = await this.orderRepo.createQueryBuilder('o')
+        .select('COUNT(*)', 'orderCount')
+        .addSelect(`COUNT(DISTINCT COALESCE(o.companyId, o.customerEmail, o.storeName))`, 'customerCount')
+        .where(
+          '(o.salesRepId = :repId OR (o.companyId IS NOT NULL AND o.companyId IN (SELECT c.id::text FROM companies c WHERE c."salesRepId" = :repId)))',
+          { repId: rep.id },
+        )
+        .getRawOne();
+      return {
+        repName: `${rep.firstName} ${rep.lastName}`.trim(),
+        orderCount: parseInt(row?.orderCount, 10) || 0,
+        customerCount: parseInt(row?.customerCount, 10) || 0,
+      };
+    }));
+
+    return results.filter(r => r.orderCount > 0).sort((a, b) => b.orderCount - a.orderCount).slice(0, 5);
+  }
+
   async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
     const qb = this.orderRepo.createQueryBuilder('order');
 

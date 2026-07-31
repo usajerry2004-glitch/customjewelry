@@ -73,6 +73,30 @@ export class OrdersController {
     return this.ordersService.getNavCounts();
   }
 
+  @Get('reports/weekly')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Dashboard report: Mon-Fri order activity (received/approved/cancelled) for the week containing ?weekStart (YYYY-MM-DD), defaults to the current week.' })
+  getWeeklyActivityReport(@Query('weekStart') weekStart?: string) {
+    return this.ordersService.getWeeklyActivityReport(weekStart);
+  }
+
+  @Get('reports/top-customers')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Dashboard report: top 5 customers for ?month (YYYY-MM, defaults to current month), ranked by ?sortBy=count|amount (defaults to count).' })
+  getTopCustomersReport(@Query('month') month?: string, @Query('sortBy') sortBy?: 'count' | 'amount') {
+    return this.ordersService.getTopCustomersReport(month, sortBy === 'amount' ? 'amount' : 'count');
+  }
+
+  @Get('reports/top-sales-reps')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Dashboard report: top 5 sales reps by all-time total order count across their customers.' })
+  getTopSalesRepsReport() {
+    return this.ordersService.getTopSalesRepsReport();
+  }
+
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { AppLayout } from '../components/layout/AppLayout';
+import { ReportsSection } from '../components/dashboard/ReportsSection';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
 
@@ -21,7 +22,7 @@ const card: React.CSSProperties = {
 
 const PIPELINE_ORDER: OrderStatus[] = [
   OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED,
-  OrderStatus.MANUFACTURED, OrderStatus.SHIPPED,
+  OrderStatus.MANUFACTURED,
   OrderStatus.REPAIR, OrderStatus.COMPLETED,
 ];
 
@@ -169,33 +170,27 @@ export default function Dashboard() {
     <AppLayout title="Dashboard" subtitle="Overview"
       actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}>+ New Order</button>}
     >
-      {/* ── KPIs ── */}
-      <div className="dash-kpi">
-        <KpiCard label="Active Orders"  value={activeOrders}   color={NAVY}                                         sub="not completed or cancelled" link="/orders" />
-        <KpiCard label="New This Week"  value={recent.length}  color="#0891B2"                                      sub="last 7 days"                link="/orders" />
-        <KpiCard label="My Actions"     value={actions.length} color="#7C3AED"                                      sub="priority tasks"              link="/todos" accent />
-      </div>
-
-      {/* ── Pipeline ── */}
-      <div style={{ ...card, padding: '20px 22px', marginBottom: 8 }}>
-        <div className="pipeline-row" style={{ display: 'flex', gap: 4, alignItems: 'stretch', overflowX: 'auto' }}>
-          {PIPELINE_ORDER.map((status, i) => {
-            const cfg = STATUS_CONFIG[status]; const count = sc(status); const isLast = i === PIPELINE_ORDER.length - 1;
+      {/* ── Pipeline (compact) ── */}
+      <div style={{ ...card, padding: '8px 10px', marginBottom: 12 }}>
+        <div className="pipeline-row" style={{ display: 'flex', gap: 6, alignItems: 'stretch', overflowX: 'auto' }}>
+          {PIPELINE_ORDER.map(status => {
+            const cfg = STATUS_CONFIG[status]; const count = sc(status);
             return (
-              <React.Fragment key={status}>
-                <div className="pipeline-tile" onClick={() => router.push(`/orders?status=${status}`)} style={{ flex: '1 1 0', minWidth: 60, background: count > 0 ? `${cfg.color}10` : '#F9F8F5', border: `1px solid ${count > 0 ? cfg.color + '35' : '#EDE9E2'}`, borderRadius: 10, padding: '14px 8px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                  onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}1E`; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}10` : '#F9F8F5'; }}
-                >
-                  <div className="pipeline-count" style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 30, fontWeight: 600, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1, marginBottom: 6 }}>{loading ? '—' : count}</div>
-                  <div className="pipeline-label" style={{ fontSize: 11, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, lineHeight: 1.3 }}>{cfg.label}</div>
-                </div>
-                {!isLast && <div style={{ display: 'flex', alignItems: 'center', color: '#D4CEC6', fontSize: 14, flexShrink: 0 }}>›</div>}
-              </React.Fragment>
+              <div key={status} className="pipeline-tile" onClick={() => router.push(`/orders?status=${status}`)}
+                style={{ flex: '1 1 0', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', background: count > 0 ? `${cfg.color}10` : '#F9F8F5', border: `1px solid ${count > 0 ? cfg.color + '35' : '#EDE9E2'}`, borderRadius: 8, padding: '4px 8px', display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5, cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { if (count > 0) (e.currentTarget as HTMLDivElement).style.background = `${cfg.color}1E`; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = count > 0 ? `${cfg.color}10` : '#F9F8F5'; }}
+              >
+                <span className="pipeline-count" style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 15, fontWeight: 700, color: count > 0 ? cfg.color : '#C9D0D8', lineHeight: 1 }}>{loading ? '—' : count}</span>
+                <span className="pipeline-label" style={{ fontSize: 10, color: count > 0 ? cfg.color : '#C9D0D8', fontWeight: 600, opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis' }}>{cfg.label}</span>
+              </div>
             );
           })}
         </div>
       </div>
+
+      {/* ── Reports ── */}
+      <ReportsSection />
 
       {/* ── Queues ── */}
       <div className="dash-2col">
