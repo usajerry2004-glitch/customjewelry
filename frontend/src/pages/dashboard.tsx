@@ -171,7 +171,7 @@ export default function Dashboard() {
       actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}>+ New Order</button>}
     >
       {/* ── Pipeline (compact) ── */}
-      <div style={{ ...card, padding: '8px 10px', marginBottom: 12 }}>
+      <div style={{ ...card, padding: '8px 10px', marginBottom: 6 }}>
         <div className="pipeline-row" style={{ display: 'flex', gap: 6, alignItems: 'stretch', overflowX: 'auto' }}>
           {PIPELINE_ORDER.map(status => {
             const cfg = STATUS_CONFIG[status]; const count = sc(status);
