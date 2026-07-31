@@ -182,6 +182,17 @@ export class ReportsService {
     return { ordersReceived, cadsApproved, cadsRevised, avgCadTurnaroundMs: avg(turnarounds) };
   }
 
+  // Confirmed manually (2026-07-31) — free-text "CAD Person" abbreviations
+  // that are the same designer as a fuller name also seen in the data.
+  // Keyed lowercase; only add an entry once the identity is verified, since
+  // guessing wrong misattributes someone's work.
+  private static readonly DESIGNER_ALIASES: Record<string, string> = {
+    'sayali t.': 'Sayali Takke',
+    'sg': 'Sayali Gawas',
+    'hl': 'H. Lakhani',
+    'sujit-jo': 'Sujit',
+  };
+
   private async computeDesignerStats(start: Date, end: Date) {
     const files = await this.cadRepo
       .createQueryBuilder('c')
@@ -196,19 +207,19 @@ export class ReportsService {
     // upload) rather than the uploadedBy account — several designers share
     // the same login (e.g. cad@kiradiam.com), so the account's own name
     // doesn't identify who actually did the work. Grouping key is
-    // case/whitespace-normalized ("Manoj" vs "manoj" is one person) — the
-    // display name is whichever exact casing was typed most often. This does
-    // NOT catch abbreviation variants (e.g. "Sayali Takke" vs "Sayali T.",
-    // "SG", "hl") since merging those needs a real identity, not a string
-    // rule; those still show as separate rows.
+    // case/whitespace-normalized ("Manoj" vs "manoj" is one person), plus the
+    // confirmed alias table above for abbreviation variants — anything not
+    // in that table still shows as its own separate row rather than being
+    // guessed at.
     const byDesigner = new Map<string, { nameCounts: Map<string, number>; files: CadFile[] }>();
     for (const f of files) {
       const raw = f.cadPersonName?.trim() || f.uploadedBy || 'Unknown';
-      const norm = raw.toLowerCase();
+      const resolved = ReportsService.DESIGNER_ALIASES[raw.toLowerCase()] || raw;
+      const norm = resolved.toLowerCase();
       if (!byDesigner.has(norm)) byDesigner.set(norm, { nameCounts: new Map(), files: [] });
       const entry = byDesigner.get(norm)!;
       entry.files.push(f);
-      entry.nameCounts.set(raw, (entry.nameCounts.get(raw) || 0) + 1);
+      entry.nameCounts.set(resolved, (entry.nameCounts.get(resolved) || 0) + 1);
     }
 
     return Array.from(byDesigner.values())
