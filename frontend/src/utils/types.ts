@@ -82,7 +82,6 @@ export interface Order {
   quoteOptions?: { label: string; price: number }[] | null;
   customerCode?: string | null;
   customerCodeName?: string | null;
-  vpoIssuedAt?: string | null;
   committedShipDate?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
@@ -138,71 +137,6 @@ export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: 
   UNIQUE_DESIGNS: { label: 'Unique Designs', color: '#059669', bg: '#D1FAE5' },
   JEWEL_ONE:      { label: 'Jewel One',      color: '#7C3AED', bg: '#EDE9FE' },
 };
-
-export const ROLE_ACTION_COLOR: Record<string, string> = {
-  ADMIN:           '#C09B58',
-  AUTHORIZER:      '#F59E0B',
-  CAD_DESIGNER:    '#6366F1',
-  STONE_MANAGER:   '#9333EA',
-  FACTORY_MANAGER: '#0D9488',
-  CUSTOMER:        '#059669',
-  SALES_REP:       '#8B5CF6',
-};
-
-export function needsActionFromRole(order: Partial<Order> & { cadSubStatus?: string | null; sentToCustomer?: boolean; stoneStatus?: string | null }, role: string): boolean {
-  switch (role) {
-    case 'ADMIN':
-    case 'AUTHORIZER':
-      if (order.status === OrderStatus.NEW) return true;
-      if (order.status === OrderStatus.CAD_IN_PROGRESS && order.cadSubStatus === 'UPLOADED' && !order.quotedCost) return true;
-      if (order.status === OrderStatus.MANUFACTURED) return true;
-      return false;
-    case 'CAD_DESIGNER':
-      if (order.status === OrderStatus.CAD_IN_PROGRESS && !order.cadSubStatus) return true;
-      if (order.status === OrderStatus.CAD_IN_PROGRESS && order.cadSubStatus === 'REVISION') return true;
-      return false;
-    case 'STONE_MANAGER':
-      return order.status === OrderStatus.VPO_ISSUED && (!order.stoneStatus || order.stoneStatus === 'PENDING_STONE');
-    case 'FACTORY_MANAGER':
-      return order.status === OrderStatus.VPO_ISSUED && order.stoneStatus === 'STONE_RECEIVED';
-    case 'CUSTOMER':
-      return order.status === OrderStatus.CAD_IN_PROGRESS && order.sentToCustomer === true;
-    default:
-      return false;
-  }
-}
-
-// Mirrors the priority-level rules in OrdersService.findPriority() (backend)
-// so order tiles on the main Orders grid can carry the same coloring without
-// a second round trip — CRITICAL > HIGH > MEDIUM, first match wins. The main
-// list is already role-scoped server-side (a Stone Manager only ever sees
-// their own pending-stone orders, etc.), so no extra ownership check is
-// needed here — only which reasons are this role's concern at all.
-export const PRIORITY_LEVEL_COLOR: Record<'CRITICAL' | 'HIGH' | 'MEDIUM', string> = {
-  CRITICAL: '#7C3AED',
-  HIGH: '#DC2626',
-  MEDIUM: '#F59E0B',
-};
-
-export function getPriorityLevel(
-  order: Partial<Order> & { cadSubStatus?: string | null; stoneStatus?: string | null; vpoIssuedAt?: string | null },
-  role: string,
-): 'CRITICAL' | 'HIGH' | 'MEDIUM' | null {
-  const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
-  if (order.status === OrderStatus.CAD_IN_PROGRESS && order.cadSubStatus === 'REVISION') return 'CRITICAL';
-  if (order.isPriorityCustomer && order.status && !FINAL.includes(order.status)) return 'HIGH';
-
-  const vpoAgeMs = order.vpoIssuedAt ? Date.now() - new Date(order.vpoIssuedAt).getTime() : 0;
-  if ((role === 'ADMIN' || role === 'STONE_MANAGER')
-      && order.status === OrderStatus.VPO_ISSUED
-      && (!order.stoneStatus || order.stoneStatus === 'PENDING_STONE')
-      && order.vpoIssuedAt && vpoAgeMs > 2 * 86400000) return 'HIGH';
-  if ((role === 'ADMIN' || role === 'FACTORY_MANAGER')
-      && order.status === OrderStatus.VPO_ISSUED
-      && order.vpoIssuedAt && vpoAgeMs > 6 * 86400000) return 'MEDIUM';
-
-  return null;
-}
 
 // For orders in CAD_IN_PROGRESS, a sub-label reflects the actual stage
 export function getCadSubLabel(order: { cadSubStatus?: string | null; sentToCustomer?: boolean; quotedCost?: number | null }): string | null {
