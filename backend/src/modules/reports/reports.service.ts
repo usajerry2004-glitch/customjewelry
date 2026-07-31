@@ -5,7 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
-import { User, UserRole } from '../../database/entities/user.entity';
+import { UserRole } from '../../database/entities/user.entity';
 import { EmailService } from '../email/email.service';
 import { buildWeeklyReportPdf, WeeklyStats } from './weekly-report-pdf.util';
 
@@ -48,7 +48,6 @@ export class ReportsService {
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(CadFile) private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(OrderEvent) private readonly eventRepo: Repository<OrderEvent>,
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly emailService: EmailService,
   ) {}
 
@@ -193,21 +192,19 @@ export class ReportsService {
       .getMany();
     if (!files.length) return [];
 
-    const byUploader = new Map<string, CadFile[]>();
+    // Grouped by cadPersonName (the free-text "CAD Person" field entered per
+    // upload) rather than the uploadedBy account — several designers share
+    // the same login (e.g. cad@kiradiam.com), so the account's own name
+    // doesn't identify who actually did the work.
+    const byDesigner = new Map<string, CadFile[]>();
     for (const f of files) {
-      const key = f.uploadedBy || 'unknown';
-      if (!byUploader.has(key)) byUploader.set(key, []);
-      byUploader.get(key)!.push(f);
+      const key = f.cadPersonName?.trim() || f.uploadedBy || 'Unknown';
+      if (!byDesigner.has(key)) byDesigner.set(key, []);
+      byDesigner.get(key)!.push(f);
     }
 
-    const emails = Array.from(byUploader.keys());
-    const users = await this.userRepo.find({ where: { email: In(emails) } });
-    const userByEmail = new Map(users.map(u => [u.email, u]));
-
-    return Array.from(byUploader.entries())
-      .map(([email, list]) => {
-        const user = userByEmail.get(email);
-        const name = user ? `${user.firstName[0]}. ${user.lastName}` : email;
+    return Array.from(byDesigner.entries())
+      .map(([name, list]) => {
         const approved = list.filter(f => f.status === CadFileStatus.APPROVED).length;
         const turnarounds = list
           .filter(f => f.status === CadFileStatus.APPROVED && f.approvedAt)
