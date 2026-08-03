@@ -11,7 +11,7 @@ import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
 
-const MAX_REFERENCE_IMAGES = 4;
+const MAX_REFERENCE_IMAGES = 10;
 
 // Admin can upload/send CAD files at any order stage (e.g. adding a revised
 // reference after the VPO is already issued), but that shouldn't regress the

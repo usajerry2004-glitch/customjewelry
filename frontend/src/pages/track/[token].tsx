@@ -50,6 +50,7 @@ interface CadFile {
   status: string;
   originalName: string;
   fileName: string;
+  filePath?: string;
   designerNotes: string | null;
   customerFeedback: string | null;
   revisionNumber: number;

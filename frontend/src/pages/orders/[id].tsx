@@ -516,7 +516,7 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stam
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
 
-const MAX_REFERENCE_IMAGES = 4;
+const MAX_REFERENCE_IMAGES = 10;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
 
 // Same option lists as the New Order form, so specs stay consistent everywhere

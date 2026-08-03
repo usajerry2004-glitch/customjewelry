@@ -195,14 +195,27 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
   const colTopY = y;
 
   // Left: CAD team approval rate
+  //
+  // This report has a fixed single-page layout — nothing here calls
+  // doc.addPage() or accounts for overflow. Both loops below render every
+  // entry in s.designers, so a week with a long tail of designers (name
+  // variants, one-off submitters) pushes leftY past the page bottom. PDFKit
+  // then silently starts a new page per remaining .text() call — since each
+  // call passes its own explicit (already-overflowed) y, every field of every
+  // remaining row lands on its own near-blank page. Capping the rendered
+  // list keeps leftY inside the single page this layout was built for.
+  const MAX_DESIGNERS_SHOWN = 8;
+  const shownDesigners = s.designers.slice(0, MAX_DESIGNERS_SHOWN);
+  const hiddenDesignerCount = s.designers.length - shownDesigners.length;
+
   doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('CAD TEAM — APPROVAL RATE', colLeftX, y, { characterSpacing: 0.8 });
   doc.moveTo(colLeftX, y + 14).lineTo(colLeftX + colW, y + 14).lineWidth(0.75).strokeColor(BORDER).stroke();
   let leftY = y + 22;
-  if (!s.designers.length) {
+  if (!shownDesigners.length) {
     doc.font('Helvetica').fontSize(10).fillColor(MUTED).text('No CAD submissions this week.', colLeftX, leftY);
     leftY += 18;
   }
-  for (const d of s.designers) {
+  for (const d of shownDesigners) {
     const pct = d.submitted ? Math.round((d.approved / d.submitted) * 100) : 0;
     doc.font('Helvetica-Bold').fontSize(10.5).fillColor(NAVY).text(d.name, colLeftX, leftY, { continued: false });
     doc.font('Helvetica').fontSize(9.5).fillColor(TEXT2)
@@ -222,10 +235,15 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
   leftY += 12;
   doc.moveTo(colLeftX, leftY).lineTo(colLeftX + colW, leftY).lineWidth(0.5).strokeColor(BORDER).stroke();
   leftY += 6;
-  for (const d of s.designers) {
+  for (const d of shownDesigners) {
     doc.font('Helvetica').fontSize(9.5).fillColor(NAVY).text(d.name, colLeftX, leftY);
     doc.text(String(d.submitted), colLeftX, leftY, { width: colW - 55, align: 'right' });
     doc.text(formatDuration(d.avgTurnaroundMs), colLeftX + colW - 50, leftY, { width: 50, align: 'right' });
+    leftY += 14;
+  }
+  if (hiddenDesignerCount > 0) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
+      .text(`+${hiddenDesignerCount} more designer${hiddenDesignerCount === 1 ? '' : 's'} this week — see the dashboard for the full breakdown.`, colLeftX, leftY, { width: colW });
     leftY += 14;
   }
 
