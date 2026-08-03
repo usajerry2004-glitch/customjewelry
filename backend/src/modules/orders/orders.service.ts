@@ -1010,12 +1010,8 @@ export class OrdersService implements OnModuleInit {
       throw new ForbiddenException('Only Admin can edit this field.');
     }
 
-    // Saving a quoted price requires a RightClick customer number to already be
-    // set on the order, or to be provided alongside this save.
-    if (dto.quotedCost !== undefined && Number(dto.quotedCost) > 0
-        && !(dto.customerCode !== undefined ? dto.customerCode : order.customerCode)) {
-      throw new BadRequestException('Select a customer number before saving a quote.');
-    }
+    // Customer number is optional on a quoted price — if one is given, it must
+    // be a recognized code, but saving a quote no longer requires it.
     if (dto.customerCode !== undefined && dto.customerCode !== order.customerCode) {
       if (dto.customerCode) {
         const match = await this.customerCodeRepo.findOne({ where: { code: dto.customerCode } });
@@ -1139,10 +1135,6 @@ export class OrdersService implements OnModuleInit {
       const finalPrice = quotedCost ?? order.quotedCost;
       if (!finalPrice || Number(finalPrice) <= 0) {
         throw new BadRequestException('Approximate quoted price is required before issuing the VPO.');
-      }
-      const finalCustomerCode = customerCode ?? order.customerCode;
-      if (!finalCustomerCode) {
-        throw new BadRequestException('Select a customer number before issuing the VPO.');
       }
       if (!order.kiraSkuNumber) {
         await this.skuService.generate(id, user?.email);

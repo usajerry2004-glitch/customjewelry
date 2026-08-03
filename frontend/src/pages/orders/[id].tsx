@@ -810,10 +810,6 @@ export default function OrderDetail() {
   const saveQuotedPrice = async () => {
     const price = parseFloat(quotedPriceInput);
     if (!price || price <= 0 || !order?.id) return;
-    if (!customerCodeSelected) {
-      toast.error('Select a customer number before saving a quote.');
-      return;
-    }
     setSavingPrice(true);
     const res = await apiFetch(`${API}/orders/${order.id}`, {
       method: 'PUT',
@@ -987,10 +983,6 @@ export default function OrderDetail() {
   const confirmPriceAndMove = async () => {
     const price = parseFloat(pendingPrice);
     if (!price || price <= 0) return;
-    if (!order?.customerCode && !customerCodeSelected) {
-      toast.error('Select a customer number before issuing the VPO.');
-      return;
-    }
     setPriceModal(false);
     await moveStatus(OrderStatus.VPO_ISSUED, price, undefined, customerCodeSelected || undefined);
   };
@@ -1895,15 +1887,15 @@ export default function OrderDetail() {
               </div>
               {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
                 <>
-                  {/* Customer number — compulsory before a quoted price can be saved */}
+                  {/* Customer number — optional */}
                   <div style={{ position: 'relative', marginBottom: '8px' }}>
                     <input
                       value={customerCodeInput}
                       onChange={e => { setCustomerCodeInput(e.target.value); setCustomerCodeSelected(''); setShowCustomerCodeDrop(true); }}
                       onFocus={() => setShowCustomerCodeDrop(true)}
                       onBlur={() => setTimeout(() => setShowCustomerCodeDrop(false), 150)}
-                      placeholder="Customer number… e.g. Diyora Diamond (C01234)"
-                      style={{ width: '100%', background: 'var(--bg-input)', border: `1px solid ${customerCodeSelected ? 'var(--border)' : 'rgba(220,38,38,0.4)'}`, borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      placeholder="Customer number (optional)… e.g. Diyora Diamond (C01234)"
+                      style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
                     />
                     {showCustomerCodeDrop && customerCodeInput && !customerCodeSelected && (() => {
                       const q = customerCodeInput.toLowerCase();
@@ -1943,9 +1935,8 @@ export default function OrderDetail() {
                     </div>
                     <button
                       onClick={saveQuotedPrice}
-                      disabled={savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0 || !customerCodeSelected}
-                      title={!customerCodeSelected ? 'Select a customer number first' : undefined}
-                      style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0 || !customerCodeSelected) ? 0.5 : 1 }}
+                      disabled={savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0}
+                      style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingPrice || !quotedPriceInput || parseFloat(quotedPriceInput) <= 0) ? 0.5 : 1 }}
                     >
                       {savingPrice ? '…' : 'Save'}
                     </button>
@@ -2172,8 +2163,8 @@ export default function OrderDetail() {
                   onChange={e => { setCustomerCodeInput(e.target.value); setCustomerCodeSelected(''); setShowCustomerCodeDrop(true); }}
                   onFocus={() => setShowCustomerCodeDrop(true)}
                   onBlur={() => setTimeout(() => setShowCustomerCodeDrop(false), 150)}
-                  placeholder="e.g. Diyora Diamond (C01234)"
-                  style={{ width: '100%', background: 'var(--bg-input)', border: `1px solid ${customerCodeSelected ? 'var(--border)' : 'rgba(220,38,38,0.4)'}`, borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  placeholder="Optional — e.g. Diyora Diamond (C01234)"
+                  style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
                 />
                 {showCustomerCodeDrop && customerCodeInput && !customerCodeSelected && (() => {
                   const q = customerCodeInput.toLowerCase();
@@ -2220,8 +2211,8 @@ export default function OrderDetail() {
               </button>
               <button
                 onClick={confirmPriceAndMove}
-                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0 || (!order.customerCode && !customerCodeSelected)}
-                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0 || (!order.customerCode && !customerCodeSelected)) ? 0.5 : 1 }}>
+                disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
                 Confirm & Issue VPO
               </button>
             </div>
