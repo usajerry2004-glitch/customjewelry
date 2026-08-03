@@ -1226,7 +1226,7 @@ export default function OrderDetail() {
           >
             {isMuted ? '🔕 Muted' : '🔔 Mute'}
           </button>
-          {canManageSupplier && order.assignedFactory && (
+          {canManageSupplier && order.assignedFactory && !['MANUFACTURED','SHIPPED','COMPLETED'].includes(order.status!) && (
             <button
               onClick={handleResendFactoryAlert}
               disabled={resendingFactoryAlert}

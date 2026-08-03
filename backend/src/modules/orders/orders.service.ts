@@ -1500,11 +1500,23 @@ export class OrdersService implements OnModuleInit {
   // factory" alert for an already-assigned order, awaited this time, so the
   // caller gets an immediate, honest success/failure result instead of a
   // detached promise nobody is watching.
+  // Orders past this point have already moved beyond "issued to the factory"
+  // in the factory's own workflow — resending the alert here would tell them
+  // to manufacture an order that's already made, shipped, or done.
+  private static readonly RESEND_FACTORY_ALERT_BLOCKED_STATUSES = new Set([
+    OrderStatus.MANUFACTURED,
+    OrderStatus.SHIPPED,
+    OrderStatus.COMPLETED,
+  ]);
+
   async resendFactoryAssignedAlert(id: string): Promise<{ sent: boolean; recipientCount: number; recipients: string[] }> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (!order.assignedFactory) {
       throw new BadRequestException(`Order ${order.poNumber} has no assigned factory to notify.`);
+    }
+    if (OrdersService.RESEND_FACTORY_ALERT_BLOCKED_STATUSES.has(order.status)) {
+      throw new BadRequestException(`Order ${order.poNumber} is already ${order.status} — resending the factory alert would be misleading.`);
     }
 
     const factoryUsers = await this.userRepo.find({ where: { assignedFactory: order.assignedFactory } });
