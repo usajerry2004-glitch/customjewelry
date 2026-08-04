@@ -2186,15 +2186,17 @@ export default function OrderDetail() {
                   Shipping
                 </div>
                 {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
-                  <select
-                    value={qcDoneInput ? 'yes' : 'no'}
-                    onChange={e => setQcDoneInput(e.target.value === 'yes')}
-                    title="QC Done"
-                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none' }}
-                  >
-                    <option value="no">QC Done: No</option>
-                    <option value="yes">QC Done: Yes</option>
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>QC Done</span>
+                    <select
+                      value={qcDoneInput ? 'yes' : 'no'}
+                      onChange={e => setQcDoneInput(e.target.value === 'yes')}
+                      style={{ width: '58px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 6px', fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none' }}
+                    >
+                      <option value="no">No</option>
+                      <option value="yes">Yes</option>
+                    </select>
+                  </div>
                 ) : (
                   <div style={{ fontSize: '11px', fontWeight: 600, color: order.qcDone ? '#16A34A' : 'var(--text-muted)' }}>
                     QC Done: {order.qcDone ? 'Yes' : 'No'}
