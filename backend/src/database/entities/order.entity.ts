@@ -191,6 +191,9 @@ export class Order {
   @Column({ type: 'date', nullable: true })
   shippedDate: string;
 
+  @Column({ type: 'boolean', default: false })
+  qcDone: boolean;
+
   @Column({ nullable: true, type: 'text' })
   shippingNotes: string;
 

@@ -574,6 +574,7 @@ export default function OrderDetail() {
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [shippedDateInput, setShippedDateInput] = useState('');
   const [shipViaInput, setShipViaInput] = useState('');
+  const [qcDoneInput, setQcDoneInput] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
   const [savingPriority, setSavingPriority] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
@@ -695,6 +696,7 @@ export default function OrderDetail() {
           setTrackingNumberInput(o.trackingNumber || '');
           setShippedDateInput(o.shippedDate ? String(o.shippedDate).slice(0, 10) : '');
           setShipViaInput(o.shipMethod || '');
+          setQcDoneInput(!!o.qcDone);
           const specs: Record<string, string> = {};
           EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = o[k] ?? ''; });
           setSpecInputs(specs);
@@ -978,6 +980,7 @@ export default function OrderDetail() {
           trackingNumber: trackingNumberInput || null,
           shippedDate: shippedDateInput || null,
           shipMethod: shipViaInput || null,
+          qcDone: qcDoneInput,
         }),
       });
       if (res.ok) {
@@ -2178,8 +2181,25 @@ export default function OrderDetail() {
           {userRole !== UserRole.CUSTOMER
             && ![OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED].includes(order.status!) && (
             <div style={cardStyle}>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Shipping
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  Shipping
+                </div>
+                {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                  <select
+                    value={qcDoneInput ? 'yes' : 'no'}
+                    onChange={e => setQcDoneInput(e.target.value === 'yes')}
+                    title="QC Done"
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', outline: 'none' }}
+                  >
+                    <option value="no">QC Done: No</option>
+                    <option value="yes">QC Done: Yes</option>
+                  </select>
+                ) : (
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: order.qcDone ? '#16A34A' : 'var(--text-muted)' }}>
+                    QC Done: {order.qcDone ? 'Yes' : 'No'}
+                  </div>
+                )}
               </div>
               {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
                 <>

@@ -85,6 +85,7 @@ export interface Order {
   committedShipDate?: string | null;
   shippedDate?: string | null;
   shipMethod?: string | null;
+  qcDone?: boolean;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
   supplySource?: SupplySource | null;
