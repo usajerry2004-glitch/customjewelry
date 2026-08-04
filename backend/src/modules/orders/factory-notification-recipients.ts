@@ -14,7 +14,6 @@ const CREATIONS_RECIPIENTS: string[] = [
   'diamond@creationjewel.co.in',
   'specialorder@creationjewel.co.in',
   'Santosh@creationjewel.co.in',
-  'manish@creationjewel.co.in',
   'production@creationjewel.co.in',
 ];
 
