@@ -186,6 +186,11 @@ export class Order {
   @Column({ type: 'date', nullable: true })
   committedShipDate: string;
 
+  // The actual date the order left the building — distinct from committedShipDate,
+  // which is the promised date set ahead of time.
+  @Column({ type: 'date', nullable: true })
+  shippedDate: string;
+
   @Column({ nullable: true, type: 'text' })
   shippingNotes: string;
 

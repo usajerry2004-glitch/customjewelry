@@ -516,6 +516,8 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stam
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
 
+const SHIP_VIA_OPTIONS = ['FedEx', 'UPS', 'DHL', 'USPS', 'Brinks', 'Malca-Amit'];
+
 const MAX_REFERENCE_IMAGES = 10;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
 
@@ -569,6 +571,10 @@ export default function OrderDetail() {
   const [savingPo, setSavingPo] = useState(false);
   const [shipDateInput, setShipDateInput] = useState('');
   const [savingShipDate, setSavingShipDate] = useState(false);
+  const [trackingNumberInput, setTrackingNumberInput] = useState('');
+  const [shippedDateInput, setShippedDateInput] = useState('');
+  const [shipViaInput, setShipViaInput] = useState('');
+  const [savingShipping, setSavingShipping] = useState(false);
   const [savingPriority, setSavingPriority] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
@@ -686,6 +692,9 @@ export default function OrderDetail() {
           setCustomerCodeInput(o.customerCode ? `${o.customerCodeName || ''} (${o.customerCode})` : '');
           setCustomerPoInput(o.refCustomerPo || '');
           setShipDateInput(o.committedShipDate ? String(o.committedShipDate).slice(0, 10) : '');
+          setTrackingNumberInput(o.trackingNumber || '');
+          setShippedDateInput(o.shippedDate ? String(o.shippedDate).slice(0, 10) : '');
+          setShipViaInput(o.shipMethod || '');
           const specs: Record<string, string> = {};
           EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = o[k] ?? ''; });
           setSpecInputs(specs);
@@ -956,6 +965,31 @@ export default function OrderDetail() {
       toast.error('Failed to save committed ship date — check your connection and try again.');
     } finally {
       setSavingShipDate(false);
+    }
+  };
+
+  const saveShipping = async () => {
+    if (!order?.id) return;
+    setSavingShipping(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          trackingNumber: trackingNumberInput || null,
+          shippedDate: shippedDateInput || null,
+          shipMethod: shipViaInput || null,
+        }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save shipping info.'));
+      }
+    } catch {
+      toast.error('Failed to save shipping info — check your connection and try again.');
+    } finally {
+      setSavingShipping(false);
     }
   };
 
@@ -2139,6 +2173,73 @@ export default function OrderDetail() {
               </div>
             ))}
           </div>
+
+          {/* Shipping — tracking number, ship date, and courier, independent of order status */}
+          {userRole !== UserRole.CUSTOMER
+            && ![OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED].includes(order.status!) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Shipping
+              </div>
+              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                <>
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Tracking Number</div>
+                    <input
+                      value={trackingNumberInput}
+                      onChange={e => setTrackingNumberInput(e.target.value)}
+                      placeholder="e.g. 1Z999AA10123456784"
+                      style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Ship Date</div>
+                      <input
+                        type="date"
+                        value={shippedDateInput}
+                        onChange={e => setShippedDateInput(e.target.value)}
+                        style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Ship Via</div>
+                      <select
+                        value={shipViaInput}
+                        onChange={e => setShipViaInput(e.target.value)}
+                        style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                      >
+                        <option value="">Select…</option>
+                        {[...new Set(shipViaInput && !SHIP_VIA_OPTIONS.includes(shipViaInput) ? [...SHIP_VIA_OPTIONS, shipViaInput] : SHIP_VIA_OPTIONS)].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    onClick={saveShipping}
+                    disabled={savingShipping}
+                    style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: savingShipping ? 0.5 : 1 }}
+                  >
+                    {savingShipping ? '…' : 'Save'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: order.trackingNumber ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    {order.trackingNumber || 'Not set yet'}
+                  </div>
+                  {(order.shippedDate || order.shipMethod) && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                      {order.shippedDate ? new Date(order.shippedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                      {order.shippedDate && order.shipMethod ? ' · ' : ''}
+                      {order.shipMethod || ''}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>{/* ── end sidebar ── */}
 
       </div>{/* ── end outer grid ── */}

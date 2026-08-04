@@ -83,6 +83,8 @@ export interface Order {
   customerCode?: string | null;
   customerCodeName?: string | null;
   committedShipDate?: string | null;
+  shippedDate?: string | null;
+  shipMethod?: string | null;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
   supplySource?: SupplySource | null;
