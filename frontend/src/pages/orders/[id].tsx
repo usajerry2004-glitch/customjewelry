@@ -833,6 +833,7 @@ export default function OrderDetail() {
     if (res.ok) {
       const fresh = await apiFetch(`${API}/orders/${order.id}`);
       if (fresh.ok) setOrder(await fresh.json());
+      toast.success('Quoted price saved.');
     } else {
       const err = await res.json().catch(() => null);
       toast.error(getErrorMessage(err, 'Failed to save quoted price.'));
