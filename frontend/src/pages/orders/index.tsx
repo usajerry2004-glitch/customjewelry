@@ -1275,21 +1275,26 @@ export default function OrdersPage() {
           ))}
           {/* A tab like the others, not a combinable toggle — selecting it
               clears the status filter (it applies across all statuses), and
-              selecting any status tab clears it back out. */}
-          <button
-            onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
-            title="Only show orders with an unread customer chat message — clears once any staff member opens the conversation"
-            style={{
-              padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-              fontWeight: customerTextedFilter ? 600 : 400,
-              background: customerTextedFilter ? 'var(--navy)' : 'var(--bg-card)',
-              color: customerTextedFilter ? '#fff' : 'var(--text-secondary)',
-              border: `1px solid ${customerTextedFilter ? 'var(--navy)' : 'var(--border)'}`,
-              transition: 'all 0.15s',
-            }}
-          >
-            Customer Text
-          </button>
+              selecting any status tab clears it back out. Customer chat
+              content is only relevant to internal staff who talk to
+              customers — Stone/Factory Manager are external partners and
+              shouldn't see this tab. */}
+          {!['STONE_MANAGER', 'FACTORY_MANAGER'].includes(userRole) && (
+            <button
+              onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
+              title="Only show orders with an unread customer chat message — clears once any staff member opens the conversation"
+              style={{
+                padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                fontWeight: customerTextedFilter ? 600 : 400,
+                background: customerTextedFilter ? 'var(--navy)' : 'var(--bg-card)',
+                color: customerTextedFilter ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${customerTextedFilter ? 'var(--navy)' : 'var(--border)'}`,
+                transition: 'all 0.15s',
+              }}
+            >
+              Customer Text
+            </button>
+          )}
         </div>
 
         {/* Mobile: dropdown select */}
