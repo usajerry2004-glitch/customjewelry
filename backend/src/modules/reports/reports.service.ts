@@ -515,7 +515,8 @@ export class ReportsService {
   // had a REVISION_REQUESTED file, so this doesn't scan the whole cad_files table.
   private async computeRevisionEvents(): Promise<RevisionEvent[]> {
     const revisedOrderIds = await this.cadRepo.createQueryBuilder('cf')
-      .select('DISTINCT cf.orderId', 'orderId')
+      .select('cf.orderId', 'orderId')
+      .distinct(true)
       .where('cf.status = :rev', { rev: CadFileStatus.REVISION_REQUESTED })
       .getRawMany();
     const orderIds = revisedOrderIds.map((r: any) => r.orderId);
@@ -525,7 +526,12 @@ export class ReportsService {
       .leftJoin(Order, 'o', 'o.id = cf.orderId')
       .where('cf.orderId IN (:...ids)', { ids: orderIds })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
-      .select(['cf.orderId AS "orderId"', 'cf.status AS status', 'cf.cadPersonName AS "cadPersonName"', 'cf.createdAt AS "createdAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .select('cf.orderId', 'orderId')
+      .addSelect('cf.status', 'status')
+      .addSelect('cf.cadPersonName', 'cadPersonName')
+      .addSelect('cf.createdAt', 'createdAt')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
       .orderBy('cf.orderId', 'ASC')
       .addOrderBy('cf.createdAt', 'ASC')
       .getRawMany();
@@ -552,19 +558,25 @@ export class ReportsService {
     return events;
   }
 
+  // Local-calendar-based formatting throughout (never toISOString on a local-constructed
+  // Date) — mixing the two shifted bucket keys by a day/month for positive UTC-offset
+  // server timezones, since toISOString() converts to UTC before slicing.
+  private pad2(n: number): string { return String(n).padStart(2, '0'); }
+
   private bucketKey(date: Date, periodType: ProductionPeriodType): string {
-    return periodType === 'monthly' ? date.toISOString().slice(0, 10) : date.toISOString().slice(0, 7);
+    const ym = `${date.getFullYear()}-${this.pad2(date.getMonth() + 1)}`;
+    return periodType === 'monthly' ? `${ym}-${this.pad2(date.getDate())}` : ym;
   }
 
   private bucketRange(from: Date, to: Date, periodType: ProductionPeriodType): string[] {
     const keys: string[] = [];
     if (periodType === 'monthly') {
       for (let d = new Date(from); d < to; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-        keys.push(d.toISOString().slice(0, 10));
+        keys.push(this.bucketKey(d, periodType));
       }
     } else {
       for (let d = new Date(from.getFullYear(), from.getMonth(), 1); d < to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-        keys.push(d.toISOString().slice(0, 7));
+        keys.push(this.bucketKey(d, periodType));
       }
     }
     return keys;
@@ -578,7 +590,9 @@ export class ReportsService {
       .where('o.salesRepName = :webOrder', { webOrder: 'Web Order' })
       .andWhere('o.createdAt >= :from AND o.createdAt < :to', { from, to })
       .andWhere('o.isArchived = false')
-      .select(['o.poNumber AS "poNumber"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .select('o.poNumber', 'poNumber')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
       .getRawMany();
     const directMap = new Map<string, string[]>();
     for (const o of directOrders) {
@@ -598,7 +612,11 @@ export class ReportsService {
       .leftJoin(Order, 'o', 'o.id = cf.orderId')
       .where('cf.createdAt >= :from AND cf.createdAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
-      .select(['cf.status AS status', 'cf.cadPersonName AS "cadPersonName"', 'cf.createdAt AS "createdAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .select('cf.status', 'status')
+      .addSelect('cf.cadPersonName', 'cadPersonName')
+      .addSelect('cf.createdAt', 'createdAt')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
       .getRawMany();
 
     const byPersonMap = new Map<string, CadAggregate>();
@@ -637,7 +655,10 @@ export class ReportsService {
       .where('cf.status = :approved', { approved: CadFileStatus.APPROVED })
       .andWhere('cf.approvedAt >= :from AND cf.approvedAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
-      .select(['cf.cadPersonName AS "cadPersonName"', 'cf.approvedAt AS "approvedAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .select('cf.cadPersonName', 'cadPersonName')
+      .addSelect('cf.approvedAt', 'approvedAt')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
       .getRawMany();
     const uploadedByPerson = new Map<string, number>();
     for (const r of cadRows) uploadedByPerson.set(r.cadPersonName || 'Unassigned', (uploadedByPerson.get(r.cadPersonName || 'Unassigned') || 0) + 1);

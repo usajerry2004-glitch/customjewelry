@@ -157,12 +157,22 @@ export const MonthlyProductionReport: React.FC = () => {
   const [breakdownMode, setBreakdownMode] = useState<Record<'cads' | 'samples' | 'revisions', BreakdownMode>>({ cads: 'person', samples: 'person', revisions: 'person' });
   const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', cads: 'simple', samples: 'simple', revisions: 'simple' });
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   useEffect(() => {
     setLoading(true);
+    setErrorMessage(null);
     apiFetch(`${API}/reports/monthly-production?period=${periodType}&month=${anchorMonth}`)
-      .then(r => r.ok ? r.json() : null)
+      .then(async r => {
+        if (r.ok) return r.json();
+        const body = await r.json().catch(() => null);
+        // eslint-disable-next-line no-console
+        console.error('Monthly Production Report failed:', r.status, body);
+        setErrorMessage(body?.message ? `${body.message} (${r.status})` : `Request failed (${r.status})`);
+        return null;
+      })
       .then(setData)
-      .catch(() => setData(null))
+      .catch(err => { console.error('Monthly Production Report request error:', err); setErrorMessage('Network error — check your connection.'); setData(null); })
       .finally(() => setLoading(false));
   }, [periodType, anchorMonth]);
 
@@ -363,7 +373,9 @@ export const MonthlyProductionReport: React.FC = () => {
       {loading && !data ? (
         <div style={{ color: 'var(--text-muted)', padding: '30px 0', textAlign: 'center', fontSize: '13px' }}>Loading…</div>
       ) : !data ? (
-        <div style={{ color: 'var(--text-muted)', padding: '30px 0', textAlign: 'center', fontSize: '13px' }}>Couldn't load this report.</div>
+        <div style={{ color: 'var(--text-muted)', padding: '30px 0', textAlign: 'center', fontSize: '13px' }}>
+          Couldn't load this report.{errorMessage && <div style={{ marginTop: '6px', fontSize: '11.5px', color: 'var(--danger)' }}>{errorMessage}</div>}
+        </div>
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '16px', marginBottom: '18px' }}>
