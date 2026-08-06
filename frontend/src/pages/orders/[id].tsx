@@ -2186,7 +2186,7 @@ export default function OrderDetail() {
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
                   Shipping
                 </div>
-                {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+                {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN || userRole === UserRole.FACTORY_MANAGER) ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>QC Done</span>
                     <select
@@ -2204,7 +2204,7 @@ export default function OrderDetail() {
                   </div>
                 )}
               </div>
-              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN) ? (
+              {(userRole === UserRole.AUTHORIZER || userRole === UserRole.ADMIN || userRole === UserRole.FACTORY_MANAGER) ? (
                 <>
                   <div style={{ marginBottom: '10px' }}>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Tracking Number</div>
