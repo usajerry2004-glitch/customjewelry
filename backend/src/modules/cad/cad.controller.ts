@@ -77,12 +77,12 @@ export class CadController {
     return { sent: true };
   }
 
-  @Patch('order/:orderId/mark-awaiting-approval')
+  @Patch('order/:orderId/sub-stage')
   @Roles(UserRole.ADMIN)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Manual correction: force every non-reference CAD design file on this order to SENT_FOR_APPROVAL — status only, no customer email (Admin only)' })
-  async markAwaitingApproval(@Param('orderId') orderId: string) {
-    return this.cadService.markAwaitingApproval(orderId);
+  @ApiOperation({ summary: 'Manual correction: move an order\'s CAD sub-stage (Pending CAD / Awaiting Quote / Awaiting Approval / Revision), keeping cadSubStatus/sentToCustomer/file statuses in sync. Can also pull a VPO_ISSUED order back into CAD_IN_PROGRESS. Admin only, no customer email.' })
+  async setSubStage(@Param('orderId') orderId: string, @Body('subStage') subStage: string, @Request() req: any) {
+    return this.cadService.setSubStage(orderId, subStage, req.user);
   }
 
   @Patch('order/:orderId/send-reminder')

@@ -587,6 +587,7 @@ export default function OrderDetail() {
   const [repairContractorInput, setRepairContractorInput] = useState('');
   const [sendingToCustomer, setSendingToCustomer] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [revertingCadStage, setRevertingCadStage] = useState<string | null>(null);
   const [events, setEvents] = useState<{ id: string; action: string; userEmail: string; fromStatus?: string; toStatus?: string; note?: string; createdAt: string }[]>([]);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
@@ -1079,6 +1080,31 @@ export default function OrderDetail() {
       toast.error('Failed to send follow-up email — check your connection and try again.');
     } finally {
       setSendingReminder(false);
+    }
+  };
+
+  const revertCadStage = async (subStage: string) => {
+    if (!order?.id) return;
+    setRevertingCadStage(subStage);
+    try {
+      const res = await apiFetch(`${API}/cad/order/${order.id}/sub-stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subStage }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+        const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+        if (cRes.ok) setCads(await cRes.json());
+        toast.success('CAD stage updated.');
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to update CAD stage.'));
+      }
+    } catch {
+      toast.error('Failed to update CAD stage — check your connection and try again.');
+    } finally {
+      setRevertingCadStage(null);
     }
   };
 
@@ -2162,6 +2188,32 @@ export default function OrderDetail() {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* CAD Stage — Admin-only manual correction for the CAD sub-label (Pending CAD /
+              Awaiting Quote / Awaiting Approval / Revision), including pulling an
+              already-Approved (VPO Issued) order back into CAD without a script. */}
+          {userRole === UserRole.ADMIN
+            && [OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED].includes(order.status!) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>CAD Stage</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {[
+                  { key: 'PENDING_CAD', label: 'Pending CAD' },
+                  { key: 'AWAITING_QUOTE', label: 'Awaiting Quote' },
+                  { key: 'AWAITING_APPROVAL', label: 'Awaiting Approval' },
+                  { key: 'REVISION', label: 'Revision' },
+                ].map(({ key, label }) => {
+                  const isCurrent = order.status === OrderStatus.CAD_IN_PROGRESS && getCadSubLabel(order as any) === label;
+                  return (
+                    <button key={key} onClick={() => revertCadStage(key)} disabled={!!revertingCadStage || isCurrent}
+                      style={{ background: isCurrent ? 'var(--bg-input)' : 'transparent', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: isCurrent ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: (revertingCadStage || isCurrent) ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: revertingCadStage && revertingCadStage !== key ? 0.6 : 1, letterSpacing: '0.2px' }}>
+                      {isCurrent ? '● ' : '→ '}{revertingCadStage === key ? 'Updating…' : label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

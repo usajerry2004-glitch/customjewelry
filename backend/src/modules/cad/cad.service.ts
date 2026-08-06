@@ -13,6 +13,15 @@ import { SkuService } from '../sku/sku.service';
 
 const MAX_REFERENCE_IMAGES = 10;
 
+// Target field values for each manually-selectable CAD sub-stage — keeps order.cadSubStatus,
+// order.sentToCustomer, and the underlying CAD file statuses consistent with each other.
+const CAD_SUB_STAGE_FIELDS: Record<string, { cadSubStatus: string | null; sentToCustomer: boolean; fileStatus: CadFileStatus }> = {
+  PENDING_CAD:       { cadSubStatus: null,       sentToCustomer: false, fileStatus: CadFileStatus.UPLOADED },
+  AWAITING_QUOTE:    { cadSubStatus: 'UPLOADED', sentToCustomer: false, fileStatus: CadFileStatus.UPLOADED },
+  AWAITING_APPROVAL: { cadSubStatus: 'UPLOADED', sentToCustomer: true,  fileStatus: CadFileStatus.SENT_FOR_APPROVAL },
+  REVISION:          { cadSubStatus: 'REVISION', sentToCustomer: false, fileStatus: CadFileStatus.REVISION_REQUESTED },
+};
+
 // Admin can upload/send CAD files at any order stage (e.g. adding a revised
 // reference after the VPO is already issued), but that shouldn't regress the
 // order back into the CAD approval flow once it's moved past it.
@@ -260,24 +269,51 @@ export class CadService {
     }
   }
 
-  // Admin-only manual correction: force every non-reference CAD design file
-  // on an order to SENT_FOR_APPROVAL ("Awaiting Approval" in the UI), status
-  // only — unlike sendToCustomer() above, this never emails the customer and
-  // never touches the order's sentToCustomer/lastApprovalEmailAt fields. For
-  // fixing a stuck/incorrect status on an order that's already past the
-  // normal CAD approval stage, not for actually sending anything.
-  async markAwaitingApproval(orderId: string): Promise<{ updated: number }> {
+  // Admin-only manual correction: move an order's CAD sub-stage (the badge shown
+  // on CAD_IN_PROGRESS orders — Pending CAD / Awaiting Quote / Awaiting Approval /
+  // Revision) to any target stage, no email side effects. Unlike the one-off fixes
+  // this replaces, it always keeps cadSubStatus, sentToCustomer, and the underlying
+  // CAD file statuses in sync with each other — that's the exact drift that caused
+  // getCadSubLabel() to show a stale label in the past. Also doubles as the "revert
+  // Approved back into CAD" action: called on a VPO_ISSUED order, it pulls the
+  // order back to CAD_IN_PROGRESS first (SKU/quoted price are left alone, same as
+  // the plain VPO_ISSUED -> CAD_IN_PROGRESS status revert).
+  async setSubStage(orderId: string, subStage: string, user?: { id?: string; email?: string; role?: string }): Promise<Order> {
+    if (user?.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only Admin can manually change the CAD stage.');
+    }
+    const target = CAD_SUB_STAGE_FIELDS[subStage];
+    if (!target) {
+      throw new BadRequestException(`Unknown CAD stage "${subStage}". Expected one of: ${Object.keys(CAD_SUB_STAGE_FIELDS).join(', ')}.`);
+    }
+
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+    if (![OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED].includes(order.status)) {
+      throw new BadRequestException('Can only change the CAD stage while an order is in CAD In Progress or has just been approved (VPO Issued).');
+    }
+    const wasApproved = order.status === OrderStatus.VPO_ISSUED;
+
+    await this.orderRepo.update(orderId, {
+      status: OrderStatus.CAD_IN_PROGRESS,
+      cadSubStatus: target.cadSubStatus,
+      sentToCustomer: target.sentToCustomer,
+      customerEmailApproval: false,
+      ...(wasApproved ? { vpoIssuedAt: null as any } : {}),
+    });
 
     const allCads = await this.cadRepo.find({ where: { orderId } });
     const designFileIds = allCads.filter(
       c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image',
     ).map(c => c.id);
-    if (!designFileIds.length) return { updated: 0 };
+    if (designFileIds.length) {
+      await this.cadRepo.update({ id: In(designFileIds) }, { status: target.fileStatus });
+    }
 
-    const result = await this.cadRepo.update({ id: In(designFileIds) }, { status: CadFileStatus.SENT_FOR_APPROVAL });
-    return { updated: result.affected || 0 };
+    this.logEvent(orderId, 'STATUS_CHANGE', user, wasApproved ? OrderStatus.VPO_ISSUED : OrderStatus.CAD_IN_PROGRESS, OrderStatus.CAD_IN_PROGRESS,
+      `CAD stage manually set to ${subStage}${wasApproved ? ' (reverted from VPO Issued)' : ''}`);
+
+    return this.orderRepo.findOne({ where: { id: orderId } }) as Promise<Order>;
   }
 
   // Admin/Authorizer manually nudges a customer who hasn't approved/rejected yet.
