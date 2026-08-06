@@ -143,12 +143,12 @@ export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: 
 
 // For orders in CAD_IN_PROGRESS, a sub-label reflects the actual stage
 export function getCadSubLabel(order: { cadSubStatus?: string | null; sentToCustomer?: boolean; quotedCost?: number | null }): string | null {
+  // sentToCustomer is the authoritative "the customer can see this" signal — trust it even
+  // if cadSubStatus is missing/stale (e.g. a manual file-status fix that skipped that field).
+  if (order.sentToCustomer) return 'Awaiting Approval';
   if (!order.cadSubStatus) return 'Pending CAD';
   if (order.cadSubStatus === 'REVISION') return 'Revision';
   if (order.cadSubStatus === 'REJECTED') return 'Rejected';
-  if (order.cadSubStatus === 'UPLOADED') {
-    if (order.sentToCustomer) return 'Awaiting Approval';
-    return 'Awaiting Quote';
-  }
+  if (order.cadSubStatus === 'UPLOADED') return 'Awaiting Quote';
   return null;
 }
