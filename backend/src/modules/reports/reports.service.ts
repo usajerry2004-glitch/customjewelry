@@ -40,6 +40,12 @@ interface ShippedRecord {
   groupName: string;
 }
 
+type ProductionPeriodType = 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
+const PRODUCTION_PERIOD_MONTHS: Record<ProductionPeriodType, number> = { monthly: 1, quarterly: 3, halfyearly: 6, yearly: 12 };
+
+interface CadAggregate { made: number; approved: number; rejected: number; revised: number }
+interface RevisionEvent { customer: string; cadPersonName: string; completedAt: Date }
+
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
@@ -456,5 +462,221 @@ export class ReportsService {
       g.value += o.quotedCost ? Number(o.quotedCost) : 0;
     }
     return Array.from(groups.values());
+  }
+
+  // ── Monthly Production Report ───────────────────────────────────────
+  // Direct Orders Received, CADs Made, Samples Approved, Revisions Completed.
+  // "Samples Approved" proxies CAD-file approval (no physical-sample stage
+  // exists in the app). "Revisions Completed" is inferred: whenever a CAD
+  // file sits at REVISION_REQUESTED and a later file is uploaded for the same
+  // order, that later file's createdAt is treated as the revision's completion.
+  // Neither is a directly-stored event — see the "inferred" flags in the response.
+
+  async getMonthlyProductionReport(periodType: ProductionPeriodType, anchorMonth: string) {
+    const months = PRODUCTION_PERIOD_MONTHS[periodType] || 1;
+    const [y, m] = anchorMonth.split('-').map(Number);
+    const to = new Date(y, m, 1); // exclusive — first day of the month after the anchor
+    const from = new Date(y, m - months, 1);
+    const prevTo = from;
+    const prevFrom = new Date(y, m - months * 2, 1);
+
+    // Revision-completion events are inferred from each order's full file history,
+    // not just files created inside the window — compute once, then filter by date.
+    const revisionEvents = await this.computeRevisionEvents();
+
+    const current = await this.computeProductionWindow(from, to, periodType, revisionEvents);
+    const previous = await this.computeProductionWindow(prevFrom, prevTo, periodType, revisionEvents);
+
+    const pct = (cur: number, prev: number): number | null => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
+    const lastDay = new Date(to.getTime() - DAY_MS);
+    const fmtMonth = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const label = from.getFullYear() === lastDay.getFullYear() && from.getMonth() === lastDay.getMonth()
+      ? fmtMonth(from)
+      : `${fmtMonth(from)} – ${fmtMonth(lastDay)}`;
+
+    return {
+      period: { type: periodType, from: from.toISOString().slice(0, 10), to: lastDay.toISOString().slice(0, 10), label },
+      kpis: {
+        directOrders:       { value: current.directTotal, deltaPct: pct(current.directTotal, previous.directTotal) },
+        cadsMade:            { value: current.cadsTotal.made, deltaPct: pct(current.cadsTotal.made, previous.cadsTotal.made) },
+        samplesApproved:     { value: current.samplesApprovedTotal, deltaPct: pct(current.samplesApprovedTotal, previous.samplesApprovedTotal), inferred: true },
+        revisionsCompleted:  { value: current.revisionsCompletedTotal, deltaPct: pct(current.revisionsCompletedTotal, previous.revisionsCompletedTotal), inferred: true },
+      },
+      direct: current.direct,
+      cads: current.cads,
+      samples: current.samples,
+      revisions: current.revisions,
+    };
+  }
+
+  // Every non-reference CAD file, per order, oldest-first — used to detect a
+  // "revision completed" event: a file uploaded right after that same order's
+  // most recent file sat at REVISION_REQUESTED. Scoped to orders that have ever
+  // had a REVISION_REQUESTED file, so this doesn't scan the whole cad_files table.
+  private async computeRevisionEvents(): Promise<RevisionEvent[]> {
+    const revisedOrderIds = await this.cadRepo.createQueryBuilder('cf')
+      .select('DISTINCT cf.orderId', 'orderId')
+      .where('cf.status = :rev', { rev: CadFileStatus.REVISION_REQUESTED })
+      .getRawMany();
+    const orderIds = revisedOrderIds.map((r: any) => r.orderId);
+    if (!orderIds.length) return [];
+
+    const files = await this.cadRepo.createQueryBuilder('cf')
+      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .where('cf.orderId IN (:...ids)', { ids: orderIds })
+      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
+      .select(['cf.orderId AS "orderId"', 'cf.status AS status', 'cf.cadPersonName AS "cadPersonName"', 'cf.createdAt AS "createdAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .orderBy('cf.orderId', 'ASC')
+      .addOrderBy('cf.createdAt', 'ASC')
+      .getRawMany();
+
+    const byOrder = new Map<string, any[]>();
+    for (const f of files) {
+      if (!byOrder.has(f.orderId)) byOrder.set(f.orderId, []);
+      byOrder.get(f.orderId)!.push(f);
+    }
+
+    const events: RevisionEvent[] = [];
+    for (const rows of byOrder.values()) {
+      for (let i = 0; i < rows.length - 1; i++) {
+        if (rows[i].status === CadFileStatus.REVISION_REQUESTED) {
+          const next = rows[i + 1];
+          events.push({
+            customer: next.storeName || next.customerFullName || 'Unknown',
+            cadPersonName: next.cadPersonName || 'Unassigned',
+            completedAt: new Date(next.createdAt),
+          });
+        }
+      }
+    }
+    return events;
+  }
+
+  private bucketKey(date: Date, periodType: ProductionPeriodType): string {
+    return periodType === 'monthly' ? date.toISOString().slice(0, 10) : date.toISOString().slice(0, 7);
+  }
+
+  private bucketRange(from: Date, to: Date, periodType: ProductionPeriodType): string[] {
+    const keys: string[] = [];
+    if (periodType === 'monthly') {
+      for (let d = new Date(from); d < to; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+        keys.push(d.toISOString().slice(0, 10));
+      }
+    } else {
+      for (let d = new Date(from.getFullYear(), from.getMonth(), 1); d < to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+        keys.push(d.toISOString().slice(0, 7));
+      }
+    }
+    return keys;
+  }
+
+  private emptyCadAgg(): CadAggregate { return { made: 0, approved: 0, rejected: 0, revised: 0 }; }
+
+  private async computeProductionWindow(from: Date, to: Date, periodType: ProductionPeriodType, revisionEvents: RevisionEvent[]) {
+    // ── Direct Orders Received — grouped by customer ──
+    const directOrders = await this.orderRepo.createQueryBuilder('o')
+      .where('o.salesRepName = :webOrder', { webOrder: 'Web Order' })
+      .andWhere('o.createdAt >= :from AND o.createdAt < :to', { from, to })
+      .andWhere('o.isArchived = false')
+      .select(['o.poNumber AS "poNumber"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .getRawMany();
+    const directMap = new Map<string, string[]>();
+    for (const o of directOrders) {
+      const key = o.storeName || o.customerFullName || 'Unknown';
+      if (!directMap.has(key)) directMap.set(key, []);
+      directMap.get(key)!.push(o.poNumber);
+    }
+    const direct = {
+      byCustomer: Array.from(directMap.entries())
+        .map(([customer, poNumbers]) => ({ customer, orders: poNumbers.length, poNumbers }))
+        .sort((a, b) => b.orders - a.orders),
+    };
+    const directTotal = directOrders.length;
+
+    // ── CADs Made — every non-reference file created in the window, by current status ──
+    const cadRows = await this.cadRepo.createQueryBuilder('cf')
+      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .where('cf.createdAt >= :from AND cf.createdAt < :to', { from, to })
+      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
+      .select(['cf.status AS status', 'cf.cadPersonName AS "cadPersonName"', 'cf.createdAt AS "createdAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .getRawMany();
+
+    const byPersonMap = new Map<string, CadAggregate>();
+    const byCustomerMap = new Map<string, CadAggregate>();
+    const byTimeMap = new Map<string, CadAggregate>();
+    const bump = (map: Map<string, CadAggregate>, key: string, status: string) => {
+      if (!map.has(key)) map.set(key, this.emptyCadAgg());
+      const agg = map.get(key)!;
+      agg.made += 1;
+      if (status === CadFileStatus.APPROVED) agg.approved += 1;
+      else if (status === CadFileStatus.REJECTED) agg.rejected += 1;
+      else if (status === CadFileStatus.REVISION_REQUESTED) agg.revised += 1;
+    };
+    for (const r of cadRows) {
+      bump(byPersonMap, r.cadPersonName || 'Unassigned', r.status);
+      bump(byCustomerMap, r.storeName || r.customerFullName || 'Unknown', r.status);
+      bump(byTimeMap, this.bucketKey(new Date(r.createdAt), periodType), r.status);
+    }
+    const cadsTotal = cadRows.reduce((acc, r) => {
+      acc.made += 1;
+      if (r.status === CadFileStatus.APPROVED) acc.approved += 1;
+      else if (r.status === CadFileStatus.REJECTED) acc.rejected += 1;
+      else if (r.status === CadFileStatus.REVISION_REQUESTED) acc.revised += 1;
+      return acc;
+    }, this.emptyCadAgg());
+    const sortedAgg = (m: Map<string, CadAggregate>) => Array.from(m.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.made - a.made);
+    const cads = {
+      byPerson: sortedAgg(byPersonMap),
+      byCustomer: sortedAgg(byCustomerMap),
+      byTime: this.bucketRange(from, to, periodType).map(bucket => ({ bucket, ...(byTimeMap.get(bucket) || this.emptyCadAgg()) })),
+    };
+
+    // ── Samples Approved — CAD files approved in the window (event-based, proxy metric) ──
+    const approvedRows = await this.cadRepo.createQueryBuilder('cf')
+      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .where('cf.status = :approved', { approved: CadFileStatus.APPROVED })
+      .andWhere('cf.approvedAt >= :from AND cf.approvedAt < :to', { from, to })
+      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
+      .select(['cf.cadPersonName AS "cadPersonName"', 'cf.approvedAt AS "approvedAt"', 'o.storeName AS "storeName"', 'o.customerFullName AS "customerFullName"'])
+      .getRawMany();
+    const uploadedByPerson = new Map<string, number>();
+    for (const r of cadRows) uploadedByPerson.set(r.cadPersonName || 'Unassigned', (uploadedByPerson.get(r.cadPersonName || 'Unassigned') || 0) + 1);
+    const samplesByPerson = new Map<string, number>();
+    const samplesByCustomer = new Map<string, number>();
+    const samplesByTime = new Map<string, number>();
+    for (const r of approvedRows) {
+      const person = r.cadPersonName || 'Unassigned';
+      const customer = r.storeName || r.customerFullName || 'Unknown';
+      samplesByPerson.set(person, (samplesByPerson.get(person) || 0) + 1);
+      samplesByCustomer.set(customer, (samplesByCustomer.get(customer) || 0) + 1);
+      const bucket = this.bucketKey(new Date(r.approvedAt), periodType);
+      samplesByTime.set(bucket, (samplesByTime.get(bucket) || 0) + 1);
+    }
+    const samples = {
+      byPerson: Array.from(samplesByPerson.entries()).map(([name, approved]) => ({ name, uploaded: uploadedByPerson.get(name) || 0, approved })).sort((a, b) => b.approved - a.approved),
+      byCustomer: Array.from(samplesByCustomer.entries()).map(([name, approved]) => ({ name, approved })).sort((a, b) => b.approved - a.approved),
+      byTime: this.bucketRange(from, to, periodType).map(bucket => ({ bucket, approved: samplesByTime.get(bucket) || 0 })),
+    };
+    const samplesApprovedTotal = approvedRows.length;
+
+    // ── Revisions Completed — pre-computed events, filtered to this window ──
+    const windowRevisions = revisionEvents.filter(e => e.completedAt >= from && e.completedAt < to);
+    const revisionsByPerson = new Map<string, number>();
+    const revisionsByCustomer = new Map<string, number>();
+    const revisionsByTime = new Map<string, number>();
+    for (const e of windowRevisions) {
+      revisionsByPerson.set(e.cadPersonName, (revisionsByPerson.get(e.cadPersonName) || 0) + 1);
+      revisionsByCustomer.set(e.customer, (revisionsByCustomer.get(e.customer) || 0) + 1);
+      const bucket = this.bucketKey(e.completedAt, periodType);
+      revisionsByTime.set(bucket, (revisionsByTime.get(bucket) || 0) + 1);
+    }
+    const revisions = {
+      byPerson: Array.from(revisionsByPerson.entries()).map(([name, revised]) => ({ name, uploaded: uploadedByPerson.get(name) || 0, revised })).sort((a, b) => b.revised - a.revised),
+      byCustomer: Array.from(revisionsByCustomer.entries()).map(([name, revised]) => ({ name, revised })).sort((a, b) => b.revised - a.revised),
+      byTime: this.bucketRange(from, to, periodType).map(bucket => ({ bucket, revised: revisionsByTime.get(bucket) || 0 })),
+    };
+    const revisionsCompletedTotal = windowRevisions.length;
+
+    return { directTotal, direct, cadsTotal, cads, samplesApprovedTotal, samples, revisionsCompletedTotal, revisions };
   }
 }

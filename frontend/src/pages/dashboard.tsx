@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ReportsSection } from '../components/dashboard/ReportsSection';
+import { MonthlyProductionReport } from '../components/dashboard/MonthlyProductionReport';
 import { apiFetch, API } from '../utils/apiFetch';
 import { OrderStatus, STATUS_CONFIG } from '../utils/types';
 
@@ -39,12 +40,16 @@ export default function Dashboard() {
   const [myManufacturedTotal, setMyManufacturedTotal] = useState<number>(0);
   const [loading, setLoading]         = useState(true);
   const [userRole, setUserRole]   = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [refImages, setRefImages] = useState<Record<string, string>>({});
   const [showMoreA, setShowMoreA] = useState(false);
   const [showMoreR, setShowMoreR] = useState(false);
 
   useEffect(() => {
-    try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
+    try {
+      const u = localStorage.getItem('jf_user');
+      if (u) { const parsed = JSON.parse(u); setUserRole(parsed.role || ''); setUserEmail(parsed.email || ''); }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -188,6 +193,9 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+
+      {/* ── Monthly Production Report — temporary single-user rollout ── */}
+      {userEmail === 'princy.k@kirajewels.one' && <MonthlyProductionReport />}
 
       {/* ── Reports ── */}
       <ReportsSection />
