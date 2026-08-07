@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { Repository, In, Between } from 'typeorm';
+import { Repository, In, Between, Not } from 'typeorm';
 import { randomBytes } from 'crypto';
 import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
@@ -1086,6 +1086,10 @@ export class OrdersService implements OnModuleInit {
     // Manual cancellation by admin/authorizer → deactivate (allowed from any active status)
     if (status === OrderStatus.CANCELLED) {
       const beforeCancel = await this.findOne(id);
+      // A double-click (or two tabs) re-cancelling an already-cancelled order
+      // would otherwise log a CANCELLED → CANCELLED no-op event, which then
+      // corrupts reactivateOrder()'s "what to restore to" lookup.
+      if (beforeCancel.status === OrderStatus.CANCELLED) return beforeCancel;
       const cancelled = await this.update(id, { status: OrderStatus.CANCELLED, isArchived: true }, user);
       // Recorded so reactivateOrder() below knows what to restore — this
       // transition previously wasn't logged at all, unlike every other one.
@@ -1332,8 +1336,12 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException(`Order ${order.poNumber} is not cancelled.`);
     }
 
+    // Excludes CANCELLED → CANCELLED no-ops (a duplicate cancel click, or a
+    // previous botched reactivate before this fix) — otherwise one of those
+    // becomes "the most recent cancellation" and every reactivate attempt
+    // resolves to CANCELLED again, self-perpetuating forever.
     const lastCancelEvent = await this.eventRepo.findOne({
-      where: { orderId: id, action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED },
+      where: { orderId: id, action: 'STATUS_CHANGE', toStatus: OrderStatus.CANCELLED, fromStatus: Not(OrderStatus.CANCELLED) },
       order: { createdAt: 'DESC' },
     });
     const restoredStatus = (lastCancelEvent?.fromStatus as OrderStatus) || OrderStatus.NEW;
