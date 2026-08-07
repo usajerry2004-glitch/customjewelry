@@ -14,12 +14,29 @@ export default function CustomerOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Partial<Order>[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // Picks up ?search= from the global search bar (or a shared/bookmarked link)
+  useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.search;
+    if (typeof q === 'string' && q !== search) setSearch(q);
+  }, [router.isReady, router.query.search]);
 
   useEffect(() => {
-    apiFetch(`${API}/orders?limit=50`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setOrders(data.orders || []); setLoading(false); });
-  }, []);
+    setLoading(true);
+    const params = new URLSearchParams({ limit: '50' });
+    if (search.trim()) params.set('search', search.trim());
+    const timer = setTimeout(() => {
+      apiFetch(`${API}/orders?${params.toString()}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setOrders(data.orders || []); setLoading(false); });
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const hasOrders = orders.length > 0;
+  const isSearching = search.trim().length > 0;
 
   return (
     <CustomerLayout
@@ -34,9 +51,30 @@ export default function CustomerOrdersPage() {
         </button>
       }
     >
+      <div style={{ marginBottom: '16px' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by order # or your PO #…"
+          style={{
+            width: '100%', maxWidth: '360px', background: 'var(--bg-input)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)', padding: '10px 14px', color: 'var(--text-primary)', fontSize: '13px',
+            outline: 'none', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
       {loading ? (
         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px 0' }}>Loading your orders…</div>
-      ) : orders.length === 0 ? (
+      ) : !hasOrders && isSearching ? (
+        <div style={{ textAlign: 'center', padding: '80px 0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}>🔍</div>
+          <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>No matching orders</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '360px', margin: '0 auto', lineHeight: 1.7 }}>
+            No orders match "{search}" by order # or your PO #.
+          </div>
+        </div>
+      ) : !hasOrders ? (
         <div style={{ textAlign: 'center', padding: '80px 0' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}>💍</div>
           <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>No orders yet</div>
@@ -74,12 +112,12 @@ export default function CustomerOrdersPage() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px', overflowWrap: 'break-word' }}>
                       {order.poNumber}
-                      {order.refCustomerPo && (
-                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '8px' }}>
-                          (PO: {order.refCustomerPo})
-                        </span>
-                      )}
                     </div>
+                    {order.refCustomerPo && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        Your PO: <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{order.refCustomerPo}</span>
+                      </div>
+                    )}
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {order.orderType && <span>{order.orderType}</span>}
                       {order.metalType && <span>{order.metalType} {order.metalColor}</span>}

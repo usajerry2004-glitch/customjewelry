@@ -61,7 +61,7 @@ export default function NewOrderPage() {
   const [form, setForm] = useState({
     orderType: '', metalType: '', metalColor: '', size: '',
     quantity: '1', stamping: '',
-    diamondType: '', diamondQuality: '', customerNotes: '',
+    diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '',
   });
   const [refFiles, setRefFiles] = useState<File[]>([]);
   const [refLink, setRefLink] = useState('');
@@ -272,6 +272,16 @@ export default function NewOrderPage() {
                 {DIAMOND_QUALITY.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
+          </div>
+
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Customer PO# (optional)</label>
+            <input
+              value={form.refCustomerPo}
+              onChange={e => set('refCustomerPo', e.target.value)}
+              placeholder="Your own PO / reference number"
+              style={inputStyle}
+            />
           </div>
 
           {/* Reference & Notes */}

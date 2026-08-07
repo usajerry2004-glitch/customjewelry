@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -12,6 +12,13 @@ interface CustomerLayoutProps {
 export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title, subtitle, actions }) => {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  const runGlobalSearch = () => {
+    const q = globalSearch.trim();
+    if (!q) return;
+    router.push(`/customer/orders?search=${encodeURIComponent(q)}`);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-page)', color: 'var(--text-primary)' }}>
@@ -57,7 +64,17 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children, title,
           </nav>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <input
+            value={globalSearch}
+            onChange={e => setGlobalSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') runGlobalSearch(); }}
+            placeholder="Search by order # or your PO #…"
+            style={{
+              width: '220px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '6px', padding: '7px 12px', color: '#fff', fontSize: '12px', outline: 'none',
+            }}
+          />
           {user && (
             <>
               <div style={{
