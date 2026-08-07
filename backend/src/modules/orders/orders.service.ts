@@ -114,6 +114,7 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     { header: 'Store Name', value: (o: Order) => o.storeName || '', factoryVisible: false },
     { header: 'Customer Name', value: (o: Order) => o.customerFullName || '', factoryVisible: false },
     { header: 'Customer Email', value: (o: Order) => o.customerEmail || '', factoryVisible: false },
+    { header: 'Customer Code', value: (o: Order) => o.customerCode || '', factoryVisible: false },
     { header: 'Phone', value: (o: Order) => o.phoneNumber || '', factoryVisible: false },
     { header: 'Metal Type', value: (o: Order) => o.metalType || '' },
     { header: 'Metal Color', value: (o: Order) => o.metalColor || '' },
@@ -629,19 +630,22 @@ export class OrdersService implements OnModuleInit {
   // FactoryRedactionInterceptor hides everywhere else (pricing, customer
   // identity), plus the reference link, since that's the closest thing to a
   // "reference image" this row has.
-  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }, orderIds?: string[]): Promise<string> {
+  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }, orderIds?: string[], status?: OrderStatus): Promise<string> {
     const isFactory = user?.role === UserRole.FACTORY_MANAGER;
 
-    const where: any = { status: OrderStatus.VPO_ISSUED };
+    const where: any = {};
     if (isFactory) where.assignedFactory = user?.assignedFactory ?? null;
     if (orderIds?.length) {
-      // An explicit selection overrides the date range — the caller picked
-      // exactly which orders they want, regardless of when the VPO was issued.
+      // An explicit selection overrides both the status and the date range —
+      // the caller picked exactly which orders they want.
       where.id = In(orderIds);
-    } else if (dateFrom || dateTo) {
-      const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date('1970-01-01');
-      const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : new Date();
-      where.vpoIssuedAt = Between(from, to);
+    } else {
+      where.status = status && Object.values(OrderStatus).includes(status) ? status : OrderStatus.VPO_ISSUED;
+      if (dateFrom || dateTo) {
+        const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date('1970-01-01');
+        const to = dateTo ? new Date(`${dateTo}T23:59:59.999`) : new Date();
+        where.vpoIssuedAt = Between(from, to);
+      }
     }
     const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
     return ordersToCsv(orders, buildOrderCsvColumns(isFactory));

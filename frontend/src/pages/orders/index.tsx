@@ -33,6 +33,15 @@ const ALL_STATUS_FILTERS = [
   { label: 'Cancelled',       value: OrderStatus.CANCELLED },
 ];
 
+// "Normal Export" (the CSV button + the bulk-selection menu's "Normal Export"
+// option) is available from these three statuses — VPO Issued, Manufactured,
+// and Completed all carry a vpoIssuedAt stamp from when the VPO was first
+// issued, which is what the date-range filter and CSV sort key key off of.
+const EXPORTABLE_STATUSES: string[] = [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.COMPLETED];
+const EXPORT_STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  ALL_STATUS_FILTERS.filter(s => s.value).map(s => [s.value, s.label]),
+);
+
 const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
   CAD_DESIGNER: [
     { label: 'All',      value: '' },
@@ -467,14 +476,15 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  // Exports the current VPO Issued list — the date range (if set) filters
-  // by vpoIssuedAt on the backend, not createdAt, so it matches "orders
-  // approved in this window" rather than "orders placed in this window".
+  // Exports the current status list (VPO Issued, Manufactured, or Completed)
+  // — the date range (if set) filters by vpoIssuedAt on the backend, not
+  // createdAt, so it matches "orders whose VPO was issued in this window"
+  // rather than "orders placed in this window", even for the later statuses.
   const [exportingCsv, setExportingCsv] = useState(false);
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ status: statusFilter });
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       const res = await apiFetch(`${API}/orders/export/csv?${params}`);
@@ -486,7 +496,8 @@ export default function OrdersPage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const today = new Date().toISOString().slice(0, 10);
-      const namePrefix = isFactoryManager ? 'vpo-issued-orders-mine' : 'vpo-issued-orders';
+      const statusSlug = statusFilter.toLowerCase().replace(/_/g, '-');
+      const namePrefix = isFactoryManager ? `${statusSlug}-orders-mine` : `${statusSlug}-orders`;
       const a = document.createElement('a');
       a.href = url;
       a.download = (dateFrom || dateTo)
@@ -1198,11 +1209,13 @@ export default function OrdersPage() {
           >+ Save current filters</button>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-          {statusFilter === OrderStatus.VPO_ISSUED && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
+          {EXPORTABLE_STATUSES.includes(statusFilter) && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
             <button
               onClick={handleExportCsv}
               disabled={exportingCsv}
-              title={isFactoryManager ? 'Export your assigned VPO Issued orders as CSV' : 'Export the VPO Issued list as CSV'}
+              title={isFactoryManager
+                ? `Export your assigned ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} orders as CSV`
+                : `Export the ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} list as CSV`}
               style={{
                 padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                 cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',

@@ -100,25 +100,28 @@ export class OrdersController {
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Export VPO Issued orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Date range filters on vpoIssuedAt, not createdAt. Pass orderIds (comma-separated) to export just those orders instead of the date range.' })
+  @ApiOperation({ summary: '"Normal Export" — orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Pass status (VPO_ISSUED/MANUFACTURED/COMPLETED, defaults to VPO_ISSUED) to pick which list; date range filters on vpoIssuedAt, not createdAt. Pass orderIds (comma-separated) to export exactly those orders instead, regardless of their status.' })
   async exportCsv(
     @Query('dateFrom') dateFrom: string | undefined,
     @Query('dateTo') dateTo: string | undefined,
     @Query('orderIds') orderIdsParam: string | undefined,
+    @Query('status') status: string | undefined,
     @Request() req: any,
     @Res() res: Response,
   ) {
     const orderIds = orderIdsParam ? orderIdsParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
-    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user, orderIds);
+    const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user, orderIds, status as OrderStatus);
     const today = new Date().toISOString().slice(0, 10);
     const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
       ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
       : '';
+    const statusSlug = (status || OrderStatus.VPO_ISSUED).toLowerCase().replace(/_/g, '-');
+    const filenamePrefix = orderIds ? 'orders-selected' : `${statusSlug}-orders`;
     const filename = orderIds
-      ? `vpo-issued-orders${factorySuffix}-selected-${today}.csv`
+      ? `${filenamePrefix}${factorySuffix}-${today}.csv`
       : (dateFrom || dateTo
-        ? `vpo-issued-orders${factorySuffix}-${dateFrom || today}-${dateTo || today}.csv`
-        : `vpo-issued-orders${factorySuffix}-${today}.csv`);
+        ? `${filenamePrefix}${factorySuffix}-${dateFrom || today}-${dateTo || today}.csv`
+        : `${filenamePrefix}${factorySuffix}-${today}.csv`);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
