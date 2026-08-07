@@ -523,7 +523,7 @@ export class ReportsService {
     if (!orderIds.length) return [];
 
     const files = await this.cadRepo.createQueryBuilder('cf')
-      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
       .where('cf.orderId IN (:...ids)', { ids: orderIds })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
       .select('cf.orderId', 'orderId')
@@ -609,7 +609,7 @@ export class ReportsService {
 
     // ── CADs Made — every non-reference file created in the window, by current status ──
     const cadRows = await this.cadRepo.createQueryBuilder('cf')
-      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
       .where('cf.createdAt >= :from AND cf.createdAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
       .select('cf.status', 'status')
@@ -651,7 +651,7 @@ export class ReportsService {
 
     // ── Samples Approved — CAD files approved in the window (event-based, proxy metric) ──
     const approvedRows = await this.cadRepo.createQueryBuilder('cf')
-      .leftJoin(Order, 'o', 'o.id = cf.orderId')
+      .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
       .where('cf.status = :approved', { approved: CadFileStatus.APPROVED })
       .andWhere('cf.approvedAt >= :from AND cf.approvedAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
