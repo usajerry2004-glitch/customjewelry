@@ -597,6 +597,11 @@ export default function OrderDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // Cancelling an order used to fire on a single click with no confirmation at
+  // all — an accidental double-click could cancel twice in a row, which is
+  // exactly what corrupted reactivateOrder()'s audit trail before that was
+  // fixed. Two separate confirmation steps make that much harder to trigger by accident.
+  const [cancelStep, setCancelStep] = useState<0 | 1 | 2>(0);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadCadPerson, setUploadCadPerson] = useState('');
@@ -2206,7 +2211,7 @@ export default function OrderDetail() {
                   {movableStatuses.map(s => {
                     const sc = STATUS_CONFIG[s];
                     return (
-                      <button key={s} onClick={() => moveStatus(s)} disabled={updatingStatus}
+                      <button key={s} onClick={() => s === OrderStatus.CANCELLED ? setCancelStep(1) : moveStatus(s)} disabled={updatingStatus}
                         style={{ background: sc.bg, border: `1px solid ${sc.color}40`, borderRadius: '8px', padding: '9px 14px', color: sc.color, fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: updatingStatus ? 0.6 : 1, transition: 'opacity 0.15s', letterSpacing: '0.2px' }}>
                         → {sc.label}
                       </button>
@@ -2564,6 +2569,57 @@ export default function OrderDetail() {
         </div>
       )}
 
+      {/* Cancel Order — two separate confirmation steps, since this used to fire
+          on a single click with no confirmation at all */}
+      {cancelStep > 0 && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '420px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            {cancelStep === 1 ? (
+              <>
+                <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+                  Cancel Order?
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+                  This will cancel order <strong>{order.poNumber}</strong>. It'll be archived and removed from
+                  every active queue — an Admin can reactivate it later, but this isn't reversible on your own.
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setCancelStep(0)} disabled={updatingStatus}
+                    style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                    Keep Order
+                  </button>
+                  <button onClick={() => setCancelStep(2)} disabled={updatingStatus}
+                    style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+                  Are you absolutely sure?
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+                  Final confirmation — order <strong>{order.poNumber}</strong> for{' '}
+                  <strong>{order.storeName || order.customerFullName || 'this customer'}</strong> will be cancelled now.
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setCancelStep(1)} disabled={updatingStatus}
+                    style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                    Go Back
+                  </button>
+                  <button
+                    onClick={async () => { setCancelStep(0); await moveStatus(OrderStatus.CANCELLED); }}
+                    disabled={updatingStatus}
+                    style={{ flex: 2, background: '#dc2626', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: updatingStatus ? 0.5 : 1 }}>
+                    {updatingStatus ? 'Cancelling…' : 'Yes, Cancel Order'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {showUploadModal && (
         <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '420px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
