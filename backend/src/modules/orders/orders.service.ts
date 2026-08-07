@@ -46,7 +46,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIM
 const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
 // Customer detail fields — editable via PUT /orders/:id, Admin only
-const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
+const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
 const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer'];
@@ -193,6 +193,7 @@ const TRACKED_FIELD_LABELS: Record<string, string> = {
   customerFullName: 'Customer name',
   customerEmail: 'Customer email',
   phoneNumber: 'Phone number',
+  customerNotes: 'Customer notes',
 };
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {

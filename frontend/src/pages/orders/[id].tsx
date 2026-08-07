@@ -514,7 +514,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
 const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
 
 // Customer detail fields — editable inline, Admin only, any order status
-const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber'];
+const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
 
 const SHIP_VIA_OPTIONS = ['FedEx', 'UPS', 'DHL', 'USPS', 'Brinks', 'Malca-Amit'];
 
@@ -1466,12 +1466,38 @@ export default function OrderDetail() {
 
           {/* ── Col 2: Reference Files + Design Files ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {order.customerNotes && (() => {
+          {(order.customerNotes || userRole === UserRole.ADMIN) && (() => {
+            if (userRole === UserRole.ADMIN) {
+              return (
+                <div style={cardStyle}>
+                  <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px' }}>
+                    Customer Notes
+                  </h3>
+                  <textarea
+                    value={customerInputs.customerNotes ?? ''}
+                    onChange={e => setCustomerInputs(s => ({ ...s, customerNotes: e.target.value }))}
+                    placeholder="Add customer notes…"
+                    rows={4}
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' }}
+                  />
+                  {(customerInputs.customerNotes ?? '') !== (order.customerNotes ?? '') && (
+                    <button
+                      onClick={() => saveCustomerField('customerNotes')}
+                      disabled={savingCustomerKey === 'customerNotes'}
+                      style={{ marginTop: '8px', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingCustomerKey === 'customerNotes' ? 0.5 : 1 }}
+                    >
+                      {savingCustomerKey === 'customerNotes' ? 'Saving…' : 'Save'}
+                    </button>
+                  )}
+                </div>
+              );
+            }
             const NOTES_PREVIEW_LIMIT = 240;
-            const isLong = order.customerNotes.length > NOTES_PREVIEW_LIMIT;
+            const notes = order.customerNotes || '';
+            const isLong = notes.length > NOTES_PREVIEW_LIMIT;
             const displayedNotes = notesExpanded || !isLong
-              ? order.customerNotes
-              : `${order.customerNotes.slice(0, NOTES_PREVIEW_LIMIT)}…`;
+              ? notes
+              : `${notes.slice(0, NOTES_PREVIEW_LIMIT)}…`;
             return (
               <div style={cardStyle}>
                 <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px' }}>
