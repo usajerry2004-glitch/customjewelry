@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { API, getErrorMessage } from '../utils/apiFetch';
+import { formatCurrency } from '../utils/format';
 
 interface PreviewRow {
   poNumber: string; storeName: string; customerFullName: string;
@@ -232,7 +233,7 @@ export default function ImportPage() {
                       <td style={{ padding: '9px 12px', color: 'var(--text-secondary)' }}>{row.orderType || '—'}</td>
                       <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{[row.metalType, row.metalColor].filter(Boolean).join(' ') || '—'}</td>
                       <td style={{ padding: '9px 12px' }}><span style={{ fontSize: '10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '5px', padding: '2px 7px' }}>{row.status || 'Waiting Confirmation'}</span></td>
-                      <td style={{ padding: '9px 12px', color: row.quotedCost ? 'var(--accent-dark)' : 'var(--text-muted)', fontWeight: row.quotedCost ? 600 : 400 }}>{row.quotedCost ? `$${row.quotedCost.toLocaleString()}` : '—'}</td>
+                      <td style={{ padding: '9px 12px', color: row.quotedCost ? 'var(--accent-dark)' : 'var(--text-muted)', fontWeight: row.quotedCost ? 600 : 400 }}>{row.quotedCost ? formatCurrency(row.quotedCost) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

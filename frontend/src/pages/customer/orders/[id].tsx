@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
+import { formatCurrency } from '../../../utils/format';
 import { OrderConversation } from '../../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
@@ -389,7 +390,7 @@ export default function CustomerOrderDetail() {
             {order.quoteOptions.map((q, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>{q.label || `Option ${i + 1}`}</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${Number(q.price).toLocaleString()}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{formatCurrency(Number(q.price))}</span>
               </div>
             ))}
           </div>
@@ -400,7 +401,7 @@ export default function CustomerOrderDetail() {
       {order.quotedCost != null && order.quotedCost > 0 && (
         <div style={{ ...card, marginBottom: '16px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.25)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#059669', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>Quoted Price</div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>${Number(order.quotedCost).toLocaleString()}</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>{formatCurrency(Number(order.quotedCost))}</div>
         </div>
       )}
 

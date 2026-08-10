@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import * as Sentry from '@sentry/node';
 import { User } from '../../database/entities/user.entity';
+import { formatMoney } from '../../common/format-money.util';
 
 export interface EmailPayload {
   to: string | string[];
@@ -476,7 +477,7 @@ export class EmailService {
     orderId: string;
   }) {
     const priceRow = opts.quotedCost
-      ? `<tr><td style="padding:6px 0;color:#6B7280;font-size:13px">Quoted Price</td><td style="padding:6px 0;font-weight:700;color:#1A2740">$${Number(opts.quotedCost).toLocaleString()}</td></tr>`
+      ? `<tr><td style="padding:6px 0;color:#6B7280;font-size:13px">Quoted Price</td><td style="padding:6px 0;font-weight:700;color:#1A2740">${formatMoney(Number(opts.quotedCost))}</td></tr>`
       : '';
     return this.send({
       to: opts.to,

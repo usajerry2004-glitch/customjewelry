@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { toast } from '../../utils/toast';
+import { formatCurrency } from '../../utils/format';
 
 const API = '/api/proxy';
 
@@ -247,7 +248,7 @@ export default function TrackPage() {
                       {order.quoteOptions.map((q, i) => (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                           <span style={{ color: '#4B5563' }}>{q.label || `Option ${i + 1}`}</span>
-                          <span style={{ fontWeight: 700, color: '#1A2740' }}>${Number(q.price).toLocaleString()}</span>
+                          <span style={{ fontWeight: 700, color: '#1A2740' }}>{formatCurrency(Number(q.price))}</span>
                         </div>
                       ))}
                     </div>
@@ -258,7 +259,7 @@ export default function TrackPage() {
                   <div style={{ marginTop: 16, background: '#F0FDF4', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 11, color: '#16A34A', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>Quoted Price</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#1A2740' }}>${Number(order.quotedCost).toLocaleString()}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#1A2740' }}>{formatCurrency(Number(order.quotedCost))}</div>
                     </div>
                   </div>
                 )}

@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
+import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
@@ -2042,7 +2043,7 @@ export default function OrderDetail() {
               ) : (
                 <>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: order.quotedCost ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
-                    {order.quotedCost ? `$${Number(order.quotedCost).toLocaleString()}` : 'Not set yet'}
+                    {order.quotedCost ? formatCurrency(Number(order.quotedCost)) : 'Not set yet'}
                   </div>
                   {order.customerCode && (
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -2117,7 +2118,7 @@ export default function OrderDetail() {
                   {order.quoteOptions.map((q, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>{q.label || `Option ${i + 1}`}</span>
-                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${Number(q.price).toLocaleString()}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{formatCurrency(Number(q.price))}</span>
                     </div>
                   ))}
                 </div>

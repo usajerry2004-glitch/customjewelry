@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
+import { formatCurrency } from '../../utils/format';
 
 interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }
 interface TopCustomer { name: string; orderCount: number; amount: number }
@@ -226,7 +227,7 @@ export const ReportsSection: React.FC = () => {
               {customers.map((c, i) => (
                 <tr key={c.name}>
                   <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{c.name}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? `$${c.amount.toLocaleString()}` : c.orderCount}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? formatCurrency(c.amount) : c.orderCount}</td>
                 </tr>
               ))}
               {customers.length === 0 && <tr><td style={tdStyle} colSpan={2}>No orders this month.</td></tr>}

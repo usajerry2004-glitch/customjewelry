@@ -17,6 +17,7 @@ import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
 import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
+import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
 
 export { OrderFilterDto };
@@ -131,7 +132,7 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     { header: 'Priority', value: (o: Order) => o.isPriorityCustomer ? 'Priority' : 'Regular' },
     { header: 'Stone Status', value: (o: Order) => o.stoneStatus === StoneStatus.STONE_RECEIVED ? 'Stone Received' : o.stoneStatus === StoneStatus.PENDING_STONE ? 'Pending Stone' : '' },
     { header: 'Quoted Price', value: (o: Order) => o.quotedCost != null ? String(o.quotedCost) : '', factoryVisible: false },
-    { header: 'Quote Options', value: (o: Order) => (o.quoteOptions || []).map(q => `${q.label}: $${q.price}`).join('; '), factoryVisible: false },
+    { header: 'Quote Options', value: (o: Order) => (o.quoteOptions || []).map(q => `${q.label}: ${formatMoney(q.price)}`).join('; '), factoryVisible: false },
     { header: 'Committed Ship Date', value: (o: Order) => o.committedShipDate || '' },
     { header: 'Created By', value: (o: Order) => o.salesRepName || o.salesRepEmail || '' },
     { header: 'Created Date', value: (o: Order) => o.createdAt ? o.createdAt.toISOString() : '' },

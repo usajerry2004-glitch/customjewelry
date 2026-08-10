@@ -2,6 +2,7 @@
 // PDFDocument from 'pdfkit'` resolves to the module's `.default`, which
 // doesn't exist on pdfkit's CJS export.
 const PDFDocument = require('pdfkit');
+import { formatMoney } from '../../common/format-money.util';
 
 export interface DesignerStat {
   name: string;
@@ -66,10 +67,6 @@ function formatDuration(ms: number | null): string {
 
 function formatDays(days: number | null): string {
   return days === null ? '—' : `${days.toFixed(1)}d`;
-}
-
-function formatMoney(n: number): string {
-  return `$${Math.round(n).toLocaleString('en-US')}`;
 }
 
 function factoryLabel(factory: string | null | undefined): string {

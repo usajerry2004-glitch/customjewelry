@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, MOUNTING_OPTION_CONFIG, getCadSubLabel } from '../../utils/types';
+import { formatCurrency } from '../../utils/format';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -111,7 +112,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
           {order.orderType && <Tag text={order.orderType} />}
           {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
-          {!hideFinancials && order.quotedCost && <Tag text={`$${order.quotedCost.toLocaleString()}`} gold />}
+          {!hideFinancials && order.quotedCost && <Tag text={formatCurrency(order.quotedCost)} gold />}
           {cadSubLabel === 'Revision' && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>
           )}
