@@ -17,6 +17,12 @@ const CREATIONS_RECIPIENTS: string[] = [
   'production@creationjewel.co.in',
 ];
 
+const JEWEL_ONE_RECIPIENTS: string[] = [
+  'ujjwal.yadav@jewelone.com',
+  'chirag.mehta@jewelone.com',
+];
+
 export const STANDING_FACTORY_RECIPIENTS: Partial<Record<Factory, string[]>> = {
   [Factory.CREATIONS]: CREATIONS_RECIPIENTS,
+  [Factory.JEWEL_ONE]: JEWEL_ONE_RECIPIENTS,
 };
