@@ -1547,7 +1547,7 @@ export default function OrdersPage() {
                 const isSelected = selectedIds.has(order.id!);
                 const isSelectable = isFactoryManager
                   ? order.stoneStatus === StoneStatus.STONE_RECEIVED
-                  : order.status !== OrderStatus.CANCELLED && order.status !== OrderStatus.COMPLETED;
+                  : order.status !== OrderStatus.CANCELLED;
                 return (
                   <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
                     onClick={selectMode ? (e) => {
