@@ -34,10 +34,11 @@ const ALL_STATUS_FILTERS = [
 ];
 
 // "Normal Export" (the CSV button + the bulk-selection menu's "Normal Export"
-// option) is available from these three statuses — VPO Issued, Manufactured,
-// and Completed all carry a vpoIssuedAt stamp from when the VPO was first
-// issued, which is what the date-range filter and CSV sort key key off of.
-const EXPORTABLE_STATUSES: string[] = [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.COMPLETED];
+// option) is available from these statuses — VPO Issued, Manufactured,
+// Completed, and Cancelled all carry a vpoIssuedAt stamp from when the VPO
+// was first issued, which is what the date-range filter and CSV sort key key
+// off of (Cancelled orders that never reached VPO Issued just sort last).
+const EXPORTABLE_STATUSES: string[] = [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.COMPLETED, OrderStatus.CANCELLED];
 const EXPORT_STATUS_LABELS: Record<string, string> = Object.fromEntries(
   ALL_STATUS_FILTERS.filter(s => s.value).map(s => [s.value, s.label]),
 );
