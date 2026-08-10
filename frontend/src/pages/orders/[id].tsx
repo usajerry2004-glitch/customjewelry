@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, UserRole, getCadSubLabel } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { OrderConversation } from '../../components/OrderConversation';
 
@@ -512,7 +512,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
 ];
 
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'mountingOption', 'centerStoneShape', 'approximateCaratWeight'];
 
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
@@ -526,6 +526,7 @@ const DESIGN_FILES_COLLAPSED_COUNT = 2;
 const SPEC_SELECT_OPTIONS: Record<string, string[]> = {
   metalType: ['10K', '14K', '18K', 'Platinum'],
   metalColor: ['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'],
+  mountingOption: [...MOUNTING_OPTIONS],
 };
 
 const cardStyle = {
