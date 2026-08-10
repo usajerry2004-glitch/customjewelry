@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG } from '../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, MOUNTING_OPTION_CONFIG } from '../utils/types';
 import { toast } from '../utils/toast';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
@@ -117,6 +117,11 @@ export default function StonePage() {
                         <span style={{ background: `${cfg.color}15`, color: cfg.color, padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>{cfg.label}</span>
                         {order.kiraSkuNumber && (
                           <span style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', border: '1px solid var(--border)' }}>{order.kiraSkuNumber}</span>
+                        )}
+                        {order.mountingOption && MOUNTING_OPTION_CONFIG[order.mountingOption] && (
+                          <span style={{ background: MOUNTING_OPTION_CONFIG[order.mountingOption].bg, color: MOUNTING_OPTION_CONFIG[order.mountingOption].color, padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, border: `1px solid ${MOUNTING_OPTION_CONFIG[order.mountingOption].color}40` }}>
+                            {MOUNTING_OPTION_CONFIG[order.mountingOption].icon} {MOUNTING_OPTION_CONFIG[order.mountingOption].label}
+                          </span>
                         )}
                         {unassigned
                           ? <span style={{ background: 'rgba(14,165,233,0.1)', color: '#0369A1', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>🏭 Assign Supplier</span>

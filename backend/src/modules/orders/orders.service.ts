@@ -123,6 +123,7 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     { header: 'Stamping', value: (o: Order) => o.stamping || '' },
     { header: 'Diamond Type', value: (o: Order) => o.diamondType || '' },
     { header: 'Diamond Quality', value: (o: Order) => o.diamondQuality || '' },
+    { header: 'Mounting Option', value: (o: Order) => o.mountingOption || '' },
     { header: 'Stone Shape', value: (o: Order) => o.centerStoneShape || '' },
     { header: 'Carat Weight', value: (o: Order) => o.approximateCaratWeight || '' },
     { header: 'Customer Notes', value: (o: Order) => o.customerNotes || '' },
@@ -1816,7 +1817,7 @@ export class OrdersService implements OnModuleInit {
       buildBase()
         .select([
           'o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.status', 'o.cadSubStatus',
-          'o.sentToCustomer', 'o.stoneStatus', 'o.supplySource', 'o.assignedFactory', 'o.isPriorityCustomer', 'o.quotedCost',
+          'o.sentToCustomer', 'o.stoneStatus', 'o.supplySource', 'o.assignedFactory', 'o.isPriorityCustomer', 'o.quotedCost', 'o.mountingOption',
           'o.orderType', 'o.metalType', 'o.metalColor', 'o.salesRepName', 'o.salesRepEmail',
           'o.storeName', 'o.customerFullName', 'o.createdAt', 'o.updatedAt',
         ])

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
+import { MOUNTING_OPTIONS } from '../../../utils/types';
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '11px', color: 'var(--text-muted)',
@@ -61,7 +62,7 @@ export default function NewOrderPage() {
   const [form, setForm] = useState({
     orderType: '', metalType: '', metalColor: '', size: '',
     quantity: '1', stamping: '',
-    diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '',
+    diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '',
   });
   const [refFiles, setRefFiles] = useState<File[]>([]);
   const [refLink, setRefLink] = useState('');
@@ -118,6 +119,7 @@ export default function NewOrderPage() {
         body: JSON.stringify({
           ...form,
           quantity: Math.max(1, parseInt(form.quantity, 10) || 1),
+          mountingOption: form.mountingOption || undefined,
           manufacturingPath: 'STANDARD',
           referenceWeblink: refLink || undefined,
         }),
@@ -271,6 +273,17 @@ export default function NewOrderPage() {
                 <option value="">Select…</option>
                 {DIAMOND_QUALITY.map(o => <option key={o}>{o}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Mounting Option (optional)</label>
+            <select value={form.mountingOption} onChange={e => set('mountingOption', e.target.value)} style={selectStyle}>
+              <option value="">Full order — stones to be set</option>
+              {MOUNTING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <div style={{ marginTop: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              Choose this only if the piece needs just the mounting made, or a center stone set later — leave as-is for a normal fully-set order.
             </div>
           </div>
 

@@ -504,6 +504,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'stamping', label: 'Stamping' },
       { key: 'diamondType', label: 'Diamond Type' },
       { key: 'diamondQuality', label: 'Diamond Quality' },
+      { key: 'mountingOption', label: 'Mounting Option' },
       { key: 'centerStoneShape', label: 'Stone Shape' },
       { key: 'approximateCaratWeight', label: 'Carat Weight' },
     ],

@@ -104,9 +104,20 @@ export async function buildFactoryOrderPdf(order: Order): Promise<Buffer> {
     { label: 'Stamping', value: order.stamping || '—' },
     { label: 'Diamond Type', value: order.diamondType || '—' },
     { label: 'Diamond Quality', value: order.diamondQuality || '—' },
+    { label: 'Mounting Option', value: order.mountingOption || '—' },
     { label: 'Stone Shape', value: order.centerStoneShape || '—' },
     { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : '—' },
   ], y);
+
+  // ── Mounting Only / Semi-Mount callout — flagged so Factory/Stone don't
+  // expect a full stone-setting job on this order ──
+  if (order.mountingOption) {
+    y += 8;
+    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 26, 4).fillAndStroke(NOTE_BG, NOTE_BORDER);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NOTE_LABEL)
+      .text(`⚠ ${order.mountingOption.toUpperCase()}`, MARGIN + 12, y + 8, { characterSpacing: 0.4 });
+    y += 34;
+  }
 
   // ── Special Instructions ──
   if (order.customerNotes) {

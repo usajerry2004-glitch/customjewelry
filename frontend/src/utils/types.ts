@@ -27,6 +27,11 @@ export enum Factory {
   JEWEL_ONE      = 'JEWEL_ONE',
 }
 
+// Set once at order creation (not editable afterward) — flags that this order
+// doesn't need a full stone-setting job, so Factory and Stone Manager both
+// know what to expect before they open it.
+export const MOUNTING_OPTIONS = ['Mounting Only', 'Semi-Mount'] as const;
+
 // Per-user permission overrides — mirrors backend/src/common/permissions.ts.
 export enum Permission {
   ASSIGN_SUPPLIER = 'ASSIGN_SUPPLIER',
@@ -74,6 +79,7 @@ export interface Order {
   stamping?: string;
   diamondType?: string;
   diamondQuality?: string;
+  mountingOption?: string | null;
   centerStoneShape?: string;
   approximateCaratWeight?: string;
   customerNotes?: string;
@@ -139,6 +145,14 @@ export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: 
   CREATIONS:      { label: 'Creations',      color: '#B45309', bg: '#FEF3C7' },
   UNIQUE_DESIGNS: { label: 'Unique Designs', color: '#059669', bg: '#D1FAE5' },
   JEWEL_ONE:      { label: 'Jewel One',      color: '#7C3AED', bg: '#EDE9FE' },
+};
+
+// Bold/high-contrast on purpose — this needs to jump out at both Factory and
+// Stone Manager, same as the ★ Priority badge, since it changes what work
+// they should expect on the order.
+export const MOUNTING_OPTION_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  'Mounting Only': { label: 'Mounting Only', icon: '⚙️', color: '#9A3412', bg: '#FFEDD5' },
+  'Semi-Mount':    { label: 'Semi-Mount',    icon: '◐',  color: '#9A3412', bg: '#FFEDD5' },
 };
 
 // For orders in CAD_IN_PROGRESS, a sub-label reflects the actual stage

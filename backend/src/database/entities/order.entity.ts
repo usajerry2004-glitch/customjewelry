@@ -130,6 +130,13 @@ export class Order {
   @Column({ nullable: true })
   diamondQuality: string;
 
+  // Set by whoever places the order (customer or staff) at creation time only —
+  // 'Mounting Only' (no stones to set) or 'Semi-Mount' (center stone set later).
+  // Purely informational: shown to both Factory and Stone Manager so they know
+  // not to expect/source a full stone-setting job on this order.
+  @Column({ nullable: true })
+  mountingOption: string | null;
+
   @Column({ nullable: true })
   centerStoneShape: string;
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, MOUNTING_OPTION_CONFIG, getCadSubLabel } from '../../utils/types';
 
 interface OrderCardProps {
   order: Partial<Order>;
@@ -68,6 +68,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
             {(order as any).isPriorityCustomer && (
               <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent-dark)', background: 'rgba(192,155,88,0.15)', border: '1px solid rgba(192,155,88,0.3)', borderRadius: '99px', padding: '1px 8px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 ★ Priority
+              </span>
+            )}
+            {order.mountingOption && MOUNTING_OPTION_CONFIG[order.mountingOption] && (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: MOUNTING_OPTION_CONFIG[order.mountingOption].color, background: MOUNTING_OPTION_CONFIG[order.mountingOption].bg, border: `1px solid ${MOUNTING_OPTION_CONFIG[order.mountingOption].color}40`, borderRadius: '99px', padding: '1px 8px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {MOUNTING_OPTION_CONFIG[order.mountingOption].icon} {MOUNTING_OPTION_CONFIG[order.mountingOption].label}
               </span>
             )}
           </div>

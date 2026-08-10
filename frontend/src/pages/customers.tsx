@@ -41,6 +41,7 @@ const ORDER_FIELDS = [
   { key: 'size', label: 'Size / Ring Size', type: 'text', placeholder: 'e.g. Ring - 6.5' },
   { key: 'diamondType', label: 'Diamond Type', type: 'select', options: ['Certified Lab Grown Diamond', 'Non Certified (CVD)', 'Non Certified (HPHT)', 'Natural'] },
   { key: 'diamondQuality', label: 'Diamond Quality', type: 'text', placeholder: 'e.g. F+VS+' },
+  { key: 'mountingOption', label: 'Mounting Option', type: 'select', options: ['Mounting Only', 'Semi-Mount'] },
   { key: 'centerStoneShape', label: 'Center Stone Shape', type: 'select', options: ['Round', 'Oval', 'Cushion', 'Emerald', 'Pear', 'Princess', 'Radiant', 'Marquise', 'Asscher', 'Heart', 'Other'] },
   { key: 'approximateCaratWeight', label: 'Approx. Carat Weight', type: 'text', placeholder: 'e.g. 1.5' },
   { key: 'quotedCost', label: 'Quoted Cost ($)', type: 'text', placeholder: 'e.g. 1250' },
@@ -96,7 +97,7 @@ export default function CustomersPage() {
 
   const [newOrder, setNewOrder] = useState<Record<string, string>>({
     orderType: '', metalType: '', metalColor: '', size: '', diamondType: '',
-    diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '',
+    diamondQuality: '', mountingOption: '', centerStoneShape: '', approximateCaratWeight: '',
     quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '',
   });
 
@@ -232,7 +233,7 @@ export default function CustomersPage() {
         }
         setShowOrder(null);
         setRefImage(null);
-        setNewOrder({ orderType: '', metalType: '', metalColor: '', size: '', diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '' });
+        setNewOrder({ orderType: '', metalType: '', metalColor: '', size: '', diamondType: '', diamondQuality: '', mountingOption: '', centerStoneShape: '', approximateCaratWeight: '', quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '' });
         router.push(`/orders/${created.id}`);
       } else {
         const d = await res.json().catch(() => null);

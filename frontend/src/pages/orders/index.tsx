@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
-import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission, MOUNTING_OPTIONS } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
@@ -175,7 +175,7 @@ export default function OrdersPage() {
   const [newOrder, setNewOrder] = useState({
     orderType: '', size: '', metalType: '', metalColor: '',
     quantity: '1', stamping: '',
-    diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '',
+    diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '',
   });
   // Contact info for admin/sales rep placing order
   const [contact, setContact] = useState({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
@@ -725,6 +725,7 @@ export default function OrdersPage() {
           quantity: Math.max(1, parseInt(newOrder.quantity, 10) || 1),
           storeName: resolvedCompany || undefined,
           phoneNumber: contact.phone || undefined,
+          mountingOption: newOrder.mountingOption || undefined,
           manufacturingPath: 'STANDARD',
           referenceWeblink: refLink || undefined,
         }),
@@ -751,7 +752,7 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
+        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '' });
         setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
@@ -771,7 +772,7 @@ export default function OrdersPage() {
     setShowNew(false); setRefFiles([]); setRefLink('');
     setSelectedCustomer(null); setCustomerSearch('');
     setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
-    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', customerNotes: '', refCustomerPo: '' });
+    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '' });
   };
 
   return (
@@ -1065,6 +1066,14 @@ export default function OrdersPage() {
                   {DIAMOND_QUALITY_MODAL.map(o => <option key={o}>{o}</option>)}
                 </select>
               </div>
+            </div>
+
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Mounting Option (optional)</label>
+              <select value={newOrder.mountingOption} onChange={e => setO('mountingOption', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">Full order — stones to be set</option>
+                {MOUNTING_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
             </div>
 
             {/* Customer PO# */}
