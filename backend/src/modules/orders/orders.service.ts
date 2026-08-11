@@ -373,20 +373,36 @@ export class OrdersService implements OnModuleInit {
   // are read off order_events rather than the order's current status, since
   // an order's status can move on past VPO_ISSUED/CANCELLED by the time this
   // report runs — the event log is what actually happened *that day*.
-  async getWeeklyActivityReport(weekStart?: string): Promise<{ date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }[]> {
-    const base = weekStart ? new Date(`${weekStart}T00:00:00`) : new Date();
-    const dow = base.getDay();
-    const mondayOffset = dow === 0 ? -6 : 1 - dow;
-    const monday = new Date(base);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(monday.getDate() + mondayOffset);
+  async getWeeklyActivityReport(weekStart?: string, dateFrom?: string, dateTo?: string): Promise<{ date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }[]> {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const MAX_CUSTOM_RANGE_DAYS = 92;
 
-    const days = Array.from({ length: 5 }, (_, i) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      return d;
-    });
-    const weekEnd = new Date(days[4]);
+    let monday: Date;
+    let days: Date[];
+    if (dateFrom && dateTo) {
+      const rangeStart = new Date(`${dateFrom}T00:00:00`);
+      const rangeEndRequested = new Date(`${dateTo}T00:00:00`);
+      const dayCount = Math.max(1, Math.min(MAX_CUSTOM_RANGE_DAYS, Math.round((rangeEndRequested.getTime() - rangeStart.getTime()) / DAY_MS) + 1));
+      monday = rangeStart;
+      days = Array.from({ length: dayCount }, (_, i) => {
+        const d = new Date(rangeStart);
+        d.setDate(rangeStart.getDate() + i);
+        return d;
+      });
+    } else {
+      const base = weekStart ? new Date(`${weekStart}T00:00:00`) : new Date();
+      const dow = base.getDay();
+      const mondayOffset = dow === 0 ? -6 : 1 - dow;
+      monday = new Date(base);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(monday.getDate() + mondayOffset);
+      days = Array.from({ length: 5 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return d;
+      });
+    }
+    const weekEnd = new Date(days[days.length - 1]);
     weekEnd.setHours(23, 59, 59, 999);
 
     // 3 grouped-by-day queries instead of 15 individual per-day counts —
@@ -437,10 +453,16 @@ export class OrdersService implements OnModuleInit {
   // different sets of 5 (a customer with few but expensive orders can outrank
   // a high-volume one by amount) — sortBy re-runs the query, it doesn't just
   // reorder one fixed result set.
-  async getTopCustomersReport(month?: string, sortBy: 'count' | 'amount' = 'count'): Promise<{ name: string; orderCount: number; amount: number }[]> {
-    const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
-    const start = new Date(year, mon - 1, 1);
-    const end = new Date(year, mon, 0, 23, 59, 59, 999);
+  async getTopCustomersReport(month?: string, sortBy: 'count' | 'amount' = 'count', dateFrom?: string, dateTo?: string): Promise<{ name: string; orderCount: number; amount: number }[]> {
+    let start: Date, end: Date;
+    if (dateFrom && dateTo) {
+      start = new Date(`${dateFrom}T00:00:00`);
+      end = new Date(`${dateTo}T23:59:59.999`);
+    } else {
+      const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+      start = new Date(year, mon - 1, 1);
+      end = new Date(year, mon, 0, 23, 59, 59, 999);
+    }
 
     const rows = await this.orderRepo.createQueryBuilder('o')
       .select(`COALESCE(NULLIF(o.storeName, ''), NULLIF(o.customerFullName, ''), 'Unknown')`, 'name')
@@ -462,10 +484,16 @@ export class OrdersService implements OnModuleInit {
   // salesRepId is them) — a plain GROUP BY on order.salesRepId would
   // undercount reps whose customers' companies were reassigned since those
   // orders were placed.
-  async getTopSalesRepsReport(month?: string): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
-    const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
-    const start = new Date(year, mon - 1, 1);
-    const end = new Date(year, mon, 0, 23, 59, 59, 999);
+  async getTopSalesRepsReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
+    let start: Date, end: Date;
+    if (dateFrom && dateTo) {
+      start = new Date(`${dateFrom}T00:00:00`);
+      end = new Date(`${dateTo}T23:59:59.999`);
+    } else {
+      const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+      start = new Date(year, mon - 1, 1);
+      end = new Date(year, mon, 0, 23, 59, 59, 999);
+    }
 
     // Single grouped query instead of one round trip per sales rep — the
     // "effective rep" per order is the same rule findAll() uses (a

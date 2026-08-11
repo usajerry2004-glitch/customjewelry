@@ -76,25 +76,38 @@ export class OrdersController {
   @Get('reports/weekly')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Dashboard report: Mon-Fri order activity (received/approved/cancelled) for the week containing ?weekStart (YYYY-MM-DD), defaults to the current week.' })
-  getWeeklyActivityReport(@Query('weekStart') weekStart?: string) {
-    return this.ordersService.getWeeklyActivityReport(weekStart);
+  @ApiOperation({ summary: 'Dashboard report: Mon-Fri order activity (received/approved/cancelled) for the week containing ?weekStart (YYYY-MM-DD), defaults to the current week. Pass ?dateFrom&?dateTo (YYYY-MM-DD) instead for an arbitrary custom range, capped at 92 days.' })
+  getWeeklyActivityReport(
+    @Query('weekStart') weekStart?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getWeeklyActivityReport(weekStart, dateFrom, dateTo);
   }
 
   @Get('reports/top-customers')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Dashboard report: top 5 customers for ?month (YYYY-MM, defaults to current month), ranked by ?sortBy=count|amount (defaults to count).' })
-  getTopCustomersReport(@Query('month') month?: string, @Query('sortBy') sortBy?: 'count' | 'amount') {
-    return this.ordersService.getTopCustomersReport(month, sortBy === 'amount' ? 'amount' : 'count');
+  @ApiOperation({ summary: 'Dashboard report: top 5 customers for ?month (YYYY-MM, defaults to current month), ranked by ?sortBy=count|amount (defaults to count). Pass ?dateFrom&?dateTo (YYYY-MM-DD) instead for an arbitrary custom range.' })
+  getTopCustomersReport(
+    @Query('month') month?: string,
+    @Query('sortBy') sortBy?: 'count' | 'amount',
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getTopCustomersReport(month, sortBy === 'amount' ? 'amount' : 'count', dateFrom, dateTo);
   }
 
   @Get('reports/top-sales-reps')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Dashboard report: top 5 sales reps by total order count across their customers, for ?month (YYYY-MM, defaults to current month).' })
-  getTopSalesRepsReport(@Query('month') month?: string) {
-    return this.ordersService.getTopSalesRepsReport(month);
+  @ApiOperation({ summary: 'Dashboard report: top 5 sales reps by total order count across their customers, for ?month (YYYY-MM, defaults to current month). Pass ?dateFrom&?dateTo (YYYY-MM-DD) instead for an arbitrary custom range.' })
+  getTopSalesRepsReport(
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getTopSalesRepsReport(month, dateFrom, dateTo);
   }
 
   @Get('export/csv')

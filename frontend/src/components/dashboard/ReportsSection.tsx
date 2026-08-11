@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { formatCurrency } from '../../utils/format';
 
 interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }
 interface TopCustomer { name: string; orderCount: number; amount: number }
 interface TopSalesRep { repName: string; customerCount: number; orderCount: number }
+interface DateRange { from: string; to: string }
 
 const INFO = '#0EA5E9';
 const MFG = '#8B5CF6';
@@ -62,6 +63,63 @@ function ViewToggle({ view, setView }: { view: 'table' | 'graph'; setView: (v: '
   );
 }
 
+function CustomRangeControl({ active, onApply, onClear }: { active: DateRange | null; onApply: (r: DateRange) => void; onClear: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState(active?.from || '');
+  const [to, setTo] = useState(active?.to || '');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const inputStyle: React.CSSProperties = { width: '100%', marginTop: '2px', fontSize: '12px', padding: '4px 5px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-input)', color: 'inherit', fontFamily: 'inherit' };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <span
+        style={{ ...arrowBtnStyle, width: 'auto', padding: '0 5px', color: active ? '#fff' : 'var(--text-secondary)', background: active ? 'var(--accent)' : 'var(--bg-input)', borderColor: active ? 'var(--accent)' : 'var(--border)' }}
+        title="Custom date range"
+        onClick={() => { setFrom(active?.from || ''); setTo(active?.to || ''); setOpen(o => !o); }}
+      >
+        📅
+      </span>
+      {open && (
+        <div style={{ position: 'absolute', top: '24px', left: 0, zIndex: 20, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 14px rgba(0,0,0,0.18)', padding: '10px', display: 'flex', flexDirection: 'column', gap: '7px', width: '190px' }}>
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            From
+            <input type="date" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            To
+            <input type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} style={inputStyle} />
+          </label>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+            <button
+              disabled={!from || !to}
+              onClick={() => { if (from && to) { onApply({ from, to }); setOpen(false); } }}
+              style={{ flex: 1, fontSize: '12px', padding: '5px', border: 'none', borderRadius: '4px', background: 'var(--accent)', color: '#fff', cursor: from && to ? 'pointer' : 'not-allowed', opacity: from && to ? 1 : 0.5, fontFamily: 'inherit' }}
+            >
+              Apply
+            </button>
+            {active && (
+              <button
+                onClick={() => { onClear(); setOpen(false); }}
+                style={{ fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-input)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const thStyle: React.CSSProperties = { textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 8px', borderBottom: '1px solid var(--border)' };
 const tdStyle: React.CSSProperties = { padding: '8px 8px', borderBottom: '1px solid var(--border-light)', fontSize: '13px' };
 
@@ -89,32 +147,41 @@ function HBar({ label, value, max }: { label: string; value: number; max: number
 
 export const ReportsSection: React.FC = () => {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [weekCustomRange, setWeekCustomRange] = useState<DateRange | null>(null);
   const [weekly, setWeekly] = useState<WeeklyDay[]>([]);
   const [weeklyView, setWeeklyView] = useState<'table' | 'graph'>('table');
 
   const [monthOffset, setMonthOffset] = useState(0);
+  const [customersCustomRange, setCustomersCustomRange] = useState<DateRange | null>(null);
   const [customerSortBy, setCustomerSortBy] = useState<'count' | 'amount'>('count');
   const [customers, setCustomers] = useState<TopCustomer[]>([]);
   const [customersView, setCustomersView] = useState<'table' | 'graph'>('table');
 
   const [repsMonthOffset, setRepsMonthOffset] = useState(0);
+  const [repsCustomRange, setRepsCustomRange] = useState<DateRange | null>(null);
   const [reps, setReps] = useState<TopSalesRep[]>([]);
   const [repsView, setRepsView] = useState<'table' | 'graph'>('table');
 
   useEffect(() => {
-    const weekStart = toISODate(mondayOfWeek(weekOffset));
-    apiFetch(`${API}/orders/reports/weekly?weekStart=${weekStart}`).then(r => r.ok ? r.json() : []).then(setWeekly).catch(() => {});
-  }, [weekOffset]);
+    const params = weekCustomRange
+      ? `dateFrom=${weekCustomRange.from}&dateTo=${weekCustomRange.to}`
+      : `weekStart=${toISODate(mondayOfWeek(weekOffset))}`;
+    apiFetch(`${API}/orders/reports/weekly?${params}`).then(r => r.ok ? r.json() : []).then(setWeekly).catch(() => {});
+  }, [weekOffset, weekCustomRange]);
 
   useEffect(() => {
-    const { param } = monthLabel(monthOffset);
-    apiFetch(`${API}/orders/reports/top-customers?month=${param}&sortBy=${customerSortBy}`).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
-  }, [monthOffset, customerSortBy]);
+    const params = customersCustomRange
+      ? `dateFrom=${customersCustomRange.from}&dateTo=${customersCustomRange.to}`
+      : `month=${monthLabel(monthOffset).param}`;
+    apiFetch(`${API}/orders/reports/top-customers?${params}&sortBy=${customerSortBy}`).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
+  }, [monthOffset, customersCustomRange, customerSortBy]);
 
   useEffect(() => {
-    const { param } = monthLabel(repsMonthOffset);
-    apiFetch(`${API}/orders/reports/top-sales-reps?month=${param}`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
-  }, [repsMonthOffset]);
+    const params = repsCustomRange
+      ? `dateFrom=${repsCustomRange.from}&dateTo=${repsCustomRange.to}`
+      : `month=${monthLabel(repsMonthOffset).param}`;
+    apiFetch(`${API}/orders/reports/top-sales-reps?${params}`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
+  }, [repsMonthOffset, repsCustomRange]);
 
   const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const weekRange = weekly.length ? `${shortDate(weekly[0].date)} – ${shortDate(weekly[weekly.length - 1].date)}` : '';
@@ -132,9 +199,16 @@ export const ReportsSection: React.FC = () => {
           <div>
             <div style={reportTitleStyle}>Order Activity</div>
             <div style={periodStyle}>
-              <span style={arrowBtnStyle} onClick={() => setWeekOffset(w => w - 1)}>‹</span>
-              Week of {weekRange || '…'}
-              <span style={arrowBtnStyle} onClick={() => setWeekOffset(w => w + 1)}>›</span>
+              {weekCustomRange ? (
+                <span>{weekRange || '…'}</span>
+              ) : (
+                <>
+                  <span style={arrowBtnStyle} onClick={() => setWeekOffset(w => w - 1)}>‹</span>
+                  Week of {weekRange || '…'}
+                  <span style={arrowBtnStyle} onClick={() => setWeekOffset(w => w + 1)}>›</span>
+                </>
+              )}
+              <CustomRangeControl active={weekCustomRange} onApply={setWeekCustomRange} onClear={() => setWeekCustomRange(null)} />
             </div>
           </div>
           <ViewToggle view={weeklyView} setView={setWeeklyView} />
@@ -196,9 +270,16 @@ export const ReportsSection: React.FC = () => {
           <div>
             <div style={reportTitleStyle}>Top Customers</div>
             <div style={periodStyle}>
-              <span style={arrowBtnStyle} onClick={() => setMonthOffset(m => m - 1)}>‹</span>
-              {monthLabel(monthOffset).label}
-              <span style={arrowBtnStyle} onClick={() => setMonthOffset(m => m + 1)}>›</span>
+              {customersCustomRange ? (
+                <span>{shortDate(customersCustomRange.from)} – {shortDate(customersCustomRange.to)}</span>
+              ) : (
+                <>
+                  <span style={arrowBtnStyle} onClick={() => setMonthOffset(m => m - 1)}>‹</span>
+                  {monthLabel(monthOffset).label}
+                  <span style={arrowBtnStyle} onClick={() => setMonthOffset(m => m + 1)}>›</span>
+                </>
+              )}
+              <CustomRangeControl active={customersCustomRange} onApply={setCustomersCustomRange} onClear={() => setCustomersCustomRange(null)} />
             </div>
           </div>
           <ViewToggle view={customersView} setView={setCustomersView} />
@@ -248,9 +329,16 @@ export const ReportsSection: React.FC = () => {
           <div>
             <div style={reportTitleStyle}>Top Sales Reps</div>
             <div style={periodStyle}>
-              <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m - 1)}>‹</span>
-              {monthLabel(repsMonthOffset).label}
-              <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m + 1)}>›</span>
+              {repsCustomRange ? (
+                <span>{shortDate(repsCustomRange.from)} – {shortDate(repsCustomRange.to)}</span>
+              ) : (
+                <>
+                  <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m - 1)}>‹</span>
+                  {monthLabel(repsMonthOffset).label}
+                  <span style={arrowBtnStyle} onClick={() => setRepsMonthOffset(m => m + 1)}>›</span>
+                </>
+              )}
+              <CustomRangeControl active={repsCustomRange} onApply={setRepsCustomRange} onClear={() => setRepsCustomRange(null)} />
             </div>
           </div>
           <ViewToggle view={repsView} setView={setRepsView} />
