@@ -47,33 +47,34 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
   );
 }
 
-// Anchored right where you clicked, not a page-centered modal — so it opens
-// on top of the row/cell you were actually looking at instead of dumping you
-// back at the top of a long scrolled page behind a full-screen dim.
-function DrillPopover({ title, sub, rows, top, left, onClose }: { title: string; sub: string; rows: CadRecord[]; top: number; left: number; onClose: () => void }) {
+// Inline, not a floating popover — it's inserted directly into the table
+// flow right after the row you clicked, so it can never end up positioned
+// somewhere disconnected from what you were looking at (a fixed-position
+// popover computed once at click time visually drifts if anything scrolls
+// the page afterward; an inline row can't).
+function DrillRow({ colSpan, title, sub, rows, onClose }: { colSpan: number; title: string; sub: string; rows: CadRecord[]; onClose: () => void }) {
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 299 }} />
-      <div style={{ position: 'fixed', top, left, zIndex: 300, background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)', width: '520px', maxWidth: '92vw', maxHeight: '70vh', overflow: 'auto', padding: '18px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '6px' }}>
+    <tr style={{ background: 'var(--bg-input)' }}>
+      <td colSpan={colSpan} style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '10px' }}>
           <div>
-            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '19px', fontWeight: 600 }}>{title}</div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '3px', marginBottom: '12px' }}>{sub}</div>
+            <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>{title}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{sub}</div>
           </div>
-          <button onClick={onClose} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', width: '26px', height: '26px', flexShrink: 0, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '12px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '7px', width: '24px', height: '24px', flexShrink: 0, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px' }}>✕</button>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '6px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Person</th><th style={thStyle}>Style No.</th><th style={thStyle}>Family</th><th style={thStyle}>Approved</th></tr></thead>
+            <thead><tr><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Date</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Person</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Style No.</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Family</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Approved</th></tr></thead>
             <tbody>
               {rows.length ? rows.map((r, i) => (
-                <tr key={i}><td style={tdStyle}>{fullDate(r.d)}</td><td style={{ ...tdStyle, fontWeight: 600 }}>{r.p}</td><td style={tdStyle}>{r.s}</td><td style={tdStyle}>{r.f}</td><td style={tdStyle}>{r.a ? '✅' : '—'}</td></tr>
-              )) : <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>No rows match.</td></tr>}
+                <tr key={i}><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{fullDate(r.d)}</td><td style={{ ...tdStyle, background: 'var(--bg-card)', fontWeight: 600 }}>{r.p}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.s}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.f}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.a ? '✅' : '—'}</td></tr>
+              )) : <tr><td colSpan={5} style={{ ...tdStyle, background: 'var(--bg-card)', textAlign: 'center', color: 'var(--text-muted)' }}>No rows match.</td></tr>}
             </tbody>
           </table>
         </div>
-      </div>
-    </>
+      </td>
+    </tr>
   );
 }
 
@@ -82,7 +83,8 @@ export const CadTrackingSection: React.FC = () => {
   const [dateFrom, setDateFrom] = useState(() => toISODate(new Date(Date.now() - 6 * 86400000)));
   const [data, setData] = useState<CadTrackingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [drill, setDrill] = useState<{ title: string; sub: string; rows: CadRecord[]; top: number; left: number } | null>(null);
+  const [gridDrill, setGridDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
+  const [channelDrill, setChannelDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
 
   const [channelLens, setChannelLens] = useState<'all' | 'Kira' | 'V+V'>('all');
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(new Set());
@@ -117,14 +119,11 @@ export const CadTrackingSection: React.FC = () => {
   const dayTotals = dates.map((_, i) => people.reduce((s, p) => s + personCounts(p)[i], 0));
   const grand = dayTotals.reduce((a, b) => a + b, 0);
 
-  const POPOVER_W = 520, POPOVER_H_EST = 380;
-  const drillFor = (title: string, sub: string, filter: (r: CadRecord) => boolean, e: React.MouseEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    let left = rect.left;
-    let top = rect.bottom + 6;
-    if (left + POPOVER_W > window.innerWidth - 16) left = Math.max(16, window.innerWidth - POPOVER_W - 16);
-    if (top + POPOVER_H_EST > window.innerHeight - 16) top = Math.max(16, rect.top - POPOVER_H_EST - 6);
-    setDrill({ title, sub, rows: records.filter(filter), top, left });
+  const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
+    setGridDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
+  };
+  const toggleChannelDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
+    setChannelDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
   };
 
   return (
@@ -195,10 +194,10 @@ export const CadTrackingSection: React.FC = () => {
                           onClick={() => channelLens === 'all' && setExpandedPeople(s => { const n = new Set(s); n.has(p.name) ? n.delete(p.name) : n.add(p.name); return n; })}>{p.name}</td>
                         {counts.map((c, i) => (
                           <td key={i} style={{ ...tdStyle, textAlign: 'right', cursor: 'pointer' }}
-                            onClick={e => drillFor(`${p.name} — ${dateLabels[dates[i]]}`, `${records.filter(r => r.p === p.name && r.d === dates[i] && (channelLens === 'all' || r.f === channelLens)).length} styles behind this cell`, r => r.p === p.name && r.d === dates[i] && (channelLens === 'all' || r.f === channelLens), e)}>{c}</td>
+                            onClick={() => toggleGridDrill(`${p.name}::day::${dates[i]}`, `${p.name} — ${dateLabels[dates[i]]}`, `${records.filter(r => r.p === p.name && r.d === dates[i] && (channelLens === 'all' || r.f === channelLens)).length} styles behind this cell`, r => r.p === p.name && r.d === dates[i] && (channelLens === 'all' || r.f === channelLens))}>{c}</td>
                         ))}
                         <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-dark)', cursor: 'pointer' }}
-                          onClick={e => drillFor(`${p.name} — full range`, `${total} styles across ${dates.length} day${dates.length === 1 ? '' : 's'}`, r => r.p === p.name && (channelLens === 'all' || r.f === channelLens), e)}>{total}</td>
+                          onClick={() => toggleGridDrill(`${p.name}::total`, `${p.name} — full range`, `${total} styles across ${dates.length} day${dates.length === 1 ? '' : 's'}`, r => r.p === p.name && (channelLens === 'all' || r.f === channelLens))}>{total}</td>
                       </tr>
                       {channelLens === 'all' && open && (
                         <>
@@ -214,6 +213,9 @@ export const CadTrackingSection: React.FC = () => {
                           </tr>
                         </>
                       )}
+                      {gridDrill?.key.startsWith(`${p.name}::`) && (
+                        <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} />
+                      )}
                     </React.Fragment>
                   );
                 })}
@@ -221,9 +223,12 @@ export const CadTrackingSection: React.FC = () => {
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)' }}></td>
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
                   {dayTotals.map((t, i) => <td key={i} style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700, cursor: 'pointer' }}
-                    onClick={e => drillFor(`${fullDate(dates[i])} — everyone`, `${records.filter(r => r.d === dates[i] && (channelLens === 'all' || r.f === channelLens)).length} styles this day`, r => r.d === dates[i] && (channelLens === 'all' || r.f === channelLens), e)}>{t}</td>)}
+                    onClick={() => toggleGridDrill(`__day__${dates[i]}`, `${fullDate(dates[i])} — everyone`, `${records.filter(r => r.d === dates[i] && (channelLens === 'all' || r.f === channelLens)).length} styles this day`, r => r.d === dates[i] && (channelLens === 'all' || r.f === channelLens))}>{t}</td>)}
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700, color: 'var(--accent-dark)' }}>{grand}</td>
                 </tr>
+                {gridDrill && gridDrill.key.startsWith('__day__') && (
+                  <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} />
+                )}
               </tbody>
             </table>
           </div>
@@ -279,24 +284,27 @@ export const CadTrackingSection: React.FC = () => {
             <tbody>
               {people.map(p => (
                 <React.Fragment key={p.name}>
-                  <tr style={{ cursor: 'pointer' }} onClick={e => drillFor(p.name, `${records.filter(r => r.p === p.name).length} style rows`, r => r.p === p.name, e)}>
+                  <tr style={{ cursor: 'pointer' }} onClick={() => toggleChannelDrill(p.name, p.name, `${records.filter(r => r.p === p.name).length} style rows`, r => r.p === p.name)}>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{p.name}</td>
                     {p.counts.map((c, i) => <td key={i} style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{c}</td>)}
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: 'var(--accent-dark)' }}>{p.total}</td>
                   </tr>
                   {!ccCollapsed && (
                     <>
-                      <tr style={{ background: 'var(--bg-input)', cursor: 'pointer' }} onClick={e => drillFor(`${p.name} — Kira`, `${records.filter(r => r.p === p.name && r.f === 'Kira').length} style rows`, r => r.p === p.name && r.f === 'Kira', e)}>
+                      <tr style={{ background: 'var(--bg-input)', cursor: 'pointer' }} onClick={() => toggleChannelDrill(`${p.name}-Kira`, `${p.name} — Kira`, `${records.filter(r => r.p === p.name && r.f === 'Kira').length} style rows`, r => r.p === p.name && r.f === 'Kira')}>
                         <td style={{ ...tdStyle, color: '#0369A1', fontSize: '12px' }}>↳ Kira</td>
                         {p.kira.map((c, i) => <td key={i} style={{ ...tdStyle, textAlign: 'right', fontSize: '12px' }}>{c}</td>)}
                         <td style={{ ...tdStyle, textAlign: 'right', fontSize: '12px' }}>{p.kiraTotal}</td>
                       </tr>
-                      <tr style={{ background: 'var(--bg-input)', cursor: 'pointer' }} onClick={e => drillFor(`${p.name} — V+V`, `${records.filter(r => r.p === p.name && r.f === 'V+V').length} style rows`, r => r.p === p.name && r.f === 'V+V', e)}>
+                      <tr style={{ background: 'var(--bg-input)', cursor: 'pointer' }} onClick={() => toggleChannelDrill(`${p.name}-V+V`, `${p.name} — V+V`, `${records.filter(r => r.p === p.name && r.f === 'V+V').length} style rows`, r => r.p === p.name && r.f === 'V+V')}>
                         <td style={{ ...tdStyle, color: '#6D28D9', fontSize: '12px' }}>↳ V+V</td>
                         {p.vv.map((c, i) => <td key={i} style={{ ...tdStyle, textAlign: 'right', fontSize: '12px' }}>{c}</td>)}
                         <td style={{ ...tdStyle, textAlign: 'right', fontSize: '12px' }}>{p.vvTotal}</td>
                       </tr>
                     </>
+                  )}
+                  {channelDrill && (channelDrill.key === p.name || channelDrill.key === `${p.name}-Kira` || channelDrill.key === `${p.name}-V+V`) && (
+                    <DrillRow colSpan={dates.length + 2} title={channelDrill.title} sub={channelDrill.sub} rows={channelDrill.rows} onClose={() => setChannelDrill(null)} />
                   )}
                 </React.Fragment>
               ))}
@@ -499,8 +507,6 @@ export const CadTrackingSection: React.FC = () => {
           );
         })()}
       </div>
-
-      {drill && <DrillPopover title={drill.title} sub={drill.sub} rows={drill.rows} top={drill.top} left={drill.left} onClose={() => setDrill(null)} />}
     </>
   );
 };
