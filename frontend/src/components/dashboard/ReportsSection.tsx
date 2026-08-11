@@ -188,7 +188,9 @@ export const ReportsSection: React.FC = () => {
   const weekTotals = weekly.reduce((acc, d) => ({ received: acc.received + d.received, approved: acc.approved + d.approved, manufactured: acc.manufactured + d.manufactured, cancelled: acc.cancelled + d.cancelled }), { received: 0, approved: 0, manufactured: 0, cancelled: 0 });
   const weekMax = Math.max(1, ...weekly.map(d => Math.max(d.received, d.approved, d.manufactured, d.cancelled)));
   const custMax = Math.max(1, ...customers.map(c => customerSortBy === 'amount' ? c.amount : c.orderCount));
+  const custTotals = customers.reduce((acc, c) => ({ orderCount: acc.orderCount + c.orderCount, amount: acc.amount + c.amount }), { orderCount: 0, amount: 0 });
   const repMax = Math.max(1, ...reps.map(r => r.orderCount));
+  const repTotals = reps.reduce((acc, r) => ({ customerCount: acc.customerCount + r.customerCount, orderCount: acc.orderCount + r.orderCount }), { customerCount: 0, orderCount: 0 });
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -311,6 +313,12 @@ export const ReportsSection: React.FC = () => {
                   <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? formatCurrency(c.amount) : c.orderCount}</td>
                 </tr>
               ))}
+              {customers.length > 0 && (
+                <tr>
+                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
+                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{customerSortBy === 'amount' ? formatCurrency(custTotals.amount) : custTotals.orderCount}</td>
+                </tr>
+              )}
               {customers.length === 0 && <tr><td style={tdStyle} colSpan={2}>No orders this month.</td></tr>}
             </tbody>
           </table>
@@ -355,6 +363,13 @@ export const ReportsSection: React.FC = () => {
                   <td style={{ ...tdStyle, textAlign: 'right' }}>{r.orderCount}</td>
                 </tr>
               ))}
+              {reps.length > 0 && (
+                <tr>
+                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
+                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{repTotals.customerCount}</td>
+                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{repTotals.orderCount}</td>
+                </tr>
+              )}
               {reps.length === 0 && <tr><td style={tdStyle} colSpan={3}>No orders yet.</td></tr>}
             </tbody>
           </table>
