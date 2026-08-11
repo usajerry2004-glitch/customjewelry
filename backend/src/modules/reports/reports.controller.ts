@@ -1,4 +1,4 @@
-import { Controller, ForbiddenException, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -6,10 +6,6 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/user.entity';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Temporary single-user rollout — remove once the Monthly Production Report
-// is confirmed and opened up to the rest of Admin/Authorizer.
-const MONTHLY_PRODUCTION_ALLOWED_EMAILS = ['princy.k@kirajewels.one'];
 
 // Defaults to the Monday-through-Sunday week that most recently ended —
 // same window the Monday 8am cron computes — unless a specific start date
@@ -81,16 +77,12 @@ export class ReportsController {
   }
 
   @Get('monthly-production')
-  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
-  @ApiOperation({ summary: 'Monthly Production Report — Direct Orders Received, CADs Made, Samples Approved (proxy: CAD approvals), Revisions Completed (inferred). Temporarily restricted to a single email via allowlist pending wider rollout.' })
+  @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
+  @ApiOperation({ summary: 'Monthly Production Report — Direct Orders Received, CADs Made, Samples Approved (proxy: CAD approvals), Revisions Completed (inferred). Available to Admin and CAD Designer.' })
   monthlyProduction(
-    @Request() req: any,
     @Query('period') period?: string,
     @Query('month') month?: string,
   ) {
-    if (!MONTHLY_PRODUCTION_ALLOWED_EMAILS.includes(req.user?.email)) {
-      throw new ForbiddenException('This report is not yet available for your account.');
-    }
     const periodType = ['monthly', 'quarterly', 'halfyearly', 'yearly'].includes(period || '') ? (period as any) : 'monthly';
     const anchorMonth = month || new Date().toISOString().slice(0, 7);
     return this.reportsService.getMonthlyProductionReport(periodType, anchorMonth);

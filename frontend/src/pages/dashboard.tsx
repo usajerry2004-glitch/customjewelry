@@ -194,8 +194,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Monthly Production Report — temporary single-user rollout ── */}
-      {userEmail === 'princy.k@kirajewels.one' && <MonthlyProductionReport />}
+      {/* ── Monthly Production Report — Admin only, not Authorizer ── */}
+      {userRole === 'ADMIN' && <MonthlyProductionReport />}
 
       {/* ── Reports ── */}
       <ReportsSection />
@@ -227,6 +227,7 @@ export default function Dashboard() {
   if (cfg) return (
     <AppLayout title="Dashboard" subtitle={cfg.subtitle} actions={<button onClick={() => router.push('/orders')} style={{ background: NAVY, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New Order</button>}>
       <RoleKpi items={cfg.kpis} />
+      {userRole === 'CAD_DESIGNER' && <MonthlyProductionReport />}
       <div className="dash-2col">
         <ActionSection title="My Priority Queue" subtitle="Needs your attention" items={actions} link="/todos"  showMore={showMoreA} setShowMore={setShowMoreA} />
         <ActionSection title="Recent Activity"   subtitle="Last 7 days"          items={recent}  link="/orders" showMore={showMoreR} setShowMore={setShowMoreR} />
