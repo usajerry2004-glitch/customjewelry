@@ -454,15 +454,7 @@ export class OrdersService implements OnModuleInit {
   // a high-volume one by amount) — sortBy re-runs the query, it doesn't just
   // reorder one fixed result set.
   async getTopCustomersReport(month?: string, sortBy: 'count' | 'amount' = 'count', dateFrom?: string, dateTo?: string): Promise<{ name: string; orderCount: number; amount: number }[]> {
-    let start: Date, end: Date;
-    if (dateFrom && dateTo) {
-      start = new Date(`${dateFrom}T00:00:00`);
-      end = new Date(`${dateTo}T23:59:59.999`);
-    } else {
-      const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
-      start = new Date(year, mon - 1, 1);
-      end = new Date(year, mon, 0, 23, 59, 59, 999);
-    }
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
 
     const rows = await this.orderRepo.createQueryBuilder('o')
       .select(`COALESCE(NULLIF(o.storeName, ''), NULLIF(o.customerFullName, ''), 'Unknown')`, 'name')
@@ -484,16 +476,8 @@ export class OrdersService implements OnModuleInit {
   // salesRepId is them) — a plain GROUP BY on order.salesRepId would
   // undercount reps whose customers' companies were reassigned since those
   // orders were placed.
-  async getTopSalesRepsReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{ repName: string; customerCount: number; orderCount: number }[]> {
-    let start: Date, end: Date;
-    if (dateFrom && dateTo) {
-      start = new Date(`${dateFrom}T00:00:00`);
-      end = new Date(`${dateTo}T23:59:59.999`);
-    } else {
-      const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
-      start = new Date(year, mon - 1, 1);
-      end = new Date(year, mon, 0, 23, 59, 59, 999);
-    }
+  async getTopSalesRepsReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{ repId: string; repName: string; customerCount: number; orderCount: number }[]> {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
 
     // Single grouped query instead of one round trip per sales rep — the
     // "effective rep" per order is the same rule findAll() uses (a
@@ -526,10 +510,60 @@ export class OrdersService implements OnModuleInit {
     const nameById = new Map(reps.map(u => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
 
     return rows.map(r => ({
+      repId: r.repId,
       repName: nameById.get(r.repId) || r.repId,
       orderCount: Number(r.orderCount),
       customerCount: Number(r.customerCount),
     }));
+  }
+
+  private resolveReportRange(month?: string, dateFrom?: string, dateTo?: string): { start: Date; end: Date } {
+    if (dateFrom && dateTo) {
+      return { start: new Date(`${dateFrom}T00:00:00`), end: new Date(`${dateTo}T23:59:59.999`) };
+    }
+    const [year, mon] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+    return { start: new Date(year, mon - 1, 1), end: new Date(year, mon, 0, 23, 59, 59, 999) };
+  }
+
+  // Order list behind one Top Customers row — same grouping key
+  // (storeName/customerFullName/'Unknown') as the ranking itself, so the
+  // drill-down always matches what was counted.
+  async getTopCustomerOrders(customer: string, month?: string, dateFrom?: string, dateTo?: string) {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+    const rows = await this.orderRepo.createQueryBuilder('o')
+      .select('o.id', 'id')
+      .addSelect('o.poNumber', 'poNumber')
+      .addSelect('o.status', 'status')
+      .addSelect('o.createdAt', 'createdAt')
+      .where('o.createdAt BETWEEN :start AND :end', { start, end })
+      .andWhere(`COALESCE(NULLIF(o.storeName, ''), NULLIF(o.customerFullName, ''), 'Unknown') = :customer`, { customer })
+      .orderBy('o.createdAt', 'DESC')
+      .getRawMany();
+    return rows;
+  }
+
+  // Order list behind one Top Sales Reps row — every order under that rep's
+  // *effective* ownership (own salesRepId stamp, or their customer's company's
+  // current salesRepId), matching the same rule the ranking query uses.
+  async getTopSalesRepOrders(repId: string, month?: string, dateFrom?: string, dateTo?: string) {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+    const rows = await this.orderRepo.query(
+      `WITH order_reps AS (
+         SELECT o.id, o."poNumber", o.status, o."createdAt", o."storeName", o."customerFullName",
+                COALESCE(
+                  (SELECT c."salesRepId" FROM companies c WHERE c.id::text = o."companyId"),
+                  o."salesRepId"
+                ) AS "repId"
+         FROM orders o
+         WHERE o."createdAt" BETWEEN $1 AND $2
+       )
+       SELECT id, "poNumber", status, "createdAt", "storeName", "customerFullName"
+       FROM order_reps
+       WHERE "repId" = $3
+       ORDER BY "createdAt" DESC`,
+      [start, end, repId],
+    );
+    return rows;
   }
 
   async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {

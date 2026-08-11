@@ -110,6 +110,32 @@ export class OrdersController {
     return this.ordersService.getTopSalesRepsReport(month, dateFrom, dateTo);
   }
 
+  @Get('reports/top-customers/orders')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Drill-down for a Top Customers row: every order for ?customer (exact name as returned by the ranking) in the same ?month or ?dateFrom/?dateTo window.' })
+  getTopCustomerOrders(
+    @Query('customer') customer: string,
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getTopCustomerOrders(customer, month, dateFrom, dateTo);
+  }
+
+  @Get('reports/top-sales-reps/orders')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Drill-down for a Top Sales Reps row: every order under that rep\'s effective ownership (?repId) in the same ?month or ?dateFrom/?dateTo window.' })
+  getTopSalesRepOrders(
+    @Query('repId') repId: string,
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getTopSalesRepOrders(repId, month, dateFrom, dateTo);
+  }
+
   @Get('export/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)

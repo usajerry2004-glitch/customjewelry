@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { formatCurrency } from '../../utils/format';
+import { STATUS_CONFIG } from '../../utils/types';
 
 interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }
 interface TopCustomer { name: string; orderCount: number; amount: number }
-interface TopSalesRep { repName: string; customerCount: number; orderCount: number }
+interface TopSalesRep { repId: string; repName: string; customerCount: number; orderCount: number }
 interface DateRange { from: string; to: string }
+interface DrillOrder { id: string; poNumber: string; status: string; createdAt: string; storeName?: string; customerFullName?: string }
 
 const INFO = '#0EA5E9';
 const MFG = '#8B5CF6';
@@ -133,6 +136,38 @@ function RankBadge({ n }: { n: number }) {
   );
 }
 
+function OrderDrillRow({ colSpan, orders, loading, showCustomer, onNavigate }: { colSpan: number; orders: DrillOrder[]; loading: boolean; showCustomer: boolean; onNavigate: (id: string) => void }) {
+  return (
+    <tr style={{ background: 'var(--bg-input)' }}>
+      <td colSpan={colSpan} style={{ padding: '10px 14px' }}>
+        {loading ? (
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px 0' }}>Loading orders…</div>
+        ) : orders.length === 0 ? (
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '6px 0' }}>No orders found.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '220px', overflowY: 'auto' }}>
+            {orders.map(o => {
+              const cfg = STATUS_CONFIG[o.status] || { label: o.status, color: 'var(--text-muted)', bg: 'var(--bg-input)' };
+              return (
+                <div key={o.id} onClick={() => onNavigate(o.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 8px', borderRadius: '6px', cursor: 'pointer', background: 'var(--bg-card)', fontSize: '12px' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                >
+                  <span style={{ fontWeight: 700, color: 'var(--accent-dark)', flexShrink: 0 }}>{o.poNumber}</span>
+                  {showCustomer && <span style={{ color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.storeName || o.customerFullName || 'Unknown'}</span>}
+                  <span style={{ background: cfg.bg, color: cfg.color, borderRadius: '99px', padding: '2px 8px', fontSize: '10.5px', fontWeight: 700, whiteSpace: 'nowrap' }}>{cfg.label}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '11px', whiteSpace: 'nowrap' }}>{new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function HBar({ label, value, max }: { label: string; value: number; max: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '9px' }}>
@@ -146,6 +181,7 @@ function HBar({ label, value, max }: { label: string; value: number; max: number
 }
 
 export const ReportsSection: React.FC = () => {
+  const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [weekCustomRange, setWeekCustomRange] = useState<DateRange | null>(null);
   const [weekly, setWeekly] = useState<WeeklyDay[]>([]);
@@ -162,6 +198,14 @@ export const ReportsSection: React.FC = () => {
   const [reps, setReps] = useState<TopSalesRep[]>([]);
   const [repsView, setRepsView] = useState<'table' | 'graph'>('table');
 
+  const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<DrillOrder[]>([]);
+  const [customerOrdersLoading, setCustomerOrdersLoading] = useState(false);
+
+  const [expandedRepId, setExpandedRepId] = useState<string | null>(null);
+  const [repOrders, setRepOrders] = useState<DrillOrder[]>([]);
+  const [repOrdersLoading, setRepOrdersLoading] = useState(false);
+
   useEffect(() => {
     const params = weekCustomRange
       ? `dateFrom=${weekCustomRange.from}&dateTo=${weekCustomRange.to}`
@@ -174,6 +218,7 @@ export const ReportsSection: React.FC = () => {
       ? `dateFrom=${customersCustomRange.from}&dateTo=${customersCustomRange.to}`
       : `month=${monthLabel(monthOffset).param}`;
     apiFetch(`${API}/orders/reports/top-customers?${params}&sortBy=${customerSortBy}`).then(r => r.ok ? r.json() : []).then(setCustomers).catch(() => {});
+    setExpandedCustomer(null);
   }, [monthOffset, customersCustomRange, customerSortBy]);
 
   useEffect(() => {
@@ -181,7 +226,38 @@ export const ReportsSection: React.FC = () => {
       ? `dateFrom=${repsCustomRange.from}&dateTo=${repsCustomRange.to}`
       : `month=${monthLabel(repsMonthOffset).param}`;
     apiFetch(`${API}/orders/reports/top-sales-reps?${params}`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
+    setExpandedRepId(null);
   }, [repsMonthOffset, repsCustomRange]);
+
+  const goToOrder = (id: string) => router.push(`/orders/${id}`);
+
+  const toggleCustomerOrders = (name: string) => {
+    if (expandedCustomer === name) { setExpandedCustomer(null); return; }
+    setExpandedCustomer(name);
+    setCustomerOrdersLoading(true);
+    const params = customersCustomRange
+      ? `dateFrom=${customersCustomRange.from}&dateTo=${customersCustomRange.to}`
+      : `month=${monthLabel(monthOffset).param}`;
+    apiFetch(`${API}/orders/reports/top-customers/orders?customer=${encodeURIComponent(name)}&${params}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setCustomerOrders)
+      .catch(() => setCustomerOrders([]))
+      .finally(() => setCustomerOrdersLoading(false));
+  };
+
+  const toggleRepOrders = (repId: string) => {
+    if (expandedRepId === repId) { setExpandedRepId(null); return; }
+    setExpandedRepId(repId);
+    setRepOrdersLoading(true);
+    const params = repsCustomRange
+      ? `dateFrom=${repsCustomRange.from}&dateTo=${repsCustomRange.to}`
+      : `month=${monthLabel(repsMonthOffset).param}`;
+    apiFetch(`${API}/orders/reports/top-sales-reps/orders?repId=${encodeURIComponent(repId)}&${params}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setRepOrders)
+      .catch(() => setRepOrders([]))
+      .finally(() => setRepOrdersLoading(false));
+  };
 
   const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const weekRange = weekly.length ? `${shortDate(weekly[0].date)} – ${shortDate(weekly[weekly.length - 1].date)}` : '';
@@ -308,10 +384,15 @@ export const ReportsSection: React.FC = () => {
             <thead><tr><th style={thStyle}>Customer</th><th style={{ ...thStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? 'Amount' : 'Orders'}</th></tr></thead>
             <tbody>
               {customers.map((c, i) => (
-                <tr key={c.name}>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{c.name}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? formatCurrency(c.amount) : c.orderCount}</td>
-                </tr>
+                <React.Fragment key={c.name}>
+                  <tr onClick={() => toggleCustomerOrders(c.name)} style={{ cursor: 'pointer' }}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{c.name}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{customerSortBy === 'amount' ? formatCurrency(c.amount) : c.orderCount}</td>
+                  </tr>
+                  {expandedCustomer === c.name && (
+                    <OrderDrillRow colSpan={2} orders={customerOrders} loading={customerOrdersLoading} showCustomer={false} onNavigate={goToOrder} />
+                  )}
+                </React.Fragment>
               ))}
               {customers.length > 0 && (
                 <tr>
@@ -357,11 +438,16 @@ export const ReportsSection: React.FC = () => {
             <thead><tr><th style={thStyle}>Sales Rep</th><th style={{ ...thStyle, textAlign: 'right' }}>Customers</th><th style={{ ...thStyle, textAlign: 'right' }}>Orders</th></tr></thead>
             <tbody>
               {reps.map((r, i) => (
-                <tr key={r.repName}>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{r.repName}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{r.customerCount}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{r.orderCount}</td>
-                </tr>
+                <React.Fragment key={r.repId}>
+                  <tr onClick={() => toggleRepOrders(r.repId)} style={{ cursor: 'pointer' }}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}><RankBadge n={i + 1} />{r.repName}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{r.customerCount}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>{r.orderCount}</td>
+                  </tr>
+                  {expandedRepId === r.repId && (
+                    <OrderDrillRow colSpan={3} orders={repOrders} loading={repOrdersLoading} showCustomer={true} onNavigate={goToOrder} />
+                  )}
+                </React.Fragment>
               ))}
               {reps.length > 0 && (
                 <tr>
