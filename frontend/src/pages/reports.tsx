@@ -63,7 +63,7 @@ export default function ReportsPage() {
           <div style={{ fontSize: '9.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, padding: '0 6px 5px' }}>Dashboard</div>
           {RAIL_ITEMS.map(i => <a key={i.id} onClick={() => jump(i.id)} style={railLinkStyle(i.id)}>{i.label}</a>)}
           <div style={{ fontSize: '9.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, margin: '12px 6px 5px', paddingTop: '10px', borderTop: '1px solid var(--border-light)' }}>
-            Your Workbook <span style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)', fontSize: '8.5px', fontWeight: 700, borderRadius: '99px', padding: '1px 6px', marginLeft: '4px' }}>6 sheets</span>
+            Your Workbook
           </div>
           {WORKBOOK_ITEMS.map(i => <a key={i.id} onClick={() => jump(i.id)} style={railLinkStyle(i.id)}>{i.label}</a>)}
         </aside>

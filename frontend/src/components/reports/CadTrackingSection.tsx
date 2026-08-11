@@ -21,7 +21,6 @@ const cardStyle: React.CSSProperties = {
 };
 const titleStyle: React.CSSProperties = { fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase', color: 'var(--text-secondary)' };
 const descStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '560px', lineHeight: 1.55 };
-const sheetTag: React.CSSProperties = { fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: '#4338CA', background: '#EEF2FF', border: '1px solid rgba(67,56,202,0.25)', borderRadius: '99px', padding: '2px 8px' };
 const thStyle: React.CSSProperties = { textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 8px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' };
 const tdStyle: React.CSSProperties = { padding: '8px 8px', borderBottom: '1px solid var(--border-light)', fontSize: '13px' };
 const downloadBtnStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent-dark)', fontSize: '11.5px', fontWeight: 700, padding: '6px 13px', borderRadius: '99px', cursor: 'pointer', whiteSpace: 'nowrap' };
@@ -31,9 +30,17 @@ const segWrapStyle: React.CSSProperties = { display: 'flex', background: 'var(--
 const dateChip = (multi: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', fontSize: '10.5px', fontWeight: 600, background: multi ? 'var(--accent-light)' : 'var(--bg-input)', border: `1px solid ${multi ? 'var(--accent)' : 'var(--border)'}`, color: multi ? 'var(--accent-dark)' : 'var(--text-secondary)', borderRadius: '99px', padding: '2px 8px', margin: '1px 3px 1px 0' });
 const rankStyle = (first: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '4px', background: first ? 'var(--accent-light)' : 'var(--bg-input)', color: first ? 'var(--accent-dark)' : 'var(--text-muted)', fontSize: '11px', fontWeight: 700, marginRight: '7px' });
 
-function shortDate(iso: string): string { return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
 function fullDate(iso: string): string { return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function toISODate(d: Date): string { return d.toISOString().slice(0, 10); }
+
+function ViewMoreButton({ hiddenCount, showAll, onToggle }: { hiddenCount: number; showAll: boolean; onToggle: () => void }) {
+  if (!showAll && hiddenCount <= 0) return null;
+  return (
+    <button onClick={onToggle} style={{ width: '100%', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px', fontSize: '12px', color: 'var(--accent-dark)', fontWeight: 600, cursor: 'pointer', marginTop: '8px' }}>
+      {showAll ? '▴ Show less' : `▾ View ${hiddenCount} more`}
+    </button>
+  );
+}
 
 function HBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   return (
@@ -90,16 +97,23 @@ export const CadTrackingSection: React.FC = () => {
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(new Set());
   const [scMode, setScMode] = useState<'grid' | 'person' | 'day'>('grid');
   const [scView, setScView] = useState<'table' | 'graph'>('table');
+  const [scShowAll, setScShowAll] = useState(false);
 
   const [ccCollapsed, setCcCollapsed] = useState(false);
+  const [ccShowAll, setCcShowAll] = useState(false);
 
   const [arSort, setArSort] = useState<'styles' | 'rate'>('styles');
   const [arExpanded, setArExpanded] = useState<Set<string>>(new Set());
+  const [arShowAll, setArShowAll] = useState(false);
 
   const [revExpanded, setRevExpanded] = useState<Set<string>>(new Set());
+  const [revShowAll, setRevShowAll] = useState(false);
 
   const [sdQuery, setSdQuery] = useState('');
   const [sdFamily, setSdFamily] = useState<'all' | 'Kira' | 'V+V'>('all');
+  const [sdShowAll, setSdShowAll] = useState(false);
+
+  const SHOW_LIMIT = 5;
 
   useEffect(() => {
     setLoading(true);
@@ -118,6 +132,13 @@ export const CadTrackingSection: React.FC = () => {
   const people = data.people;
   const dayTotals = dates.map((_, i) => people.reduce((s, p) => s + personCounts(p)[i], 0));
   const grand = dayTotals.reduce((a, b) => a + b, 0);
+
+  const arAllRows = [...people].filter(p => p.approvalStyles > 0)
+    .sort((a, b) => arSort === 'styles' ? b.approvalStyles - a.approvalStyles : (b.approvalApproved / b.approvalStyles) - (a.approvalApproved / a.approvalStyles));
+  const arVisibleRows = arShowAll ? arAllRows : arAllRows.slice(0, SHOW_LIMIT);
+
+  const revAllRows = [...people].sort((a, b) => b.revisions - a.revisions);
+  const revVisibleRows = revShowAll ? revAllRows : revAllRows.slice(0, SHOW_LIMIT);
 
   const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
     setGridDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
@@ -146,7 +167,7 @@ export const CadTrackingSection: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={titleStyle}>Daily Per-Person Style Count</span><span style={sheetTag}>cad_files</span>
+              <span style={titleStyle}>Daily Per-Person Style Count</span>
             </div>
             <p style={descStyle}>How many styles each CAD person touched, per day. Click a name to split it into Kira vs V+V; click any number to see the exact style rows behind it.</p>
           </div>
@@ -164,7 +185,7 @@ export const CadTrackingSection: React.FC = () => {
           <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Breakdown</span>
           <div style={segWrapStyle}>
             {(['grid', 'person', 'day'] as const).map(m => (
-              <button key={m} style={segStyle(scMode === m)} onClick={() => setScMode(m)}>{m === 'grid' ? 'Full Grid' : m === 'person' ? 'By Person' : 'By Day'}</button>
+              <button key={m} style={segStyle(scMode === m)} onClick={() => { setScMode(m); setScShowAll(false); }}>{m === 'grid' ? 'Full Grid' : m === 'person' ? 'By Person' : 'By Day'}</button>
             ))}
           </div>
           <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, marginLeft: '8px' }}>View</span>
@@ -179,7 +200,7 @@ export const CadTrackingSection: React.FC = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={thStyle}></th><th style={thStyle}>Person</th>{dates.map(d => <th key={d} style={{ ...thStyle, textAlign: 'right' }}>{dateLabels[d]}</th>)}<th style={{ ...thStyle, textAlign: 'right', color: 'var(--accent-dark)' }}>Total</th></tr></thead>
               <tbody>
-                {people.map(p => {
+                {(scShowAll ? people : people.slice(0, SHOW_LIMIT)).map(p => {
                   const counts = personCounts(p);
                   const total = counts.reduce((a, b) => a + b, 0);
                   const open = expandedPeople.has(p.name);
@@ -231,32 +252,46 @@ export const CadTrackingSection: React.FC = () => {
                 )}
               </tbody>
             </table>
+            <ViewMoreButton hiddenCount={Math.max(0, people.length - SHOW_LIMIT)} showAll={scShowAll} onToggle={() => setScShowAll(v => !v)} />
           </div>
         )}
         {scMode === 'person' && (() => {
-          const rows = [...people].map(p => ({ name: p.name, total: personCounts(p).reduce((a, b) => a + b, 0) })).sort((a, b) => b.total - a.total);
-          const max = Math.max(1, ...rows.map(r => r.total));
-          return scView === 'table' ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>Rank</th><th style={thStyle}>Person</th><th style={{ ...thStyle, textAlign: 'right' }}>Total Styles</th></tr></thead>
-              <tbody>{rows.map((r, i) => <tr key={r.name}><td style={tdStyle}><span style={rankStyle(i === 0)}>{i + 1}</span></td><td style={{ ...tdStyle, fontWeight: 600 }}>{r.name}</td><td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{r.total}</td></tr>)}</tbody>
-            </table>
-          ) : <div>{rows.map(r => <HBar key={r.name} label={r.name} value={r.total} max={max} color="var(--accent)" />)}</div>;
+          const allRows = [...people].map(p => ({ name: p.name, total: personCounts(p).reduce((a, b) => a + b, 0) })).sort((a, b) => b.total - a.total);
+          const rows = scShowAll ? allRows : allRows.slice(0, SHOW_LIMIT);
+          const max = Math.max(1, ...allRows.map(r => r.total));
+          return (
+            <>
+              {scView === 'table' ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr><th style={thStyle}>Rank</th><th style={thStyle}>Person</th><th style={{ ...thStyle, textAlign: 'right' }}>Total Styles</th></tr></thead>
+                  <tbody>{rows.map((r, i) => <tr key={r.name}><td style={tdStyle}><span style={rankStyle(i === 0)}>{i + 1}</span></td><td style={{ ...tdStyle, fontWeight: 600 }}>{r.name}</td><td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{r.total}</td></tr>)}</tbody>
+                </table>
+              ) : <div>{rows.map(r => <HBar key={r.name} label={r.name} value={r.total} max={max} color="var(--accent)" />)}</div>}
+              <ViewMoreButton hiddenCount={Math.max(0, allRows.length - SHOW_LIMIT)} showAll={scShowAll} onToggle={() => setScShowAll(v => !v)} />
+            </>
+          );
         })()}
         {scMode === 'day' && (() => {
-          return scView === 'table' ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>Day</th><th style={{ ...thStyle, textAlign: 'right' }}>Total Styles</th></tr></thead>
-              <tbody>{dates.map((d, i) => <tr key={d}><td style={tdStyle}>{dateLabels[d]}</td><td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{dayTotals[i]}</td></tr>)}</tbody>
-            </table>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '130px', padding: '4px 2px 0' }}>
-              {dayTotals.map((t, i) => { const max = Math.max(1, ...dayTotals); return (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
-                  <div style={{ width: '22px', borderRadius: '2px 2px 0 0', background: 'var(--accent)', height: `${(t / max) * 100}%` }} />
+          const allIdxs = dates.map((_, i) => i);
+          const idxs = scShowAll ? allIdxs : allIdxs.slice(0, SHOW_LIMIT);
+          return (
+            <>
+              {scView === 'table' ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr><th style={thStyle}>Day</th><th style={{ ...thStyle, textAlign: 'right' }}>Total Styles</th></tr></thead>
+                  <tbody>{idxs.map(i => <tr key={dates[i]}><td style={tdStyle}>{dateLabels[dates[i]]}</td><td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{dayTotals[i]}</td></tr>)}</tbody>
+                </table>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '130px', padding: '4px 2px 0' }}>
+                  {idxs.map(i => { const max = Math.max(1, ...dayTotals); return (
+                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ width: '22px', borderRadius: '2px 2px 0 0', background: 'var(--accent)', height: `${(dayTotals[i] / max) * 100}%` }} />
+                    </div>
+                  ); })}
                 </div>
-              ); })}
-            </div>
+              )}
+              <ViewMoreButton hiddenCount={Math.max(0, allIdxs.length - SHOW_LIMIT)} showAll={scShowAll} onToggle={() => setScShowAll(v => !v)} />
+            </>
           );
         })()}
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>See the same numbers split by channel for every row at once → <a onClick={() => document.getElementById('cad-channel')?.scrollIntoView({ behavior: 'smooth' })} style={{ color: 'var(--accent-dark)', fontWeight: 700, cursor: 'pointer' }}>CAD Report — by Channel</a>.</p>
@@ -266,7 +301,7 @@ export const CadTrackingSection: React.FC = () => {
       <div id="cad-channel" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>CAD Report — by Channel</span><span style={sheetTag}>cad_files + orders</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>CAD Report — by Channel</span></div>
             <p style={descStyle}>The same grid as above, but every row is pre-split into Kira vs V+V.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -282,7 +317,7 @@ export const CadTrackingSection: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={thStyle}>Person / Channel</th>{dates.map(d => <th key={d} style={{ ...thStyle, textAlign: 'right' }}>{dateLabels[d]}</th>)}<th style={{ ...thStyle, textAlign: 'right', color: 'var(--accent-dark)' }}>Total</th></tr></thead>
             <tbody>
-              {people.map(p => (
+              {(ccShowAll ? people : people.slice(0, SHOW_LIMIT)).map(p => (
                 <React.Fragment key={p.name}>
                   <tr style={{ cursor: 'pointer' }} onClick={() => toggleChannelDrill(p.name, p.name, `${records.filter(r => r.p === p.name).length} style rows`, r => r.p === p.name)}>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{p.name}</td>
@@ -315,6 +350,7 @@ export const CadTrackingSection: React.FC = () => {
               </tr>
             </tbody>
           </table>
+          <ViewMoreButton hiddenCount={Math.max(0, people.length - SHOW_LIMIT)} showAll={ccShowAll} onToggle={() => setCcShowAll(v => !v)} />
         </div>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>Click any row to see the underlying style numbers.</p>
       </div>
@@ -323,13 +359,13 @@ export const CadTrackingSection: React.FC = () => {
       <div id="approval-rate" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>CAD Approval Rate</span><span style={sheetTag}>cad_files.status</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>CAD Approval Rate</span></div>
             <p style={descStyle}>Of the styles each person made, how many were approved — covering Kira and V+V alike, since JewelFlow tracks approvals for both.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '4px' }}>
-              <button style={pillStyle(arSort === 'styles')} onClick={() => setArSort('styles')}>By Styles Made</button>
-              <button style={pillStyle(arSort === 'rate')} onClick={() => setArSort('rate')}>By Approval Rate</button>
+              <button style={pillStyle(arSort === 'styles')} onClick={() => { setArSort('styles'); setArShowAll(false); }}>By Styles Made</button>
+              <button style={pillStyle(arSort === 'rate')} onClick={() => { setArSort('rate'); setArShowAll(false); }}>By Approval Rate</button>
             </div>
             <button style={downloadBtnStyle} onClick={() => downloadCsv(`Approval_Rate_${dateFrom}_${dateTo}.csv`, ['Person', 'Styles Made', 'Approved', 'Approval Rate %'],
               people.filter(p => p.approvalStyles > 0).map(p => [p.name, p.approvalStyles, p.approvalApproved, (p.approvalApproved / p.approvalStyles * 100).toFixed(1)]))}>⬇ Download CSV</button>
@@ -339,9 +375,7 @@ export const CadTrackingSection: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={thStyle}></th><th style={thStyle}>Person</th><th style={{ ...thStyle, textAlign: 'right' }}>Styles Made</th><th style={{ ...thStyle, textAlign: 'right' }}>Approved</th><th style={thStyle}>Approval Rate</th></tr></thead>
             <tbody>
-              {[...people].filter(p => p.approvalStyles > 0)
-                .sort((a, b) => arSort === 'styles' ? b.approvalStyles - a.approvalStyles : (b.approvalApproved / b.approvalStyles) - (a.approvalApproved / a.approvalStyles))
-                .map(p => {
+              {arVisibleRows.map(p => {
                   const rate = p.approvalApproved / p.approvalStyles * 100;
                   const open = arExpanded.has(p.name);
                   return (
@@ -370,6 +404,7 @@ export const CadTrackingSection: React.FC = () => {
                 })}
             </tbody>
           </table>
+          <ViewMoreButton hiddenCount={Math.max(0, arAllRows.length - SHOW_LIMIT)} showAll={arShowAll} onToggle={() => setArShowAll(v => !v)} />
         </div>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>Click a person to see which specific styles were approved.</p>
       </div>
@@ -378,7 +413,7 @@ export const CadTrackingSection: React.FC = () => {
       <div id="channel-comparison" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Kira vs V+V Comparison</span><span style={sheetTag}>orders.storeName</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Kira vs V+V Comparison</span></div>
             <p style={descStyle}>Your two order channels, side by side. Click either card to filter Daily Per-Person Style Count above to just that channel.</p>
           </div>
           <button style={downloadBtnStyle} onClick={() => downloadCsv(`Kira_vs_VV_Comparison_${dateFrom}_${dateTo}.csv`, ['Channel', 'Styles', 'Approvals', 'Approval Rate %'],
@@ -427,17 +462,17 @@ export const CadTrackingSection: React.FC = () => {
       <div id="revision-activity" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Revision Activity</span><span style={sheetTag}>cad_files per order</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Revision Activity</span></div>
             <p style={descStyle}>Orders touched more than once by the same person — a real, per-style revision count, not inferred. Click a person to see which styles.</p>
           </div>
           <button style={downloadBtnStyle} onClick={() => downloadCsv(`Revision_Activity_${dateFrom}_${dateTo}.csv`, ['Person', 'Distinct Styles', 'Total Entries', 'Revisions'],
-            [...people].sort((a, b) => b.revisions - a.revisions).map(p => [p.name, p.distinctStyles, p.totalEntries, p.revisions]))}>⬇ Download CSV</button>
+            revAllRows.map(p => [p.name, p.distinctStyles, p.totalEntries, p.revisions]))}>⬇ Download CSV</button>
         </div>
         <div style={{ overflowX: 'auto', marginTop: '14px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={thStyle}></th><th style={thStyle}>Person</th><th style={{ ...thStyle, textAlign: 'right' }}>Distinct Styles</th><th style={{ ...thStyle, textAlign: 'right' }}>Total Entries</th><th style={{ ...thStyle, textAlign: 'right' }}>Revisions</th></tr></thead>
             <tbody>
-              {[...people].sort((a, b) => b.revisions - a.revisions).map(p => {
+              {revVisibleRows.map(p => {
                 const open = revExpanded.has(p.name);
                 return (
                   <React.Fragment key={p.name}>
@@ -467,6 +502,7 @@ export const CadTrackingSection: React.FC = () => {
               })}
             </tbody>
           </table>
+          <ViewMoreButton hiddenCount={Math.max(0, revAllRows.length - SHOW_LIMIT)} showAll={revShowAll} onToggle={() => setRevShowAll(v => !v)} />
         </div>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>More precise than the dashboard's inferred Revisions Completed tile.</p>
       </div>
@@ -475,25 +511,26 @@ export const CadTrackingSection: React.FC = () => {
       <div id="style-data" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Style Data</span><span style={sheetTag}>cad_files raw</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Style Data</span></div>
             <p style={descStyle}>The source rows every report above is a rollup of. Search by person or style number.</p>
           </div>
           <button style={downloadBtnStyle} onClick={() => downloadCsv(`Style_Data_Raw_${dateFrom}_${dateTo}.csv`, ['Date', 'Person', 'Style No.', 'Family', 'Approved'],
             records.map(r => [fullDate(r.d), r.p, r.s, r.f, r.a ? 'Yes' : 'No']))}>⬇ Download CSV</button>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', margin: '14px 0 10px' }}>
-          <input value={sdQuery} onChange={e => setSdQuery(e.target.value)} placeholder="Search person or style no.…"
+          <input value={sdQuery} onChange={e => { setSdQuery(e.target.value); setSdShowAll(false); }} placeholder="Search person or style no.…"
             style={{ flex: '1 1 180px', maxWidth: '280px', padding: '7px 12px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '12.5px' }} />
           <div style={{ display: 'flex', gap: '4px' }}>
-            {(['all', 'Kira', 'V+V'] as const).map(f => <button key={f} style={pillStyle(sdFamily === f)} onClick={() => setSdFamily(f)}>{f === 'all' ? 'All' : f}</button>)}
+            {(['all', 'Kira', 'V+V'] as const).map(f => <button key={f} style={pillStyle(sdFamily === f)} onClick={() => { setSdFamily(f); setSdShowAll(false); }}>{f === 'all' ? 'All' : f}</button>)}
           </div>
         </div>
         {(() => {
           const q = sdQuery.trim().toLowerCase();
-          const rows = records.filter(r => (sdFamily === 'all' || r.f === sdFamily) && (!q || r.p.toLowerCase().includes(q) || r.s.toLowerCase().includes(q)));
+          const allRows = records.filter(r => (sdFamily === 'all' || r.f === sdFamily) && (!q || r.p.toLowerCase().includes(q) || r.s.toLowerCase().includes(q)));
+          const rows = sdShowAll ? allRows : allRows.slice(0, SHOW_LIMIT);
           return (
             <>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>{rows.length} of {records.length} rows</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Showing {rows.length} of {allRows.length} rows</div>
               <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Date</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Person</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Style No.</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Family</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Approved</th></tr></thead>
@@ -503,6 +540,7 @@ export const CadTrackingSection: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              <ViewMoreButton hiddenCount={Math.max(0, allRows.length - SHOW_LIMIT)} showAll={sdShowAll} onToggle={() => setSdShowAll(v => !v)} />
             </>
           );
         })()}
