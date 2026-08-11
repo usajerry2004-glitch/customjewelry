@@ -1591,10 +1591,28 @@ export default function OrderDetail() {
                       return (
                         <div key={cad.id}
                           onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
-                          style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
+                          style={{ position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
                         >
+                          {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && (
+                            <button
+                              onClick={async e => {
+                                e.stopPropagation();
+                                if (!order?.id) return;
+                                if (!confirm(`Remove "${cad.originalName}"? This cannot be undone.`)) return;
+                                await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE' });
+                                const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                                if (cRes.ok) setCads(await cRes.json());
+                              }}
+                              title="Remove file"
+                              style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 1, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '5px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', cursor: 'pointer', lineHeight: 1 }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#EF4444')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.55)')}
+                            >
+                              ✕
+                            </button>
+                          )}
                           {isImg ? (
                             <Image src={thumbUrl} alt={cad.originalName} className="ref-thumb-img" width={200} height={110}
                               style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
