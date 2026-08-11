@@ -146,13 +146,11 @@ export const CadTrackingSection: React.FC = () => {
   return (
     <>
       {/* ── shared date range for every "Your Workbook" report below ── */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '14px', flexWrap: 'wrap', padding: '14px 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>From</label>
-          <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
-          <input type="date" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>From</label>
+        <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
+        <input type="date" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
       </div>
 
       {/* ── Daily Per-Person Style Count ── */}
