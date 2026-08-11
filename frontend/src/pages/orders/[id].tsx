@@ -8,6 +8,7 @@ import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
+import { CAD_PERSON_OPTIONS, CAD_PERSON_OTHER } from '../../utils/cadPersons';
 import { OrderConversation } from '../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
@@ -607,7 +608,9 @@ export default function OrderDetail() {
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2>(0);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploadCadPerson, setUploadCadPerson] = useState('');
+  const [uploadCadPersonSelect, setUploadCadPersonSelect] = useState('');
+  const [uploadCadPersonOther, setUploadCadPersonOther] = useState('');
+  const uploadCadPerson = uploadCadPersonSelect === CAD_PERSON_OTHER ? uploadCadPersonOther.trim() : uploadCadPersonSelect;
   const [uploadVerifiedBy, setUploadVerifiedBy] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const uploadFileRef = useRef<HTMLInputElement>(null);
@@ -1166,7 +1169,8 @@ export default function OrderDetail() {
         if (oRes.ok) setOrder(await oRes.json());
         setShowUploadModal(false);
         setUploadFiles([]);
-        setUploadCadPerson('');
+        setUploadCadPersonSelect('');
+        setUploadCadPersonOther('');
         setUploadVerifiedBy('');
       } else {
         const err = await res.json().catch(() => null);
@@ -2635,14 +2639,24 @@ export default function OrderDetail() {
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               CAD Person Name *
             </label>
-            <input
-              type="text"
-              value={uploadCadPerson}
-              onChange={e => setUploadCadPerson(e.target.value)}
-              placeholder="Who modeled this file"
+            <select
+              value={uploadCadPersonSelect}
+              onChange={e => setUploadCadPersonSelect(e.target.value)}
               autoFocus
-              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
-            />
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: uploadCadPersonSelect === CAD_PERSON_OTHER ? '8px' : '14px' }}
+            >
+              <option value="">Select…</option>
+              {CAD_PERSON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {uploadCadPersonSelect === CAD_PERSON_OTHER && (
+              <input
+                type="text"
+                value={uploadCadPersonOther}
+                onChange={e => setUploadCadPersonOther(e.target.value)}
+                placeholder="Enter their name"
+                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
+              />
+            )}
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               Verified By Name *
             </label>
@@ -2655,7 +2669,7 @@ export default function OrderDetail() {
               style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
             />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); setUploadCadPerson(''); setUploadVerifiedBy(''); }} disabled={uploadingFiles}
+              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); setUploadCadPersonSelect(''); setUploadCadPersonOther(''); setUploadVerifiedBy(''); }} disabled={uploadingFiles}
                 style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
                 Cancel
               </button>

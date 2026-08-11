@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
 import { toast } from '../utils/toast';
+import { CAD_PERSON_OPTIONS, CAD_PERSON_OTHER } from '../utils/cadPersons';
 
 interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; status?: string; cadSubStatus?: string | null; }
 
@@ -13,7 +14,9 @@ export default function CADPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [notes, setNotes] = useState('');
-  const [cadPersonName, setCadPersonName] = useState('');
+  const [cadPersonSelect, setCadPersonSelect] = useState('');
+  const [cadPersonOther, setCadPersonOther] = useState('');
+  const cadPersonName = cadPersonSelect === CAD_PERSON_OTHER ? cadPersonOther.trim() : cadPersonSelect;
   const [verifiedByName, setVerifiedByName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedFileCount, setSelectedFileCount] = useState(0);
@@ -56,7 +59,8 @@ export default function CADPage() {
       if (res.ok) {
         toast.success('CAD file uploaded.');
         setNotes('');
-        setCadPersonName('');
+        setCadPersonSelect('');
+        setCadPersonOther('');
         setVerifiedByName('');
         setSelectedOrderId('');
         setSelectedFileCount(0);
@@ -125,7 +129,8 @@ export default function CADPage() {
       if (succeeded > 0) {
         setBulkItems([]);
         setNotes('');
-        setCadPersonName('');
+        setCadPersonSelect('');
+        setCadPersonOther('');
         setVerifiedByName('');
         if (bulkFileRef.current) bulkFileRef.current.value = '';
       }
@@ -274,7 +279,18 @@ export default function CADPage() {
           <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'end', marginTop: '12px' }}>
             <div>
               <label style={lbl}>CAD Person Name *</label>
-              <input value={cadPersonName} onChange={e => setCadPersonName(e.target.value)} placeholder="Who modeled this file" style={inp} />
+              <select value={cadPersonSelect} onChange={e => setCadPersonSelect(e.target.value)} style={inp}>
+                <option value="">Select…</option>
+                {CAD_PERSON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {cadPersonSelect === CAD_PERSON_OTHER && (
+                <input
+                  value={cadPersonOther}
+                  onChange={e => setCadPersonOther(e.target.value)}
+                  placeholder="Enter their name"
+                  style={{ ...inp, marginTop: '8px' }}
+                />
+              )}
             </div>
             <div>
               <label style={lbl}>Verified By Name *</label>
