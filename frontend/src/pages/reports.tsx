@@ -18,7 +18,6 @@ const WORKBOOK_ITEMS: { id: string; label: string }[] = [
   { id: 'approval-rate', label: 'CAD Approval Rate' },
   { id: 'channel-comparison', label: 'Kira vs V+V Comparison' },
   { id: 'revision-activity', label: 'Revision Activity' },
-  { id: 'style-data', label: 'Style Data' },
 ];
 
 export default function ReportsPage() {
@@ -62,9 +61,7 @@ export default function ReportsPage() {
         <aside style={{ width: '210px', flexShrink: 0, position: 'sticky', top: '20px', display: 'flex', flexDirection: 'column', gap: '2px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 10px', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ fontSize: '9.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, padding: '0 6px 5px' }}>Dashboard</div>
           {RAIL_ITEMS.map(i => <a key={i.id} onClick={() => jump(i.id)} style={railLinkStyle(i.id)}>{i.label}</a>)}
-          <div style={{ fontSize: '9.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 700, margin: '12px 6px 5px', paddingTop: '10px', borderTop: '1px solid var(--border-light)' }}>
-            Your Workbook
-          </div>
+          <div style={{ margin: '10px 6px', borderTop: '1px solid var(--border-light)' }} />
           {WORKBOOK_ITEMS.map(i => <a key={i.id} onClick={() => jump(i.id)} style={railLinkStyle(i.id)}>{i.label}</a>)}
         </aside>
 

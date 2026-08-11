@@ -109,10 +109,6 @@ export const CadTrackingSection: React.FC = () => {
   const [revExpanded, setRevExpanded] = useState<Set<string>>(new Set());
   const [revShowAll, setRevShowAll] = useState(false);
 
-  const [sdQuery, setSdQuery] = useState('');
-  const [sdFamily, setSdFamily] = useState<'all' | 'Kira' | 'V+V'>('all');
-  const [sdShowAll, setSdShowAll] = useState(false);
-
   const SHOW_LIMIT = 5;
 
   useEffect(() => {
@@ -150,10 +146,7 @@ export const CadTrackingSection: React.FC = () => {
   return (
     <>
       {/* ── shared date range for every "Your Workbook" report below ── */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', padding: '14px 22px' }}>
-        <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-          Every report below is computed live from your <strong>cad_files</strong> and <strong>orders</strong> data — no manual sheet needed.
-        </div>
+      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '14px', flexWrap: 'wrap', padding: '14px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>From</label>
           <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '12px', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
@@ -505,45 +498,6 @@ export const CadTrackingSection: React.FC = () => {
           <ViewMoreButton hiddenCount={Math.max(0, revAllRows.length - SHOW_LIMIT)} showAll={revShowAll} onToggle={() => setRevShowAll(v => !v)} />
         </div>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>More precise than the dashboard's inferred Revisions Completed tile.</p>
-      </div>
-
-      {/* ── Style Data (raw) ── */}
-      <div id="style-data" style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Style Data</span></div>
-            <p style={descStyle}>The source rows every report above is a rollup of. Search by person or style number.</p>
-          </div>
-          <button style={downloadBtnStyle} onClick={() => downloadCsv(`Style_Data_Raw_${dateFrom}_${dateTo}.csv`, ['Date', 'Person', 'Style No.', 'Family', 'Approved'],
-            records.map(r => [fullDate(r.d), r.p, r.s, r.f, r.a ? 'Yes' : 'No']))}>⬇ Download CSV</button>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', margin: '14px 0 10px' }}>
-          <input value={sdQuery} onChange={e => { setSdQuery(e.target.value); setSdShowAll(false); }} placeholder="Search person or style no.…"
-            style={{ flex: '1 1 180px', maxWidth: '280px', padding: '7px 12px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '12.5px' }} />
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {(['all', 'Kira', 'V+V'] as const).map(f => <button key={f} style={pillStyle(sdFamily === f)} onClick={() => { setSdFamily(f); setSdShowAll(false); }}>{f === 'all' ? 'All' : f}</button>)}
-          </div>
-        </div>
-        {(() => {
-          const q = sdQuery.trim().toLowerCase();
-          const allRows = records.filter(r => (sdFamily === 'all' || r.f === sdFamily) && (!q || r.p.toLowerCase().includes(q) || r.s.toLowerCase().includes(q)));
-          const rows = sdShowAll ? allRows : allRows.slice(0, SHOW_LIMIT);
-          return (
-            <>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Showing {rows.length} of {allRows.length} rows</div>
-              <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Date</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Person</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Style No.</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Family</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-card)' }}>Approved</th></tr></thead>
-                  <tbody>
-                    {rows.length ? rows.map((r, i) => <tr key={i}><td style={tdStyle}>{fullDate(r.d)}</td><td style={{ ...tdStyle, fontWeight: 600 }}>{r.p}</td><td style={tdStyle}>{r.s}</td><td style={tdStyle}>{r.f}</td><td style={tdStyle}>{r.a ? '✅' : '—'}</td></tr>)
-                      : <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)' }}>No matching rows.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-              <ViewMoreButton hiddenCount={Math.max(0, allRows.length - SHOW_LIMIT)} showAll={sdShowAll} onToggle={() => setSdShowAll(v => !v)} />
-            </>
-          );
-        })()}
       </div>
     </>
   );
