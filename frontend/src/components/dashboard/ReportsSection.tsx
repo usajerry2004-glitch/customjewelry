@@ -196,7 +196,7 @@ export const ReportsSection: React.FC = () => {
     <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
 
       {/* Order Activity */}
-      <div style={cardStyle}>
+      <div id="order-activity" style={{ ...cardStyle, scrollMarginTop: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
           <div>
             <div style={reportTitleStyle}>Order Activity</div>
@@ -267,7 +267,7 @@ export const ReportsSection: React.FC = () => {
       </div>
 
       {/* Top Customers */}
-      <div style={cardStyle}>
+      <div id="top-customers" style={{ ...cardStyle, scrollMarginTop: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
           <div>
             <div style={reportTitleStyle}>Top Customers</div>
@@ -332,7 +332,7 @@ export const ReportsSection: React.FC = () => {
       </div>
 
       {/* Top Sales Reps */}
-      <div style={cardStyle}>
+      <div id="top-sales-reps" style={{ ...cardStyle, scrollMarginTop: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
           <div>
             <div style={reportTitleStyle}>Top Sales Reps</div>

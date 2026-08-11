@@ -87,4 +87,11 @@ export class ReportsController {
     const anchorMonth = month || new Date().toISOString().slice(0, 7);
     return this.reportsService.getMonthlyProductionReport(periodType, anchorMonth);
   }
+
+  @Get('cad-tracking')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Admin-only Reports tab: per-CAD-person daily style counts, split by Kira/V+V channel, approval rate, and revision activity, computed live from cad_files + orders (?dateFrom/?dateTo, YYYY-MM-DD, default last 7 days).' })
+  cadTracking(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.reportsService.getCadTrackingReport(dateFrom, dateTo);
+  }
 }

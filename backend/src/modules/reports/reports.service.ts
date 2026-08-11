@@ -700,4 +700,99 @@ export class ReportsService {
 
     return { directTotal, direct, cadsTotal, cads, samplesApprovedTotal, samples, revisionsCompletedTotal, revisions };
   }
+
+  // "V+V" = Vow and Vine specifically; "Kira" is not a branded channel of its
+  // own — it's every other custom order. Matched loosely (case-insensitive,
+  // "vow" ... "vine" in either order-ish) since the name shows up inconsistently
+  // across storeName/customerFullName/customerCodeName ("Vow and Vine",
+  // "Vow And Vine LLC", etc.).
+  private classifyFamily(storeName?: string, customerFullName?: string, customerCodeName?: string): 'Kira' | 'V+V' {
+    const s = `${storeName || ''} ${customerFullName || ''} ${customerCodeName || ''}`.toLowerCase();
+    return s.includes('vow') && s.includes('vine') ? 'V+V' : 'Kira';
+  }
+
+  private dayKey(d: Date): string {
+    return `${d.getFullYear()}-${this.pad2(d.getMonth() + 1)}-${this.pad2(d.getDate())}`;
+  }
+
+  private dayLabel(key: string): string {
+    const [, m, d] = key.split('-');
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${d}-${monthNames[parseInt(m, 10) - 1]}`;
+  }
+
+  // Powers every "Your Workbook" report on the admin Reports tab (Daily
+  // Per-Person Style Count, CAD Report by Channel, CAD Approval Rate, Kira vs
+  // V+V Comparison, Revision Activity, Style Data) from real cad_files/orders
+  // rows — no dependency on the CAD team's manually-maintained tracking sheet.
+  // "Style No." in that sheet is just the order's own PO number; every order
+  // gets one from generatePoNumber() regardless of channel.
+  async getCadTrackingReport(dateFromParam?: string, dateToParam?: string) {
+    const to = dateToParam ? new Date(`${dateToParam}T23:59:59.999`) : new Date();
+    const from = dateFromParam ? new Date(`${dateFromParam}T00:00:00`) : new Date(to.getTime() - 6 * DAY_MS);
+    from.setHours(0, 0, 0, 0);
+
+    const rows = await this.cadRepo.createQueryBuilder('cf')
+      .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
+      .where('cf.createdAt BETWEEN :from AND :to', { from, to })
+      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
+      .select('cf.orderId', 'orderId')
+      .addSelect('cf.cadPersonName', 'cadPersonName')
+      .addSelect('cf.createdAt', 'createdAt')
+      .addSelect('cf.status', 'status')
+      .addSelect('o.poNumber', 'poNumber')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
+      .addSelect('o.customerCodeName', 'customerCodeName')
+      .orderBy('cf.createdAt', 'ASC')
+      .getRawMany();
+
+    const records = rows.map(r => ({
+      d: this.dayKey(new Date(r.createdAt)),
+      p: r.cadPersonName || 'Unassigned',
+      s: r.poNumber || r.orderId,
+      f: this.classifyFamily(r.storeName, r.customerFullName, r.customerCodeName),
+      a: r.status === CadFileStatus.APPROVED,
+    }));
+
+    const dates = Array.from(new Set(records.map(r => r.d))).sort();
+    const dateLabels: Record<string, string> = {};
+    dates.forEach(d => { dateLabels[d] = this.dayLabel(d); });
+
+    const personNames = Array.from(new Set(records.map(r => r.p))).sort();
+    const channel: Record<'Kira' | 'V+V', { styles: number; approvals: number }> = { Kira: { styles: 0, approvals: 0 }, 'V+V': { styles: 0, approvals: 0 } };
+    for (const r of records) {
+      channel[r.f].styles += 1;
+      if (r.a) channel[r.f].approvals += 1;
+    }
+
+    const people = personNames.map(name => {
+      const own = records.filter(r => r.p === name);
+      const counts = dates.map(d => own.filter(r => r.d === d).length);
+      const kira = dates.map(d => own.filter(r => r.d === d && r.f === 'Kira').length);
+      const vv = dates.map(d => own.filter(r => r.d === d && r.f === 'V+V').length);
+
+      const byStyle = new Map<string, { dates: string[]; approved: boolean; family: 'Kira' | 'V+V' }[]>();
+      for (const r of own) {
+        if (!byStyle.has(r.s)) byStyle.set(r.s, []);
+        byStyle.get(r.s)!.push({ dates: [r.d], approved: r.a, family: r.f });
+      }
+      const revisionStyles = Array.from(byStyle.entries())
+        .map(([style, entries]) => ({ style, dates: entries.map(e => e.dates[0]).sort(), count: entries.length }))
+        .sort((a, b) => b.count - a.count);
+
+      const approvalDetail = own.map(r => ({ style: r.s, date: r.d, approved: r.a, family: r.f }));
+      const approvalStyles = own.length;
+      const approvalApproved = own.filter(r => r.a).length;
+
+      return {
+        name, counts, total: own.length, kira, vv,
+        kiraTotal: kira.reduce((a, b) => a + b, 0), vvTotal: vv.reduce((a, b) => a + b, 0),
+        approvalStyles, approvalApproved, approvalDetail,
+        revisionStyles, distinctStyles: byStyle.size, totalEntries: own.length, revisions: own.length - byStyle.size,
+      };
+    });
+
+    return { dates, dateLabels, people, channel, records };
+  }
 }
