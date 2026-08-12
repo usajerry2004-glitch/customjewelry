@@ -104,12 +104,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           </div>
         )}
 
-        {priorityReason && (
-          <div style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '5px', padding: '2px 8px', marginBottom: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            🚨 {priorityReason}
-          </div>
-        )}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {priorityReason && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '5px', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              🚨 {priorityReason}
+            </span>
+          )}
           {order.orderType && <Tag text={order.orderType} />}
           {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
           {!hideFinancials && order.quotedCost && <Tag text={formatCurrency(order.quotedCost)} gold />}
