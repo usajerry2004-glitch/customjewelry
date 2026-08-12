@@ -146,11 +146,11 @@ export const CadTrackingSection: React.FC = () => {
   return (
     <>
       {/* ── shared date range for every "Your Workbook" report below ── */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>From</label>
-        <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>To</label>
-        <input type="date" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>From</label>
+        <input type="date" value={dateFrom} max={dateTo} onChange={e => setDateFrom(e.target.value)} style={{ width: '140px', flexShrink: 0, fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>To</label>
+        <input type="date" value={dateTo} min={dateFrom} onChange={e => setDateTo(e.target.value)} style={{ width: '140px', flexShrink: 0, fontSize: '12px', padding: '4px 7px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)' }} />
       </div>
 
       {/* ── Daily Per-Person Style Count ── */}
