@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
+import { OrdersTable } from '../../components/orders/OrdersTable';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
 import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission, MOUNTING_OPTIONS } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
@@ -1592,55 +1593,67 @@ export default function OrdersPage() {
               </div>
             )}
 
-            <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(300px, 1fr))' : '1fr', gap: viewMode === 'grid' ? '12px' : '8px' }}>
-              {displayOrders.map(order => {
-                const isSelected = selectedIds.has(order.id!);
-                const isSelectable = isFactoryManager
-                  ? order.stoneStatus === StoneStatus.STONE_RECEIVED
-                  : order.status !== OrderStatus.CANCELLED;
-                return (
-                  <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
-                    onClick={selectMode ? (e) => {
-                      if (!isSelectable) return;
-                      e.preventDefault();
-                      setSelectedIds(s => { const n = new Set(s); n.has(order.id!) ? n.delete(order.id!) : n.add(order.id!); return n; });
-                    } : undefined}
-                  >
-                    {/* Selection indicator overlay for factory manager (mark manufactured) or office roles (bulk cancel) select mode */}
-                    {selectMode && isSelectable && (
-                      <div style={{
-                        position: 'absolute', inset: 0, zIndex: 2, borderRadius: 'var(--radius)',
-                        border: `2px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
-                        background: isSelected ? 'rgba(192,155,88,0.06)' : 'transparent',
-                        pointerEvents: 'none', transition: 'all 0.1s',
-                      }} />
-                    )}
-                    {selectMode && isSelectable && (
-                      <div style={{
-                        position: 'absolute', top: '10px', left: '10px', zIndex: 3,
-                        width: '22px', height: '22px', borderRadius: '50%',
-                        background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.92)',
-                        border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                        transition: 'all 0.1s',
-                        pointerEvents: 'none',
-                      }}>
-                        {isSelected && <span style={{ color: '#fff', fontSize: '13px', lineHeight: 1, fontWeight: 700 }}>✓</span>}
-                      </div>
-                    )}
-                    <OrderCard
-                      order={order}
-                      compact={viewMode === 'list'}
-                      hideFinancials={!isAdmin}
-                      onClick={selectMode ? undefined : () => router.push(`/orders/${order.id}`)}
-                      referenceImage={thumbnails[order.id!] || undefined}
-                      currentUserRole={userRole}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+            {viewMode === 'list' ? (
+              <OrdersTable
+                orders={displayOrders}
+                hideFinancials={!isAdmin}
+                thumbnails={thumbnails}
+                onRowClick={order => router.push(`/orders/${order.id}`)}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={id => setSelectedIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; })}
+                isSelectable={order => isFactoryManager ? order.stoneStatus === StoneStatus.STONE_RECEIVED : order.status !== OrderStatus.CANCELLED}
+              />
+            ) : (
+              <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+                {displayOrders.map(order => {
+                  const isSelected = selectedIds.has(order.id!);
+                  const isSelectable = isFactoryManager
+                    ? order.stoneStatus === StoneStatus.STONE_RECEIVED
+                    : order.status !== OrderStatus.CANCELLED;
+                  return (
+                    <div key={order.id} style={{ position: 'relative', opacity: selectMode && !isSelectable ? 0.45 : 1, transition: 'opacity 0.15s' }}
+                      onClick={selectMode ? (e) => {
+                        if (!isSelectable) return;
+                        e.preventDefault();
+                        setSelectedIds(s => { const n = new Set(s); n.has(order.id!) ? n.delete(order.id!) : n.add(order.id!); return n; });
+                      } : undefined}
+                    >
+                      {/* Selection indicator overlay for factory manager (mark manufactured) or office roles (bulk cancel) select mode */}
+                      {selectMode && isSelectable && (
+                        <div style={{
+                          position: 'absolute', inset: 0, zIndex: 2, borderRadius: 'var(--radius)',
+                          border: `2px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
+                          background: isSelected ? 'rgba(192,155,88,0.06)' : 'transparent',
+                          pointerEvents: 'none', transition: 'all 0.1s',
+                        }} />
+                      )}
+                      {selectMode && isSelectable && (
+                        <div style={{
+                          position: 'absolute', top: '10px', left: '10px', zIndex: 3,
+                          width: '22px', height: '22px', borderRadius: '50%',
+                          background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.92)',
+                          border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                          transition: 'all 0.1s',
+                          pointerEvents: 'none',
+                        }}>
+                          {isSelected && <span style={{ color: '#fff', fontSize: '13px', lineHeight: 1, fontWeight: 700 }}>✓</span>}
+                        </div>
+                      )}
+                      <OrderCard
+                        order={order}
+                        hideFinancials={!isAdmin}
+                        onClick={selectMode ? undefined : () => router.push(`/orders/${order.id}`)}
+                        referenceImage={thumbnails[order.id!] || undefined}
+                        currentUserRole={userRole}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Pagination */}
             {total > PAGE_SIZE && (
