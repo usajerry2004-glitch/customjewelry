@@ -157,6 +157,8 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (typeof window !== 'undefined' && (localStorage.getItem('jf_orders_view') as 'grid' | 'list')) || 'grid');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => readOrdersReturnState()?.sortOrder ?? 'desc');
   // Pre-fill statusFilter from URL query param (e.g. /orders?status=CAD_IN_PROGRESS)
   // if present — an explicit link always wins over a remembered filter —
@@ -647,6 +649,24 @@ export default function OrdersPage() {
     load(0);
   }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, sortOrder]);
   useEffect(() => { load(page); }, [page]);
+
+  // Per-tab counts for the status pill badges — independent of which tab is
+  // currently selected (it covers all of them at once), but still respects
+  // the same side filters (factory/supplier/date/customer-texted) as the
+  // list itself, so a badge always matches what clicking that tab would show.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (factoryFilter) params.set('assignedFactory', factoryFilter);
+    if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
+    apiFetch(`${API}/orders/status-counts?${params}`).then(r => r.ok ? r.json() : {}).then(setStatusCounts).catch(() => {});
+  }, [factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, userRole]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('jf_orders_view', viewMode);
+  }, [viewMode]);
 
   // Remember filters/pagination on every change, so returning here (e.g.
   // via "Back to Orders") restores the same view instead of resetting it.
@@ -1244,6 +1264,22 @@ export default function OrdersPage() {
             <option value="desc">Newest first</option>
             <option value="asc">Oldest first</option>
           </select>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '7px', overflow: 'hidden', flexShrink: 0 }}>
+            {(['grid', 'list'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setViewMode(v)}
+                title={v === 'grid' ? 'Grid view' : 'List view'}
+                style={{
+                  border: 'none', borderRight: v === 'grid' ? '1px solid var(--border)' : 'none',
+                  background: viewMode === v ? 'var(--navy)' : 'var(--bg-card)', color: viewMode === v ? '#fff' : 'var(--text-muted)',
+                  fontSize: '13px', padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
+                }}
+              >
+                {v === 'grid' ? '▦' : '☰'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1280,22 +1316,36 @@ export default function OrdersPage() {
 
         {/* Desktop: pill buttons */}
         <div className="status-tabs-desktop" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-          {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
-            <button
-              key={f.value}
-              onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); }}
-              style={{
-                padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                fontWeight: statusFilter === f.value && !customerTextedFilter ? 600 : 400,
-                background: statusFilter === f.value && !customerTextedFilter ? 'var(--navy)' : 'var(--bg-card)',
-                color: statusFilter === f.value && !customerTextedFilter ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${statusFilter === f.value && !customerTextedFilter ? 'var(--navy)' : 'var(--border)'}`,
-                transition: 'all 0.15s',
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+          {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => {
+            const active = statusFilter === f.value && !customerTextedFilter;
+            const count = statusCounts[f.value];
+            return (
+              <button
+                key={f.value}
+                onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                  fontWeight: active ? 600 : 400,
+                  background: active ? 'var(--navy)' : 'var(--bg-card)',
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${active ? 'var(--navy)' : 'var(--border)'}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {f.label}
+                {count !== undefined && (
+                  <span style={{
+                    background: active ? 'rgba(255,255,255,0.25)' : 'var(--bg-input)',
+                    color: active ? '#fff' : 'var(--text-muted)',
+                    fontSize: '10px', fontWeight: 700, borderRadius: '99px', padding: '1px 6px', minWidth: '10px', textAlign: 'center',
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
           {/* A tab like the others, not a combinable toggle — selecting it
               clears the status filter (it applies across all statuses), and
               selecting any status tab clears it back out. Customer chat
@@ -1328,7 +1378,7 @@ export default function OrdersPage() {
           style={{ ...inputStyle, flex: '1 1 160px', maxWidth: '220px', fontSize: '13px', padding: '8px 12px', fontWeight: 500 }}
         >
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (
-            <option key={f.value} value={f.value}>{f.label}</option>
+            <option key={f.value} value={f.value}>{f.label}{statusCounts[f.value] !== undefined ? ` (${statusCounts[f.value]})` : ''}</option>
           ))}
         </select>
       </div>
@@ -1542,7 +1592,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+            <div className="orders-grid" style={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(300px, 1fr))' : '1fr', gap: viewMode === 'grid' ? '12px' : '8px' }}>
               {displayOrders.map(order => {
                 const isSelected = selectedIds.has(order.id!);
                 const isSelectable = isFactoryManager
@@ -1581,6 +1631,7 @@ export default function OrdersPage() {
                     )}
                     <OrderCard
                       order={order}
+                      compact={viewMode === 'list'}
                       hideFinancials={!isAdmin}
                       onClick={selectMode ? undefined : () => router.push(`/orders/${order.id}`)}
                       referenceImage={thumbnails[order.id!] || undefined}

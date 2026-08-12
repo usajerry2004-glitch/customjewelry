@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { Repository, In, Between, Not } from 'typeorm';
+import { Repository, In, Between, Not, SelectQueryBuilder } from 'typeorm';
 import { randomBytes } from 'crypto';
 import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
@@ -23,6 +23,11 @@ import { buildFactoryOrderPdf } from './factory-order-pdf.util';
 export { OrderFilterDto };
 
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
+
+interface OrdersUser {
+  id: string; email: string; role: string;
+  companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null;
+}
 
 // Caps for buildFactoryOrderPdfAttachment: an unresponsive file host must
 // degrade the factory-assigned email (fewer/no attachments) rather than
@@ -566,9 +571,7 @@ export class OrdersService implements OnModuleInit {
     return rows;
   }
 
-  async findAll(filters: OrderFilterDto, user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
-    const qb = this.orderRepo.createQueryBuilder('order');
-
+  private applyRoleScope(qb: SelectQueryBuilder<Order>, user?: OrdersUser): void {
     if (user?.role === 'CUSTOMER') {
       // Companies share order visibility — a teammate sees every order placed
       // by anyone at their company, not just their own.
@@ -602,30 +605,12 @@ export class OrdersService implements OnModuleInit {
       qb.andWhere('(order.stoneStatus = :pendingStone OR order.stoneStatus IS NULL)', { pendingStone: 'PENDING_STONE' });
       qb.andWhere('order.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
     }
+  }
 
-    if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
-
-    // CAD sub-filters (applied server-side so pagination is accurate)
-    if (filters.cadSubFilter === 'cad_pending')
-      qb.andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' });
-    else if (filters.cadSubFilter === 'cad_awaiting_quote')
-      qb.andWhere('(order.cadSubStatus = :csUploaded AND order.sentToCustomer = :notSent)', { csUploaded: 'UPLOADED', notSent: false });
-    else if (filters.cadSubFilter === 'cad_awaiting_approval')
-      qb.andWhere('(order.cadSubStatus = :csUploaded2 AND order.sentToCustomer = :sent)', { csUploaded2: 'UPLOADED', sent: true });
-    else if (filters.cadSubFilter === 'cad_revision')
-      qb.andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' });
-    else if (filters.cadSubFilter === 'cad_approved')
-      qb.andWhere('order.cadSubStatus = :csApproved', { csApproved: 'APPROVED' });
-
-    // Stone sub-filters
-    if (filters.stoneSubFilter === 'stone_unassigned')
-      qb.andWhere('(order.assignedFactory IS NULL OR order.supplySource IS NULL)');
-    else if (filters.stoneSubFilter === 'stone_pending')
-      qb.andWhere('order.assignedFactory IS NOT NULL AND order.supplySource IS NOT NULL')
-        .andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
-    else if (filters.stoneSubFilter === 'stone_received')
-      qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
-
+  // Filters shared between the paginated list (findAll) and the per-status
+  // tab counts (getStatusCounts) — everything except status/cadSubFilter/
+  // stoneSubFilter, which each caller applies on its own terms.
+  private applyCommonFilters(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>): void {
     if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
     if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
 
@@ -674,12 +659,82 @@ export class OrdersService implements OnModuleInit {
       to.setHours(23, 59, 59, 999);
       qb.andWhere('order.createdAt <= :dateTo', { dateTo: to });
     }
+  }
+
+  async findAll(filters: OrderFilterDto, user?: OrdersUser) {
+    const qb = this.orderRepo.createQueryBuilder('order');
+    this.applyRoleScope(qb, user);
+
+    if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
+
+    // CAD sub-filters (applied server-side so pagination is accurate)
+    if (filters.cadSubFilter === 'cad_pending')
+      qb.andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' });
+    else if (filters.cadSubFilter === 'cad_awaiting_quote')
+      qb.andWhere('(order.cadSubStatus = :csUploaded AND order.sentToCustomer = :notSent)', { csUploaded: 'UPLOADED', notSent: false });
+    else if (filters.cadSubFilter === 'cad_awaiting_approval')
+      qb.andWhere('(order.cadSubStatus = :csUploaded2 AND order.sentToCustomer = :sent)', { csUploaded2: 'UPLOADED', sent: true });
+    else if (filters.cadSubFilter === 'cad_revision')
+      qb.andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' });
+    else if (filters.cadSubFilter === 'cad_approved')
+      qb.andWhere('order.cadSubStatus = :csApproved', { csApproved: 'APPROVED' });
+
+    // Stone sub-filters
+    if (filters.stoneSubFilter === 'stone_unassigned')
+      qb.andWhere('(order.assignedFactory IS NULL OR order.supplySource IS NULL)');
+    else if (filters.stoneSubFilter === 'stone_pending')
+      qb.andWhere('order.assignedFactory IS NOT NULL AND order.supplySource IS NOT NULL')
+        .andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
+    else if (filters.stoneSubFilter === 'stone_received')
+      qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
+
+    this.applyCommonFilters(qb, filters);
+
     qb.orderBy('order.isPriorityCustomer', 'DESC')
       .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC')
       .skip(filters.offset || 0)
       .take(filters.limit || 50);
     const [orders, total] = await qb.getManyAndCount();
     return { orders, total };
+  }
+
+  // Powers the count badge on each status tab on the Orders list — same
+  // role-scoping and side filters (factory/supplySource/date/search/customer
+  // message) as findAll, minus status itself, grouped by status so every tab
+  // gets an accurate count for "if I clicked this tab right now." Also
+  // includes the two CAD sub-filter pseudo-statuses (cad_pending/cad_revision)
+  // the CAD Designer role's own tab set uses instead of real statuses.
+  async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>, user?: OrdersUser): Promise<Record<string, number>> {
+    const qb = this.orderRepo.createQueryBuilder('order');
+    this.applyRoleScope(qb, user);
+    this.applyCommonFilters(qb, filters);
+
+    const rows = await qb.select('order.status', 'status').addSelect('COUNT(*)', 'count').groupBy('order.status').getRawMany();
+    const counts: Record<string, number> = {};
+    let all = 0;
+    for (const r of rows) {
+      const n = parseInt(r.count, 10);
+      counts[r.status] = n;
+      all += n;
+    }
+    counts[''] = all;
+
+    if (user?.role === 'CAD_DESIGNER') {
+      const buildSubQb = () => {
+        const q = this.orderRepo.createQueryBuilder('order');
+        this.applyRoleScope(q, user);
+        this.applyCommonFilters(q, filters);
+        return q;
+      };
+      const [pending, revision] = await Promise.all([
+        buildSubQb().andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' }).getCount(),
+        buildSubQb().andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' }).getCount(),
+      ]);
+      counts['cad_pending'] = pending;
+      counts['cad_revision'] = revision;
+    }
+
+    return counts;
   }
 
   // Admin/Authorizer export of the VPO Issued list — mirrors what's on the

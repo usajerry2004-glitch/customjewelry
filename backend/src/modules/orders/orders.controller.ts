@@ -43,6 +43,12 @@ export class OrdersController {
     return this.ordersService.findAll(filters, req.user);
   }
 
+  @Get('status-counts')
+  @ApiOperation({ summary: 'Count of orders per status tab (same role-scoping and side filters as the list itself), for the count badge on each status pill' })
+  getStatusCounts(@Query() filters: OrderFilterDto, @Request() req: any) {
+    return this.ordersService.getStatusCounts(filters, req.user);
+  }
+
   @Get('priority')
   @ApiOperation({ summary: 'Get priority orders for current user role' })
   findPriority(@Request() req: any) {
