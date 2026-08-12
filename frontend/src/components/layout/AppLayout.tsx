@@ -18,9 +18,11 @@ interface AppLayoutProps {
   title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle, actions }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle, actions, onBack, backLabel = 'Back' }) => {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const [notifs, setNotifs] = useState<Notification[]>([]);
@@ -278,6 +280,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             >
               ☰
             </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px',
+                  padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 500,
+                  cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                }}
+              >
+                ← {backLabel}
+              </button>
+            )}
             <div style={{ minWidth: 0 }}>
               {title && (
                 <div className="topbar-title" style={{

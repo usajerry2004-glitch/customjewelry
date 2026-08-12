@@ -1258,6 +1258,8 @@ export default function OrderDetail() {
     <AppLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.storeName || order.customerFullName || ''}
+      onBack={goBackToOrders}
+      backLabel="Back to Orders"
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -1304,12 +1306,6 @@ export default function OrderDetail() {
               {resendingFactoryAlert ? 'Sending…' : '✉ Resend Factory Alert'}
             </button>
           )}
-          <button
-            onClick={goBackToOrders}
-            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
-          >
-            ← Back to Orders
-          </button>
           {canDelete && (
             <button
               onClick={() => { setDeleteConfirmInput(''); setShowDeleteModal(true); }}
