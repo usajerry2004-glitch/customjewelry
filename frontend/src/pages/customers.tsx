@@ -6,6 +6,7 @@ import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { Order, STATUS_CONFIG } from '../utils/types';
 import { formatName } from '../utils/name';
 import { toast } from '../utils/toast';
+import { downloadCsv } from '../utils/csvExport';
 
 interface Customer {
   id: string;
@@ -200,6 +201,14 @@ export default function CustomersPage() {
   const filtered = allFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const resetPage = () => setPage(1);
+
+  // Exports whatever the current search/status/priority/rep filters show —
+  // with nothing set, that's every customer. One row per store/company
+  // (allFiltered is already deduped that way), not one per teammate login.
+  const handleExportEmails = () => {
+    const rows = allFiltered.map(c => [c.storeName || formatName(c.firstName, c.lastName), c.email]);
+    downloadCsv(`Customer_Emails_${new Date().toISOString().slice(0, 10)}.csv`, ['Customer / Store Name', 'Email'], rows);
+  };
 
   const placeOrder = async () => {
     if (!showOrder || !newOrder.orderType || !newOrder.metalType || !newOrder.metalColor || !newOrder.diamondType) {
@@ -462,7 +471,15 @@ export default function CustomersPage() {
             Clear filters
           </button>
         )}
-        <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+        <button
+          onClick={handleExportEmails}
+          disabled={allFiltered.length === 0}
+          title="Export the customer/store names and emails currently shown (respects the filters above) as a CSV"
+          style={{ marginLeft: 'auto', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12px', fontWeight: 600, cursor: allFiltered.length === 0 ? 'default' : 'pointer', opacity: allFiltered.length === 0 ? 0.6 : 1, whiteSpace: 'nowrap' }}
+        >
+          ⬇ Export CSV
+        </button>
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
           {allFiltered.length} result{allFiltered.length !== 1 ? 's' : ''}
         </span>
       </div>
