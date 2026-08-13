@@ -74,6 +74,9 @@ export default function CustomersPage() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [refImage, setRefImage] = useState<File | null>(null);
   const refImageRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [showTeam, setShowTeam] = useState<{ customer: Customer; teammates: Customer[] } | null>(null);
   const [showTeamTop, setShowTeamTop] = useState(200);
   const [showTeamH, setShowTeamH] = useState(400);
@@ -389,6 +392,28 @@ export default function CustomersPage() {
     }
   };
 
+  // Permanent — deleting removes the login/account row itself, not order
+  // history (orders keep their own copy of customerEmail/storeName, so past
+  // orders still show up). Gated to inactive accounts only, and requires
+  // typing the email, so this can't happen from a stray click.
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteConfirmInput.trim().toLowerCase() !== deleteTarget.email.toLowerCase()) return;
+    setDeleting(true);
+    try {
+      const res = await apiFetch(`${API}/users/${deleteTarget.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success(`Deleted ${deleteTarget.storeName || formatName(deleteTarget.firstName, deleteTarget.lastName)}.`);
+        setCustomers(prev => prev.filter(c => c.id !== deleteTarget.id));
+        setDeleteTarget(null);
+        setDeleteConfirmInput('');
+      } else {
+        toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to delete customer.'));
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const togglePriority = async (id: string) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, isPriority: !c.isPriority } : c));
     const res = await apiFetch(`${API}/users/${id}/priority`, { method: 'PATCH' });
@@ -613,6 +638,11 @@ export default function CustomersPage() {
                     {isAdmin && !c.isActive && (
                       <button onClick={() => reactivate(c.id)} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(5,150,105,0.3)', background: 'transparent', color: '#059669', fontSize: '11px', cursor: 'pointer' }}>
                         Reactivate
+                      </button>
+                    )}
+                    {isAdmin && !c.isActive && (
+                      <button onClick={() => { setDeleteTarget(c); setDeleteConfirmInput(''); }} style={{ padding: '5px 11px', borderRadius: '6px', border: '1px solid rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.06)', color: '#DC2626', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        Delete
                       </button>
                     )}
                   </div>
@@ -962,6 +992,48 @@ export default function CustomersPage() {
           </div>
         </>,
         document.body
+      )}
+
+      {/* ── Delete Customer Confirmation ── */}
+      {deleteTarget && (
+        <div className="modal-bg" style={modalBg} onClick={() => { if (!deleting) { setDeleteTarget(null); setDeleteConfirmInput(''); } }}>
+          <div className="modal-box" style={{ ...modalBox, maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: '#DC2626', margin: '0 0 8px' }}>Delete customer account?</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 14px' }}>
+              This permanently removes <strong>{deleteTarget.storeName || formatName(deleteTarget.firstName, deleteTarget.lastName)}</strong>'s login ({deleteTarget.email}). Their past orders keep their own record of the name/email, so order history isn't deleted — but this account can no longer sign in, and this can't be undone.
+            </p>
+            <label style={LABEL}>Type the email to confirm: {deleteTarget.email}</label>
+            <input
+              autoFocus
+              value={deleteConfirmInput}
+              onChange={e => setDeleteConfirmInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmDelete(); }}
+              placeholder={deleteTarget.email}
+              style={{ ...INPUT, marginBottom: '16px' }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteConfirmInput(''); }}
+                disabled={deleting}
+                style={{ flex: 1, padding: '9px 16px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: deleting ? 'default' : 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting || deleteConfirmInput.trim().toLowerCase() !== deleteTarget.email.toLowerCase()}
+                style={{
+                  flex: 1, padding: '9px 16px', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                  background: '#DC2626',
+                  cursor: (deleting || deleteConfirmInput.trim().toLowerCase() !== deleteTarget.email.toLowerCase()) ? 'not-allowed' : 'pointer',
+                  opacity: (deleting || deleteConfirmInput.trim().toLowerCase() !== deleteTarget.email.toLowerCase()) ? 0.5 : 1,
+                }}
+              >
+                {deleting ? 'Deleting…' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AppLayout>
   );
