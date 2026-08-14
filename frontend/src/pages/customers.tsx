@@ -661,6 +661,13 @@ export default function CustomersPage() {
           </span>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
+              onClick={() => setPage(1)}
+              disabled={safePage === 1}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === 1 ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === 1 ? 'default' : 'pointer', opacity: safePage === 1 ? 0.5 : 1 }}
+            >
+              « First
+            </button>
+            <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={safePage === 1}
               style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === 1 ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === 1 ? 'default' : 'pointer', opacity: safePage === 1 ? 0.5 : 1 }}
@@ -702,6 +709,13 @@ export default function CustomersPage() {
               style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === totalPages ? 'default' : 'pointer', opacity: safePage === totalPages ? 0.5 : 1 }}
             >
               Next ›
+            </button>
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={safePage === totalPages}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-input)', color: safePage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12px', cursor: safePage === totalPages ? 'default' : 'pointer', opacity: safePage === totalPages ? 0.5 : 1 }}
+            >
+              Last »
             </button>
           </div>
         </div>

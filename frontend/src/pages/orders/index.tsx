@@ -1564,8 +1564,50 @@ export default function OrdersPage() {
           : displayOrders.filter(o => o.status !== OrderStatus.CANCELLED && o.status !== OrderStatus.COMPLETED);
         const allSelectableSelected = selectableOrders.length > 0 && selectableOrders.every(o => selectedIds.has(o.id!));
 
+        const totalPages = Math.ceil(total / PAGE_SIZE);
+        function renderPagination(key: string) {
+          if (total <= PAGE_SIZE) return null;
+          return (
+            <div key={key} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', margin: '16px 0', flexWrap: 'wrap' }}>
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(0)}
+                style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page === 0 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+              >« First</button>
+              <button
+                disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}
+                style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page === 0 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+              >← Prev</button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  style={{ padding: '6px 12px', borderRadius: '7px', border: `1px solid ${page === i ? 'var(--navy)' : 'var(--border)'}`, background: page === i ? 'var(--navy)' : 'var(--bg-card)', color: page === i ? '#fff' : 'var(--text-primary)', cursor: 'pointer', fontSize: '12px', fontWeight: page === i ? 700 : 400 }}
+                >{i + 1}</button>
+              )).slice(Math.max(0, page - 2), page + 5)}
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => p + 1)}
+                style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page >= totalPages - 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+              >Next →</button>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(totalPages - 1)}
+                style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page >= totalPages - 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
+              >Last »</button>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Page {page + 1} of {totalPages} · {total} total
+              </span>
+            </div>
+          );
+        }
+
         return (
           <>
+            {/* Pagination (top) */}
+            {renderPagination('top')}
+
             {/* Select-all row — factory manager (mark manufactured) or office roles (bulk cancel) */}
             {selectMode && displayOrders.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
@@ -1655,31 +1697,8 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {/* Pagination */}
-            {total > PAGE_SIZE && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '24px', flexWrap: 'wrap' }}>
-                <button
-                  disabled={page === 0}
-                  onClick={() => setPage(p => p - 1)}
-                  style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page === 0 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === 0 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
-                >← Prev</button>
-                {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    style={{ padding: '6px 12px', borderRadius: '7px', border: `1px solid ${page === i ? 'var(--navy)' : 'var(--border)'}`, background: page === i ? 'var(--navy)' : 'var(--bg-card)', color: page === i ? '#fff' : 'var(--text-primary)', cursor: 'pointer', fontSize: '12px', fontWeight: page === i ? 700 : 400 }}
-                  >{i + 1}</button>
-                )).slice(Math.max(0, page - 2), page + 5)}
-                <button
-                  disabled={page >= Math.ceil(total / PAGE_SIZE) - 1}
-                  onClick={() => setPage(p => p + 1)}
-                  style={{ padding: '6px 14px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--bg-card)', color: page >= Math.ceil(total / PAGE_SIZE) - 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page >= Math.ceil(total / PAGE_SIZE) - 1 ? 'not-allowed' : 'pointer', fontSize: '12px' }}
-                >Next →</button>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  Page {page + 1} of {Math.ceil(total / PAGE_SIZE)} · {total} total
-                </span>
-              </div>
-            )}
+            {/* Pagination (bottom) */}
+            {renderPagination('bottom')}
           </>
         );
       })()}
