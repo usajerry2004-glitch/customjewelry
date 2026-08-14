@@ -8,6 +8,8 @@ import { CadFile } from '../../database/entities/cad-file.entity';
 import { Notification } from '../../database/entities/notification.entity';
 import { PublicOrdersController } from './public-orders.controller';
 import { PublicOrdersService } from './public-orders.service';
+import { RingBuilderOrdersController } from './ring-builder-orders.controller';
+import { RingBuilderOrdersService } from './ring-builder-orders.service';
 import { OrdersModule } from '../orders/orders.module';
 
 @Module({
@@ -21,7 +23,7 @@ import { OrdersModule } from '../orders/orders.module';
       limits:  { fileSize: 200 * 1024 * 1024, files: 10 },
     }),
   ],
-  controllers: [PublicOrdersController],
-  providers: [PublicOrdersService],
+  controllers: [PublicOrdersController, RingBuilderOrdersController],
+  providers: [PublicOrdersService, RingBuilderOrdersService],
 })
 export class PublicModule {}

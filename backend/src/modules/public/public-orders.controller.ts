@@ -1,13 +1,14 @@
 import {
   Controller, Post, Get, Patch, Body, Param,
-  UploadedFiles, UseInterceptors,
-  Headers, ForbiddenException, BadRequestException, Logger,
+  UploadedFiles, UseInterceptors, UseGuards,
+  BadRequestException, Logger,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
 import { Public } from '../../common/decorators/public.decorator';
+import { RequireApiKey } from '../../common/decorators/require-api-key.decorator';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { PublicOrdersService } from './public-orders.service';
 
 @ApiTags('Public')
@@ -17,33 +18,20 @@ export class PublicOrdersController {
 
   constructor(
     private readonly service: PublicOrdersService,
-    private readonly config: ConfigService,
   ) {}
 
   // ── WordPress / web form order submission ─────────────────────────────
   @Post('orders')
   @Public()
+  @UseGuards(ApiKeyGuard)
+  @RequireApiKey('WORDPRESS_API_KEY', ['KiRa@WebForm#2026!'])
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @UseInterceptors(AnyFilesInterceptor())
   @ApiOperation({ summary: 'Submit order from external website (no auth — API key required)' })
   async submitWebOrder(
-    @Headers('x-api-key') apiKey: string,
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    // Accept either whatever's configured via WORDPRESS_API_KEY, or the key
-    // baked directly into the WordPress plugin (it's plaintext in that PHP
-    // source anyway, so it was never a real secret). This way the endpoint
-    // keeps working regardless of what — if anything — is set in a given
-    // environment's WORDPRESS_API_KEY.
-    const WP_PLUGIN_KEY = 'KiRa@WebForm#2026!';
-    const configured = this.config.get<string>('WORDPRESS_API_KEY', '');
-    const accepted = [configured, WP_PLUGIN_KEY].filter(Boolean);
-    if (!apiKey || !accepted.includes(apiKey)) {
-      this.logger.warn(`Web order rejected — invalid API key`);
-      throw new ForbiddenException('Invalid API key');
-    }
-
     if (!body.email || !body.firstName) {
       throw new BadRequestException('email and firstName are required');
     }

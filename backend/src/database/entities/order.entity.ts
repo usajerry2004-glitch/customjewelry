@@ -283,6 +283,27 @@ export class Order {
   @Column({ nullable: true })
   refCustomerPo: string;
 
+  // Where this order originated — 'MANUAL' (staff-entered), 'WEB_FORM' (the
+  // WordPress contact-form intake), or 'RING_BUILDER' (the website's ring
+  // configurator checkout). Purely informational/for reporting; doesn't
+  // change any processing logic.
+  @Column({ type: 'varchar', default: 'MANUAL' })
+  source: string;
+
+  // The originating system's own order number for this line item — set only
+  // for orders created through an external intake (e.g. Ring Builder). Lets
+  // repeated/retried intake calls be recognized as the same order instead of
+  // creating a duplicate (Postgres unique index allows multiple NULLs, so
+  // manually-entered orders are unaffected).
+  @Column({ unique: true, nullable: true })
+  externalOrderId: string | null;
+
+  // Groups multiple Order rows that came from a single external checkout
+  // (e.g. a multi-ring Ring Builder cart, where each ring becomes its own
+  // Order but all share one externalCartId).
+  @Column({ nullable: true })
+  externalCartId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
