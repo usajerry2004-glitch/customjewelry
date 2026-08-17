@@ -1,5 +1,4 @@
 import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { Repository, In, Between, Not, SelectQueryBuilder } from 'typeorm';
@@ -231,56 +230,7 @@ export class OrdersService implements OnModuleInit {
     @InjectRepository(CustomerCode) private readonly customerCodeRepo: Repository<CustomerCode>,
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
-    private readonly config: ConfigService,
   ) {}
-
-  // Fire-and-forget push to the Ring Builder website when one of its orders
-  // completes — deliberately sends only a completed flag, nothing about
-  // internal production stages (see the poll endpoint this mirrors,
-  // RingBuilderOrdersService.getOrderByExternalId). Only fires for orders
-  // that actually came from Ring Builder; a manually-entered order has no
-  // externalOrderId the website would recognize. Silently does nothing if
-  // RING_BUILDER_WEBHOOK_URL isn't configured — a missing webhook target
-  // shouldn't turn into an alarming log line on every completed order.
-  private async notifyRingBuilderCompleted(order: Order): Promise<void> {
-    if (order.source !== 'RING_BUILDER' || !order.externalOrderId) return;
-    const url = this.config.get<string>('RING_BUILDER_WEBHOOK_URL');
-    if (!url) return;
-    const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
-
-    const payload = {
-      externalOrderId: order.externalOrderId,
-      externalCartId:  order.externalCartId,
-      poNumber:        order.poNumber,
-      completed:       true,
-      completedAt:     order.completedAt,
-    };
-
-    // One retry — unlike a missed email, a missed webhook has no other
-    // visible symptom, so it's worth a second attempt before giving up.
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-kira-webhook-secret': secret },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error(`Webhook responded ${res.status}`);
-        return;
-      } catch (err) {
-        if (attempt === 2) {
-          this.logger.warn(`Ring Builder completed-webhook failed for ${order.poNumber} after 2 attempts:`, err);
-          Sentry.captureException(err);
-        } else {
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-    }
-  }
 
   // One-time startup fix: TypeORM's synchronize didn't drop the old DB-level
   // DEFAULT 'KIRA' on supplySource when that default was removed from the
@@ -1485,19 +1435,15 @@ export class OrdersService implements OnModuleInit {
       ));
     }
 
-    // COMPLETED — email customer, and push to the Ring Builder website if
-    // this order came from there.
-    if (status === OrderStatus.COMPLETED) {
-      if (updated.customerEmail) {
-        this.emailService.sendOrderDelivered({
-          to: updated.customerEmail,
-          poNumber: updated.poNumber,
-          customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-          orderType: updated.orderType || '—',
-          orderId: updated.id,
-        }).catch(err => this.logger.warn('Order delivered email failed:', err));
-      }
-      this.notifyRingBuilderCompleted(updated).catch(err => this.logger.warn('Ring Builder completed-webhook failed:', err));
+    // COMPLETED — email customer
+    if (status === OrderStatus.COMPLETED && updated.customerEmail) {
+      this.emailService.sendOrderDelivered({
+        to: updated.customerEmail,
+        poNumber: updated.poNumber,
+        customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
+        orderType: updated.orderType || '—',
+        orderId: updated.id,
+      }).catch(err => this.logger.warn('Order delivered email failed:', err));
     }
 
     return updated;
