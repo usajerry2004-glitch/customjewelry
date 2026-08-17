@@ -303,6 +303,19 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
 
   y = Math.max(leftY, rightY) + 20;
 
+  // Same overflow hazard the designer-list cap above guards against, just
+  // one section later: if the two columns ran long enough to leave no room
+  // for this table (or even just its header), every .text() call below
+  // would land past the page's usable area. Since each call passes its own
+  // already-computed absolute y, pdfkit's auto-pagination kicks in per call
+  // instead of once — the stale y is still past the fresh page's bottom too,
+  // so each field of each row ends up alone on its own near-blank page.
+  const pageBottom = doc.page.height - MARGIN;
+  if (y > pageBottom - 80) {
+    doc.addPage();
+    y = MARGIN;
+  }
+
   // ── Top customers ──
   doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('TOP CUSTOMERS THIS WEEK', MARGIN, y, { characterSpacing: 0.8 });
   y += 18;
