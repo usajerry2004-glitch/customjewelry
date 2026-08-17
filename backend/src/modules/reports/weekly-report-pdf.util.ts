@@ -16,6 +16,7 @@ export interface TopCustomer {
   orders: number;
   value: number;
   onTimePct: number | null;
+  orderDetails: { poNumber: string; orderType: string | null; value: number }[];
 }
 
 export interface WeeklyStats {
@@ -303,44 +304,61 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
 
   y = Math.max(leftY, rightY) + 20;
 
-  // Same overflow hazard the designer-list cap above guards against, just
-  // one section later: if the two columns ran long enough to leave no room
-  // for this table (or even just its header), every .text() call below
-  // would land past the page's usable area. Since each call passes its own
-  // already-computed absolute y, pdfkit's auto-pagination kicks in per call
-  // instead of once — the stale y is still past the fresh page's bottom too,
-  // so each field of each row ends up alone on its own near-blank page.
+  // This section now lists every customer with an order this week (not just
+  // the top 3) plus every individual order under each — for a busy week that
+  // can run to several pages, so unlike the fixed single-page layout above,
+  // it manages its own page breaks rather than assuming everything fits.
   const pageBottom = doc.page.height - MARGIN;
-  if (y > pageBottom - 80) {
-    doc.addPage();
-    y = MARGIN;
-  }
-
-  // ── Top customers ──
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('TOP CUSTOMERS THIS WEEK', MARGIN, y, { characterSpacing: 0.8 });
-  y += 18;
   const custCols = [
     { label: 'CUSTOMER', w: CONTENT_WIDTH - 260, align: 'left' as const },
     { label: 'ORDERS', w: 80, align: 'right' as const },
     { label: 'VALUE', w: 90, align: 'right' as const },
     { label: 'ON TIME', w: 90, align: 'right' as const },
   ];
-  let cx = MARGIN;
-  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED);
-  for (const col of custCols) {
-    doc.text(col.label, cx, y, { width: col.w, align: col.align, characterSpacing: 0.4 });
-    cx += col.w;
+
+  function drawCustomerTableHeader() {
+    let hx = MARGIN;
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED);
+    for (const col of custCols) {
+      doc.text(col.label, hx, y, { width: col.w, align: col.align, characterSpacing: 0.4 });
+      hx += col.w;
+    }
+    y += 12;
+    doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).lineWidth(0.75).strokeColor(BORDER).stroke();
+    y += 8;
   }
-  y += 12;
-  doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).lineWidth(0.75).strokeColor(BORDER).stroke();
-  y += 8;
+
+  // Starts a fresh page if `needed` more points of room aren't left, with no
+  // other side effect — used once, up front, before anything has been drawn
+  // yet so there's no running header to continue.
+  function pageBreakIfNeeded(needed: number): boolean {
+    if (y + needed <= pageBottom) return false;
+    doc.addPage();
+    y = MARGIN;
+    return true;
+  }
+
+  // Same, but re-draws the running column header for continuity — for use
+  // once the table's already underway, so a mid-list break doesn't leave a
+  // page of rows with no header above them.
+  function ensureRoom(needed: number) {
+    if (pageBreakIfNeeded(needed)) drawCustomerTableHeader();
+  }
+
+  pageBreakIfNeeded(18 + 12 + 8 + 16);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('CUSTOMERS THIS WEEK', MARGIN, y, { characterSpacing: 0.8 });
+  y += 18;
+  drawCustomerTableHeader();
 
   if (!s.topCustomers.length) {
     doc.font('Helvetica').fontSize(10).fillColor(MUTED).text('No orders this week.', MARGIN, y);
     y += 16;
   }
   for (const c of s.topCustomers) {
-    cx = MARGIN;
+    const blockHeight = 16 + c.orderDetails.length * 13;
+    ensureRoom(blockHeight);
+
+    let cx = MARGIN;
     doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text(c.name, cx, y, { width: custCols[0].w });
     cx += custCols[0].w;
     doc.font('Helvetica').fontSize(10).fillColor(NAVY).text(String(c.orders), cx, y, { width: custCols[1].w, align: 'right' });
@@ -350,6 +368,18 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
     const onTimeColor = c.onTimePct === null ? TEXT2 : c.onTimePct >= 90 ? GOOD : AMBER;
     doc.fillColor(onTimeColor).text(c.onTimePct === null ? '—' : `${c.onTimePct}%`, cx, y, { width: custCols[3].w, align: 'right' });
     y += 16;
+
+    // Order-level detail, indented under the customer — same idea as the
+    // summary row but one line per order, in a smaller muted style.
+    for (const o of c.orderDetails) {
+      ensureRoom(13);
+      doc.font('Helvetica').fontSize(8.5).fillColor(TEXT2)
+        .text(o.poNumber, MARGIN + 14, y, { width: custCols[0].w - 14 });
+      doc.text(o.orderType || '—', MARGIN + 14 + 90, y, { width: custCols[0].w - 14 - 90 });
+      doc.text(formatMoney(o.value), MARGIN + custCols[0].w, y, { width: custCols[1].w + custCols[2].w, align: 'right' });
+      y += 13;
+    }
+
     doc.moveTo(MARGIN, y - 3).lineTo(MARGIN + CONTENT_WIDTH, y - 3).lineWidth(0.5).strokeColor('#F3F1EC').stroke();
   }
 

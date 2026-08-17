@@ -116,9 +116,10 @@ export class ReportsService {
       if (s.onTime) g.onTime += 1;
     }
 
+    // Every customer with an order this week, not just the top few — the PDF
+    // itself now paginates properly, so there's no need to cap this list here.
     const topCustomers = customerGroups
       .sort((a, b) => b.value - a.value)
-      .slice(0, 3)
       .map(c => {
         const ot = onTimeByGroup.get(c.key);
         return {
@@ -126,6 +127,7 @@ export class ReportsService {
           orders: c.orders,
           value: c.value,
           onTimePct: ot ? Math.round((ot.onTime / ot.total) * 100) : null,
+          orderDetails: c.orderDetails,
         };
       });
 
@@ -452,14 +454,19 @@ export class ReportsService {
 
   private async computeCustomerGroups(start: Date, end: Date) {
     const orders = await this.orderRepo.find({ where: { createdAt: Between(start, end) } });
-    const groups = new Map<string, { key: string; name: string; orders: number; value: number }>();
+    const groups = new Map<string, {
+      key: string; name: string; orders: number; value: number;
+      orderDetails: { poNumber: string; orderType: string | null; value: number }[];
+    }>();
     for (const o of orders) {
       const key = o.companyId || o.customerId || o.customerEmail || o.id;
       const name = o.storeName || o.customerFullName || 'Unknown';
-      if (!groups.has(key)) groups.set(key, { key, name, orders: 0, value: 0 });
+      if (!groups.has(key)) groups.set(key, { key, name, orders: 0, value: 0, orderDetails: [] });
       const g = groups.get(key)!;
+      const value = o.quotedCost ? Number(o.quotedCost) : 0;
       g.orders += 1;
-      g.value += o.quotedCost ? Number(o.quotedCost) : 0;
+      g.value += value;
+      g.orderDetails.push({ poNumber: o.poNumber, orderType: o.orderType || null, value });
     }
     return Array.from(groups.values());
   }
