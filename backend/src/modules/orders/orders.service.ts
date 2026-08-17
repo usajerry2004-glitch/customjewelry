@@ -1272,12 +1272,23 @@ export class OrdersService implements OnModuleInit {
 
     // ── Status transition guard — prevent stage-skipping ─────────────────
     const existing = await this.findOne(id);
-    const allowed = ALLOWED_TRANSITIONS[existing.status];
-    if (!allowed || !allowed.includes(status)) {
-      throw new BadRequestException(
-        `Cannot transition from ${existing.status} to ${status}. ` +
-        `Allowed next steps: ${allowed?.length ? allowed.join(', ') : 'none (order is in a terminal state)'}`,
-      );
+
+    // Ring Builder orders don't necessarily go through this app's internal
+    // manufacturing pipeline the same way staff-entered orders do, so Admin
+    // can mark one Completed directly from any status — deliberately narrow:
+    // Admin-only, and only for orders that actually came from Ring Builder.
+    const isRingBuilderAdminComplete = status === OrderStatus.COMPLETED
+      && existing.source === 'RING_BUILDER'
+      && user?.role === UserRole.ADMIN;
+
+    if (!isRingBuilderAdminComplete) {
+      const allowed = ALLOWED_TRANSITIONS[existing.status];
+      if (!allowed || !allowed.includes(status)) {
+        throw new BadRequestException(
+          `Cannot transition from ${existing.status} to ${status}. ` +
+          `Allowed next steps: ${allowed?.length ? allowed.join(', ') : 'none (order is in a terminal state)'}`,
+        );
+      }
     }
 
     // Admin-only revert: undo an accidental "Manufactured" mark, back to VPO Issued.

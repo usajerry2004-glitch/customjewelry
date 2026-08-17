@@ -102,6 +102,8 @@ export interface Order {
   salesRepEmail?: string;
   companyId?: string | null;
   companyViewerAccessEnabled?: boolean;
+  source?: string;
+  externalOrderId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

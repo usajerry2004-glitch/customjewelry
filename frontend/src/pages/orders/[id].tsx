@@ -1146,9 +1146,18 @@ export default function OrderDetail() {
   // Authorizer (e.g. NEW -> CAD_IN_PROGRESS), so it has to be excluded explicitly
   // here rather than relying on ROLE_STAGE_PERMISSIONS to keep it Admin-only.
   const isAdminOnlyRevert = order.status === OrderStatus.VPO_ISSUED;
+  // Ring Builder orders don't necessarily move through this app's internal
+  // manufacturing pipeline the same way — Admin can mark one Completed
+  // directly from any status (backend allows this narrowly-scoped bypass:
+  // Admin + source === 'RING_BUILDER' only).
+  const canRingBuilderAdminComplete = userRole === UserRole.ADMIN
+    && order.source === 'RING_BUILDER'
+    && order.status !== OrderStatus.COMPLETED
+    && order.status !== OrderStatus.CANCELLED
+    && !validNextStatuses.includes(OrderStatus.COMPLETED);
   // Admins see all valid transitions; other roles see only what they're permitted to do
   const movableStatuses = userRole === UserRole.ADMIN
-    ? validNextStatuses
+    ? (canRingBuilderAdminComplete ? [...validNextStatuses, OrderStatus.COMPLETED] : validNextStatuses)
     : allowedStatuses.filter(s => validNextStatuses.includes(s) && !(isAdminOnlyRevert && s === OrderStatus.CAD_IN_PROGRESS));
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
   const canManageSupplier = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
