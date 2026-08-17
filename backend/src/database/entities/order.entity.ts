@@ -251,6 +251,12 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   vpoIssuedAt: Date | null;
 
+  // When the order transitioned to COMPLETED — COMPLETED has no outgoing
+  // transitions (see ALLOWED_TRANSITIONS), so unlike vpoIssuedAt this is
+  // write-once and never reset.
+  @Column({ type: 'timestamp', nullable: true })
+  completedAt: Date | null;
+
   @Column({ default: false })
   isArchived: boolean;
 

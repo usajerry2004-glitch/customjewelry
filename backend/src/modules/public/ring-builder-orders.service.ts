@@ -233,7 +233,11 @@ export class RingBuilderOrdersService {
     }
   }
 
-  // ── Poll: current status by the website's own order number ───────────
+  // ── Poll: only whether the order is done, nothing about internal stages ──
+  // Deliberately narrow: the website should only ever learn "completed or
+  // not" — none of NEW/CAD_IN_PROGRESS/VPO_ISSUED/MANUFACTURED/SHIPPED/etc.
+  // are exposed here, since those are internal production stages, not
+  // something the customer-facing site should reflect.
   async getOrderByExternalId(externalOrderId: string) {
     const order = await this.orderRepo.findOne({ where: { externalOrderId } });
     if (!order) throw new NotFoundException('Order not found');
@@ -242,16 +246,8 @@ export class RingBuilderOrdersService {
       externalOrderId: order.externalOrderId,
       externalCartId:  order.externalCartId,
       poNumber:        order.poNumber,
-      status:          order.status,
-      cadSubStatus:    order.cadSubStatus,
-      stoneStatus:     order.stoneStatus,
-      trackingNumber:  order.trackingNumber,
-      courierName:     order.courierName,
-      shipMethod:      order.shipMethod,
-      committedShipDate: order.committedShipDate,
-      shippedDate:     order.shippedDate,
-      trackingUrl:     this.trackingUrl(order.trackingToken),
-      updatedAt:       order.updatedAt,
+      completed:       order.status === OrderStatus.COMPLETED,
+      completedAt:     order.completedAt,
     };
   }
 }

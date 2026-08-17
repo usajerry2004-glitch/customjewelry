@@ -69,25 +69,19 @@ Store `poNumber` and `trackingUrl` against the website's own order — you'll ne
 
 Call this whenever the customer views their order/account page on the website.
 
+**Deliberately narrow on purpose**: this only tells you whether the order is completed — none of the internal production stages (CAD, VPO, manufacturing, shipping, etc.) are exposed. Those are internal-only; the website should just show "in progress" until `completed` flips to `true`.
+
 **Response:**
 ```json
 {
   "externalOrderId": "wc_order_10432_item_1",
   "externalCartId": "wc_order_10432",
   "poNumber": "C00312",
-  "status": "CAD_IN_PROGRESS",
-  "cadSubStatus": null,
-  "stoneStatus": null,
-  "trackingNumber": null,
-  "courierName": null,
-  "shipMethod": null,
-  "committedShipDate": null,
-  "shippedDate": null,
-  "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",
-  "updatedAt": "2026-08-14T10:03:00.000Z"
+  "completed": false,
+  "completedAt": null
 }
 ```
 
-`status` is one of: `NEW`, `CAD_IN_PROGRESS`, `VPO_ISSUED`, `MANUFACTURED`, `SHIPPED`, `REPAIR`, `COMPLETED`, `CANCELLED`.
+Once the order finishes: `completed: true`, `completedAt: "2026-08-20T14:32:00.000Z"`.
 
-The customer also automatically gets an email at every status change (order confirmed, in production, shipped, delivered) — that's existing behavior, unchanged by this integration.
+The customer also automatically gets an email at every internal status change (order confirmed, in production, shipped, delivered) — that's existing behavior, unrelated to and unchanged by this endpoint.

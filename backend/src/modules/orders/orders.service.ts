@@ -1345,6 +1345,7 @@ export class OrdersService implements OnModuleInit {
 
     const patch: Partial<Order> = { status };
     if (quotedCost) patch.quotedCost = quotedCost;
+    if (status === OrderStatus.COMPLETED) patch.completedAt = new Date();
     const updated = await this.update(id, patch, user);
     this.logEvent(id, 'STATUS_CHANGE', user, existing.status, status);
 
