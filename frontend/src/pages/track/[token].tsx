@@ -78,6 +78,7 @@ interface OrderData {
   quoteOptions: { label: string; price: number }[] | null;
   committedShipDate: string | null;
   cadFiles: CadFile[];
+  viewerAccessEnabled?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -367,6 +368,23 @@ export default function TrackPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 3D Viewer — company-gated placeholder, real iJewel3D embed not wired up yet */}
+              {order.viewerAccessEnabled && (
+                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8E4DC', padding: '24px 28px', marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>3D Viewer</div>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, padding: '32px 16px', borderRadius: 8, border: '1px dashed #E8E4DC', background: '#FAF9F6', textAlign: 'center',
+                  }}>
+                    <span style={{ fontSize: 22 }}>💍</span>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1A2740' }}>Interactive 3D preview coming soon</div>
+                    <div style={{ fontSize: 12, color: '#9CA3AF', maxWidth: 320 }}>
+                      Your account has 3D preview access — the live viewer isn't connected yet, but it'll appear right here once it is.
+                    </div>
+                  </div>
                 </div>
               )}
 

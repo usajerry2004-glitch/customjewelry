@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { Company } from '../../database/entities/company.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
@@ -49,6 +50,7 @@ export class PublicOrdersService {
   constructor(
     @InjectRepository(Order)        private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
+    @InjectRepository(Company)      private readonly companyRepo: Repository<Company>,
     @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
@@ -202,6 +204,8 @@ export class PublicOrdersService {
       order: { createdAt: 'ASC' },
     });
 
+    const company = order.companyId ? await this.companyRepo.findOne({ where: { id: order.companyId } }) : null;
+
     return {
       poNumber:       order.poNumber,
       status:         order.status,
@@ -222,6 +226,7 @@ export class PublicOrdersService {
       quotedCost:     order.quotedCost ?? null,
       quoteOptions:   order.quoteOptions ?? null,
       committedShipDate: order.committedShipDate ?? null,
+      viewerAccessEnabled: company?.viewerAccessEnabled ?? false,
       cadFiles: cadFiles.map(f => ({
         id:             f.id,
         status:         f.status,

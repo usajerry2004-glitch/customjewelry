@@ -80,6 +80,8 @@ export default function CustomersPage() {
   const [showTeam, setShowTeam] = useState<{ customer: Customer; teammates: Customer[] } | null>(null);
   const [showTeamTop, setShowTeamTop] = useState(200);
   const [showTeamH, setShowTeamH] = useState(400);
+  const [viewerAccess, setViewerAccess] = useState<boolean | null>(null);
+  const [viewerAccessSaving, setViewerAccessSaving] = useState(false);
   const [addingTeammate, setAddingTeammate] = useState(false);
   const [teammateForm, setTeammateForm] = useState({ firstName: '', lastName: '', email: '' });
   const [savingTeammate, setSavingTeammate] = useState(false);
@@ -288,6 +290,7 @@ export default function CustomersPage() {
     setExistingSearch('');
     setTeammateError('');
     setTeammateForm({ firstName: '', lastName: '', email: '' });
+    setViewerAccess(null);
     const res = await apiFetch(`${API}/users/${customer.id}/teammates`);
     if (res.ok) {
       const teammates = await res.json();
@@ -296,6 +299,21 @@ export default function CustomersPage() {
       // fetched before this call, so "Add a Teammate" has something to attach to.
       const freshCustomer = teammates.find((t: Customer) => t.id === customer.id) || customer;
       setShowTeam({ customer: freshCustomer, teammates });
+      if (isAdmin && freshCustomer.companyId) {
+        const companyRes = await apiFetch(`${API}/companies/${freshCustomer.companyId}`);
+        if (companyRes.ok) setViewerAccess((await companyRes.json()).viewerAccessEnabled);
+      }
+    }
+  };
+
+  const toggleViewerAccess = async () => {
+    if (!showTeam?.customer.companyId || viewerAccessSaving) return;
+    setViewerAccessSaving(true);
+    try {
+      const res = await apiFetch(`${API}/companies/${showTeam.customer.companyId}/viewer-access`, { method: 'PATCH' });
+      if (res.ok) setViewerAccess((await res.json()).viewerAccessEnabled);
+    } finally {
+      setViewerAccessSaving(false);
     }
   };
 
@@ -918,6 +936,28 @@ export default function CustomersPage() {
                 ✕
               </button>
             </div>
+
+            {isAdmin && showTeam.customer.companyId && viewerAccess !== null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>3D Viewer Access</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Company-wide — shows a 3D preview slot on this company's orders</div>
+                </div>
+                <button
+                  onClick={toggleViewerAccess}
+                  disabled={viewerAccessSaving}
+                  style={{
+                    padding: '5px 12px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 600,
+                    border: `1px solid ${viewerAccess ? 'var(--accent)' : 'var(--border)'}`,
+                    background: viewerAccess ? 'var(--accent)' : 'var(--bg-card)',
+                    color: viewerAccess ? '#fff' : 'var(--text-secondary)',
+                    cursor: viewerAccessSaving ? 'default' : 'pointer', opacity: viewerAccessSaving ? 0.6 : 1,
+                  }}
+                >
+                  {viewerAccess ? 'On' : 'Off'}
+                </button>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
               {showTeam.teammates.map(t => (

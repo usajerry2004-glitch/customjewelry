@@ -900,7 +900,7 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order & { companyViewerAccessEnabled?: boolean }> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
@@ -938,7 +938,11 @@ export class OrdersService implements OnModuleInit {
       throw new NotFoundException(`Order ${id} not found`);
     }
 
-    return order;
+    // The 3D viewer slot is gated per-company (see Company.viewerAccessEnabled),
+    // not stored on the order itself, so it stays live if the company's access
+    // is toggled after the order was created.
+    const company = order.companyId ? await this.companyRepo.findOne({ where: { id: order.companyId } }) : null;
+    return { ...order, companyViewerAccessEnabled: company?.viewerAccessEnabled ?? false };
   }
 
   // Reuses findOne()'s per-role visibility checks (it throws NotFoundException

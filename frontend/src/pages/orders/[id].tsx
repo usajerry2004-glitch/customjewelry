@@ -1852,6 +1852,28 @@ export default function OrderDetail() {
           })()}
         </div>
 
+          {/* ── 3D Viewer (company-gated placeholder — real iJewel3D embed not wired up yet) ── */}
+          {order.companyViewerAccessEnabled && (
+            <div style={cardStyle}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 12px' }}>
+                3D Viewer
+              </h3>
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '6px', padding: '32px 16px', borderRadius: 'var(--radius)',
+                border: '1px dashed var(--border)', background: 'var(--bg-input)', textAlign: 'center',
+              }}>
+                <span style={{ fontSize: '22px' }}>💍</span>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Interactive 3D preview reserved for this company
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', maxWidth: '320px' }}>
+                  The live iJewel3D viewer isn't connected yet — this slot will show it here once it is.
+                </div>
+              </div>
+            </div>
+          )}
+
           </div>{/* ── end Col 2 (Reference Files + Design Files) ── */}
 
           </div>{/* ── end fields+refs sub-grid ── */}

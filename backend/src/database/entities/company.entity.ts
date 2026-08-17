@@ -16,6 +16,12 @@ export class Company {
   @Column({ nullable: true })
   salesRepId: string | null;
 
+  // Gates the (currently placeholder) interactive 3D/AR viewer on this
+  // company's orders — Admin-toggled per company, not per individual order,
+  // since it's meant as a company-wide perk rather than a per-order add-on.
+  @Column({ default: false })
+  viewerAccessEnabled: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }

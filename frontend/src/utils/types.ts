@@ -100,6 +100,8 @@ export interface Order {
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
+  companyId?: string | null;
+  companyViewerAccessEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
