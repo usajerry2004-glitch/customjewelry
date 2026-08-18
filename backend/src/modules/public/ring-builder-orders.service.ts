@@ -151,7 +151,7 @@ export class RingBuilderOrdersService {
         addr.name,
         addr.company,
         addr.address,
-        [addr.city, addr.state, addr.zip].filter(Boolean).join(', ') || undefined,
+        [[addr.city, addr.state].filter(Boolean).join(', '), addr.zip].filter(Boolean).join(' ') || undefined,
         addr.country,
       ].filter((x): x is string => Boolean(x));
       parts.push(addrLines.join('\n'));
