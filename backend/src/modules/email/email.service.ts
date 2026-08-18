@@ -598,11 +598,11 @@ export class EmailService {
   }) {
     return this.send({
       to: opts.to,
-      subject: `Your order ${opts.poNumber} has been delivered`,
+      subject: `Your order ${opts.poNumber} is complete`,
       html: emailLayout(`
-        <h2 style="color:#10B981;margin:0 0 16px">Order Delivered ✓</h2>
+        <h2 style="color:#10B981;margin:0 0 16px">Order Completed ✓</h2>
         <p>Hi ${opts.customerName},</p>
-        <p>Your custom piece has been delivered. We hope you love it! If you have any questions or concerns, please don't hesitate to reach out.</p>
+        <p>Your custom piece has been completed. We hope you love it! If you have any questions or concerns, please don't hesitate to reach out.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#10B981')}">View Order →</a>
       `),
