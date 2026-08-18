@@ -112,25 +112,28 @@ The customer also automatically gets an email at every internal status change (o
 
 ## 3. Outbound push when an order completes
 
-In addition to polling, we now also push to your site the moment an order is marked completed on our end — so you don't strictly need to poll at all if you'd rather just receive this.
+In addition to polling, we also push to your site the moment an order is marked completed on our end — so you don't strictly need to poll at all if you'd rather just receive this. Built to match `kira-app-sigma.vercel.app`'s published receiver spec.
 
-**Setup needed on our side** (once you give us a URL): set these two in the backend environment —
+**Setup needed on our side** (once you give us a URL and a shared secret): set these two in the backend environment —
 ```
-RING_BUILDER_WEBHOOK_URL=https://kirajewels.com/wp-json/your-plugin/order-completed
-RING_BUILDER_WEBHOOK_SECRET=<a shared secret you and we both know>
+RING_BUILDER_WEBHOOK_URL=https://kira-app-sigma.vercel.app/api/webhooks/jewelflow
+RING_BUILDER_WEBHOOK_SECRET=<the shared secret you generate and send us>
 ```
 Nothing fires until `RING_BUILDER_WEBHOOK_URL` is set — no webhook target configured means no calls go out.
 
 **What we send**, `POST` to that URL:
 ```json
 {
+  "event": "order.completed",
   "externalOrderId": "wc_order_10432_item_1",
   "externalCartId": "wc_order_10432",
   "poNumber": "C00312",
-  "completed": true,
-  "completedAt": "2026-08-20T14:32:00.000Z"
+  "status": "COMPLETED",
+  "updatedAt": "2026-08-20T14:32:00.000Z"
 }
 ```
-Header `x-kira-webhook-secret` carries the shared secret above — your endpoint should reject the request if it doesn't match, so nobody else can spoof a "completed" call to your site.
+`status` here is always the literal `"COMPLETED"` — this webhook only ever fires at that one transition, so no other internal pipeline stage (CAD, VPO, manufacturing, shipping, etc.) is ever sent through it, same restriction as the poll endpoint above.
 
-We retry once (after a 2 second delay) if the first attempt fails or times out (10s), then give up and log it on our end — there's no further retry after that, so if your endpoint is down for longer than that, you'd only find out from the poll endpoint (§2) still returning `completed: false` until you check again.
+**Signing**: header `x-jewelflow-signature: sha256=<hex>` — an HMAC-SHA256 of the exact request body bytes, keyed with the shared secret above. Recompute it the same way on your end and compare; reject anything that doesn't match.
+
+**Retry behavior**: a `5xx` response (or a timeout, 10s) gets one retry after a 2 second delay, then we give up and log it. A `4xx` response (bad signature, bad shape) is **not** retried — that's a request-level problem retrying identically won't fix, so we log it and stop immediately rather than burning the retry on something that can't succeed.

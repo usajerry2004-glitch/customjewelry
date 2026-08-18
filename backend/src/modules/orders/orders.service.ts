@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { Repository, In, Between, Not, SelectQueryBuilder } from 'typeorm';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHmac } from 'crypto';
 import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -235,11 +235,16 @@ export class OrdersService implements OnModuleInit {
   ) {}
 
   // Fire-and-forget push to the Ring Builder website when one of its orders
-  // completes — deliberately sends only a completed flag, nothing about
-  // internal production stages (see the poll endpoint this mirrors,
-  // RingBuilderOrdersService.getOrderByExternalId). Only fires for orders
-  // that actually came from Ring Builder; a manually-entered order has no
-  // externalOrderId the website would recognize.
+  // completes. Follows their published integration spec: HMAC-SHA256-signed
+  // over the exact request body bytes (x-jewelflow-signature: sha256=<hex>),
+  // body shaped like their receiver expects (externalOrderId/externalCartId
+  // required, plus a status/event pair). `status` is always the literal
+  // "COMPLETED" — this call site only ever fires at that one transition, so
+  // no other internal pipeline stage is ever exposed through it, matching
+  // the same "completed-only" restriction as the poll endpoint this
+  // complements (RingBuilderOrdersService.getOrderByExternalId). Only fires
+  // for orders that actually came from Ring Builder; a manually-entered
+  // order has no externalOrderId the website would recognize.
   private async notifyRingBuilderCompleted(order: Order): Promise<void> {
     if (order.source !== 'RING_BUILDER' || !order.externalOrderId) return;
     const url = this.config.get<string>('RING_BUILDER_WEBHOOK_URL');
@@ -253,13 +258,19 @@ export class OrdersService implements OnModuleInit {
     }
     const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
 
-    const payload = {
+    // Serialized once and reused as both the signature input and the actual
+    // request body — re-serializing the same object a second time isn't
+    // guaranteed to reproduce identical bytes, and the signature has to be
+    // computed over exactly what gets sent.
+    const bodyString = JSON.stringify({
+      event: 'order.completed',
       externalOrderId: order.externalOrderId,
       externalCartId:  order.externalCartId,
       poNumber:        order.poNumber,
-      completed:       true,
-      completedAt:     order.completedAt,
-    };
+      status:          'COMPLETED',
+      updatedAt:       (order.completedAt ?? order.updatedAt).toISOString(),
+    });
+    const signature = 'sha256=' + createHmac('sha256', secret).update(bodyString).digest('hex');
 
     // One retry — unlike a missed email, a missed webhook has no other
     // visible symptom, so it's worth a second attempt before giving up.
@@ -269,17 +280,28 @@ export class OrdersService implements OnModuleInit {
         const timeout = setTimeout(() => controller.abort(), 10_000);
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-kira-webhook-secret': secret },
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json', 'x-jewelflow-signature': signature },
+          body: bodyString,
           signal: controller.signal,
         });
         clearTimeout(timeout);
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`Webhook responded ${res.status} from ${url}${body ? ` — ${body.slice(0, 300)}` : ''}`);
+
+        if (res.ok) {
+          this.logger.log(`Ring Builder completed-webhook delivered for ${order.poNumber} (attempt ${attempt}).`);
+          return;
         }
-        this.logger.log(`Ring Builder completed-webhook delivered for ${order.poNumber} (attempt ${attempt}).`);
-        return;
+
+        const responseBody = await res.text().catch(() => '');
+        // Per their spec: only a 5xx is worth retrying (their server actually
+        // failed). A 400/401 means the request itself is wrong — bad
+        // signature, bad shape — and retrying identically won't fix that;
+        // it needs a human, so stop here rather than burning the retry.
+        if (res.status < 500) {
+          this.logger.warn(`Ring Builder completed-webhook rejected for ${order.poNumber}: ${res.status} from ${url} — ${responseBody.slice(0, 300)}`);
+          Sentry.captureMessage(`Ring Builder webhook rejected (${res.status}) for ${order.poNumber}: ${responseBody.slice(0, 300)}`);
+          return;
+        }
+        throw new Error(`Webhook responded ${res.status} from ${url}${responseBody ? ` — ${responseBody.slice(0, 300)}` : ''}`);
       } catch (err) {
         if (attempt === 2) {
           this.logger.warn(`Ring Builder completed-webhook failed for ${order.poNumber} after 2 attempts (target: ${url}):`, err);
