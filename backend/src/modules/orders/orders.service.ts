@@ -239,13 +239,18 @@ export class OrdersService implements OnModuleInit {
   // internal production stages (see the poll endpoint this mirrors,
   // RingBuilderOrdersService.getOrderByExternalId). Only fires for orders
   // that actually came from Ring Builder; a manually-entered order has no
-  // externalOrderId the website would recognize. Silently does nothing if
-  // RING_BUILDER_WEBHOOK_URL isn't configured — a missing webhook target
-  // shouldn't turn into an alarming log line on every completed order.
+  // externalOrderId the website would recognize.
   private async notifyRingBuilderCompleted(order: Order): Promise<void> {
     if (order.source !== 'RING_BUILDER' || !order.externalOrderId) return;
     const url = this.config.get<string>('RING_BUILDER_WEBHOOK_URL');
-    if (!url) return;
+    if (!url) {
+      // Logged (not silently skipped) — a config value that isn't reaching
+      // this process (e.g. set on the wrong App Platform component) would
+      // otherwise look identical to a network failure from the outside,
+      // with nothing to tell them apart in the logs.
+      this.logger.log(`Ring Builder completed-webhook skipped for ${order.poNumber}: RING_BUILDER_WEBHOOK_URL not configured on this process.`);
+      return;
+    }
     const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
 
     const payload = {
@@ -269,11 +274,15 @@ export class OrdersService implements OnModuleInit {
           signal: controller.signal,
         });
         clearTimeout(timeout);
-        if (!res.ok) throw new Error(`Webhook responded ${res.status}`);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`Webhook responded ${res.status} from ${url}${body ? ` — ${body.slice(0, 300)}` : ''}`);
+        }
+        this.logger.log(`Ring Builder completed-webhook delivered for ${order.poNumber} (attempt ${attempt}).`);
         return;
       } catch (err) {
         if (attempt === 2) {
-          this.logger.warn(`Ring Builder completed-webhook failed for ${order.poNumber} after 2 attempts:`, err);
+          this.logger.warn(`Ring Builder completed-webhook failed for ${order.poNumber} after 2 attempts (target: ${url}):`, err);
           Sentry.captureException(err);
         } else {
           await new Promise(r => setTimeout(r, 2000));
