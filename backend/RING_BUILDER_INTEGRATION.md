@@ -10,49 +10,73 @@ Call this once per completed checkout. A cart with multiple rings creates one Or
 
 ```json
 {
-  "externalCartId": "wc_order_10432",
+  "externalCartId": "O-100020",
+  "source": "kira-website",
+  "orderDate": "2026-08-18T00:00:00.000Z",
   "customer": {
     "firstName": "Jane",
     "lastName": "Doe",
     "email": "jane@example.com",
     "phoneNumber": "555-0100",
-    "storeName": "Doe & Co."
+    "storeName": "Sherwood Management"
   },
-  "items": [
-    {
-      "externalOrderId": "wc_order_10432_item_1",
-      "productName": "Eternity Ring Builder",
-      "metalType": "14K Yellow",
-      "metalColor": "Yellow",
-      "size": "7",
-      "centerStoneShape": "Round",
-      "approximateCaratWeight": "3.61-3.71 ct TW",
-      "mountingOption": "Semi-Mount",
-      "quantity": 1,
-      "quotedCost": 940,
-      "referenceWeblink": "https://kirajewels.com/products/eternity-ring-builder",
-      "customerNotes": "Comfort fit",
-      "specs": {
-        "Setting": "Basket",
-        "Coverage": "Full",
-        "Band Width": "Classic",
-        "Basket Height": "Normal"
-      }
-    }
-  ]
+  "customerNotes": "optional",
+  "refCustomerPo": "O-100020",
+  "shippingAddress": {
+    "name": "Jane Doe",
+    "company": "Sherwood Management",
+    "address": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "zip": "10001",
+    "country": "USA"
+  },
+  "items": [{
+    "externalOrderId": "CB60817001",
+    "designId": "CB60817001",
+    "modelId": "abc123",
+    "title": "Round Basket Full — Size 7 — 3.66 ct · 14K Yellow",
+    "description": "Stones: 0.20 ct Round\nSetting: Basket\nRing Metal: 14K Yellow",
+    "quantity": 1,
+    "unitPrice": 940,
+    "currency": "USD",
+    "orderType": "Ring",
+    "size": "7",
+    "metalType": "14K",
+    "metalColor": "Yellow",
+    "stones": "0.20 ct Round",
+    "setting": "Basket",
+    "coverage": "Full",
+    "caratTotalWeight": 3.66,
+    "imageUrl": "https://...",
+    "referenceWeblink": "https://.../share?token=..."
+  }]
 }
 ```
 
 `externalOrderId` is required per item — it's the idempotency key. Retrying the same call (e.g. after a timeout) never creates a duplicate order; it just returns the same result again.
 
+**How this maps into the portal, field by field:**
+| Payload field | Where it goes |
+|---|---|
+| `orderType`, `size`, `metalType`, `metalColor`, `referenceWeblink` | Same-named order field, directly |
+| `quantity` | Order quantity |
+| `unitPrice` × `quantity` | Order's quoted price (total, not per-unit) |
+| `stones` (e.g. `"0.20 ct Round"`) | Split into stone shape + carat weight where we recognize the shape name; kept as-is either way |
+| `caratTotalWeight` | Preferred over the parsed `stones` weight when both are present |
+| `refCustomerPo` | Order's customer PO reference |
+| `imageUrl` | Fetched and saved as a reference image on the order (same as an uploaded reference photo) — best-effort, a failed fetch doesn't block the order |
+| `title`, `description`, `designId`, `modelId`, `setting`, `coverage`, `shippingAddress`, `orderDate`, `source`, cart-level `customerNotes` | All folded into the order's notes field, so nothing is lost even though there's no dedicated column for each of these |
+| `currency` | Not used — the portal has no multi-currency support, so this is currently ignored |
+
 **Response:**
 ```json
 {
   "success": true,
-  "externalCartId": "wc_order_10432",
+  "externalCartId": "O-100020",
   "orders": [
     {
-      "externalOrderId": "wc_order_10432_item_1",
+      "externalOrderId": "CB60817001",
       "poNumber": "C00312",
       "trackingToken": "a1b2c3...",
       "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",

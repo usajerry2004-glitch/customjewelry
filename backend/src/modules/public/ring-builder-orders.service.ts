@@ -6,8 +6,10 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { EmailService } from '../email/email.service';
+import { SpacesService } from '../spaces/spaces.service';
 import { OrdersService } from '../orders/orders.service';
 
 export interface RingBuilderCustomerDto {
@@ -18,30 +20,55 @@ export interface RingBuilderCustomerDto {
   storeName?: string;
 }
 
+export interface RingBuilderShippingAddressDto {
+  name?: string;
+  company?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
 export interface RingBuilderItemDto {
   // The Ring Builder checkout's own line-item/order number — required, used
   // as the idempotency key so a retried submission never double-creates.
   externalOrderId: string;
-  productName?: string;
+  designId?: string;
+  modelId?: string;
+  title?: string;
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  currency?: string;
+  orderType?: string;
+  size?: string;
   metalType?: string;
   metalColor?: string;
-  size?: string;
-  centerStoneShape?: string;
-  approximateCaratWeight?: string;
-  mountingOption?: string;
-  quantity?: number;
-  quotedCost?: number;
+  // Combined shape+weight string, e.g. "0.20 ct Round" — parsed into
+  // centerStoneShape/approximateCaratWeight (see parseStones below), and
+  // kept verbatim in customerNotes regardless of whether parsing succeeds.
+  stones?: string;
+  setting?: string;
+  coverage?: string;
+  caratTotalWeight?: number;
+  // A rendered preview image of the exact configuration — fetched and saved
+  // as a reference CadFile, same as a customer-uploaded reference image.
+  imageUrl?: string;
   referenceWeblink?: string;
-  customerNotes?: string;
-  // Any build spec without its own Order column (setting, coverage, band
-  // width, basket height, fit, etc.) — appended into customerNotes as a
-  // readable block so nothing from the configurator is lost.
-  specs?: Record<string, string>;
 }
 
 export interface RingBuilderOrderDto {
   externalCartId?: string;
+  // Their own label for the sales channel (e.g. "kira-website") — informational
+  // only; every order from this endpoint is still tagged source: 'RING_BUILDER'
+  // internally regardless of what they call it.
+  source?: string;
+  orderDate?: string;
   customer: RingBuilderCustomerDto;
+  customerNotes?: string;
+  refCustomerPo?: string;
+  shippingAddress?: RingBuilderShippingAddressDto;
   items: RingBuilderItemDto[];
 }
 
@@ -58,6 +85,10 @@ export interface RingBuilderOrderResult {
   message: string;
 }
 
+// Longest/most-specific first so "Elongated Cushion" matches before the
+// plain "Cushion" suffix would.
+const KNOWN_STONE_SHAPES = ['Elongated Cushion', 'Round', 'Oval', 'Emerald', 'Princess', 'Cushion', 'Radiant'];
+
 @Injectable()
 export class RingBuilderOrdersService {
   private readonly logger = new Logger(RingBuilderOrdersService.name);
@@ -66,8 +97,10 @@ export class RingBuilderOrdersService {
   constructor(
     @InjectRepository(Order)        private readonly orderRepo: Repository<Order>,
     @InjectRepository(User)         private readonly userRepo: Repository<User>,
+    @InjectRepository(CadFile)      private readonly cadRepo: Repository<CadFile>,
     @InjectRepository(Notification) private readonly notifRepo: Repository<Notification>,
     private readonly emailService: EmailService,
+    private readonly spacesService: SpacesService,
     private readonly ordersService: OrdersService,
     config: ConfigService,
   ) {
@@ -78,12 +111,61 @@ export class RingBuilderOrdersService {
     return `${this.frontendUrl}/track/${token}`;
   }
 
-  private buildCustomerNotes(item: RingBuilderItemDto): string | undefined {
-    const specLines = Object.entries(item.specs || {})
-      .filter(([, v]) => v !== undefined && v !== null && v !== '')
-      .map(([k, v]) => `${k}: ${v}`);
-    const parts = [item.customerNotes, ...specLines].filter(Boolean);
-    return parts.length ? parts.join('\n') : undefined;
+  // Best-effort split of a combined "0.20 ct Round" style string into shape +
+  // weight. Falls back to keeping the whole string as the weight if the shape
+  // isn't one we recognize — never drops data, since the raw string also
+  // always ends up in customerNotes regardless of how this parses.
+  private parseStones(stones?: string): { shape?: string; caratWeight?: string } {
+    if (!stones) return {};
+    const trimmed = stones.trim();
+    for (const shape of KNOWN_STONE_SHAPES) {
+      if (trimmed.toLowerCase().endsWith(shape.toLowerCase())) {
+        const rest = trimmed.slice(0, trimmed.length - shape.length).trim();
+        return { shape, caratWeight: rest || undefined };
+      }
+    }
+    return { caratWeight: trimmed };
+  }
+
+  // Everything about this item/cart that doesn't have its own Order column
+  // (setting, coverage, design/model IDs, shipping address, cart-level notes,
+  // etc.) gets folded in here so nothing from the submission is silently lost.
+  private buildCustomerNotes(dto: RingBuilderOrderDto, item: RingBuilderItemDto): string | undefined {
+    const parts: string[] = [];
+    if (item.title) parts.push(item.title);
+    if (item.description) parts.push(item.description);
+
+    const specLines = [
+      item.setting ? `Setting: ${item.setting}` : null,
+      item.coverage ? `Coverage: ${item.coverage}` : null,
+      item.caratTotalWeight != null ? `Total Carat Weight: ${item.caratTotalWeight} ct` : null,
+      item.designId ? `Design ID: ${item.designId}` : null,
+      item.modelId ? `Model ID: ${item.modelId}` : null,
+    ].filter((x): x is string => Boolean(x));
+    if (specLines.length) parts.push(specLines.join('\n'));
+
+    const addr = dto.shippingAddress;
+    if (addr && Object.values(addr).some(Boolean)) {
+      const addrLines = [
+        'Shipping Address:',
+        addr.name,
+        addr.company,
+        addr.address,
+        [addr.city, addr.state, addr.zip].filter(Boolean).join(', ') || undefined,
+        addr.country,
+      ].filter((x): x is string => Boolean(x));
+      parts.push(addrLines.join('\n'));
+    }
+
+    const metaLines = [
+      dto.orderDate ? `Order Date: ${dto.orderDate}` : null,
+      dto.source ? `Website Source: ${dto.source}` : null,
+    ].filter((x): x is string => Boolean(x));
+    if (metaLines.length) parts.push(metaLines.join('\n'));
+
+    if (dto.customerNotes) parts.push(dto.customerNotes);
+
+    return parts.length ? parts.join('\n\n') : undefined;
   }
 
   // ── Find or create customer by email (same pattern as the web-form intake) ──
@@ -106,6 +188,36 @@ export class RingBuilderOrdersService {
       isActive: true,
     });
     return this.userRepo.save(user);
+  }
+
+  // Fetches the configurator's rendered preview image and saves it as a
+  // reference CadFile — same as a customer-uploaded reference image, just
+  // sourced from a URL instead of a multipart upload. Never blocks order
+  // creation: a failed fetch just means no reference image, logged and
+  // otherwise ignored.
+  private async saveReferenceImage(order: Order, imageUrl: string, uploadedBy: string): Promise<void> {
+    try {
+      const res = await fetch(imageUrl);
+      if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get('content-type') || 'image/jpeg';
+      const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg';
+      const originalName = `ring-builder-render${ext}`;
+      const uploaded = await this.spacesService.uploadWithThumbnail(buffer, 'customer-uploads', originalName, contentType);
+      await this.cadRepo.save(this.cadRepo.create({
+        orderId:       order.id,
+        originalName,
+        fileName:      uploaded.fileName,
+        filePath:      uploaded.filePath,
+        thumbnailPath: uploaded.thumbnailPath,
+        uploadedBy,
+        revisionNumber: 1,
+        designerNotes: 'Ring Builder configuration render',
+        status: CadFileStatus.UPLOADED,
+      }));
+    } catch (err) {
+      this.logger.warn(`Failed to save Ring Builder reference image for ${order.poNumber}:`, err);
+    }
   }
 
   // ── Main: create one Order per cart line item ────────────────────────
@@ -142,6 +254,7 @@ export class RingBuilderOrdersService {
 
       const poNumber      = await this.ordersService.generatePoNumber();
       const trackingToken = randomBytes(32).toString('hex');
+      const { shape: parsedShape, caratWeight: parsedCaratWeight } = this.parseStones(item.stones);
 
       const order = await this.orderRepo.save(this.orderRepo.create({
         poNumber,
@@ -155,21 +268,26 @@ export class RingBuilderOrdersService {
         customerFullName: `${dto.customer.firstName} ${dto.customer.lastName || ''}`.trim(),
         storeName:        dto.customer.storeName?.trim() || customer.storeName,
         phoneNumber:      dto.customer.phoneNumber,
-        orderType:        item.productName || 'Ring Builder',
+        refCustomerPo:    dto.refCustomerPo,
+        orderType:        item.orderType || item.title || 'Ring Builder',
         size:             item.size,
         metalType:        item.metalType,
         metalColor:       item.metalColor,
-        centerStoneShape: item.centerStoneShape,
-        approximateCaratWeight: item.approximateCaratWeight,
-        mountingOption:   item.mountingOption,
+        centerStoneShape: parsedShape,
+        approximateCaratWeight: item.caratTotalWeight != null ? `${item.caratTotalWeight} ct TW` : parsedCaratWeight,
         quantity:         item.quantity || 1,
-        quotedCost:       item.quotedCost,
+        quotedCost:       item.unitPrice != null ? item.unitPrice * (item.quantity || 1) : undefined,
         referenceWeblink: item.referenceWeblink,
-        customerNotes:    this.buildCustomerNotes(item),
+        customerNotes:    this.buildCustomerNotes(dto, item),
         salesRepName:     'Ring Builder',
         salesRepId:       customer.salesRepId || undefined,
       }));
       newlyCreated.push(order);
+
+      if (item.imageUrl) {
+        await this.saveReferenceImage(order, item.imageUrl, customer.email);
+      }
+
       results.push({
         externalOrderId: item.externalOrderId,
         poNumber:        order.poNumber,
