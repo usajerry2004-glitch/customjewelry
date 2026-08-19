@@ -260,25 +260,35 @@ export default function OrdersPage() {
   const showStoneSubRow = statusFilter === OrderStatus.VPO_ISSUED &&
     ['ADMIN', 'FACTORY_MANAGER', 'AUTHORIZER'].includes(userRole);
 
+  // Every filter the Orders list can have active, minus pagination — shared
+  // by the paginated fetch (load, below) and the "export everything matching
+  // these filters" CSV button, so the export always matches what's on screen.
+  const buildFilterParams = (): URLSearchParams => {
+    const params = new URLSearchParams();
+    if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
+    if (isCadSubFilter) {
+      params.set('status', 'CAD_IN_PROGRESS');
+      params.set('cadSubFilter', statusFilter);
+    }
+    if (statusFilter === OrderStatus.CAD_IN_PROGRESS && cadSubFilter) params.set('cadSubFilter', cadSubFilter);
+    if (stoneSubFilter) params.set('stoneSubFilter', stoneSubFilter);
+    if (factoryFilter) params.set('assignedFactory', factoryFilter);
+    if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
+    params.set('sortOrder', sortOrder);
+    return params;
+  };
+
   const load = async (pageNum = 0) => {
     setLoading(true);
     setLoadError('');
     setSelectedIds(new Set());
     try {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageNum * PAGE_SIZE) });
-      if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
-      if (isCadSubFilter) {
-        params.set('status', 'CAD_IN_PROGRESS');
-        params.set('cadSubFilter', statusFilter);
-      }
-      if (statusFilter === OrderStatus.CAD_IN_PROGRESS && cadSubFilter) params.set('cadSubFilter', cadSubFilter);
-      if (stoneSubFilter) params.set('stoneSubFilter', stoneSubFilter);
-      if (factoryFilter) params.set('assignedFactory', factoryFilter);
-      if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
-      if (dateFrom) params.set('dateFrom', dateFrom);
-      if (dateTo) params.set('dateTo', dateTo);
-      if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
-      params.set('sortOrder', sortOrder);
+      const params = buildFilterParams();
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', String(pageNum * PAGE_SIZE));
       const res = await apiFetch(`${API}/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -480,18 +490,25 @@ export default function OrdersPage() {
 
   const clearDates = () => { setDateFrom(''); setDateTo(''); setActiveMonth(''); };
 
-  // Exports the current status list (VPO Issued, Manufactured, or Completed)
-  // — the date range (if set) filters by vpoIssuedAt on the backend, not
-  // createdAt, so it matches "orders whose VPO was issued in this window"
-  // rather than "orders placed in this window", even for the later statuses.
+  // Two export paths, both downloading a CSV the same way:
+  // - The four EXPORTABLE_STATUSES tabs keep the existing, specifically-tuned
+  //   export (date range filters vpoIssuedAt, not createdAt — matches "orders
+  //   whose VPO was issued in this window", which is what that workflow needs).
+  // - Every other tab (All, New, CAD In Progress, or any sub-filter) exports
+  //   whatever the list is actually showing right now, via the same filters
+  //   the page itself uses.
   const [exportingCsv, setExportingCsv] = useState(false);
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
-      const params = new URLSearchParams({ status: statusFilter });
-      if (dateFrom) params.set('dateFrom', dateFrom);
-      if (dateTo) params.set('dateTo', dateTo);
-      const res = await apiFetch(`${API}/orders/export/csv?${params}`);
+      const useVpoExport = EXPORTABLE_STATUSES.includes(statusFilter);
+      const params = useVpoExport ? new URLSearchParams({ status: statusFilter }) : buildFilterParams();
+      if (useVpoExport) {
+        if (dateFrom) params.set('dateFrom', dateFrom);
+        if (dateTo) params.set('dateTo', dateTo);
+      }
+      const endpoint = useVpoExport ? 'export/csv' : 'export/list-csv';
+      const res = await apiFetch(`${API}/orders/${endpoint}?${params}`);
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         toast.error(getErrorMessage(err, 'Failed to export CSV'));
@@ -501,7 +518,9 @@ export default function OrdersPage() {
       const url = URL.createObjectURL(blob);
       const today = new Date().toISOString().slice(0, 10);
       const statusSlug = statusFilter.toLowerCase().replace(/_/g, '-');
-      const namePrefix = isFactoryManager ? `${statusSlug}-orders-mine` : `${statusSlug}-orders`;
+      const namePrefix = useVpoExport
+        ? (isFactoryManager ? `${statusSlug}-orders-mine` : `${statusSlug}-orders`)
+        : (isFactoryManager ? 'orders-mine' : 'orders');
       const a = document.createElement('a');
       a.href = url;
       a.download = (dateFrom || dateTo)
@@ -1240,13 +1259,17 @@ export default function OrdersPage() {
           >+ Save current filters</button>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-          {EXPORTABLE_STATUSES.includes(statusFilter) && ['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
+          {['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
             <button
               onClick={handleExportCsv}
               disabled={exportingCsv}
-              title={isFactoryManager
-                ? `Export your assigned ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} orders as CSV`
-                : `Export the ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} list as CSV`}
+              title={EXPORTABLE_STATUSES.includes(statusFilter)
+                ? (isFactoryManager
+                  ? `Export your assigned ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} orders as CSV`
+                  : `Export the ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} list as CSV`)
+                : (isFactoryManager
+                  ? 'Export your assigned orders matching the current filters as CSV'
+                  : 'Export every order matching the current filters as CSV')}
               style={{
                 padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                 cursor: exportingCsv ? 'default' : 'pointer', background: 'var(--navy)', color: '#fff', border: 'none',

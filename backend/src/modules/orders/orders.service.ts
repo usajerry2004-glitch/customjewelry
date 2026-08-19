@@ -742,7 +742,12 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async findAll(filters: OrderFilterDto, user?: OrdersUser) {
+  // Shared by findAll() and exportOrdersListCsv() — every filter the Orders
+  // list page can have active (status tab, CAD/stone sub-filter, factory,
+  // supplier, date range, search) except pagination and sort, which each
+  // caller applies on top for its own purpose (a page of results vs. every
+  // matching row for export).
+  private buildOrdersQuery(filters: OrderFilterDto, user?: OrdersUser): SelectQueryBuilder<Order> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
 
@@ -770,13 +775,31 @@ export class OrdersService implements OnModuleInit {
       qb.andWhere('order.stoneStatus = :spReceived', { spReceived: 'STONE_RECEIVED' });
 
     this.applyCommonFilters(qb, filters);
+    return qb;
+  }
 
+  async findAll(filters: OrderFilterDto, user?: OrdersUser) {
+    const qb = this.buildOrdersQuery(filters, user);
     qb.orderBy('order.isPriorityCustomer', 'DESC')
       .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC')
       .skip(filters.offset || 0)
       .take(filters.limit || 50);
     const [orders, total] = await qb.getManyAndCount();
     return { orders, total };
+  }
+
+  // Exports every order matching the Orders list page's current filters —
+  // not just the current page — as a CSV. Same role-scoping/redaction as the
+  // existing VPO-issued export (buildOrderCsvColumns), just sourced from
+  // whatever the list is actually showing right now instead of a fixed
+  // VPO_ISSUED/MANUFACTURED/COMPLETED status.
+  async exportOrdersListCsv(filters: OrderFilterDto, user?: OrdersUser): Promise<string> {
+    const qb = this.buildOrdersQuery(filters, user);
+    qb.orderBy('order.isPriorityCustomer', 'DESC')
+      .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC');
+    const orders = await qb.getMany();
+    const isFactory = user?.role === UserRole.FACTORY_MANAGER;
+    return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
   }
 
   // Powers the count badge on each status tab on the Orders list — same

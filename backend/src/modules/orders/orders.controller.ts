@@ -172,6 +172,21 @@ export class OrdersController {
     res.send(csv);
   }
 
+  @Get('export/list-csv')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Export every order matching the Orders list page\'s current filters (status tab, factory, supplier, date range, search) as CSV — not just the current page. Factory Manager gets pricing/customer-identity fields stripped, same as the other export.' })
+  async exportListCsv(@Query() filters: OrderFilterDto, @Request() req: any, @Res() res: Response) {
+    const csv = await this.ordersService.exportOrdersListCsv(filters, req.user);
+    const today = new Date().toISOString().slice(0, 10);
+    const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
+      ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
+      : '';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders${factorySuffix}-${today}.csv"`);
+    res.send(csv);
+  }
+
   @Get('export/sku-csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)
