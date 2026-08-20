@@ -35,6 +35,7 @@ export default function JobBagPage() {
     { label: 'Quality',       value: order.diamondQuality },
     { label: 'Shape',         value: order.centerStoneShape },
     { label: 'Carat',         value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : null },
+    { label: 'Gemstone',      value: order.hasGemstone ? 'Yes' : 'No' },
     { label: 'Tracking',      value: (order as any).trackingNumber },
   ].filter(r => r.value);
 

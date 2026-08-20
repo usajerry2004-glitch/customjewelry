@@ -66,6 +66,7 @@ function jewelflow_submit_order(array $form_data, array $files = []): array {
     $add_field('metalColor',    sanitize_text_field($form_data['metal_color']    ?? $form_data['metalColor']    ?? ''));
     $add_field('diamondQuality',sanitize_text_field($form_data['diamond_quality']?? $form_data['diamondQuality']?? ''));
     $add_field('centerStoneShape', sanitize_text_field($form_data['stone_shape'] ?? $form_data['centerStoneShape'] ?? ''));
+    $add_field('hasGemstone',   sanitize_text_field($form_data['gemstone']      ?? $form_data['hasGemstone']    ?? ''));
     $add_field('referenceWeblink', esc_url_raw($form_data['reference_url']       ?? $form_data['referenceWeblink'] ?? ''));
     $add_field('refCustomerPo', sanitize_text_field($form_data['customer_po']    ?? $form_data['po_number']     ?? ''));
     $add_field('stockNumber',   sanitize_text_field($form_data['stock_no']       ?? $form_data['stockNumber']   ?? ''));

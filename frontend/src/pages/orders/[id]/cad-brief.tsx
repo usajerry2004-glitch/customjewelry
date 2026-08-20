@@ -49,6 +49,7 @@ export default function CadBriefPage() {
     { label: 'Stone Quality', value: order.diamondQuality },
     { label: 'Stone Shape',  value: order.centerStoneShape },
     { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : null },
+    { label: 'Gemstone',     value: order.hasGemstone ? 'Yes' : 'No' },
   ].filter(r => r.value);
 
   return (

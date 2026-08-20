@@ -29,6 +29,7 @@ export interface WebOrderDto {
   diamondType?: string;
   centerStoneShape?: string;
   approximateCaratWeight?: string;
+  hasGemstone?: boolean;
 
   // Reference
   referenceWeblink?: string;
@@ -112,6 +113,7 @@ export class PublicOrdersService {
         diamondType:      dto.diamondType,
         centerStoneShape: dto.centerStoneShape,
         approximateCaratWeight: dto.approximateCaratWeight,
+        hasGemstone:      dto.hasGemstone ?? false,
         referenceWeblink: dto.referenceWeblink,
         refCustomerPo:    dto.refCustomerPo,
         stockNumber:      dto.stockNumber,
@@ -217,6 +219,7 @@ export class PublicOrdersService {
       diamondQuality: order.diamondQuality,
       centerStoneShape: order.centerStoneShape,
       approximateCaratWeight: order.approximateCaratWeight,
+      hasGemstone:    order.hasGemstone,
       customerNotes:  order.customerNotes,
       refCustomerPo:  order.refCustomerPo ?? null,
       createdAt:      order.createdAt,

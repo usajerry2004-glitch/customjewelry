@@ -69,6 +69,7 @@ interface OrderData {
   diamondQuality: string | null;
   centerStoneShape: string | null;
   approximateCaratWeight: string | null;
+  hasGemstone: boolean;
   customerNotes: string | null;
   refCustomerPo: string | null;
   createdAt: string;
@@ -226,6 +227,7 @@ export default function TrackPage() {
                     { label: 'Stone Shape',     value: order.centerStoneShape },
                     { label: 'Carat Weight',    value: order.approximateCaratWeight },
                     { label: 'Diamond Quality', value: order.diamondQuality },
+                    { label: 'Gemstone',        value: order.hasGemstone ? 'Yes' : 'No' },
                     { label: 'Your PO #',       value: order.refCustomerPo },
                   ].filter(r => r.value).map(row => (
                     <div key={row.label}>

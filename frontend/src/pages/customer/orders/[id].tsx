@@ -351,6 +351,7 @@ export default function CustomerOrderDetail() {
             { label: 'Stone Quality', value: order.diamondQuality },
             { label: 'Shape', value: order.centerStoneShape },
             { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight}ct` : null },
+            { label: 'Gemstone', value: order.hasGemstone ? 'Yes' : 'No' },
           ].map(({ label, value }) => value ? (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{label}</span>

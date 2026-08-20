@@ -62,7 +62,7 @@ export default function NewOrderPage() {
   const [form, setForm] = useState({
     orderType: '', metalType: '', metalColor: '', size: '',
     quantity: '1', stamping: '',
-    diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '',
+    diamondType: '', diamondQuality: '', mountingOption: '', hasGemstone: 'No', customerNotes: '', refCustomerPo: '',
   });
   const [refFiles, setRefFiles] = useState<File[]>([]);
   const [refLink, setRefLink] = useState('');
@@ -120,6 +120,7 @@ export default function NewOrderPage() {
           ...form,
           quantity: Math.max(1, parseInt(form.quantity, 10) || 1),
           mountingOption: form.mountingOption || undefined,
+          hasGemstone: form.hasGemstone === 'Yes',
           manufacturingPath: 'STANDARD',
           referenceWeblink: refLink || undefined,
         }),
@@ -274,6 +275,14 @@ export default function NewOrderPage() {
                 {DIAMOND_QUALITY.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
+          </div>
+
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Gemstone</label>
+            <select value={form.hasGemstone} onChange={e => set('hasGemstone', e.target.value)} style={selectStyle}>
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
           </div>
 
           <div style={fieldWrap}>

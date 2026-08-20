@@ -45,6 +45,7 @@ const ORDER_FIELDS = [
   { key: 'mountingOption', label: 'Mounting Option', type: 'select', options: ['Mounting Only', 'Semi-Mount'] },
   { key: 'centerStoneShape', label: 'Center Stone Shape', type: 'select', options: ['Round', 'Oval', 'Cushion', 'Emerald', 'Pear', 'Princess', 'Radiant', 'Marquise', 'Asscher', 'Heart', 'Other'] },
   { key: 'approximateCaratWeight', label: 'Approx. Carat Weight', type: 'text', placeholder: 'e.g. 1.5' },
+  { key: 'hasGemstone', label: 'Gemstone', type: 'select', options: ['No', 'Yes'] },
   { key: 'quotedCost', label: 'Quoted Cost ($)', type: 'text', placeholder: 'e.g. 1250' },
   { key: 'vendorName', label: 'Vendor / Factory', type: 'text', placeholder: 'e.g. Creations' },
   { key: 'salesRepEmail', label: 'Sales Rep Email', type: 'text', placeholder: 'sales@kirajewels.one' },
@@ -103,7 +104,7 @@ export default function CustomersPage() {
 
   const [newOrder, setNewOrder] = useState<Record<string, string>>({
     orderType: '', metalType: '', metalColor: '', size: '', diamondType: '',
-    diamondQuality: '', mountingOption: '', centerStoneShape: '', approximateCaratWeight: '',
+    diamondQuality: '', mountingOption: '', centerStoneShape: '', approximateCaratWeight: '', hasGemstone: 'No',
     quotedCost: '', vendorName: '', salesRepEmail: '', customerNotes: '',
   });
 
@@ -229,6 +230,7 @@ export default function CustomersPage() {
           customerEmail: showOrder.email,
           customerFullName: formatName(showOrder.firstName, showOrder.lastName),
           quotedCost: newOrder.quotedCost ? parseFloat(newOrder.quotedCost) : undefined,
+          hasGemstone: newOrder.hasGemstone === 'Yes',
           manufacturingPath: 'STANDARD',
         }),
       });

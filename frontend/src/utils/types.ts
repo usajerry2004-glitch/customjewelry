@@ -82,6 +82,7 @@ export interface Order {
   mountingOption?: string | null;
   centerStoneShape?: string;
   approximateCaratWeight?: string;
+  hasGemstone?: boolean;
   customerNotes?: string;
   refCustomerPo?: string;
   quotedCost?: number;

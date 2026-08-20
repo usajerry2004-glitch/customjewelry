@@ -289,6 +289,7 @@ export class ImportService {
           diamondType:             str(row['Natural or Lab']),
           diamondQuality:          str(row['Dia Quality']),
           centerStoneShape:        str(row['Center Stone Shape']),
+          hasGemstone:             String(row['Gemstone'] ?? '').toLowerCase() === 'yes',
           stamping:                getCI(row, 'Stamping') || getCI(row, ...ENGRAVING_HEADERS),
           approximateCaratWeight:  str(row['Approximate Carat Weight']) || str(row['Center Stone Carat']),
           centerStoneRatio:        str(row['Center Stone Ratio']) || str(row['Stone Ratio']),

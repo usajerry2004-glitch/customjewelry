@@ -509,12 +509,13 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'mountingOption', label: 'Mounting Option' },
       { key: 'centerStoneShape', label: 'Stone Shape' },
       { key: 'approximateCaratWeight', label: 'Carat Weight' },
+      { key: 'hasGemstone', label: 'Gemstone', format: (v) => v ? 'Yes' : 'No' },
     ],
   },
 ];
 
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'mountingOption', 'centerStoneShape', 'approximateCaratWeight'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'mountingOption', 'centerStoneShape', 'approximateCaratWeight', 'hasGemstone'];
 
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
@@ -529,6 +530,7 @@ const SPEC_SELECT_OPTIONS: Record<string, string[]> = {
   metalType: ['10K', '14K', '18K', 'Platinum'],
   metalColor: ['Yellow Gold', 'White Gold', 'Rose Gold', 'Platinum', 'Two-Tone'],
   mountingOption: [...MOUNTING_OPTIONS],
+  hasGemstone: ['Yes', 'No'],
 };
 
 const cardStyle = {
@@ -710,7 +712,7 @@ export default function OrderDetail() {
           setShipViaInput(o.shipMethod || '');
           setQcDoneInput(!!o.qcDone);
           const specs: Record<string, string> = {};
-          EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = o[k] ?? ''; });
+          EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = k === 'hasGemstone' ? (o[k] ? 'Yes' : 'No') : (o[k] ?? ''); });
           setSpecInputs(specs);
           const customerFields: Record<string, string> = {};
           EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
@@ -873,6 +875,8 @@ export default function OrderDetail() {
     try {
       const value = key === 'quantity'
         ? Math.max(1, parseInt(specInputs[key], 10) || 1)
+        : key === 'hasGemstone'
+        ? specInputs[key] === 'Yes'
         : (specInputs[key]?.trim() || null);
       const res = await apiFetch(`${API}/orders/${order.id}`, {
         method: 'PUT',

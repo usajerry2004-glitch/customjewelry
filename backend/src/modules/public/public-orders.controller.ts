@@ -51,6 +51,7 @@ export class PublicOrdersController {
         diamondType:    body.diamondType || body.diamond_type,
         centerStoneShape: body.centerStoneShape || body.center_stone_shape,
         approximateCaratWeight: body.approximateCaratWeight || body.carat_weight,
+        hasGemstone: ['true', 'yes', 'on', '1'].includes(String(body.hasGemstone ?? body.has_gemstone ?? body.gemstone ?? '').toLowerCase()),
         referenceWeblink: body.referenceWeblink || body.reference_weblink || body.reference_url,
         refCustomerPo: body.refCustomerPo || body.customer_po || body.po_number,
         stockNumber:   body.stockNumber || body.stock_no,

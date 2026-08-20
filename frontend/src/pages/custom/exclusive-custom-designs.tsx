@@ -23,7 +23,7 @@ const MAX_FILES = 5;
 const emptyForm = {
   firstName: '', lastName: '', email: '', phoneNumber: '',
   orderType: '', size: '', metalType: '', metalColor: '',
-  diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '',
+  diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', hasGemstone: 'No',
   referenceWeblink: '', customerNotes: '',
 };
 
@@ -241,6 +241,13 @@ export default function ExclusiveCustomDesignsPage() {
                   </select>
                 </div>
                 <div><label style={label}>Approx. Carat Weight</label><input value={form.approximateCaratWeight} onChange={set('approximateCaratWeight')} placeholder="e.g. 1.5 ct" style={inp} /></div>
+                <div>
+                  <label style={label}>Gemstone</label>
+                  <select value={form.hasGemstone} onChange={set('hasGemstone')} style={{ ...inp, cursor: 'pointer' }}>
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </div>
               </div>
 
               <div style={sectionHead}>Reference</div>

@@ -112,6 +112,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           )}
           {order.orderType && <Tag text={order.orderType} />}
           {order.metalType && order.metalColor && <Tag text={`${order.metalType} · ${order.metalColor}`} />}
+          {order.hasGemstone && <Tag text="💎 Gemstone" />}
           {!hideFinancials && order.quotedCost && <Tag text={formatCurrency(order.quotedCost)} gold />}
           {cadSubLabel === 'Revision' && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>

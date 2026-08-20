@@ -140,6 +140,9 @@ export class Order {
   @Column({ nullable: true })
   centerStoneShape: string;
 
+  @Column({ type: 'boolean', default: false })
+  hasGemstone: boolean;
+
   @Column({ nullable: true })
   approximateCaratWeight: string;
 

@@ -179,7 +179,7 @@ export default function OrdersPage() {
   const [newOrder, setNewOrder] = useState({
     orderType: '', size: '', metalType: '', metalColor: '',
     quantity: '1', stamping: '',
-    diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '',
+    diamondType: '', diamondQuality: '', mountingOption: '', hasGemstone: 'No', customerNotes: '', refCustomerPo: '',
   });
   // Contact info for admin/sales rep placing order
   const [contact, setContact] = useState({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
@@ -767,6 +767,7 @@ export default function OrdersPage() {
           storeName: resolvedCompany || undefined,
           phoneNumber: contact.phone || undefined,
           mountingOption: newOrder.mountingOption || undefined,
+          hasGemstone: newOrder.hasGemstone === 'Yes',
           manufacturingPath: 'STANDARD',
           referenceWeblink: refLink || undefined,
         }),
@@ -793,7 +794,7 @@ export default function OrdersPage() {
         }
 
         setShowNew(false);
-        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '' });
+        setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', hasGemstone: 'No', customerNotes: '', refCustomerPo: '' });
         setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
         setSelectedCustomer(null);
         setCustomerSearch('');
@@ -813,7 +814,7 @@ export default function OrdersPage() {
     setShowNew(false); setRefFiles([]); setRefLink('');
     setSelectedCustomer(null); setCustomerSearch('');
     setContact({ firstName: '', lastName: '', companyName: '', companyNameOther: '', email: '', phone: '' });
-    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', customerNotes: '', refCustomerPo: '' });
+    setNewOrder({ orderType: '', size: '', metalType: '', metalColor: '', quantity: '1', stamping: '', diamondType: '', diamondQuality: '', mountingOption: '', hasGemstone: 'No', customerNotes: '', refCustomerPo: '' });
   };
 
   return (
@@ -1107,6 +1108,14 @@ export default function OrdersPage() {
                   {DIAMOND_QUALITY_MODAL.map(o => <option key={o}>{o}</option>)}
                 </select>
               </div>
+            </div>
+
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Gemstone</label>
+              <select value={newOrder.hasGemstone} onChange={e => setO('hasGemstone', e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
             </div>
 
             <div style={fieldStyle}>

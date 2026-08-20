@@ -107,6 +107,7 @@ export async function buildFactoryOrderPdf(order: Order): Promise<Buffer> {
     { label: 'Mounting Option', value: order.mountingOption || '—' },
     { label: 'Stone Shape', value: order.centerStoneShape || '—' },
     { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : '—' },
+    { label: 'Gemstone', value: order.hasGemstone ? 'Yes' : 'No' },
   ], y);
 
   // ── Mounting Only / Semi-Mount callout — flagged so Factory/Stone don't
