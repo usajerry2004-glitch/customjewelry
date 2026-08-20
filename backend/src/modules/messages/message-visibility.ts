@@ -5,7 +5,7 @@ import { UserRole } from '../../database/entities/user.entity';
 // between MessagesService (REST fetch + search) and MessagesGateway (live
 // broadcast) so a message hidden from a role over REST can't leak to that
 // same role over the socket.
-export const RESTRICTED_ROLES = [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER];
+export const RESTRICTED_ROLES = [UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER];
 
 export function isMessageVisible(
   role: string,

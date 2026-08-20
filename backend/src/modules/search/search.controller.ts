@@ -8,7 +8,7 @@ import { UserRole } from '../../database/entities/user.entity';
 @ApiTags('Search')
 @ApiBearerAuth()
 @Controller('search')
-@Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+@Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER)
 @UseGuards(RolesGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}

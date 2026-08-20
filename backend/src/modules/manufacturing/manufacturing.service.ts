@@ -34,7 +34,7 @@ export class ManufacturingService {
         .getMany();
       return this.sortQueue(orders);
     }
-    if (user?.role === UserRole.FACTORY_MANAGER) {
+    if (user?.role === UserRole.FACTORY_MANAGER || user?.role === UserRole.FACTORY_VIEWER) {
       const q = this.orderRepo
         .createQueryBuilder('o')
         .where('o.status = :s', { s: OrderStatus.VPO_ISSUED });

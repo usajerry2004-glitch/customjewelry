@@ -23,6 +23,7 @@ const STAFF_ROLES = [
   UserRole.AUTHORIZER,
   UserRole.CAD_DESIGNER,
   UserRole.FACTORY_MANAGER,
+  UserRole.FACTORY_VIEWER,
   UserRole.STONE_MANAGER,
   UserRole.ADMIN,
   UserRole.CUSTOMER,
@@ -34,6 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
   [UserRole.AUTHORIZER]:      'Authorizer',
   [UserRole.CAD_DESIGNER]:    'CAD Designer',
   [UserRole.FACTORY_MANAGER]: 'Factory Manager',
+  [UserRole.FACTORY_VIEWER]:  'Factory Viewer',
   [UserRole.STONE_MANAGER]:   'Stone Manager',
   [UserRole.CUSTOMER]:        'Customer',
 };
@@ -44,6 +46,7 @@ const ROLE_COLORS: Record<string, string> = {
   [UserRole.AUTHORIZER]:      '#7C3AED',
   [UserRole.CAD_DESIGNER]:    '#0891B2',
   [UserRole.FACTORY_MANAGER]: '#D97706',
+  [UserRole.FACTORY_VIEWER]:  '#B45309',
   [UserRole.STONE_MANAGER]:   '#9333EA',
   [UserRole.CUSTOMER]:        '#BE185D',
 };
@@ -385,14 +388,14 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-            {(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.STONE_MANAGER) && (
+            {(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER || form.role === UserRole.STONE_MANAGER) && (
               <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                    Factory{form.role === UserRole.FACTORY_MANAGER ? ' (required)' : ' (optional)'}
+                    Factory{(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER) ? ' (required)' : ' (optional)'}
                   </label>
                   <select
-                    required={form.role === UserRole.FACTORY_MANAGER}
+                    required={form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER}
                     value={form.assignedFactory}
                     onChange={e => setForm(f => ({ ...f, assignedFactory: e.target.value as Factory }))}
                     style={{ ...inp, cursor: 'pointer' }}

@@ -57,7 +57,7 @@ export class ReportsController {
   }
 
   @Get('audit-log')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER)
   @ApiOperation({ summary: 'Audit log of status changes, supplier assignments, and edits — admins see every order, other staff see only their own actions (not available to customers)' })
   auditLog(
     @Request() req: any,

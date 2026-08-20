@@ -11,6 +11,7 @@ const ROLE_COLORS: Record<string, string> = {
   AUTHORIZER:     '#F59E0B',
   CAD_DESIGNER:   '#6366F1',
   FACTORY_MANAGER:'#0D9488',
+  FACTORY_VIEWER: '#B45309',
   STONE_MANAGER:  '#9333EA',
   SALES_REP:      '#8B5CF6',
   CUSTOMER:       '#059669',
@@ -67,6 +68,10 @@ function formatFileSize(bytes: number): string {
 
 export function OrderConversation({ orderId, currentUserRole, currentUserId }: Props) {
   const isCustomer = currentUserRole === 'CUSTOMER';
+  // Read-only accounts can follow the thread but never post to it — enforced
+  // again server-side (postMessage rejects this role), this just avoids a
+  // dead-end composer that would 403 on send.
+  const isReadOnly = currentUserRole === 'FACTORY_VIEWER';
   const [messages, setMessages] = useState<OrderMessage[]>([]);
   const [content, setContent] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -430,6 +435,11 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
       )}
 
       {/* Input */}
+      {isReadOnly ? (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-input)', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+          Read-only access — you can follow this conversation but can't post to it.
+        </div>
+      ) : (
       <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--bg-input)' }}>
         {/* Options row (company only) */}
         {!isCustomer && (
@@ -603,6 +613,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
         </div>
         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px' }}>Ctrl+Enter to send</div>
       </div>
+      )}
     </div>
   );
 }

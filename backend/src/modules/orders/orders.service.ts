@@ -676,8 +676,10 @@ export class OrdersService implements OnModuleInit {
       );
     } else if (user?.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
-    } else if (user?.role === 'FACTORY_MANAGER') {
+    } else if (user?.role === 'FACTORY_MANAGER' || user?.role === 'FACTORY_VIEWER') {
       // Invisible until Admin/Authorizer assigns this order to this user's factory.
+      // FACTORY_VIEWER shares this exact scoping — it's the read-only
+      // counterpart to FACTORY_MANAGER, blocked from mutating actions elsewhere.
       qb.andWhere('order.status IN (:...factoryStatuses)', {
         factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED],
       });
@@ -800,7 +802,7 @@ export class OrdersService implements OnModuleInit {
     qb.orderBy('order.isPriorityCustomer', 'DESC')
       .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC');
     const orders = await qb.getMany();
-    const isFactory = user?.role === UserRole.FACTORY_MANAGER;
+    const isFactory = user?.role === UserRole.FACTORY_MANAGER || user?.role === UserRole.FACTORY_VIEWER;
     return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
   }
 
@@ -857,7 +859,7 @@ export class OrdersService implements OnModuleInit {
   // identity), plus the reference link, since that's the closest thing to a
   // "reference image" this row has.
   async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }, orderIds?: string[], status?: OrderStatus): Promise<string> {
-    const isFactory = user?.role === UserRole.FACTORY_MANAGER;
+    const isFactory = user?.role === UserRole.FACTORY_MANAGER || user?.role === UserRole.FACTORY_VIEWER;
 
     const where: any = {};
     if (isFactory) where.assignedFactory = user?.assignedFactory ?? null;
@@ -1030,7 +1032,8 @@ export class OrdersService implements OnModuleInit {
     }
 
     // Invisible until Admin/Authorizer assigns this order to this user's factory.
-    if (user?.role === 'FACTORY_MANAGER' && (
+    // FACTORY_VIEWER shares this exact scoping (read-only counterpart to FACTORY_MANAGER).
+    if ((user?.role === 'FACTORY_MANAGER' || user?.role === 'FACTORY_VIEWER') && (
       (order.status !== OrderStatus.VPO_ISSUED && order.status !== OrderStatus.MANUFACTURED) ||
       !order.assignedFactory || order.assignedFactory !== user.assignedFactory
     )) {
@@ -1083,7 +1086,7 @@ export class OrdersService implements OnModuleInit {
       );
     } else if (user.role === 'CAD_DESIGNER') {
       qb.andWhere('order.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
-    } else if (user.role === 'FACTORY_MANAGER') {
+    } else if (user.role === 'FACTORY_MANAGER' || user.role === 'FACTORY_VIEWER') {
       qb.andWhere('order.status IN (:...factoryStatuses)', { factoryStatuses: [OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED] });
       qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
     } else if (user.role === 'STONE_MANAGER') {
@@ -1922,6 +1925,7 @@ export class OrdersService implements OnModuleInit {
       [UserRole.CAD_DESIGNER]:    [OrderStatus.CAD_IN_PROGRESS],
       [UserRole.AUTHORIZER]:      [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.VPO_ISSUED, OrderStatus.MANUFACTURED, OrderStatus.SHIPPED],
       [UserRole.FACTORY_MANAGER]: [OrderStatus.VPO_ISSUED],
+      [UserRole.FACTORY_VIEWER]: [OrderStatus.VPO_ISSUED],
       [UserRole.STONE_MANAGER]:   [OrderStatus.VPO_ISSUED],
     };
 
@@ -1938,7 +1942,7 @@ export class OrdersService implements OnModuleInit {
       if (role === UserRole.STONE_MANAGER) {
         q.andWhere('o.supplySource = :assignedSupplySource', { assignedSupplySource: user.assignedSupplySource ?? null });
       }
-      if (role === UserRole.FACTORY_MANAGER) {
+      if (role === UserRole.FACTORY_MANAGER || role === UserRole.FACTORY_VIEWER) {
         q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
       }
       return q;
@@ -1981,13 +1985,13 @@ export class OrdersService implements OnModuleInit {
           })()
         : none,
       // Factory: still in VPO Issued > 6 days since it was issued
-      [UserRole.FACTORY_MANAGER, UserRole.ADMIN].includes(role as UserRole)
+      [UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.ADMIN].includes(role as UserRole)
         ? (() => {
             const q = this.orderRepo.createQueryBuilder('o')
               .where('o.isArchived = false')
               .andWhere('o.status = :s', { s: OrderStatus.VPO_ISSUED })
               .andWhere('o."vpoIssuedAt" IS NOT NULL AND o."vpoIssuedAt" < :d', { d: daysAgo(6) });
-            if (role === UserRole.FACTORY_MANAGER) {
+            if (role === UserRole.FACTORY_MANAGER || role === UserRole.FACTORY_VIEWER) {
               q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
             }
             return q.getMany();
@@ -2042,7 +2046,7 @@ export class OrdersService implements OnModuleInit {
         );
       } else if (user?.role === 'CAD_DESIGNER') {
         q.andWhere('o.status IN (:...cadStatuses)', { cadStatuses: CAD_STATUSES });
-      } else if (user?.role === 'FACTORY_MANAGER') {
+      } else if (user?.role === 'FACTORY_MANAGER' || user?.role === 'FACTORY_VIEWER') {
         q.andWhere('o.kiraSkuNumber IS NOT NULL');
         q.andWhere('o.assignedFactory = :assignedFactory', { assignedFactory: user.assignedFactory ?? null });
       } else if (user?.role === 'STONE_MANAGER') {

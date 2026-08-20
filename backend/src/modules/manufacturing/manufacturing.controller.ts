@@ -14,7 +14,7 @@ export class ManufacturingController {
   constructor(private readonly manufacturingService: ManufacturingService) {}
 
   @Get('queue')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Get manufacturing queue (role-filtered — Stone Manager excludes Stone Creations orders)' })
   getQueue(@Request() req: any) {
@@ -22,7 +22,7 @@ export class ManufacturingController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.AUTHORIZER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Manufacturing metrics' })
   getMetrics() {

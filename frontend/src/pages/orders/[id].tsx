@@ -1344,7 +1344,7 @@ export default function OrderDetail() {
               // server-side, see FactoryRedactionInterceptor); phone number only
               // shows up when the order actually has one
               const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
-              const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.STONE_MANAGER;
+              const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.FACTORY_VIEWER || userRole === UserRole.STONE_MANAGER;
               // Supply source / factory are only meaningful once the VPO has been issued
               const supplySourceRelevant = order.status !== OrderStatus.NEW && order.status !== OrderStatus.CAD_IN_PROGRESS;
               const visibleFields = group.fields.filter(f => {
@@ -2111,7 +2111,7 @@ export default function OrderDetail() {
           {/* Quote Options — multiple price options the customer can review while
               deciding (e.g. different metal/quality tiers). Purely informational;
               Admin still confirms one final price above via Quoted Price. */}
-          {![UserRole.CUSTOMER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER].includes(userRole as UserRole) && (
+          {![UserRole.CUSTOMER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER].includes(userRole as UserRole) && (
             <div style={cardStyle}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
                 Quote Options

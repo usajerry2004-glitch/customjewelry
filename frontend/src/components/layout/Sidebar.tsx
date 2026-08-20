@@ -24,7 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '◻', label: 'Orders',         path: '/orders',          roles: Object.values(UserRole) as UserRole[], countKey: 'orders' },
   { icon: '⊞', label: 'Pipeline Board', path: '/orders/kanban',   roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
   { icon: '◎', label: 'CAD Files',      path: '/cad',             roles: [UserRole.ADMIN, UserRole.CAD_DESIGNER] },
-  { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER], countKey: 'manufacturing' },
+  { icon: '⬡', label: 'Manufacturing',  path: '/manufacturing',   roles: [UserRole.ADMIN, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER], countKey: 'manufacturing' },
   { icon: '💎', label: 'Stone',         path: '/stone',           roles: [UserRole.ADMIN, UserRole.STONE_MANAGER], countKey: 'stone' },
   { icon: '◉', label: 'Repairs',        path: '/repairs',         roles: [UserRole.ADMIN, UserRole.AUTHORIZER], countKey: 'repairs' },
   { icon: '◌', label: 'Customers',      path: '/customers',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER] },
@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '✓', label: 'Priority Tasks',   path: '/todos',           roles: Object.values(UserRole) as UserRole[] },
   { icon: '◇', label: 'Settings',       path: '/settings',        roles: [UserRole.ADMIN] },
   { icon: '▦', label: 'Reports',        path: '/reports',         roles: [UserRole.ADMIN] },
-  { icon: '🕐', label: 'Audit Log',      path: '/audit-log',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER] },
+  { icon: '🕐', label: 'Audit Log',      path: '/audit-log',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER] },
 ];
 
 interface SidebarProps {

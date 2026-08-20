@@ -140,11 +140,15 @@ export default function ManufacturingPage() {
                           ⏳ Waiting for Stone Manager to send the stone before production can proceed.
                         </div>
                       )
-                    ) : (
+                    ) : (currentUser?.role === 'FACTORY_MANAGER' || currentUser?.role === 'ADMIN') ? (
                       <button onClick={() => action(order.id, 'complete')} disabled={busy}
                         style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '8px 16px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                         ✓ Mark as Manufactured
                       </button>
+                    ) : (
+                      <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#047857', fontWeight: 500 }}>
+                        ✓ Stone received — ready for the factory to mark as manufactured.
+                      </div>
                     )
                   )}
                 </div>

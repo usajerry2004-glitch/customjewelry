@@ -98,7 +98,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           </div>
         </div>
 
-        {(order.storeName || order.customerFullName || !['FACTORY_MANAGER', 'STONE_MANAGER'].includes(currentUserRole || '')) && (
+        {(order.storeName || order.customerFullName || !['FACTORY_MANAGER', 'FACTORY_VIEWER', 'STONE_MANAGER'].includes(currentUserRole || '')) && (
           <div style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
             {order.storeName || order.customerFullName || 'Unknown Store'}
           </div>

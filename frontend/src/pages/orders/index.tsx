@@ -59,6 +59,11 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'VPO Issued',   value: OrderStatus.VPO_ISSUED },
     { label: 'Manufactured', value: OrderStatus.MANUFACTURED },
   ],
+  FACTORY_VIEWER: [
+    { label: 'All',          value: '' },
+    { label: 'VPO Issued',   value: OrderStatus.VPO_ISSUED },
+    { label: 'Manufactured', value: OrderStatus.MANUFACTURED },
+  ],
   CUSTOMER: [
     { label: 'All',             value: '' },
     { label: 'CAD In Progress', value: OrderStatus.CAD_IN_PROGRESS },
@@ -258,7 +263,7 @@ export default function OrdersPage() {
   const showCadSubRow = (statusFilter === OrderStatus.CAD_IN_PROGRESS || isCadSubFilter) &&
     ['ADMIN', 'AUTHORIZER'].includes(userRole);
   const showStoneSubRow = statusFilter === OrderStatus.VPO_ISSUED &&
-    ['ADMIN', 'FACTORY_MANAGER', 'AUTHORIZER'].includes(userRole);
+    ['ADMIN', 'FACTORY_MANAGER', 'FACTORY_VIEWER', 'AUTHORIZER'].includes(userRole);
 
   // Every filter the Orders list can have active, minus pagination — shared
   // by the paginated fetch (load, below) and the "export everything matching
@@ -320,6 +325,10 @@ export default function OrdersPage() {
   };
 
   const isFactoryManager = userRole === 'FACTORY_MANAGER';
+  // Read-only counterpart to Factory Manager — same view/export scoping,
+  // never wired into the bulk "mark as Manufactured" action flow below
+  // (that stays keyed off isFactoryManager specifically).
+  const isFactoryViewer = userRole === 'FACTORY_VIEWER';
   const canBulkCancel = ['ADMIN', 'AUTHORIZER', 'SALES_REP'].includes(userRole);
   const canBulkDelete = ['ADMIN', 'AUTHORIZER'].includes(userRole) || extraPermissions.includes(Permission.BULK_DELETE_ORDERS);
   const canBulkReassignFactory = ['ADMIN', 'AUTHORIZER'].includes(userRole) || extraPermissions.includes(Permission.ASSIGN_SUPPLIER);
@@ -519,8 +528,8 @@ export default function OrdersPage() {
       const today = new Date().toISOString().slice(0, 10);
       const statusSlug = statusFilter.toLowerCase().replace(/_/g, '-');
       const namePrefix = useVpoExport
-        ? (isFactoryManager ? `${statusSlug}-orders-mine` : `${statusSlug}-orders`)
-        : (isFactoryManager ? 'orders-mine' : 'orders');
+        ? ((isFactoryManager || isFactoryViewer) ? `${statusSlug}-orders-mine` : `${statusSlug}-orders`)
+        : ((isFactoryManager || isFactoryViewer) ? 'orders-mine' : 'orders');
       const a = document.createElement('a');
       a.href = url;
       a.download = (dateFrom || dateTo)
@@ -849,12 +858,14 @@ export default function OrdersPage() {
               {selectMode ? '✕ Exit Select' : '☑ Select'}
             </button>
           )}
-          <button
-            onClick={openNewOrderModal}
-            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
-          >
-            + New Order
-          </button>
+          {!isFactoryViewer && (
+            <button
+              onClick={openNewOrderModal}
+              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.3px' }}
+            >
+              + New Order
+            </button>
+          )}
         </div>
       }
     >
@@ -1268,15 +1279,15 @@ export default function OrdersPage() {
           >+ Save current filters</button>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-          {['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER'].includes(userRole) && (
+          {['ADMIN', 'AUTHORIZER', 'FACTORY_MANAGER', 'FACTORY_VIEWER'].includes(userRole) && (
             <button
               onClick={handleExportCsv}
               disabled={exportingCsv}
               title={EXPORTABLE_STATUSES.includes(statusFilter)
-                ? (isFactoryManager
+                ? ((isFactoryManager || isFactoryViewer)
                   ? `Export your assigned ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} orders as CSV`
                   : `Export the ${EXPORT_STATUS_LABELS[statusFilter] || statusFilter} list as CSV`)
-                : (isFactoryManager
+                : ((isFactoryManager || isFactoryViewer)
                   ? 'Export your assigned orders matching the current filters as CSV'
                   : 'Export every order matching the current filters as CSV')}
               style={{
@@ -1385,7 +1396,7 @@ export default function OrdersPage() {
               content is only relevant to internal staff who talk to
               customers — Stone/Factory Manager are external partners and
               shouldn't see this tab. */}
-          {!['STONE_MANAGER', 'FACTORY_MANAGER'].includes(userRole) && (
+          {!['STONE_MANAGER', 'FACTORY_MANAGER', 'FACTORY_VIEWER'].includes(userRole) && (
             <button
               onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
               title="Only show orders with an unread customer chat message — clears once any staff member opens the conversation"

@@ -4,7 +4,7 @@ import { map } from 'rxjs/operators';
 import { UserRole } from '../../database/entities/user.entity';
 
 const REDACTED_FIELDS = ['quotedCost', 'quoteOptions', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
-const REDACTED_ROLES: string[] = [UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER];
+const REDACTED_ROLES: string[] = [UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER];
 
 // Recursively strips REDACTED_FIELDS from any order-shaped object (identified
 // by a poNumber key) anywhere in the response — single order, {orders,total}

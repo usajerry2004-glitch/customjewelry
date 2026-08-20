@@ -10,6 +10,10 @@ export enum UserRole {
   AUTHORIZER = 'AUTHORIZER',
   CAD_DESIGNER = 'CAD_DESIGNER',
   FACTORY_MANAGER = 'FACTORY_MANAGER',
+  // Read-only counterpart to FACTORY_MANAGER — same assignedFactory scoping
+  // and CSV export access, but blocked from every action that mutates an
+  // order (status changes, assignments, messages, etc).
+  FACTORY_VIEWER = 'FACTORY_VIEWER',
   STONE_MANAGER = 'STONE_MANAGER',
   CUSTOMER = 'CUSTOMER',
 }
@@ -52,8 +56,9 @@ export class User {
   @Column({ nullable: true })
   companyId: string | null;
 
-  // Which factory this account manages orders for (FACTORY_MANAGER role) — only
-  // orders assigned to this same factory are visible to them.
+  // Which factory this account manages orders for (FACTORY_MANAGER and
+  // FACTORY_VIEWER roles) — only orders assigned to this same factory are
+  // visible to them.
   @Column({ type: 'varchar', nullable: true })
   assignedFactory: Factory | null;
 

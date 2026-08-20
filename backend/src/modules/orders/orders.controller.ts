@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, Res, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, Res, UseGuards, UseInterceptors, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { IsArray, IsString, ArrayMinSize } from 'class-validator';
@@ -56,7 +56,7 @@ export class OrdersController {
   }
 
   @Get('kanban')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Kanban board' })
   kanban(@Request() req: any) {
@@ -64,7 +64,7 @@ export class OrdersController {
   }
 
   @Get('metrics')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.STONE_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Order metrics' })
   metrics() {
@@ -143,7 +143,7 @@ export class OrdersController {
   }
 
   @Get('export/csv')
-  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: '"Normal Export" — orders as CSV — Admin/Authorizer get every order with all fields; Factory Manager gets only orders assigned to their own factory, with pricing/customer-identity/reference-link fields stripped. Pass status (VPO_ISSUED/MANUFACTURED/COMPLETED, defaults to VPO_ISSUED) to pick which list; date range filters on vpoIssuedAt, not createdAt. Pass orderIds (comma-separated) to export exactly those orders instead, regardless of their status.' })
   async exportCsv(
@@ -157,7 +157,7 @@ export class OrdersController {
     const orderIds = orderIdsParam ? orderIdsParam.split(',').map(s => s.trim()).filter(Boolean) : undefined;
     const csv = await this.ordersService.exportVpoIssuedCsv(dateFrom, dateTo, req.user, orderIds, status as OrderStatus);
     const today = new Date().toISOString().slice(0, 10);
-    const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
+    const factorySuffix = (req.user?.role === UserRole.FACTORY_MANAGER || req.user?.role === UserRole.FACTORY_VIEWER) && req.user?.assignedFactory
       ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
       : '';
     const statusSlug = (status || OrderStatus.VPO_ISSUED).toLowerCase().replace(/_/g, '-');
@@ -173,13 +173,13 @@ export class OrdersController {
   }
 
   @Get('export/list-csv')
-  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER)
   @UseGuards(RolesGuard)
   @ApiOperation({ summary: 'Export every order matching the Orders list page\'s current filters (status tab, factory, supplier, date range, search) as CSV — not just the current page. Factory Manager gets pricing/customer-identity fields stripped, same as the other export.' })
   async exportListCsv(@Query() filters: OrderFilterDto, @Request() req: any, @Res() res: Response) {
     const csv = await this.ordersService.exportOrdersListCsv(filters, req.user);
     const today = new Date().toISOString().slice(0, 10);
-    const factorySuffix = req.user?.role === UserRole.FACTORY_MANAGER && req.user?.assignedFactory
+    const factorySuffix = (req.user?.role === UserRole.FACTORY_MANAGER || req.user?.role === UserRole.FACTORY_VIEWER) && req.user?.assignedFactory
       ? `-${String(req.user.assignedFactory).toLowerCase().replace(/_/g, '-')}`
       : '';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -228,6 +228,9 @@ export class OrdersController {
   @Post()
   @ApiOperation({ summary: 'Create new order' })
   create(@Body() dto: Partial<Order>, @Request() req: any) {
+    if (req.user?.role === UserRole.FACTORY_VIEWER) {
+      throw new ForbiddenException('Read-only accounts cannot create orders.');
+    }
     return this.ordersService.create(dto, req.user);
   }
 

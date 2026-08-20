@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards, UseInterceptors, UploadedFile, ForbiddenException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { MessagesService, CreateMessageDto } from './messages.service';
@@ -51,6 +51,9 @@ export class MessagesController {
     @Body('parentMessageId') parentMessageId: string,
     @Request() req: any,
   ) {
+    if (req.user?.role === UserRole.FACTORY_VIEWER) {
+      throw new ForbiddenException('Read-only accounts cannot post messages.');
+    }
     const dto: CreateMessageDto = {
       content,
       isInternal: isInternal === 'true',
