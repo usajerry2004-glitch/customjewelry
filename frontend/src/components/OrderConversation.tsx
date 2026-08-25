@@ -4,7 +4,23 @@ import { getSocket } from '../utils/socket';
 import { OrderMessage } from '../utils/types';
 import { formatName } from '../utils/name';
 
-interface ReadReceipt { userId: string; name: string; lastReadAt: string }
+interface ReadReceipt { userId: string; name: string; role: string; lastReadAt: string }
+
+// Mirrors backend/src/modules/messages/message-visibility.ts — reads are
+// tracked per-order, not per-message, so a reader's `lastReadAt` alone
+// doesn't tell us whether they could actually see any given internal
+// message. Re-applying the same rule here keeps "Seen by" from crediting a
+// restricted-role reader (or a customer) with having seen a message that
+// getMessages() would never have sent them in the first place.
+const RESTRICTED_ROLES = ['FACTORY_MANAGER', 'FACTORY_VIEWER', 'STONE_MANAGER'];
+function canReaderSeeMessage(readerRole: string, readerId: string, message: OrderMessage): boolean {
+  if (!message.isInternal) return true;
+  if (readerRole === 'CUSTOMER') return false;
+  if (RESTRICTED_ROLES.includes(readerRole)) {
+    return message.authorId === readerId || (message.mentions || []).includes(readerId);
+  }
+  return true;
+}
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN:          '#C09B58',
@@ -143,8 +159,8 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
         return next;
       });
     };
-    const onRead = (data: { userId: string; userName: string; lastReadAt: string }) => {
-      setReads(prev => [...prev.filter(r => r.userId !== data.userId), { userId: data.userId, name: data.userName, lastReadAt: data.lastReadAt }]);
+    const onRead = (data: { userId: string; userName: string; role: string; lastReadAt: string }) => {
+      setReads(prev => [...prev.filter(r => r.userId !== data.userId), { userId: data.userId, name: data.userName, role: data.role, lastReadAt: data.lastReadAt }]);
     };
 
     socket.on('message:new', onNewMessage);
@@ -291,6 +307,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
     if (CAD_EVENT_PREFIX.exec(m.content)) continue;
     const names = reads
       .filter(r => r.userId !== m.authorId && r.userId !== currentUserId && new Date(r.lastReadAt) >= new Date(m.createdAt))
+      .filter(r => canReaderSeeMessage(r.role, r.userId, m))
       .map(r => r.name);
     if (names.length > 0) {
       seenAtMessageId = m.id;

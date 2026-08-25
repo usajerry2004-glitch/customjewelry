@@ -95,20 +95,24 @@ export class MessagesService {
     return this.enrichMessages(visible);
   }
 
-  async markRead(orderId: string, user: { id: string; firstName?: string; lastName?: string; email: string }): Promise<void> {
+  async markRead(orderId: string, user: { id: string; firstName?: string; lastName?: string; email: string; role: string }): Promise<void> {
     if (!user?.id) {
       this.logger.warn(`markRead called with no user id for order ${orderId} — skipping (would have written unusable data to order_conversation_reads)`);
       return;
     }
     await this.readRepo.upsert({ userId: user.id, orderId }, ['userId', 'orderId']);
     const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
-    this.gateway.broadcastRead(orderId, user.id, userName, new Date());
+    this.gateway.broadcastRead(orderId, user.id, userName, user.role, new Date());
   }
 
   // "Seen by" state for a whole order's thread — who has viewed the
   // conversation and when, so the frontend can show "Seen by X" on whichever
   // message was the most recent at the time each reader last opened it.
-  async getReads(orderId: string): Promise<{ userId: string; name: string; lastReadAt: Date }[]> {
+  // Includes each reader's role so the frontend can re-apply the same
+  // per-message isMessageVisible() rule getMessages() uses — this endpoint
+  // returns every reader of the *order*, not of any specific message, since
+  // reads are tracked per-order rather than per-message.
+  async getReads(orderId: string): Promise<{ userId: string; name: string; role: string; lastReadAt: Date }[]> {
     const reads = await this.readRepo.find({ where: { orderId } });
     if (!reads.length) return [];
 
@@ -130,7 +134,13 @@ export class MessagesService {
 
     const users = await this.userRepo.find({ where: { id: In(validReads.map(r => r.userId)) } });
     const nameById = new Map(users.map(u => [u.id, [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email]));
-    return validReads.map(r => ({ userId: r.userId, name: nameById.get(r.userId) || 'Unknown user', lastReadAt: r.lastReadAt }));
+    const roleById = new Map(users.map(u => [u.id, u.role]));
+    return validReads.map(r => ({
+      userId: r.userId,
+      name: nameById.get(r.userId) || 'Unknown user',
+      role: roleById.get(r.userId) || 'CUSTOMER',
+      lastReadAt: r.lastReadAt,
+    }));
   }
 
   // Keyword search across message content — ILIKE substring match, same

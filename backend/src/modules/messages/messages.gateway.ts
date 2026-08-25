@@ -115,7 +115,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  broadcastRead(orderId: string, userId: string, userName: string, lastReadAt: Date) {
-    this.server.to(room(orderId)).emit('message:read', { userId, userName, lastReadAt });
+  broadcastRead(orderId: string, userId: string, userName: string, role: string, lastReadAt: Date) {
+    this.server.to(room(orderId)).emit('message:read', { userId, userName, role, lastReadAt });
   }
 }
