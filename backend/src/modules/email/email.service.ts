@@ -93,6 +93,10 @@ export class EmailService {
     return `${this.frontendUrl}/track/${token}`;
   }
 
+  surveyUrl(token: string) {
+    return `${this.frontendUrl}/survey/${token}`;
+  }
+
   // A bulk-recipient template with an empty `to` array resolves successfully
   // and sends nothing — no exception, nothing for a caller's .catch() to see.
   // This was the actual root cause behind factories never getting notified
@@ -386,6 +390,63 @@ export class EmailService {
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${reviewLink}" style="${btnStyle('#6366F1')}">Review & Approve Design →</a>
         <p style="margin-top:16px;font-size:12px;color:#9CA3AF">We'll email you a one-time code — no password needed.</p>
+      `),
+    });
+  }
+
+  // Automatic approval-stall check-in — day-5 survey, or the day-10 reminder
+  // (same content, different subject/intro) if the day-5 survey went
+  // unanswered. Links to the public, no-login /survey/:token page, not
+  // sendCadReadyForApproval's login link — this is a short 3-option question,
+  // not a return to the full CAD review flow.
+  async sendApprovalStallSurvey(opts: {
+    to: string;
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    trackingToken: string;
+    isReminder: boolean;
+  }) {
+    const link = this.surveyUrl(opts.trackingToken);
+    const intro = opts.isReminder
+      ? `We wanted to follow up — we still haven't heard back on the CAD design for order <strong>${opts.poNumber}</strong>. No rush, we just want to make sure nothing's stuck on our end.`
+      : `It's been a few days since we sent the CAD design for order <strong>${opts.poNumber}</strong> for your approval. Could you take a moment to let us know what's going on?`;
+    return this.send({
+      to: opts.to,
+      subject: opts.isReminder
+        ? `Following up — ${opts.poNumber} still awaiting your approval`
+        : `Quick check-in on your design approval — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#6366F1;margin:0 0 16px">${opts.isReminder ? "Following Up — We Haven't Heard Back" : 'Quick Check-In on Your Design'}</h2>
+        <p>Hi ${opts.customerName},</p>
+        <p>${intro}</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <a href="${link}" style="${btnStyle('#6366F1')}">Let Us Know →</a>
+      `),
+    });
+  }
+
+  // Sent to Admins when a customer answers the approval-stall survey above —
+  // reasonLabel is the human-readable answer, computed by the caller
+  // (PublicOrdersService) from the reason/subReason the customer picked.
+  async sendApprovalStallResponseToAdmins(opts: {
+    to: string[];
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    orderId: string;
+    reasonLabel: string;
+  }) {
+    if (!opts.to.length) { this.warnNoRecipients('sendApprovalStallResponseToAdmins', opts.poNumber); return; }
+    return this.send({
+      to: opts.to,
+      subject: `[Approval Check-In] ${opts.poNumber} — ${opts.reasonLabel}`,
+      html: emailLayout(`
+        <h2 style="color:#D97706;margin:0 0 16px">Customer Responded to Approval Check-In</h2>
+        <p>${opts.customerName} answered the approval check-in survey for the order below:</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <p style="font-weight:700;color:#1A2740">${opts.reasonLabel}</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
       `),
     });
   }

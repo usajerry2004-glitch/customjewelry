@@ -66,7 +66,13 @@ export interface Order {
   status: OrderStatus;
   cadSubStatus?: string | null;
   sentToCustomer?: boolean;
+  customerEmailApproval?: boolean;
   lastApprovalEmailAt?: string | null;
+  approvalStallSurveySentAt?: string | null;
+  approvalStallReminderSentAt?: string | null;
+  approvalStallReason?: string | null;
+  approvalStallSubReason?: string | null;
+  approvalStallRespondedAt?: string | null;
   manufacturingPath: 'STANDARD' | 'CASTING_ONLY';
   storeName?: string;
   customerFullName?: string;

@@ -1774,6 +1774,44 @@ export default function OrderDetail() {
             return null;
           })()}
           {(() => {
+            // Approval-stall check-in — surfaces the automatic day-5/day-10
+            // customer survey (see CadService.checkStalledCadApprovals) so
+            // staff can see why an order hasn't moved without having to ask.
+            // Only relevant while the CAD is actually still awaiting approval.
+            if (!order.sentToCustomer || order.customerEmailApproval) return null;
+            if (!order.approvalStallSurveySentAt && !order.approvalStallReason) return null;
+
+            const fmtDate = (d?: string | null) =>
+              d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+
+            if (order.approvalStallReason) {
+              const reasonText = order.approvalStallReason === 'NOT_INTERESTED'
+                ? `No longer interested — ${order.approvalStallSubReason === 'CUSTOMER_CANCELLED' ? 'customer cancelled' : 'other reason'}`
+                : order.approvalStallReason === 'PRICE_ISSUE'
+                ? "There's a price concern"
+                : 'Still waiting on their own customer to approve';
+              return (
+                <div style={{ background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.3)', borderLeft: '3px solid #D97706', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 700 }}>
+                    Approval check-in ({fmtDate(order.approvalStallRespondedAt)}): {reasonText}
+                  </div>
+                </div>
+              );
+            }
+
+            const parts = [`Day-5 survey sent ${fmtDate(order.approvalStallSurveySentAt)}`];
+            if (order.approvalStallReminderSentAt) parts.push(`Day-10 reminder sent ${fmtDate(order.approvalStallReminderSentAt)}`);
+            parts.push('No response yet');
+
+            return (
+              <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderLeft: '3px solid #6366F1', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', color: '#6366F1', fontWeight: 700 }}>
+                  Approval check-in — {parts.join(' · ')}
+                </div>
+              </div>
+            );
+          })()}
+          {(() => {
             const designList = cads.filter(c => c.designerNotes !== 'Reference image' && c.designerNotes !== 'Customer reference image');
             if (designList.length === 0) return (
               <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '13px', opacity: 0.6 }}>

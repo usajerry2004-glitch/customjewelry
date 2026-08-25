@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -42,6 +42,23 @@ export interface WebOrderResult {
   success: boolean;
   orderRef: string;
   message: string;
+}
+
+const STALL_REASONS = ['WAITING_ON_CUSTOMER', 'PRICE_ISSUE', 'NOT_INTERESTED'];
+const STALL_SUB_REASONS = ['CUSTOMER_CANCELLED', 'OTHER'];
+
+const STALL_REASON_LABELS: Record<string, string> = {
+  WAITING_ON_CUSTOMER: 'Still waiting on their own customer to approve',
+  PRICE_ISSUE: "There's a price concern",
+};
+
+function describeStallAnswer(reason: string, subReason?: string | null): string {
+  if (reason === 'NOT_INTERESTED') {
+    return subReason === 'CUSTOMER_CANCELLED'
+      ? 'No longer interested — their customer cancelled'
+      : 'No longer interested — other reason';
+  }
+  return STALL_REASON_LABELS[reason] || reason;
 }
 
 @Injectable()
@@ -333,5 +350,76 @@ export class PublicOrdersService {
     }
 
     return { success: true, message: 'Revision requested. Our design team will update the CAD shortly.' };
+  }
+
+  // ── Approval-stall check-in survey ────────────────────────────────────
+  // Minimal, no-login context for the /survey/:token page — deliberately a
+  // much smaller payload than getOrderByToken since this page only ever
+  // needs to show what the customer is being asked about, not the full
+  // order/CAD history.
+  async getSurveyContext(token: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    return {
+      poNumber: order.poNumber,
+      orderType: order.orderType,
+      metalType: order.metalType,
+      metalColor: order.metalColor,
+      centerStoneShape: order.centerStoneShape,
+      diamondQuality: order.diamondQuality,
+      alreadyResponded: !!order.approvalStallRespondedAt,
+      isReminder: !!order.approvalStallReminderSentAt,
+      sentAt: order.approvalStallSurveySentAt,
+      reminderAt: order.approvalStallReminderSentAt,
+    };
+  }
+
+  async submitApprovalStallSurvey(token: string, reason: string, subReason?: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (!STALL_REASONS.includes(reason)) {
+      throw new BadRequestException(`Invalid reason. Expected one of: ${STALL_REASONS.join(', ')}`);
+    }
+    if (reason === 'NOT_INTERESTED' && !STALL_SUB_REASONS.includes(subReason || '')) {
+      throw new BadRequestException(`subReason is required when reason is NOT_INTERESTED — expected one of: ${STALL_SUB_REASONS.join(', ')}`);
+    }
+
+    // Re-submission overwrites the previous answer rather than erroring — a
+    // customer changing their mind after re-opening the link shouldn't hit a wall.
+    await this.orderRepo.update(order.id, {
+      approvalStallReason: reason,
+      approvalStallSubReason: reason === 'NOT_INTERESTED' ? (subReason || null) : null,
+      approvalStallRespondedAt: new Date(),
+    });
+
+    const label = describeStallAnswer(reason, subReason);
+    const admins = await this.userRepo.find({ where: { role: UserRole.ADMIN } });
+
+    await Promise.all(admins.map(u =>
+      this.notifRepo.save(this.notifRepo.create({
+        type:         NotificationType.APPROVAL_SURVEY_RESPONSE,
+        title:        `Approval Check-In — ${order.poNumber}`,
+        message:      `${order.customerFullName || order.storeName || 'Customer'} responded: ${label}`,
+        orderId:      order.id,
+        targetUserId: u.id,
+        isPriority:   order.isPriorityCustomer,
+      })),
+    ));
+
+    const adminEmails = admins.map(u => u.email).filter(Boolean);
+    if (adminEmails.length) {
+      this.emailService.sendApprovalStallResponseToAdmins({
+        to:           adminEmails,
+        poNumber:     order.poNumber,
+        customerName: order.customerFullName || order.storeName || 'Customer',
+        orderType:    order.orderType || 'Custom Order',
+        orderId:      order.id,
+        reasonLabel:  label,
+      }).catch(err => this.logger.warn('Approval stall response admin email failed:', err));
+    }
+
+    return { success: true, message: "Thanks — we've let our team know." };
   }
 }

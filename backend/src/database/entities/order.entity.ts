@@ -277,6 +277,29 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   lastApprovalEmailAt: Date | null;
 
+  // Approval-stall check-in survey — auto-emailed to the customer when a CAD
+  // has sat awaiting their approval too long (day-5 survey, day-10 reminder if
+  // still unanswered; see CadService.checkStalledCadApprovals). All 5 fields
+  // are reset to null wherever lastApprovalEmailAt gets refreshed (a fresh
+  // sendToCustomer or a manual approval-reminder nudge), so a new round starts
+  // with a clean slate instead of showing a stale answer from a prior round.
+  @Column({ type: 'timestamp', nullable: true })
+  approvalStallSurveySentAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  approvalStallReminderSentAt: Date | null;
+
+  // 'WAITING_ON_CUSTOMER' | 'PRICE_ISSUE' | 'NOT_INTERESTED'
+  @Column({ type: 'varchar', nullable: true })
+  approvalStallReason: string | null;
+
+  // 'CUSTOMER_CANCELLED' | 'OTHER' — only set when approvalStallReason is NOT_INTERESTED
+  @Column({ type: 'varchar', nullable: true })
+  approvalStallSubReason: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  approvalStallRespondedAt: Date | null;
+
   @Column({ nullable: true })
   headStyle: string;
 

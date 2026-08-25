@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, MoreThan, IsNull } from 'typeorm';
+import { Repository, In, MoreThan, IsNull, Not, LessThanOrEqual } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -10,6 +11,18 @@ import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
+import { businessDaysElapsed } from '../../common/business-days.util';
+
+// Reset alongside sentToCustomer/lastApprovalEmailAt wherever those are
+// refreshed (a fresh send or a manual reminder nudge) — see order.entity.ts
+// for why these five fields exist.
+const RESET_STALL_SURVEY_FIELDS = {
+  approvalStallSurveySentAt: null,
+  approvalStallReminderSentAt: null,
+  approvalStallReason: null,
+  approvalStallSubReason: null,
+  approvalStallRespondedAt: null,
+};
 
 const MAX_REFERENCE_IMAGES = 10;
 
@@ -245,7 +258,7 @@ export class CadService {
   async sendToCustomer(orderId: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-    await this.orderRepo.update(orderId, { sentToCustomer: true, lastApprovalEmailAt: new Date() });
+    await this.orderRepo.update(orderId, { sentToCustomer: true, lastApprovalEmailAt: new Date(), ...RESET_STALL_SURVEY_FIELDS });
 
     // Mark all non-reference design files as SENT_FOR_APPROVAL so the customer portal shows approval buttons
     const allCads = await this.cadRepo.find({ where: { orderId } });
@@ -342,8 +355,96 @@ export class CadService {
       orderId:       order.id,
       trackingToken: order.trackingToken,
     });
-    await this.orderRepo.update(orderId, { lastApprovalEmailAt: new Date() });
+    await this.orderRepo.update(orderId, { lastApprovalEmailAt: new Date(), ...RESET_STALL_SURVEY_FIELDS });
     return { sent: true };
+  }
+
+  // ── Approval-stall check-in survey ──────────────────────────────────────
+  // Runs daily: day-5 survey to a customer who's gone quiet on a CAD sent for
+  // approval, then a single day-10 reminder if they still haven't answered.
+  // Both thresholds are business days (see business-days.util.ts), so a
+  // stall spanning a weekend doesn't fire early.
+  @Cron('0 9 * * *', { timeZone: 'America/New_York' })
+  async sendScheduledApprovalStallCheck(): Promise<void> {
+    await this.checkStalledCadApprovals(new Date());
+  }
+
+  async checkStalledCadApprovals(now: Date): Promise<void> {
+    await this.sendApprovalStallSurveys(now);
+    await this.sendApprovalStallReminders(now);
+  }
+
+  async sendApprovalStallSurveys(now: Date): Promise<void> {
+    // Calendar-day prefilter: 5 business days elapsed always implies at least
+    // 5 calendar days elapsed, so this can only over-select, never miss a row
+    // — the exact business-day check happens per candidate below.
+    const cutoff = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+    const candidates = await this.orderRepo.find({
+      where: {
+        status: OrderStatus.CAD_IN_PROGRESS,
+        sentToCustomer: true,
+        customerEmailApproval: false,
+        isArchived: false,
+        approvalStallSurveySentAt: IsNull(),
+        lastApprovalEmailAt: LessThanOrEqual(cutoff),
+      },
+    });
+
+    for (const order of candidates) {
+      if (!order.lastApprovalEmailAt || !order.customerEmail || !order.trackingToken) continue;
+      if (businessDaysElapsed(new Date(order.lastApprovalEmailAt), now) < 5) continue;
+      // order.sentToCustomer/customerEmailApproval alone can't tell whether the
+      // customer already acted (e.g. requested a revision on the public track
+      // page, which doesn't reset those order-level flags) — same guard the
+      // "Send Follow-up Email" button uses, keyed off the actual file status.
+      const pending = await this.cadRepo.count({ where: { orderId: order.id, status: CadFileStatus.SENT_FOR_APPROVAL } });
+      if (pending === 0) continue;
+
+      await this.emailService.sendApprovalStallSurvey({
+        to: order.customerEmail,
+        poNumber: order.poNumber,
+        customerName: order.customerFullName || order.storeName || 'Valued Customer',
+        orderType: order.orderType || '—',
+        trackingToken: order.trackingToken,
+        isReminder: false,
+      }).catch(err => this.logger.warn('Approval stall survey email failed:', err));
+
+      await this.orderRepo.update(order.id, { approvalStallSurveySentAt: now });
+    }
+  }
+
+  async sendApprovalStallReminders(now: Date): Promise<void> {
+    const cutoff = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+    const candidates = await this.orderRepo.find({
+      where: {
+        status: OrderStatus.CAD_IN_PROGRESS,
+        sentToCustomer: true,
+        customerEmailApproval: false,
+        isArchived: false,
+        approvalStallSurveySentAt: Not(IsNull()),
+        approvalStallRespondedAt: IsNull(),
+        approvalStallReminderSentAt: IsNull(),
+        lastApprovalEmailAt: LessThanOrEqual(cutoff),
+      },
+    });
+
+    for (const order of candidates) {
+      if (!order.lastApprovalEmailAt || !order.customerEmail || !order.trackingToken) continue;
+      if (businessDaysElapsed(new Date(order.lastApprovalEmailAt), now) < 10) continue;
+      const pending = await this.cadRepo.count({ where: { orderId: order.id, status: CadFileStatus.SENT_FOR_APPROVAL } });
+      if (pending === 0) continue;
+
+      await this.emailService.sendApprovalStallSurvey({
+        to: order.customerEmail,
+        poNumber: order.poNumber,
+        customerName: order.customerFullName || order.storeName || 'Valued Customer',
+        orderType: order.orderType || '—',
+        trackingToken: order.trackingToken,
+        isReminder: true,
+      }).catch(err => this.logger.warn('Approval stall reminder email failed:', err));
+
+      await this.orderRepo.update(order.id, { approvalStallReminderSentAt: now });
+    }
   }
 
   async uploadReference(orderId: string, file: Express.Multer.File, uploadedBy: string): Promise<CadFile> {
