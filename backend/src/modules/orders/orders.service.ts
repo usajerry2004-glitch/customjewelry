@@ -1566,6 +1566,18 @@ export class OrdersService implements OnModuleInit {
           orderType: updated.orderType || '—',
           orderId: updated.id,
         }).catch(err => this.logger.warn('Order delivered email failed:', err));
+
+        if (updated.trackingToken) {
+          this.emailService.sendFeedbackRequest({
+            to: updated.customerEmail,
+            poNumber: updated.poNumber,
+            customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
+            orderType: updated.orderType || '—',
+            trackingToken: updated.trackingToken,
+          }).catch(err => this.logger.warn('Feedback request email failed:', err));
+          updated.feedbackRequestedAt = new Date();
+          await this.orderRepo.update(updated.id, { feedbackRequestedAt: updated.feedbackRequestedAt });
+        }
       }
       this.notifyRingBuilderCompleted(updated).catch(err => this.logger.warn('Ring Builder completed-webhook failed:', err));
     }

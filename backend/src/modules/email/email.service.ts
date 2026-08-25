@@ -97,6 +97,10 @@ export class EmailService {
     return `${this.frontendUrl}/survey/${token}`;
   }
 
+  feedbackUrl(token: string) {
+    return `${this.frontendUrl}/feedback/${token}`;
+  }
+
   // A bulk-recipient template with an empty `to` array resolves successfully
   // and sends nothing — no exception, nothing for a caller's .catch() to see.
   // This was the actual root cause behind factories never getting notified
@@ -666,6 +670,58 @@ export class EmailService {
         <p>Your custom piece has been completed. We hope you love it! If you have any questions or concerns, please don't hesitate to reach out.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#10B981')}">View Order →</a>
+      `),
+    });
+  }
+
+  // Sent alongside sendOrderDelivered when an order completes — links to the
+  // public, no-login /feedback/:token page (star ratings + a comments box),
+  // not an AMP/interactive-email body: that would only render for Gmail
+  // recipients with the sender pre-registered with Google, so a normal email
+  // linking to a real page is what actually works everywhere.
+  async sendFeedbackRequest(opts: {
+    to: string;
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    trackingToken: string;
+  }) {
+    const link = this.feedbackUrl(opts.trackingToken);
+    return this.send({
+      to: opts.to,
+      subject: `How did we do? — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#C09B58;margin:0 0 16px">We'd Love Your Feedback</h2>
+        <p>Hi ${opts.customerName},</p>
+        <p>Now that your order has been completed, we'd love to hear how everything went. It only takes a minute and helps us keep improving.</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <a href="${link}" style="${btnStyle('#C09B58')}">Share Your Feedback →</a>
+      `),
+    });
+  }
+
+  // Sent to Admins when a customer submits the feedback survey above.
+  // ratingsSummary/comments are pre-formatted by the caller (PublicOrdersService).
+  async sendFeedbackResponseToAdmins(opts: {
+    to: string[];
+    poNumber: string;
+    customerName: string;
+    orderType: string;
+    orderId: string;
+    ratingsSummary: string;
+    comments: string | null;
+  }) {
+    if (!opts.to.length) { this.warnNoRecipients('sendFeedbackResponseToAdmins', opts.poNumber); return; }
+    return this.send({
+      to: opts.to,
+      subject: `[Feedback] ${opts.poNumber} — ${opts.ratingsSummary}`,
+      html: emailLayout(`
+        <h2 style="color:#C09B58;margin:0 0 16px">Customer Feedback Received</h2>
+        <p>${opts.customerName} submitted feedback for the order below:</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <p style="font-weight:700;color:#1A2740">${opts.ratingsSummary}</p>
+        ${opts.comments ? `<p style="color:#4B5563;font-style:italic">"${escapeHtml(opts.comments)}"</p>` : ''}
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#C09B58')}">Open Order →</a>
       `),
     });
   }

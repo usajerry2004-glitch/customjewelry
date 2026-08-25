@@ -61,6 +61,10 @@ function describeStallAnswer(reason: string, subReason?: string | null): string 
   return STALL_REASON_LABELS[reason] || reason;
 }
 
+function isValidRating(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5;
+}
+
 @Injectable()
 export class PublicOrdersService {
   private readonly logger = new Logger(PublicOrdersService.name);
@@ -421,5 +425,79 @@ export class PublicOrdersService {
     }
 
     return { success: true, message: "Thanks — we've let our team know." };
+  }
+
+  // ── Post-completion feedback survey ─────────────────────────────────────
+  async getFeedbackContext(token: string) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.feedbackRequestedAt) throw new NotFoundException('No feedback request found for this order');
+
+    return {
+      poNumber: order.poNumber,
+      orderType: order.orderType,
+      alreadyResponded: !!order.feedbackRespondedAt,
+      experienceRating: order.feedbackExperienceRating,
+      priceRating: order.feedbackPriceRating,
+      qualityRating: order.feedbackQualityRating,
+      comments: order.feedbackComments,
+    };
+  }
+
+  async submitFeedback(
+    token: string,
+    experienceRating: unknown,
+    priceRating: unknown,
+    qualityRating: unknown,
+    comments?: string,
+  ) {
+    const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.feedbackRequestedAt) throw new BadRequestException('No feedback request found for this order');
+
+    if (!isValidRating(experienceRating) || !isValidRating(priceRating) || !isValidRating(qualityRating)) {
+      throw new BadRequestException('experienceRating, priceRating, and qualityRating are all required — integers from 1 to 5.');
+    }
+    const trimmedComments = (comments || '').trim().slice(0, 2000) || null;
+
+    // Re-submission overwrites the previous answer, same reasoning as the
+    // approval-stall survey — a customer re-opening the link to add a comment
+    // they forgot shouldn't hit a wall.
+    await this.orderRepo.update(order.id, {
+      feedbackExperienceRating: experienceRating,
+      feedbackPriceRating: priceRating,
+      feedbackQualityRating: qualityRating,
+      feedbackComments: trimmedComments,
+      feedbackRespondedAt: new Date(),
+    });
+
+    const ratingsSummary = `Experience ${experienceRating}/5 · Price ${priceRating}/5 · Quality ${qualityRating}/5`;
+    const admins = await this.userRepo.find({ where: { role: UserRole.ADMIN } });
+
+    await Promise.all(admins.map(u =>
+      this.notifRepo.save(this.notifRepo.create({
+        type:         NotificationType.FEEDBACK_RECEIVED,
+        title:        `Feedback Received — ${order.poNumber}`,
+        message:      `${order.customerFullName || order.storeName || 'Customer'} rated: ${ratingsSummary}`,
+        orderId:      order.id,
+        targetUserId: u.id,
+        isPriority:   order.isPriorityCustomer,
+      })),
+    ));
+
+    const adminEmails = admins.map(u => u.email).filter(Boolean);
+    if (adminEmails.length) {
+      this.emailService.sendFeedbackResponseToAdmins({
+        to:             adminEmails,
+        poNumber:       order.poNumber,
+        customerName:   order.customerFullName || order.storeName || 'Customer',
+        orderType:      order.orderType || 'Custom Order',
+        orderId:        order.id,
+        ratingsSummary,
+        comments:       trimmedComments,
+      }).catch(err => this.logger.warn('Feedback response admin email failed:', err));
+    }
+
+    return { success: true, message: 'Thank you for your feedback!' };
   }
 }

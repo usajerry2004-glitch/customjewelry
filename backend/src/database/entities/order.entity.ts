@@ -300,6 +300,27 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   approvalStallRespondedAt: Date | null;
 
+  // Post-completion feedback survey — emailed once, when the order moves to
+  // COMPLETED (see OrdersService.updateStatus). Three 1-5 ratings plus a free-
+  // text "how can we improve" answer, all optional until the customer submits.
+  @Column({ type: 'timestamp', nullable: true })
+  feedbackRequestedAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  feedbackRespondedAt: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  feedbackExperienceRating: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  feedbackPriceRating: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  feedbackQualityRating: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  feedbackComments: string | null;
+
   @Column({ nullable: true })
   headStyle: string;
 

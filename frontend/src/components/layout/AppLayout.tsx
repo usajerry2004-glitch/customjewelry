@@ -440,7 +440,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                         ORDER_CREATED: '🆕', ORDER_AUTHORIZED: '✔', SKU_GENERATED: '🏷️',
                         ORDER_IN_MANUFACTURING: '🏭', ORDER_SHIPPED: '📦', READY_TO_SHIP: '🚚',
                         STATUS_CHANGED: '🔄', CUSTOMER_MESSAGE: '💬', FACTORY_MESSAGE: '🏭', MENTION: '@', SLA_OVERDUE: '⏰',
-                        APPROVAL_SURVEY_RESPONSE: '📝',
+                        APPROVAL_SURVEY_RESPONSE: '📝', FEEDBACK_RECEIVED: '⭐',
                       };
                       const icon = typeIcon[n.type] || '🔔';
                       const clickable = !!n.orderId;

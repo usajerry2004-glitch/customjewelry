@@ -112,4 +112,24 @@ export class PublicOrdersController {
   ) {
     return this.service.submitApprovalStallSurvey(token, body?.reason, body?.subReason);
   }
+
+  // ── Post-completion feedback survey (magic link, no auth) ──────────────
+  @Get('feedback/:token')
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: 'Get order context for the post-completion feedback survey' })
+  async getFeedback(@Param('token') token: string) {
+    return this.service.getFeedbackContext(token);
+  }
+
+  @Post('feedback/:token')
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Customer submits the post-completion feedback survey' })
+  async submitFeedback(
+    @Param('token') token: string,
+    @Body() body: any,
+  ) {
+    return this.service.submitFeedback(token, body?.experienceRating, body?.priceRating, body?.qualityRating, body?.comments);
+  }
 }

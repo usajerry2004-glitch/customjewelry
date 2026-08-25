@@ -73,6 +73,12 @@ export interface Order {
   approvalStallReason?: string | null;
   approvalStallSubReason?: string | null;
   approvalStallRespondedAt?: string | null;
+  feedbackRequestedAt?: string | null;
+  feedbackRespondedAt?: string | null;
+  feedbackExperienceRating?: number | null;
+  feedbackPriceRating?: number | null;
+  feedbackQualityRating?: number | null;
+  feedbackComments?: string | null;
   manufacturingPath: 'STANDARD' | 'CASTING_ONLY';
   storeName?: string;
   customerFullName?: string;

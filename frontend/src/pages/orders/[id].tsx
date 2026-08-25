@@ -1929,6 +1929,32 @@ export default function OrderDetail() {
 
           </div>{/* ── end fields+refs sub-grid ── */}
 
+          {/* ── Customer Feedback (post-completion survey — see /feedback/:token) ── */}
+          {order.feedbackRespondedAt && (
+            <div style={cardStyle}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 12px' }}>
+                Customer Feedback
+              </h3>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: order.feedbackComments ? '12px' : 0 }}>
+                {[
+                  { label: 'Overall Experience', value: order.feedbackExperienceRating },
+                  { label: 'Price', value: order.feedbackPriceRating },
+                  { label: 'Quality', value: order.feedbackQualityRating },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '2px' }}>{row.label}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#C09B58' }}>{row.value ? '★'.repeat(row.value) + '☆'.repeat(5 - row.value) : '—'}</div>
+                  </div>
+                ))}
+              </div>
+              {order.feedbackComments && (
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                  "{order.feedbackComments}"
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Conversation */}
           {order.id && currentUser && (
             <div>
