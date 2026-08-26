@@ -173,6 +173,19 @@ export const MOUNTING_OPTION_CONFIG: Record<string, { label: string; icon: strin
   'Semi-Mount':    { label: 'Semi-Mount',    icon: '◐',  color: '#9A3412', bg: '#FFEDD5' },
 };
 
+// Friendlier phrasing for the customer portal only — "VPO Issued" is real
+// internal operational terminology staff use daily and should keep seeing
+// on the internal dashboard (which reads STATUS_CONFIG directly); customers
+// just need to know their order is being made.
+export const CUSTOMER_STATUS_LABEL_OVERRIDES: Record<string, string> = {
+  VPO_ISSUED: 'In Production',
+};
+
+export function customerStatusLabel(status?: string | null): string {
+  if (!status) return '';
+  return CUSTOMER_STATUS_LABEL_OVERRIDES[status] || STATUS_CONFIG[status]?.label || status;
+}
+
 // For orders in CAD_IN_PROGRESS, a sub-label reflects the actual stage
 export function getCadSubLabel(order: { cadSubStatus?: string | null; sentToCustomer?: boolean; quotedCost?: number | null }): string | null {
   // sentToCustomer is the authoritative "the customer can see this" signal — trust it even

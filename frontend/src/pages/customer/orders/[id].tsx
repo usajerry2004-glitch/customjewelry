@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
-import { Order, STATUS_CONFIG, getCadSubLabel } from '../../../utils/types';
+import { Order, STATUS_CONFIG, getCadSubLabel, customerStatusLabel } from '../../../utils/types';
 import { formatCurrency } from '../../../utils/format';
 import { OrderConversation } from '../../../components/OrderConversation';
 
@@ -307,7 +307,7 @@ export default function CustomerOrderDetail() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Current Status</div>
           <div style={{ background: `${cfg.color}18`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
-            {cadSubLabel || cfg.label}
+            {cadSubLabel || customerStatusLabel(order.status)}
           </div>
         </div>
         {/* Timeline dots */}
