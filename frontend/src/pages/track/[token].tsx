@@ -390,11 +390,40 @@ export default function TrackPage() {
                 </div>
               )}
 
+              {/* Revisions pending — the design(s) you asked us to change, kept fully
+                  visible (image + your feedback together) until we send the updated
+                  version, instead of collapsing into a text-only history row. */}
+              {quoteSet && historyFiles.filter(f => f.status === 'REVISION_REQUESTED').length > 0 && (
+                <div style={{ background: '#fff', borderRadius: 12, border: '2px solid #D97706', padding: '24px 28px', marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, color: '#D97706', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, marginBottom: 16 }}>
+                    Revision{historyFiles.filter(f => f.status === 'REVISION_REQUESTED').length > 1 ? 's' : ''} Pending — We're Updating This Design
+                  </div>
+                  {historyFiles.filter(f => f.status === 'REVISION_REQUESTED').map(f => (
+                    <div key={f.id} style={{ border: '1px solid #E8E4DC', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+                      {/\.(jpg|jpeg|png|gif|webp)$/i.test(f.fileName) && (
+                        <img
+                          src={`${f.filePath || '/uploads/cad/' + f.fileName}`}
+                          alt={f.originalName}
+                          style={{ width: '100%', maxHeight: 400, objectFit: 'contain', background: '#F9F8F6', display: 'block' }}
+                        />
+                      )}
+                      <div style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: 13, color: '#1A2740', fontWeight: 600 }}>{f.originalName}</div>
+                        {f.designerNotes && <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>{f.designerNotes}</div>}
+                        {f.customerFeedback && (
+                          <div style={{ fontSize: 13, color: '#D97706', marginTop: 6 }}>Your requested changes: "{f.customerFeedback}"</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Design history — only visible after quote is set */}
-              {quoteSet && historyFiles.length > 0 && (
+              {quoteSet && historyFiles.filter(f => f.status !== 'REVISION_REQUESTED').length > 0 && (
                 <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8E4DC', padding: '24px 28px', marginBottom: 20 }}>
                   <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>Design History</div>
-                  {historyFiles.map(f => (
+                  {historyFiles.filter(f => f.status !== 'REVISION_REQUESTED').map(f => (
                     <div key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #F0EDE8', gap: 12, flexWrap: 'wrap' }}>
                       <div>
                         <div style={{ fontSize: 13, color: '#1A2740', fontWeight: 500 }}>{f.originalName}</div>
@@ -406,8 +435,8 @@ export default function TrackPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         <span style={{
                           fontSize: 11, fontWeight: 600, borderRadius: 10, padding: '3px 10px',
-                          background: f.status === 'APPROVED' ? '#ECFDF5' : f.status === 'REVISION_REQUESTED' ? '#FFF7ED' : '#F3F4F6',
-                          color: f.status === 'APPROVED' ? '#059669' : f.status === 'REVISION_REQUESTED' ? '#D97706' : '#6B7280',
+                          background: f.status === 'APPROVED' ? '#ECFDF5' : '#F3F4F6',
+                          color: f.status === 'APPROVED' ? '#059669' : '#6B7280',
                         }}>
                           {CAD_STATUS_LABELS[f.status] || f.status}
                         </span>
