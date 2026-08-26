@@ -410,11 +410,18 @@ export class EmailService {
     orderType: string;
     trackingToken: string;
     isReminder: boolean;
+    // The pending design's thumbnail/file URL, already a public DO Spaces
+    // link (see SpacesService.getPublicUrl) — safe to embed directly.
+    // null when the pending file isn't an image (STL/PDF) or has none.
+    imageUrl?: string | null;
   }) {
     const link = this.surveyUrl(opts.trackingToken);
     const intro = opts.isReminder
       ? `We wanted to follow up — we still haven't heard back on the CAD design for order <strong>${opts.poNumber}</strong>. No rush, we just want to make sure nothing's stuck on our end.`
       : `It's been a few days since we sent the CAD design for order <strong>${opts.poNumber}</strong> for your approval. Could you take a moment to let us know what's going on?`;
+    const imageBlock = opts.imageUrl
+      ? `<img src="${opts.imageUrl}" alt="Your design — ${opts.poNumber}" style="width:100%;max-width:496px;border-radius:8px;border:1px solid #E8E4DC;margin:20px 0;display:block" />`
+      : '';
     return this.send({
       to: opts.to,
       subject: opts.isReminder
@@ -424,6 +431,7 @@ export class EmailService {
         <h2 style="color:#6366F1;margin:0 0 16px">${opts.isReminder ? "Following Up — We Haven't Heard Back" : 'Quick Check-In on Your Design'}</h2>
         <p>Hi ${opts.customerName},</p>
         <p>${intro}</p>
+        ${imageBlock}
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${link}" style="${btnStyle('#6366F1')}">Let Us Know →</a>
       `),

@@ -374,6 +374,23 @@ export class CadService {
     await this.sendApprovalStallReminders(now);
   }
 
+  // The most recent design still awaiting approval — same existence check
+  // "pending === 0 continue" used to do, but now returning the row itself so
+  // callers can also pull an image URL for the stall-survey email out of it.
+  private async getPendingApprovalFile(orderId: string): Promise<CadFile | null> {
+    return this.cadRepo.findOne({
+      where: { orderId, status: CadFileStatus.SENT_FOR_APPROVAL },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // null for a non-image file (STL, PDF, etc.) — the email template just
+  // omits the image in that case rather than rendering a broken one.
+  private pendingApprovalImageUrl(file: CadFile): string | null {
+    if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file.fileName)) return null;
+    return file.thumbnailPath || file.filePath || null;
+  }
+
   async sendApprovalStallSurveys(now: Date): Promise<void> {
     // Calendar-day prefilter: 5 business days elapsed always implies at least
     // 5 calendar days elapsed, so this can only over-select, never miss a row
@@ -397,8 +414,8 @@ export class CadService {
       // customer already acted (e.g. requested a revision on the public track
       // page, which doesn't reset those order-level flags) — same guard the
       // "Send Follow-up Email" button uses, keyed off the actual file status.
-      const pending = await this.cadRepo.count({ where: { orderId: order.id, status: CadFileStatus.SENT_FOR_APPROVAL } });
-      if (pending === 0) continue;
+      const pendingFile = await this.getPendingApprovalFile(order.id);
+      if (!pendingFile) continue;
 
       await this.emailService.sendApprovalStallSurvey({
         to: order.customerEmail,
@@ -407,6 +424,7 @@ export class CadService {
         orderType: order.orderType || '—',
         trackingToken: order.trackingToken,
         isReminder: false,
+        imageUrl: this.pendingApprovalImageUrl(pendingFile),
       }).catch(err => this.logger.warn('Approval stall survey email failed:', err));
 
       await this.orderRepo.update(order.id, { approvalStallSurveySentAt: now });
@@ -431,8 +449,8 @@ export class CadService {
     for (const order of candidates) {
       if (!order.lastApprovalEmailAt || !order.customerEmail || !order.trackingToken) continue;
       if (businessDaysElapsed(new Date(order.lastApprovalEmailAt), now) < 10) continue;
-      const pending = await this.cadRepo.count({ where: { orderId: order.id, status: CadFileStatus.SENT_FOR_APPROVAL } });
-      if (pending === 0) continue;
+      const pendingFile = await this.getPendingApprovalFile(order.id);
+      if (!pendingFile) continue;
 
       await this.emailService.sendApprovalStallSurvey({
         to: order.customerEmail,
@@ -441,6 +459,7 @@ export class CadService {
         orderType: order.orderType || '—',
         trackingToken: order.trackingToken,
         isReminder: true,
+        imageUrl: this.pendingApprovalImageUrl(pendingFile),
       }).catch(err => this.logger.warn('Approval stall reminder email failed:', err));
 
       await this.orderRepo.update(order.id, { approvalStallReminderSentAt: now });
