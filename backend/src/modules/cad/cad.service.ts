@@ -548,7 +548,11 @@ export class CadService {
     if (order) {
       const statusBeforeApproval = order.status;
       // Customer approval auto-generates the SKU and issues the VPO immediately — no manual SKU step.
-      const sku = await this.skuService.generate(order.id, approvedBy);
+      // Skip generation if the order already carries one (e.g. from a CSV
+      // import) — same guard OrdersService.updateStatus() already uses for
+      // the staff "approve on behalf of customer" path; without it, this path
+      // silently overwrote an imported SKU the first time a CAD was approved.
+      const skuNumber = order.kiraSkuNumber || (await this.skuService.generate(order.id, approvedBy)).skuNumber;
       await this.orderRepo.update(order.id, { status: OrderStatus.VPO_ISSUED, vpoIssuedAt: new Date() });
 
       // This path bypasses OrdersService.update() entirely (the SKU/VPO fields
@@ -556,7 +560,7 @@ export class CadService {
       // an order that reached VPO_ISSUED via customer approval shows no
       // "who/when" for that transition in the Audit Log at all.
       this.logEvent(order.id, 'STATUS_CHANGE', { id: approverId, email: approvedBy }, statusBeforeApproval, OrderStatus.VPO_ISSUED,
-        `Customer approved CAD — SKU ${sku.skuNumber} generated, VPO auto-issued`);
+        `Customer approved CAD — SKU ${skuNumber}, VPO auto-issued`);
 
       // Order is VPO_ISSUED but not yet routed to any factory/stone supplier —
       // Admin/Authorizer must complete "Assign Supplier" before it's visible to
@@ -566,7 +570,7 @@ export class CadService {
       if (assignerUsers.length) {
         await this.notifyTeam(assignerUsers, NotificationType.STATUS_CHANGED,
           `Assign Supplier — ${order.poNumber}`,
-          `Customer approved the CAD for order ${order.poNumber}. SKU ${sku.skuNumber} generated. Select a stone supplier and factory to release it to production.`,
+          `Customer approved the CAD for order ${order.poNumber}. SKU ${skuNumber}. Select a stone supplier and factory to release it to production.`,
           order.id, false, order.isPriorityCustomer);
       }
       // Email both Admin and Authorizer — either can complete the Assign Supplier step.
