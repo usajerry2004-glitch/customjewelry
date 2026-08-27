@@ -89,7 +89,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      setOtpMessage(getErrorMessage(data, ''));
+      setOtpMessage(getErrorMessage(data, 'Something went wrong. Please try again.'));
       if (data.found) setOtpStep('verify');
     } catch (err: any) {
       setOtpMessage('Cannot connect to server. Make sure the backend is running.');
@@ -249,7 +249,15 @@ export default function LoginPage() {
               </button>
               {otpStep === 'verify' && (
                 <p style={{ marginTop: '14px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                  <span onClick={handleRequestOtp} style={{ color: 'var(--accent-dark)', fontWeight: 500, cursor: 'pointer' }}>Resend code</span>
+                  <span
+                    onClick={otpLoading ? undefined : handleRequestOtp}
+                    style={{
+                      color: otpLoading ? 'var(--text-muted)' : 'var(--accent-dark)', fontWeight: 500,
+                      cursor: otpLoading ? 'not-allowed' : 'pointer', opacity: otpLoading ? 0.6 : 1,
+                    }}
+                  >
+                    Resend code
+                  </span>
                 </p>
               )}
             </form>

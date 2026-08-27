@@ -63,10 +63,15 @@ export class AuthController {
   /**
    * POST /auth/otp/request
    * Passwordless login for any role: emails a 6-digit code, valid 10 minutes.
-   * Rate-limited hard to stop email-bombing.
+   * This per-IP limit is just a broad abuse backstop (e.g. one IP spraying
+   * codes at many different emails) — the actual per-user protection against
+   * a single account being spammed is the per-email cooldown enforced inside
+   * AuthService.requestOtp(). Kept loose because this IP-level bucket is
+   * shared by everyone behind the same NAT/office/VPN — a tight limit here
+   * previously locked out unrelated legitimate users sharing an IP.
    */
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Post('otp/request')
   @ApiOperation({ summary: 'Email a one-time login code to a user' })
   async requestOtp(@Body() dto: RequestOtpDto) {

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -10,6 +10,10 @@ import { LoginDto, RegisterDto } from './dto/auth.dto';
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const OTP_MAX_ATTEMPTS = 5;
+// Minimum time between two OTP requests for the SAME email — the real,
+// meaningful abuse guard (the @Throttle on the controller is a much looser
+// per-IP backstop, shared across everyone behind the same NAT/office/VPN).
+const OTP_REQUEST_COOLDOWN_MS = 30 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -56,6 +60,18 @@ export class AuthService {
       .where('LOWER(u.email) = LOWER(:email)', { email: email.trim() })
       .getOne();
     if (!user) return { found: false };
+
+    // otpExpiresAt is set to "now + OTP_EXPIRY_MS" at request time, so
+    // subtracting that back out gives us when the last code was actually
+    // sent — no extra column needed to enforce the per-email cooldown.
+    if (user.otpExpiresAt) {
+      const lastRequestedAt = user.otpExpiresAt.getTime() - OTP_EXPIRY_MS;
+      const sinceLastRequest = Date.now() - lastRequestedAt;
+      if (sinceLastRequest < OTP_REQUEST_COOLDOWN_MS) {
+        const waitSeconds = Math.ceil((OTP_REQUEST_COOLDOWN_MS - sinceLastRequest) / 1000);
+        throw new HttpException(`Please wait ${waitSeconds}s before requesting another code.`, HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
 
     const otp = String(randomInt(100000, 1000000));
     user.otpCodeHash = await bcrypt.hash(otp, 10);

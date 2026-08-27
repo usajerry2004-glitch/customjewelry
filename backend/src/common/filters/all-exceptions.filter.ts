@@ -34,12 +34,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // own `message` key means every client-side `data?.message` read gets an
     // object instead of a string (or string[] for validation errors).
     const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
-    const message =
+    // @nestjs/throttler's ThrottlerException hard-codes its message to the
+    // literal string "ThrottlerException: Too Many Requests" — every other
+    // 429 in this app (the per-email OTP cooldown, etc.) already sends a
+    // purpose-written message, so this override only ever replaces that one
+    // ugly library default, never a message we wrote ourselves.
+    const exceptionMessage =
       exceptionResponse === null
         ? 'Internal server error'
         : typeof exceptionResponse === 'string'
           ? exceptionResponse
           : (exceptionResponse as any).message ?? 'Unexpected error';
+    const message =
+      status === HttpStatus.TOO_MANY_REQUESTS && exceptionMessage === 'ThrottlerException: Too Many Requests'
+        ? "You're doing that a bit too quickly — please wait a moment and try again."
+        : exceptionMessage;
 
     response.status(status).json({
       statusCode: status,
