@@ -209,7 +209,12 @@ export class CadService {
       designerNotes,
       cadPersonName:  cadPersonName.trim(),
       verifiedByName: verifiedByName.trim(),
-      status: CadFileStatus.SENT_FOR_APPROVAL,
+      // Not sent to the customer yet — that only happens via sendToCustomer()
+      // (see notifyBatchUploaded() below), which flips UPLOADED -> SENT_FOR_APPROVAL
+      // once staff actually save the quote. Starting a fresh upload already at
+      // SENT_FOR_APPROVAL made the staff dashboard show "Awaiting Approval" on a
+      // file the customer couldn't see yet, which reads as "sent" when it isn't.
+      status: CadFileStatus.UPLOADED,
     });
     const saved = await this.cadRepo.save(cad);
     this.logEvent(orderId, 'CAD_UPLOADED', { email: uploadedBy }, undefined, undefined, `${cadPersonName.trim()} uploaded "${file.originalname}"`);
