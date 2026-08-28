@@ -117,6 +117,14 @@ export class PublicOrdersService {
       const poNumber  = await this.ordersService.generatePoNumber();
       const trackingToken = randomBytes(32).toString('hex');
 
+      // The "Stock No# (if from inventory)" field on the web form has its own
+      // column (order.stockNumber), but nothing in the portal ever displays
+      // that column — it silently disappeared for staff. Folding it into the
+      // notes staff already read on every order surface (order detail, CAD
+      // brief, job bag, customer portal) is what actually gets it seen.
+      const stockNumberNote = dto.stockNumber?.trim() ? `Stock #: ${dto.stockNumber.trim()}` : '';
+      const customerNotes = [stockNumberNote, dto.customerNotes?.trim()].filter(Boolean).join('\n\n');
+
       const order = await this.orderRepo.save(this.orderRepo.create({
         poNumber,
         trackingToken,
@@ -138,7 +146,7 @@ export class PublicOrdersService {
         referenceWeblink: dto.referenceWeblink,
         refCustomerPo:    dto.refCustomerPo,
         stockNumber:      dto.stockNumber,
-        customerNotes:    dto.customerNotes,
+        customerNotes,
         salesRepName:     'Web Order',
         // If this customer is already assigned to a sales rep, attribute the
         // order to them so it shows up in that rep's view even though the
