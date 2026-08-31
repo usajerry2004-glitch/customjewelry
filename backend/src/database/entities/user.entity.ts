@@ -2,7 +2,6 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, Index
 } from 'typeorm';
-import { Factory, SupplySource } from './order.entity';
 
 export enum UserRole {
   ADMIN = 'ADMIN',
@@ -58,15 +57,15 @@ export class User {
 
   // Which factory this account manages orders for (FACTORY_MANAGER and
   // FACTORY_VIEWER roles) — only orders assigned to this same factory are
-  // visible to them.
+  // visible to them. String, not the Factory enum — see Order.assignedFactory.
   @Column({ type: 'varchar', nullable: true })
-  assignedFactory: Factory | null;
+  assignedFactory: string | null;
 
   // Which stone supply source this account manages orders for (STONE_MANAGER role).
   // A single account may hold both an assignedFactory and an assignedSupplySource
   // (e.g. a factory that also supplies its own stones).
   @Column({ type: 'varchar', nullable: true })
-  assignedSupplySource: SupplySource | null;
+  assignedSupplySource: string | null;
 
   @Column({ default: true })
   isActive: boolean;

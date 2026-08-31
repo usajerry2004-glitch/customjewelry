@@ -5,9 +5,10 @@ import { Order } from '../../database/entities/order.entity';
 import { Company } from '../../database/entities/company.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Order, Company])],
+  imports: [TypeOrmModule.forFeature([User, Order, Company]), CatalogModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

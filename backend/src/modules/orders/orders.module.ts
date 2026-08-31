@@ -12,9 +12,10 @@ import { CustomerCode } from '../../database/entities/customer-code.entity';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { SkuModule } from '../sku/sku.module';
+import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent, OrderMessage, Sku, Company, CustomerCode]), SkuModule],
+  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent, OrderMessage, Sku, Company, CustomerCode]), SkuModule, CatalogModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

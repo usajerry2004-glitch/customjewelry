@@ -9,13 +9,12 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
-import { Factory, SupplySource } from '../../database/entities/order.entity';
 import { OrdersService } from '../orders/orders.service';
 import { isMessageVisible } from './message-visibility';
 
 interface SocketUser {
   id: string; email: string; role: string;
-  companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null;
+  companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null;
 }
 
 interface AuthedSocket extends Socket {

@@ -4,9 +4,11 @@ import { Repository, In } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf, IsArray } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
-import { Order, Factory, SupplySource } from '../../database/entities/order.entity';
+import { Order } from '../../database/entities/order.entity';
 import { Company } from '../../database/entities/company.entity';
 import { Permission } from '../../common/permissions';
+import { CatalogService } from '../catalog/catalog.service';
+import { CatalogItemKind } from '../../database/entities/catalog-item.entity';
 
 // A brand-new Customer invite (no companyId — the invite is what creates the
 // company) names the company, not necessarily a specific contact, so the
@@ -25,8 +27,10 @@ export class CreateUserDto {
   @ValidateIf(o => isNewCustomerCompany(o)) @IsString() @IsNotEmpty() storeName?: string;
   @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() salesRepId?: string;
-  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
-  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
+  // Validated against the catalog (not a fixed enum) in UsersService — the
+  // assignable list now grows via Settings > "+ Add Factory"/"+ Add Stone Supplier".
+  @IsString() @IsOptional() assignedFactory?: string;
+  @IsString() @IsOptional() assignedSupplySource?: string;
   // Admin-only: attach this Customer account to an existing company (a
   // teammate) instead of creating a new standalone company for them.
   @IsString() @IsOptional() companyId?: string;
@@ -39,8 +43,8 @@ export class InviteUserDto {
   @IsEnum(UserRole) role: UserRole;
   @ValidateIf(o => isNewCustomerCompany(o)) @IsString() @IsNotEmpty() storeName?: string;
   @IsString() @IsOptional() salesRepId?: string;
-  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory;
-  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource;
+  @IsString() @IsOptional() assignedFactory?: string;
+  @IsString() @IsOptional() assignedSupplySource?: string;
   @IsString() @IsOptional() companyId?: string;
 }
 
@@ -55,8 +59,8 @@ export class UpdateUserDto {
   @IsString() @IsOptional() department?: string;
   @IsString() @IsOptional() storeName?: string;
   @IsString() @IsOptional() salesRepId?: string;
-  @IsEnum(Factory) @IsOptional() assignedFactory?: Factory | null;
-  @IsEnum(SupplySource) @IsOptional() assignedSupplySource?: SupplySource | null;
+  @IsString() @IsOptional() assignedFactory?: string | null;
+  @IsString() @IsOptional() assignedSupplySource?: string | null;
   // Admin-only: move an already-existing Customer account into a different
   // (or newly-created) company — e.g. merging two accounts that turned out
   // to be the same business, entered as separate invites.
@@ -72,7 +76,19 @@ export class UsersService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(Company) private companyRepo: Repository<Company>,
+    private catalogService: CatalogService,
   ) {}
+
+  // Replaces the old @IsEnum(Factory)/@IsEnum(SupplySource) guarantee now that
+  // the assignable list is DB-backed rather than a fixed enum.
+  private async assertValidAssignments(assignedFactory?: string | null, assignedSupplySource?: string | null): Promise<void> {
+    if (assignedFactory && !(await this.catalogService.isValidKey(CatalogItemKind.FACTORY, assignedFactory))) {
+      throw new BadRequestException(`"${assignedFactory}" is not a known factory.`);
+    }
+    if (assignedSupplySource && !(await this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, assignedSupplySource))) {
+      throw new BadRequestException(`"${assignedSupplySource}" is not a known stone supplier.`);
+    }
+  }
 
   async findAll(role?: string, caller?: { id: string; role: string }): Promise<User[]> {
     const qb = this.userRepo.createQueryBuilder('u');
@@ -102,6 +118,7 @@ export class UsersService {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.userRepo.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
+    await this.assertValidAssignments(dto.assignedFactory, dto.assignedSupplySource);
     const passwordHash = await bcrypt.hash(dto.password, 10);
     // A Sales Rep can only ever create Customer accounts — the role they
     // request is ignored, not just hidden by the UI, so this can't be
@@ -160,6 +177,7 @@ export class UsersService {
     if (dto.role !== undefined && dto.role !== user.role && id === caller?.id) {
       throw new BadRequestException('You cannot change your own role');
     }
+    await this.assertValidAssignments(dto.assignedFactory, dto.assignedSupplySource);
     if (dto.password) {
       (user as any).passwordHash = await bcrypt.hash(dto.password, 10);
     }

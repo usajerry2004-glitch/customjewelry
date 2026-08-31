@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, MOUNTING_OPTION_CONFIG, getCadSubLabel } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTION_CONFIG, getCadSubLabel } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 
 interface OrderCardProps {
@@ -132,16 +132,22 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
               💎 Stone Received
             </span>
           )}
-          {(order as any).assignedFactory && FACTORY_CONFIG[(order as any).assignedFactory] && (
-            <span style={{ fontSize: '10px', fontWeight: 700, color: FACTORY_CONFIG[(order as any).assignedFactory].color, background: FACTORY_CONFIG[(order as any).assignedFactory].bg, border: `1px solid ${FACTORY_CONFIG[(order as any).assignedFactory].color}30`, borderRadius: '5px', padding: '1px 7px' }}>
-              🏭 {FACTORY_CONFIG[(order as any).assignedFactory].label}
-            </span>
-          )}
-          {order.supplySource && SUPPLY_SOURCE_CONFIG[order.supplySource] && (
-            <span style={{ fontSize: '10px', fontWeight: 700, color: SUPPLY_SOURCE_CONFIG[order.supplySource].color, background: SUPPLY_SOURCE_CONFIG[order.supplySource].bg, border: `1px solid ${SUPPLY_SOURCE_CONFIG[order.supplySource].color}30`, borderRadius: '5px', padding: '1px 7px' }}>
-              💎 {SUPPLY_SOURCE_CONFIG[order.supplySource].label}
-            </span>
-          )}
+          {(order as any).assignedFactory && (() => {
+            const cfg = getFactoryDisplay((order as any).assignedFactory);
+            return (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}30`, borderRadius: '5px', padding: '1px 7px' }}>
+                🏭 {cfg.label}
+              </span>
+            );
+          })()}
+          {order.supplySource && (() => {
+            const cfg = getSupplySourceDisplay(order.supplySource);
+            return (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}30`, borderRadius: '5px', padding: '1px 7px' }}>
+                💎 {cfg.label}
+              </span>
+            );
+          })()}
         </div>
 
         {(order.salesRepName || order.salesRepEmail) && (

@@ -22,7 +22,7 @@ const JEWEL_ONE_RECIPIENTS: string[] = [
   'chirag.mehta@jewelone.com',
 ];
 
-export const STANDING_FACTORY_RECIPIENTS: Partial<Record<Factory, string[]>> = {
+export const STANDING_FACTORY_RECIPIENTS: Partial<Record<string, string[]>> = {
   [Factory.CREATIONS]: CREATIONS_RECIPIENTS,
   [Factory.JEWEL_ONE]: JEWEL_ONE_RECIPIENTS,
 };

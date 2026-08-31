@@ -5,7 +5,9 @@ import { Cron } from '@nestjs/schedule';
 import { Repository, In, Between, Not, SelectQueryBuilder } from 'typeorm';
 import { randomBytes, createHmac } from 'crypto';
 import * as Sentry from '@sentry/node';
-import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus, Factory } from '../../database/entities/order.entity';
+import { CatalogService } from '../catalog/catalog.service';
+import { CatalogItemKind } from '../../database/entities/catalog-item.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Notification, NotificationType } from '../../database/entities/notification.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
@@ -27,7 +29,7 @@ const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
 interface OrdersUser {
   id: string; email: string; role: string;
-  companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null;
+  companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null;
 }
 
 // Caps for buildFactoryOrderPdfAttachment: an unresponsive file host must
@@ -234,6 +236,7 @@ export class OrdersService implements OnModuleInit {
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
     private readonly config: ConfigService,
+    private readonly catalogService: CatalogService,
   ) {}
 
   // Fire-and-forget push to the Ring Builder website when one of its orders
@@ -858,7 +861,7 @@ export class OrdersService implements OnModuleInit {
   // FactoryRedactionInterceptor hides everywhere else (pricing, customer
   // identity), plus the reference link, since that's the closest thing to a
   // "reference image" this row has.
-  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: Factory | null }, orderIds?: string[], status?: OrderStatus): Promise<string> {
+  async exportVpoIssuedCsv(dateFrom?: string, dateTo?: string, user?: { role: string; assignedFactory?: string | null }, orderIds?: string[], status?: OrderStatus): Promise<string> {
     const isFactory = user?.role === UserRole.FACTORY_MANAGER || user?.role === UserRole.FACTORY_VIEWER;
 
     const where: any = {};
@@ -882,8 +885,10 @@ export class OrdersService implements OnModuleInit {
   // "For RightClick" — one row per selected order, in the shape our ERP's
   // "New SKU" import expects. companycode/inventorylocationcode branch on
   // whether the order's diamond is natural or lab-grown; vendor_no is looked
-  // up per assigned factory.
-  private static readonly FACTORY_VENDOR_CODES: Record<Factory, string> = {
+  // up per assigned factory. Partial (not every factory has a code yet) — any
+  // factory added later via Settings needs its real RightClick vendor number
+  // added here before this export is useful for it; until then it exports blank.
+  private static readonly FACTORY_VENDOR_CODES: Partial<Record<string, string>> = {
     [Factory.CREATIONS]:      'V00252',
     [Factory.KAMA_JEWELRY]:   'V16206',
     [Factory.UNIQUE_DESIGNS]: 'V00057',
@@ -971,7 +976,7 @@ export class OrdersService implements OnModuleInit {
     const orderIds = Array.from(new Set(assignedEvents.map(e => e.orderId)));
     const orders = await this.orderRepo.find({ where: { id: In(orderIds) }, order: { poNumber: 'ASC' } });
 
-    const ordersByFactory = new Map<Factory, Order[]>();
+    const ordersByFactory = new Map<string, Order[]>();
     for (const o of orders) {
       if (!o.assignedFactory) continue;
       if (!ordersByFactory.has(o.assignedFactory)) ordersByFactory.set(o.assignedFactory, []);
@@ -1008,7 +1013,7 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<Order & { companyViewerAccessEnabled?: boolean }> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<Order & { companyViewerAccessEnabled?: boolean }> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
@@ -1058,7 +1063,7 @@ export class OrdersService implements OnModuleInit {
   // for anything the user shouldn't see) instead of re-deriving the rules —
   // used by the chat gateway to gate room joins to orders the socket's user
   // can actually access.
-  async canUserAccessOrder(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<boolean> {
+  async canUserAccessOrder(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<boolean> {
     try {
       await this.findOne(id, user);
       return true;
@@ -1070,7 +1075,7 @@ export class OrdersService implements OnModuleInit {
   // Order IDs this user is allowed to see, or null if their role has no extra
   // restriction (Admin/Authorizer see everything) — same scoping as findAll()'s
   // role branch above, factored out for reuse by global message search.
-  async getVisibleOrderIds(user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<string[] | null> {
+  async getVisibleOrderIds(user?: { id: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<string[] | null> {
     if (!user) return null;
     const qb = this.orderRepo.createQueryBuilder('order').select('order.id', 'id');
 
@@ -1618,8 +1623,8 @@ export class OrdersService implements OnModuleInit {
   // never a blanket "all factory managers" broadcast.
   async assignSupplier(
     id: string,
-    factory: Factory,
-    supplySource: SupplySource,
+    factory: string,
+    supplySource: string,
     user?: { id?: string; email: string; role: string },
   ): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id } });
@@ -1627,6 +1632,12 @@ export class OrdersService implements OnModuleInit {
     if (order.status !== OrderStatus.VPO_ISSUED) {
       throw new BadRequestException('Supplier can only be assigned once the VPO has been issued.');
     }
+    const [validFactory, validSupplySource] = await Promise.all([
+      this.catalogService.isValidKey(CatalogItemKind.FACTORY, factory),
+      this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, supplySource),
+    ]);
+    if (!validFactory) throw new BadRequestException(`"${factory}" is not a known factory.`);
+    if (!validSupplySource) throw new BadRequestException(`"${supplySource}" is not a known stone supplier.`);
 
     order.assignedFactory = factory;
     order.supplySource = supplySource;
@@ -1923,7 +1934,7 @@ export class OrdersService implements OnModuleInit {
     return order;
   }
 
-  async findPriority(user: { id: string; email: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }): Promise<any[]> {
+  async findPriority(user: { id: string; email: string; role: string; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<any[]> {
     const now = new Date();
     const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
     const FINAL = [OrderStatus.COMPLETED, OrderStatus.CANCELLED];
@@ -2041,7 +2052,7 @@ export class OrdersService implements OnModuleInit {
     });
   }
 
-  async getKanbanBoard(user?: { id: string; role: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null }) {
+  async getKanbanBoard(user?: { id: string; role: string; assignedFactory?: string | null; assignedSupplySource?: string | null }) {
     const statuses = Object.values(OrderStatus);
 
     const buildBase = () => {

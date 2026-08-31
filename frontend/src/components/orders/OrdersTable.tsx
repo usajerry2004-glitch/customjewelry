@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Order, STATUS_CONFIG, StoneStatus, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, getCadSubLabel } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, getCadSubLabel } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 
 interface OrdersTableProps {
@@ -166,11 +166,11 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
                       {stoneStatus === StoneStatus.STONE_RECEIVED && order.status === 'VPO_ISSUED' && assignedFactory && order.supplySource && (
                         <Chip text="Stone Received" color="#065F46" bg="rgba(16,185,129,0.1)" />
                       )}
-                      {assignedFactory && FACTORY_CONFIG[assignedFactory] && (
-                        <Chip text={FACTORY_CONFIG[assignedFactory].label} color={FACTORY_CONFIG[assignedFactory].color} bg={FACTORY_CONFIG[assignedFactory].bg} />
+                      {assignedFactory && (
+                        <Chip text={getFactoryDisplay(assignedFactory).label} color={getFactoryDisplay(assignedFactory).color} bg={getFactoryDisplay(assignedFactory).bg} />
                       )}
-                      {order.supplySource && SUPPLY_SOURCE_CONFIG[order.supplySource] && (
-                        <Chip text={SUPPLY_SOURCE_CONFIG[order.supplySource].label} color={SUPPLY_SOURCE_CONFIG[order.supplySource].color} bg={SUPPLY_SOURCE_CONFIG[order.supplySource].bg} />
+                      {order.supplySource && (
+                        <Chip text={getSupplySourceDisplay(order.supplySource).label} color={getSupplySourceDisplay(order.supplySource).color} bg={getSupplySourceDisplay(order.supplySource).bg} />
                       )}
                     </div>
                   </td>

@@ -5,10 +5,11 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, SupplySource, Factory, STATUS_CONFIG, SUPPLY_SOURCE_CONFIG, FACTORY_CONFIG, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { CAD_PERSON_OPTIONS, CAD_PERSON_OTHER } from '../../utils/cadPersons';
+import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions } from '../../utils/catalog';
 import { OrderConversation } from '../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
@@ -482,8 +483,8 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'kiraSkuNumber', label: 'Kira SKU' },
       { key: 'orderType', label: 'Order Type' },
       { key: 'manufacturingPath', label: 'Manufacturing Path' },
-      { key: 'supplySource', label: 'Stone Supplier', format: (v) => SUPPLY_SOURCE_CONFIG[v]?.label || v },
-      { key: 'assignedFactory', label: 'Factory', format: (v) => FACTORY_CONFIG[v]?.label || v },
+      { key: 'supplySource', label: 'Stone Supplier', format: (v) => v ? getSupplySourceDisplay(v).label : v },
+      { key: 'assignedFactory', label: 'Factory', format: (v) => v ? getFactoryDisplay(v).label : v },
       { key: 'referenceWeblink', label: 'Reference Link' },
     ],
   },
@@ -559,13 +560,15 @@ export default function OrderDetail() {
   const refSectionRef = useRef<HTMLDivElement>(null);
   const [priceModal, setPriceModal] = useState(false);
   const [pendingPrice, setPendingPrice] = useState('');
-  const [supplySourceInput, setSupplySourceInput] = useState<SupplySource | ''>('');
+  const [supplySourceInput, setSupplySourceInput] = useState('');
   const [savingSupplySource, setSavingSupplySource] = useState(false);
   const [quoteOptionsInput, setQuoteOptionsInput] = useState<{ label: string; price: string }[]>([]);
   const [savingQuoteOptions, setSavingQuoteOptions] = useState(false);
   const [assignSupplierModal, setAssignSupplierModal] = useState(false);
-  const [assignFactoryInput, setAssignFactoryInput] = useState<Factory | ''>('');
-  const [assignSupplySourceInput, setAssignSupplySourceInput] = useState<SupplySource | ''>('');
+  const [assignFactoryInput, setAssignFactoryInput] = useState('');
+  const [assignSupplySourceInput, setAssignSupplySourceInput] = useState('');
+  const [factories, setFactories] = useState<CatalogOption[]>([]);
+  const [supplySources, setSupplySources] = useState<CatalogOption[]>([]);
   const [assigningSupplier, setAssigningSupplier] = useState(false);
   const [quotedPriceInput, setQuotedPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
@@ -631,6 +634,12 @@ export default function OrderDetail() {
   useEffect(() => {
     if (currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.AUTHORIZER) return;
     apiFetch(`${API}/customer-codes`).then(r => r.ok ? r.json() : []).then(setCustomerCodeOptions).catch(() => {});
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.AUTHORIZER) return;
+    fetchFactoryOptions().then(setFactories);
+    fetchSupplySourceOptions().then(setSupplySources);
   }, [currentUser]);
 
   // Work-time tracking — just enough state to render Start vs Stop; the
@@ -1448,11 +1457,11 @@ export default function OrderDetail() {
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <select
                               value={supplySourceInput}
-                              onChange={e => setSupplySourceInput(e.target.value as SupplySource)}
+                              onChange={e => setSupplySourceInput(e.target.value)}
                               style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                             >
-                              {(Object.values(SupplySource) as SupplySource[]).map(s => (
-                                <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+                              {supplySources.map(s => (
+                                <option key={s.key} value={s.key}>{s.label}</option>
                               ))}
                             </select>
                             {supplySourceInput !== (raw ?? '') && (
@@ -2083,8 +2092,8 @@ export default function OrderDetail() {
               </p>
               <button
                 onClick={() => {
-                  setAssignFactoryInput((order.assignedFactory as Factory) || '');
-                  setAssignSupplySourceInput((order.supplySource as SupplySource) || '');
+                  setAssignFactoryInput(order.assignedFactory || '');
+                  setAssignSupplySourceInput(order.supplySource || '');
                   setAssignSupplierModal(true);
                 }}
                 style={{ width: '100%', background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '9px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
@@ -2561,18 +2570,18 @@ export default function OrderDetail() {
               Factory
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '18px' }}>
-              {(Object.values(Factory) as Factory[]).map(f => {
-                const cfg = FACTORY_CONFIG[f];
-                const selected = assignFactoryInput === f;
+              {factories.map(f => {
+                const cfg = getFactoryDisplay(f.key);
+                const selected = assignFactoryInput === f.key;
                 return (
-                  <button key={f} onClick={() => setAssignFactoryInput(f)}
+                  <button key={f.key} onClick={() => setAssignFactoryInput(f.key)}
                     style={{
                       borderRadius: '8px', padding: '10px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', textAlign: 'left',
                       border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
                       background: selected ? cfg.bg : 'var(--bg-input)',
                       color: selected ? cfg.color : 'var(--text-secondary)',
                     }}>
-                    {cfg.label}
+                    {f.label}
                   </button>
                 );
               })}
@@ -2581,18 +2590,18 @@ export default function OrderDetail() {
               Stone Supplier
             </label>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-              {(Object.values(SupplySource) as SupplySource[]).map(s => {
-                const cfg = SUPPLY_SOURCE_CONFIG[s];
-                const selected = assignSupplySourceInput === s;
+              {supplySources.map(s => {
+                const cfg = getSupplySourceDisplay(s.key);
+                const selected = assignSupplySourceInput === s.key;
                 return (
-                  <button key={s} onClick={() => setAssignSupplySourceInput(s)}
+                  <button key={s.key} onClick={() => setAssignSupplySourceInput(s.key)}
                     style={{
                       flex: 1, borderRadius: '8px', padding: '10px 8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                       border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
                       background: selected ? cfg.bg : 'var(--bg-input)',
                       color: selected ? cfg.color : 'var(--text-secondary)',
                     }}>
-                    {cfg.label}
+                    {s.label}
                   </button>
                 );
               })}

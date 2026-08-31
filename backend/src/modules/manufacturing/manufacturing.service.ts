@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Order, OrderStatus, StoneStatus, SupplySource, Factory } from '../../database/entities/order.entity';
+import { Order, OrderStatus, StoneStatus, SupplySource } from '../../database/entities/order.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -22,7 +22,7 @@ export class ManufacturingService {
     this.eventRepo.save(ev).catch(() => {});
   }
 
-  async getQueue(user?: { role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
+  async getQueue(user?: { role?: string; assignedFactory?: string | null; assignedSupplySource?: string | null; extraPermissions?: Permission[] }) {
     // Stone Manager / Factory Manager only ever see orders assigned to them
     // specifically — Admin/Authorizer see the full queue, including orders still
     // awaiting a supplier assignment.
@@ -71,7 +71,7 @@ export class ManufacturingService {
     });
   }
 
-  async markStoneSent(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: Factory | null; assignedSupplySource?: SupplySource | null; extraPermissions?: Permission[] }) {
+  async markStoneSent(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: string | null; assignedSupplySource?: string | null; extraPermissions?: Permission[] }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (order.status !== OrderStatus.VPO_ISSUED) {
@@ -123,7 +123,7 @@ export class ManufacturingService {
     return saved;
   }
 
-  async completeManufacturing(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: Factory | null }) {
+  async completeManufacturing(id: string, user?: { id?: string; email?: string; role?: string; assignedFactory?: string | null }) {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     if (user?.role === UserRole.FACTORY_MANAGER

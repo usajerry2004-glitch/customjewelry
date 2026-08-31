@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
-import { UserRole, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission, PERMISSION_LABELS } from '../utils/types';
+import { UserRole, Permission, PERMISSION_LABELS } from '../utils/types';
 import { toast } from '../utils/toast';
 import { formatName, getInitials } from '../utils/name';
+import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, addFactoryOption, addSupplySourceOption } from '../utils/catalog';
 
 interface StaffUser {
   id: string;
@@ -72,7 +73,7 @@ const inp: React.CSSProperties = {
 
 const emptyForm = {
   firstName: '', lastName: '', email: '', role: UserRole.SALES_REP, salesRepId: '', storeName: '',
-  assignedFactory: '' as Factory | '', assignedSupplySource: '' as SupplySource | '',
+  assignedFactory: '', assignedSupplySource: '',
 };
 
 export default function SettingsPage() {
@@ -94,6 +95,66 @@ export default function SettingsPage() {
   const [sortKey, setSortKey] = useState<'name' | 'email' | 'role' | 'status' | 'added'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [staffSearch, setStaffSearch] = useState('');
+
+  const [factories, setFactories] = useState<CatalogOption[]>([]);
+  const [supplySources, setSupplySources] = useState<CatalogOption[]>([]);
+  const [addingFactory, setAddingFactory] = useState(false);
+  const [addingSupplySource, setAddingSupplySource] = useState(false);
+  const [newFactoryName, setNewFactoryName] = useState('');
+  const [newSupplySourceName, setNewSupplySourceName] = useState('');
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [savingCatalogItem, setSavingCatalogItem] = useState(false);
+
+  const reloadCatalog = () => {
+    fetchFactoryOptions().then(setFactories);
+    fetchSupplySourceOptions().then(setSupplySources);
+  };
+
+  const submitNewFactory = async () => {
+    if (!newFactoryName.trim()) return;
+    setSavingCatalogItem(true);
+    setCatalogError(null);
+    try {
+      const res = await addFactoryOption(newFactoryName.trim());
+      if (res.ok) {
+        const created = await res.json();
+        reloadCatalog();
+        setForm(f => ({ ...f, assignedFactory: created.key }));
+        setNewFactoryName('');
+        setAddingFactory(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setCatalogError(getErrorMessage(data, 'Failed to add factory.'));
+      }
+    } catch {
+      setCatalogError('Failed to add factory — check your connection and try again.');
+    } finally {
+      setSavingCatalogItem(false);
+    }
+  };
+
+  const submitNewSupplySource = async () => {
+    if (!newSupplySourceName.trim()) return;
+    setSavingCatalogItem(true);
+    setCatalogError(null);
+    try {
+      const res = await addSupplySourceOption(newSupplySourceName.trim());
+      if (res.ok) {
+        const created = await res.json();
+        reloadCatalog();
+        setForm(f => ({ ...f, assignedSupplySource: created.key }));
+        setNewSupplySourceName('');
+        setAddingSupplySource(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setCatalogError(getErrorMessage(data, 'Failed to add stone supplier.'));
+      }
+    } catch {
+      setCatalogError('Failed to add stone supplier — check your connection and try again.');
+    } finally {
+      setSavingCatalogItem(false);
+    }
+  };
 
   const toggleSort = (key: typeof sortKey) => {
     if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -158,6 +219,7 @@ export default function SettingsPage() {
       return;
     }
     reload();
+    reloadCatalog();
   }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -391,36 +453,81 @@ export default function SettingsPage() {
             {(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER || form.role === UserRole.STONE_MANAGER) && (
               <div className="form-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                    Factory{(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER) ? ' (required)' : ' (optional)'}
-                  </label>
-                  <select
-                    required={form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER}
-                    value={form.assignedFactory}
-                    onChange={e => setForm(f => ({ ...f, assignedFactory: e.target.value as Factory }))}
-                    style={{ ...inp, cursor: 'pointer' }}
-                  >
-                    <option value="">— Select a Factory —</option>
-                    {(Object.values(Factory) as Factory[]).map(fac => (
-                      <option key={fac} value={fac}>{FACTORY_CONFIG[fac].label}</option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      Factory{(form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER) ? ' (required)' : ' (optional)'}
+                    </label>
+                    <button type="button" onClick={() => { setAddingFactory(a => !a); setCatalogError(null); }} style={{ background: 'none', border: 'none', color: 'var(--navy)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                      {addingFactory ? 'Cancel' : '+ Add Factory'}
+                    </button>
+                  </div>
+                  {addingFactory ? (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        autoFocus
+                        value={newFactoryName}
+                        onChange={e => setNewFactoryName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNewFactory(); } }}
+                        placeholder="New factory name"
+                        style={inp}
+                      />
+                      <button type="button" onClick={submitNewFactory} disabled={savingCatalogItem || !newFactoryName.trim()} style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '0 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: savingCatalogItem ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                        {savingCatalogItem ? 'Adding…' : 'Add'}
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      required={form.role === UserRole.FACTORY_MANAGER || form.role === UserRole.FACTORY_VIEWER}
+                      value={form.assignedFactory}
+                      onChange={e => setForm(f => ({ ...f, assignedFactory: e.target.value }))}
+                      style={{ ...inp, cursor: 'pointer' }}
+                    >
+                      <option value="">— Select a Factory —</option>
+                      {factories.map(fac => (
+                        <option key={fac.key} value={fac.key}>{fac.label}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 {form.role === UserRole.STONE_MANAGER && (
                   <div>
-                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Stone Supplier (required)</label>
-                    <select
-                      required
-                      value={form.assignedSupplySource}
-                      onChange={e => setForm(f => ({ ...f, assignedSupplySource: e.target.value as SupplySource }))}
-                      style={{ ...inp, cursor: 'pointer' }}
-                    >
-                      <option value="">— Select a Supplier —</option>
-                      {(Object.values(SupplySource) as SupplySource[]).map(s => (
-                        <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Stone Supplier (required)</label>
+                      <button type="button" onClick={() => { setAddingSupplySource(a => !a); setCatalogError(null); }} style={{ background: 'none', border: 'none', color: 'var(--navy)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                        {addingSupplySource ? 'Cancel' : '+ Add Stone Supplier'}
+                      </button>
+                    </div>
+                    {addingSupplySource ? (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          autoFocus
+                          value={newSupplySourceName}
+                          onChange={e => setNewSupplySourceName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNewSupplySource(); } }}
+                          placeholder="New stone supplier name"
+                          style={inp}
+                        />
+                        <button type="button" onClick={submitNewSupplySource} disabled={savingCatalogItem || !newSupplySourceName.trim()} style={{ background: 'var(--navy)', border: 'none', borderRadius: '7px', padding: '0 14px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: savingCatalogItem ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                          {savingCatalogItem ? 'Adding…' : 'Add'}
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={form.assignedSupplySource}
+                        onChange={e => setForm(f => ({ ...f, assignedSupplySource: e.target.value }))}
+                        style={{ ...inp, cursor: 'pointer' }}
+                      >
+                        <option value="">— Select a Supplier —</option>
+                        {supplySources.map(s => (
+                          <option key={s.key} value={s.key}>{s.label}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
+                )}
+                {catalogError && (
+                  <div style={{ gridColumn: '1 / -1', fontSize: '11px', color: '#DC2626' }}>{catalogError}</div>
                 )}
               </div>
             )}

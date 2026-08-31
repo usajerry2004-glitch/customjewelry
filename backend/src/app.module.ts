@@ -19,8 +19,10 @@ import { Company } from './database/entities/company.entity';
 import { OrderConversationRead } from './database/entities/order-conversation-read.entity';
 import { MutedOrderNotification } from './database/entities/muted-order-notification.entity';
 import { CustomerCode } from './database/entities/customer-code.entity';
+import { CatalogItem } from './database/entities/catalog-item.entity';
 
 import { OrdersModule } from './modules/orders/orders.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PublicModule } from './modules/public/public.module';
 import { CadModule } from './modules/cad/cad.module';
@@ -64,7 +66,7 @@ import { HealthController } from './health.controller';
           // lookup/write against them threw "relation does not exist",
           // masked as a generic 500 with no indication it was schema, not
           // data or logic.
-          OrderConversationRead, MutedOrderNotification, CustomerCode,
+          OrderConversationRead, MutedOrderNotification, CustomerCode, CatalogItem,
         ];
         const pool = { extra: { max: 20, min: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 } };
         if (databaseUrl) {
@@ -103,6 +105,7 @@ import { HealthController } from './health.controller';
     SearchModule,
     CustomerCodesModule,
     CompaniesModule,
+    CatalogModule,
   ],
   controllers: [HealthController],
   providers: [

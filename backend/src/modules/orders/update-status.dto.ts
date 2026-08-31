@@ -1,6 +1,6 @@
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ArrayMinSize } from 'class-validator';
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, IsNotEmpty, Min, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderStatus, SupplySource, Factory } from '../../database/entities/order.entity';
+import { OrderStatus } from '../../database/entities/order.entity';
 
 export class UpdateStatusDto {
   @IsEnum(OrderStatus, {
@@ -24,15 +24,13 @@ export class UpdateStatusDto {
 }
 
 export class AssignSupplierDto {
-  @IsEnum(Factory, {
-    message: `factory must be one of: ${Object.values(Factory).join(', ')}`,
-  })
-  factory: Factory;
+  // Validated against the catalog (not a fixed enum) in OrdersService.assignSupplier —
+  // the assignable list now grows via Settings > "+ Add Factory"/"+ Add Stone Supplier".
+  @IsString() @IsNotEmpty()
+  factory: string;
 
-  @IsEnum(SupplySource, {
-    message: `supplySource must be one of: ${Object.values(SupplySource).join(', ')}`,
-  })
-  supplySource: SupplySource;
+  @IsString() @IsNotEmpty()
+  supplySource: string;
 }
 
 export class BulkAssignSupplierDto extends AssignSupplierDto {

@@ -239,14 +239,17 @@ export class Order {
 
   // Who supplies the stone for this order — chosen by Admin/Authorizer via the
   // "Assign Supplier" step, after the VPO is issued. Stays null (invisible to any
-  // Stone Manager) until then.
+  // Stone Manager) until then. Typed as string (not the SupplySource enum, which
+  // only covers the original built-ins) because the assignable list now also
+  // includes whatever an Admin has added via CatalogService/Settings.
   @Column({ type: 'varchar', nullable: true })
-  supplySource: SupplySource | null;
+  supplySource: string | null;
 
   // Which factory manufactures this order — chosen alongside supplySource via
   // "Assign Supplier". Stays null (invisible to any Factory Manager) until then.
+  // See supplySource above for why this is string, not the Factory enum.
   @Column({ type: 'varchar', nullable: true })
-  assignedFactory: Factory | null;
+  assignedFactory: string | null;
 
   // When the order most recently entered VPO_ISSUED — the clock overdue alerts
   // count from (6 days for Factory Manager, 2 days for Stone Manager). Set on

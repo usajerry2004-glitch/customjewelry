@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
@@ -10,8 +11,10 @@ import { OrderEvent } from '../../database/entities/order-event.entity';
 import { OrderMessage } from '../../database/entities/order-message.entity';
 import { Sku } from '../../database/entities/sku.entity';
 import { Company } from '../../database/entities/company.entity';
+import { CustomerCode } from '../../database/entities/customer-code.entity';
 import { EmailService } from '../email/email.service';
 import { SkuService } from '../sku/sku.service';
+import { CatalogService } from '../catalog/catalog.service';
 
 const makeRepo = (overrides: any = {}) => ({
   find: jest.fn().mockResolvedValue([]),
@@ -64,6 +67,9 @@ describe('OrdersService', () => {
         { provide: getRepositoryToken(OrderMessage), useValue: makeRepo() },
         { provide: getRepositoryToken(Sku),          useValue: makeRepo() },
         { provide: getRepositoryToken(Company),      useValue: makeRepo() },
+        { provide: getRepositoryToken(CustomerCode), useValue: makeRepo() },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: CatalogService, useValue: { isValidKey: jest.fn().mockResolvedValue(true), findAll: jest.fn().mockResolvedValue([]), create: jest.fn() } },
         { provide: EmailService, useValue: {
           sendOrderInProduction:      jest.fn().mockResolvedValue(true),
           sendVpoIssuedNotice:        jest.fn().mockResolvedValue(true),

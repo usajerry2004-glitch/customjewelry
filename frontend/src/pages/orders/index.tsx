@@ -4,10 +4,11 @@ import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { OrdersTable } from '../../components/orders/OrdersTable';
 import { SkeletonOrderGrid } from '../../components/SkeletonOrderCard';
-import { Order, OrderStatus, StoneStatus, Factory, SupplySource, FACTORY_CONFIG, SUPPLY_SOURCE_CONFIG, Permission, MOUNTING_OPTIONS } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, Permission, MOUNTING_OPTIONS } from '../../utils/types';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
+import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions } from '../../utils/catalog';
 
 // Remembers filters, pagination, and scroll position across a visit to an
 // order's detail page, so clicking "Back to Orders" lands where the user
@@ -221,9 +222,16 @@ export default function OrdersPage() {
   const skipInitialFilterReset = useRef(true);
   const scrollRestored = useRef(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
-  const [reassignFactory, setReassignFactory] = useState<Factory | ''>('');
-  const [reassignSupplySource, setReassignSupplySource] = useState<SupplySource | ''>('');
+  const [reassignFactory, setReassignFactory] = useState('');
+  const [reassignSupplySource, setReassignSupplySource] = useState('');
+  const [factories, setFactories] = useState<CatalogOption[]>([]);
+  const [supplySources, setSupplySources] = useState<CatalogOption[]>([]);
   const [nudgeStatus, setNudgeStatus] = useState<OrderStatus | ''>('');
+
+  useEffect(() => {
+    fetchFactoryOptions().then(setFactories);
+    fetchSupplySourceOptions().then(setSupplySources);
+  }, []);
 
   // Sync statusFilter when URL query changes without a remount (e.g.
   // clicking between two ?status= links while staying on this page).
@@ -1340,8 +1348,8 @@ export default function OrdersPage() {
             style={{ ...inputStyle, flex: '0 1 160px', cursor: 'pointer' }}
           >
             <option value="">All Factories</option>
-            {(Object.values(Factory) as Factory[]).map(f => (
-              <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
+            {factories.map(f => (
+              <option key={f.key} value={f.key}>{f.label}</option>
             ))}
           </select>
         )}
@@ -1352,8 +1360,8 @@ export default function OrdersPage() {
             style={{ ...inputStyle, flex: '0 1 170px', cursor: 'pointer' }}
           >
             <option value="">All Stone Suppliers</option>
-            {(Object.values(SupplySource) as SupplySource[]).map(s => (
-              <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+            {supplySources.map(s => (
+              <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
         )}
@@ -1886,19 +1894,19 @@ export default function OrdersPage() {
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Factory *</label>
-              <select value={reassignFactory} onChange={e => setReassignFactory(e.target.value as Factory)} style={{ ...inputStyle, width: '100%' }}>
+              <select value={reassignFactory} onChange={e => setReassignFactory(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">Select factory…</option>
-                {(Object.values(Factory) as Factory[]).map(f => (
-                  <option key={f} value={f}>{FACTORY_CONFIG[f].label}</option>
+                {factories.map(f => (
+                  <option key={f.key} value={f.key}>{f.label}</option>
                 ))}
               </select>
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle}>Stone Supplier *</label>
-              <select value={reassignSupplySource} onChange={e => setReassignSupplySource(e.target.value as SupplySource)} style={{ ...inputStyle, width: '100%' }}>
+              <select value={reassignSupplySource} onChange={e => setReassignSupplySource(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">Select supplier…</option>
-                {(Object.values(SupplySource) as SupplySource[]).map(s => (
-                  <option key={s} value={s}>{SUPPLY_SOURCE_CONFIG[s].label}</option>
+                {supplySources.map(s => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
               </select>
             </div>

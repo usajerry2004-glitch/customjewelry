@@ -108,8 +108,11 @@ export interface Order {
   qcDone?: boolean;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
-  supplySource?: SupplySource | null;
-  assignedFactory?: Factory | null;
+  // String, not the SupplySource/Factory enums — those only cover the original
+  // built-ins; the assignable list now also includes whatever an Admin has
+  // added via Settings > "+ Add Factory"/"+ Add Stone Supplier".
+  supplySource?: string | null;
+  assignedFactory?: string | null;
   isPriorityCustomer?: boolean;
   repairContractor?: string;
   salesRepName?: string;
@@ -159,11 +162,45 @@ export const SUPPLY_SOURCE_CONFIG: Record<string, { label: string; color: string
 };
 
 export const FACTORY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  KAMA_JEWELRY:   { label: 'Kama Jewelry',   color: '#0EA5E9', bg: '#E0F2FE' },
-  CREATIONS:      { label: 'Creations',      color: '#B45309', bg: '#FEF3C7' },
-  UNIQUE_DESIGNS: { label: 'Unique Designs', color: '#059669', bg: '#D1FAE5' },
-  JEWEL_ONE:      { label: 'Jewel One',      color: '#7C3AED', bg: '#EDE9FE' },
+  KAMA_JEWELRY:      { label: 'Kama Jewelry',      color: '#0EA5E9', bg: '#E0F2FE' },
+  CREATIONS:         { label: 'Creations',         color: '#B45309', bg: '#FEF3C7' },
+  UNIQUE_DESIGNS:    { label: 'Unique Designs',    color: '#059669', bg: '#D1FAE5' },
+  JEWEL_ONE:         { label: 'Jewel One',         color: '#7C3AED', bg: '#EDE9FE' },
+  EMBASSY_OF_JEWELS: { label: 'Embassy Of Jewels', color: '#DB2777', bg: '#FCE7F3' },
 };
+
+// Deterministic fallback so a factory/stone supplier added later via Settings
+// (and therefore missing from the curated maps above) still gets a stable,
+// distinct badge color instead of being silently unstyled.
+const FALLBACK_PALETTE: { color: string; bg: string }[] = [
+  { color: '#0EA5E9', bg: '#E0F2FE' },
+  { color: '#B45309', bg: '#FEF3C7' },
+  { color: '#059669', bg: '#D1FAE5' },
+  { color: '#7C3AED', bg: '#EDE9FE' },
+  { color: '#DB2777', bg: '#FCE7F3' },
+  { color: '#9333EA', bg: '#F3E8FF' },
+  { color: '#0D9488', bg: '#CCFBF1' },
+  { color: '#DC2626', bg: '#FEE2E2' },
+];
+
+function humanizeKey(key: string): string {
+  return key.split('_').filter(Boolean).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+}
+
+function fallbackDisplay(key: string): { label: string; color: string; bg: string } {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  const { color, bg } = FALLBACK_PALETTE[hash % FALLBACK_PALETTE.length];
+  return { label: humanizeKey(key), color, bg };
+}
+
+export function getFactoryDisplay(key: string): { label: string; color: string; bg: string } {
+  return FACTORY_CONFIG[key] || fallbackDisplay(key);
+}
+
+export function getSupplySourceDisplay(key: string): { label: string; color: string; bg: string } {
+  return SUPPLY_SOURCE_CONFIG[key] || fallbackDisplay(key);
+}
 
 // Bold/high-contrast on purpose — this needs to jump out at both Factory and
 // Stone Manager, same as the ★ Priority badge, since it changes what work
