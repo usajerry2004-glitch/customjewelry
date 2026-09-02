@@ -1572,17 +1572,20 @@ export class OrdersService implements OnModuleInit {
           orderId: updated.id,
         }).catch(err => this.logger.warn('Order delivered email failed:', err));
 
-        if (updated.trackingToken) {
-          this.emailService.sendFeedbackRequest({
-            to: updated.customerEmail,
-            poNumber: updated.poNumber,
-            customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-            orderType: updated.orderType || '—',
-            trackingToken: updated.trackingToken,
-          }).catch(err => this.logger.warn('Feedback request email failed:', err));
-          updated.feedbackRequestedAt = new Date();
-          await this.orderRepo.update(updated.id, { feedbackRequestedAt: updated.feedbackRequestedAt });
-        }
+        // Temporarily disabled — feedback request email paused per request
+        // (2026-09-02). Re-enable by uncommenting below; left the trackingToken
+        // guard/setup intact so nothing else needs to change to turn it back on.
+        // if (updated.trackingToken) {
+        //   this.emailService.sendFeedbackRequest({
+        //     to: updated.customerEmail,
+        //     poNumber: updated.poNumber,
+        //     customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
+        //     orderType: updated.orderType || '—',
+        //     trackingToken: updated.trackingToken,
+        //   }).catch(err => this.logger.warn('Feedback request email failed:', err));
+        //   updated.feedbackRequestedAt = new Date();
+        //   await this.orderRepo.update(updated.id, { feedbackRequestedAt: updated.feedbackRequestedAt });
+        // }
       }
       this.notifyRingBuilderCompleted(updated).catch(err => this.logger.warn('Ring Builder completed-webhook failed:', err));
     }
