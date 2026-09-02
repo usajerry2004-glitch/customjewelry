@@ -22,10 +22,10 @@ const API_KEY = process.env.NEXT_PUBLIC_PARTNER_API_KEY || 'KiRa@WebForm#2026!';
 const MAX_FILES = 5;
 
 const emptyForm = {
-  firstName: '', lastName: '', email: '', phoneNumber: '',
+  firstName: '', lastName: '', email: '', phoneNumber: '', storeName: '',
   orderType: '', size: '', metalType: '', metalColor: '',
   diamondType: '', diamondQuality: '', centerStoneShape: '', approximateCaratWeight: '', hasGemstone: 'No',
-  referenceWeblink: '', customerNotes: '',
+  referenceWeblink: '', refCustomerPo: '', stockNumber: '', customerNotes: '',
 };
 
 const card: React.CSSProperties = {
@@ -89,6 +89,7 @@ export default function LimitlessFishPage() {
         `Requested by: ${[form.firstName, form.lastName].filter(Boolean).join(' ') || '—'}`,
         form.email && `Email: ${form.email}`,
         form.phoneNumber && `Phone: ${form.phoneNumber}`,
+        form.storeName && `Company: ${form.storeName}`,
       ].filter(Boolean).join('\n');
       const combinedNotes = [requestedByLines, form.customerNotes.trim()].filter(Boolean).join('\n\n');
 
@@ -97,11 +98,13 @@ export default function LimitlessFishPage() {
       if (combinedNotes) fd.set('customerNotes', combinedNotes);
       // Overrides whatever was collected above — every order always belongs
       // to the one existing Limitless Fish LLC account, not a new customer
-      // per submission.
+      // per submission. storeName in particular must not leak the buyer's own
+      // company into the order's account identity (see requestedByLines above).
       fd.set('firstName', PARTNER_ACCOUNT_NAME);
       fd.delete('lastName');
       fd.set('email', PARTNER_ACCOUNT_EMAIL);
       fd.delete('phoneNumber');
+      fd.delete('storeName');
       files.forEach(f => fd.append('files', f));
 
       const res = await fetch(`${API_BASE}/public/orders`, {
@@ -184,6 +187,7 @@ export default function LimitlessFishPage() {
                 <div><label style={label}>Last Name</label><input value={form.lastName} onChange={set('lastName')} placeholder="Ellis" style={inp} /></div>
                 <div><label style={label}>Email *</label><input required type="email" value={form.email} onChange={set('email')} placeholder="jordan@email.com" style={inp} /></div>
                 <div><label style={label}>Phone</label><input type="tel" value={form.phoneNumber} onChange={set('phoneNumber')} placeholder="(555) 000-1234" style={inp} /></div>
+                <div><label style={label}>Company Name</label><input value={form.storeName} onChange={set('storeName')} placeholder="(optional)" style={inp} /></div>
               </div>
 
               <div style={sectionHead}>The Design</div>
@@ -246,6 +250,16 @@ export default function LimitlessFishPage() {
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🖼 Click to upload — JPG, PNG or PDF (up to {MAX_FILES})</div>
                 </div>
                 <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={onFilesChosen} />
+              </div>
+              <div className="lf-grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '18px' }}>
+                <div>
+                  <label style={label}>Customer PO# (optional)</label>
+                  <input value={form.refCustomerPo} onChange={set('refCustomerPo')} placeholder="Your own PO / reference number" style={inp} />
+                </div>
+                <div>
+                  <label style={label}>Stock No# (optional)</label>
+                  <input value={form.stockNumber} onChange={set('stockNumber')} placeholder="If from inventory" style={inp} />
+                </div>
               </div>
               <div style={{ marginBottom: '18px' }}>
                 <label style={label}>Reference Link (optional)</label>
