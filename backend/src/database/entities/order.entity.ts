@@ -155,6 +155,14 @@ export class Order {
   @Column({ nullable: true })
   stockNumber: string;
 
+  // Manually pasted by Admin after uploading this order's model to iJewel3D's
+  // own dashboard and generating a shareable embed link there — there's no
+  // API integration that pushes the model automatically. Only ever shown
+  // (staff or customer-facing) when the order's company also has
+  // Company.viewerAccessEnabled on, since the viewer is a paid add-on.
+  @Column({ nullable: true })
+  viewerEmbedUrl: string;
+
   @Column({ type: 'text', nullable: true })
   customerNotes: string;
 

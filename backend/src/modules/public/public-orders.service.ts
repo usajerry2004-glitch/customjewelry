@@ -259,6 +259,7 @@ export class PublicOrdersService {
       quoteOptions:   order.quoteOptions ?? null,
       committedShipDate: order.committedShipDate ?? null,
       viewerAccessEnabled: company?.viewerAccessEnabled ?? false,
+      viewerEmbedUrl: order.viewerEmbedUrl ?? null,
       cadFiles: cadFiles.map(f => ({
         id:             f.id,
         status:         f.status,

@@ -564,6 +564,9 @@ export default function OrderDetail() {
   const [savingSupplySource, setSavingSupplySource] = useState(false);
   const [quoteOptionsInput, setQuoteOptionsInput] = useState<{ label: string; price: string }[]>([]);
   const [savingQuoteOptions, setSavingQuoteOptions] = useState(false);
+  const [viewerUrlInput, setViewerUrlInput] = useState('');
+  const [editingViewerUrl, setEditingViewerUrl] = useState(false);
+  const [savingViewerUrl, setSavingViewerUrl] = useState(false);
   const [assignSupplierModal, setAssignSupplierModal] = useState(false);
   const [assignFactoryInput, setAssignFactoryInput] = useState('');
   const [assignSupplySourceInput, setAssignSupplySourceInput] = useState('');
@@ -862,6 +865,24 @@ export default function OrderDetail() {
       toast.error(getErrorMessage(err, 'Failed to save quoted price.'));
     }
     setSavingPrice(false);
+  };
+
+  const saveViewerUrl = async () => {
+    if (!order?.id) return;
+    const url = viewerUrlInput.trim();
+    setSavingViewerUrl(true);
+    const res = await apiFetch(`${API}/orders/${order.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ viewerEmbedUrl: url || null }),
+    });
+    if (res.ok) {
+      setOrder(await res.json());
+      setEditingViewerUrl(false);
+      toast.success(url ? '3D viewer link saved.' : '3D viewer link removed.');
+    } else {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to save 3D viewer link.'));
+    }
+    setSavingViewerUrl(false);
   };
 
   const saveCustomerPo = async () => {
@@ -1912,25 +1933,75 @@ export default function OrderDetail() {
           })()}
         </div>
 
-          {/* ── 3D Viewer (company-gated placeholder — real iJewel3D embed not wired up yet) ── */}
+          {/* ── 3D Viewer (iJewel3D) — gated per-company by Company.viewerAccessEnabled,
+              a paid add-on toggled in Customers > company > Viewer Access. Admin pastes
+              the embed link generated on iJewel3D's own dashboard for this order's model;
+              there's no API push, so nothing renders here until that link is added. ── */}
           {order.companyViewerAccessEnabled && (
             <div style={cardStyle}>
-              <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 12px' }}>
-                3D Viewer
-              </h3>
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '6px', padding: '32px 16px', borderRadius: 'var(--radius)',
-                border: '1px dashed var(--border)', background: 'var(--bg-input)', textAlign: 'center',
-              }}>
-                <span style={{ fontSize: '22px' }}>💍</span>
-                <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Interactive 3D preview reserved for this company
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', maxWidth: '320px' }}>
-                  The live iJewel3D viewer isn't connected yet — this slot will show it here once it is.
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
+                  3D Viewer
+                </h3>
+                {currentUser?.role === UserRole.ADMIN && order.viewerEmbedUrl && !editingViewerUrl && (
+                  <button
+                    onClick={() => { setViewerUrlInput(order.viewerEmbedUrl || ''); setEditingViewerUrl(true); }}
+                    style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                  >
+                    Edit link
+                  </button>
+                )}
               </div>
+
+              {currentUser?.role === UserRole.ADMIN && (editingViewerUrl || !order.viewerEmbedUrl) ? (
+                <div>
+                  <input
+                    value={viewerUrlInput}
+                    onChange={e => setViewerUrlInput(e.target.value)}
+                    placeholder="Paste the iJewel3D embed URL for this order's model…"
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '7px', padding: '9px 12px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', marginBottom: '8px' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={saveViewerUrl}
+                      disabled={savingViewerUrl}
+                      style={{ flex: 1, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '8px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: savingViewerUrl ? 0.6 : 1 }}
+                    >
+                      {savingViewerUrl ? 'Saving…' : 'Save'}
+                    </button>
+                    {editingViewerUrl && (
+                      <button
+                        onClick={() => setEditingViewerUrl(false)}
+                        disabled={savingViewerUrl}
+                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : order.viewerEmbedUrl ? (
+                <iframe
+                  src={order.viewerEmbedUrl}
+                  title="iJewel3D interactive preview"
+                  style={{ width: '100%', aspectRatio: '4 / 3', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-input)' }}
+                  allow="fullscreen; xr-spatial-tracking"
+                />
+              ) : (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: '6px', padding: '32px 16px', borderRadius: 'var(--radius)',
+                  border: '1px dashed var(--border)', background: 'var(--bg-input)', textAlign: 'center',
+                }}>
+                  <span style={{ fontSize: '22px' }}>💍</span>
+                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Interactive 3D preview reserved for this company
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', maxWidth: '320px' }}>
+                    The live iJewel3D viewer isn't connected for this order yet.
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

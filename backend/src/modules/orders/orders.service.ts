@@ -58,7 +58,7 @@ const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stam
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
 
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
-const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer'];
+const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer', 'viewerEmbedUrl'];
 
 // Human-readable labels for the CSV export — mirrors STATUS_CONFIG/
 // SUPPLY_SOURCE_CONFIG/FACTORY_CONFIG in frontend/src/utils/types.ts, since

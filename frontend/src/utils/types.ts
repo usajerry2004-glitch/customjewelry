@@ -119,6 +119,7 @@ export interface Order {
   salesRepEmail?: string;
   companyId?: string | null;
   companyViewerAccessEnabled?: boolean;
+  viewerEmbedUrl?: string | null;
   source?: string;
   externalOrderId?: string | null;
   createdAt: string;
