@@ -52,9 +52,14 @@ export interface RingBuilderItemDto {
   setting?: string;
   coverage?: string;
   caratTotalWeight?: number;
-  // A rendered preview image of the exact configuration — fetched and saved
-  // as a reference CadFile, same as a customer-uploaded reference image.
+  // Rendered preview image(s) of the exact configuration — e.g. multiple
+  // camera angles from the configurator — fetched and saved as reference
+  // CadFiles, same as a customer-uploaded reference image. imageUrl is kept
+  // for backwards compatibility with the single-image integration already
+  // live; when both are sent, imageUrl is treated as just another angle
+  // (deduped against imageUrls, not sent twice).
   imageUrl?: string;
+  imageUrls?: string[];
   referenceWeblink?: string;
 }
 
@@ -200,14 +205,17 @@ export class RingBuilderOrdersService {
   // image' — the order detail page ([id].tsx) buckets a CadFile into the
   // Reference Files vs. Design Files section by matching that string
   // literally, there's no dedicated isReference column.
-  private async saveReferenceImage(order: Order, imageUrl: string, uploadedBy: string): Promise<void> {
+  // `label` (1-based position among this item's images) just distinguishes
+  // filenames when there's more than one angle — it has no effect on how the
+  // file is categorized or displayed.
+  private async saveReferenceImage(order: Order, imageUrl: string, uploadedBy: string, label = 1): Promise<void> {
     try {
       const res = await fetch(imageUrl);
       if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
       const buffer = Buffer.from(await res.arrayBuffer());
       const contentType = res.headers.get('content-type') || 'image/jpeg';
       const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg';
-      const originalName = `ring-builder-render${ext}`;
+      const originalName = `ring-builder-render-${label}${ext}`;
       const uploaded = await this.spacesService.uploadWithThumbnail(buffer, 'customer-uploads', originalName, contentType);
       await this.cadRepo.save(this.cadRepo.create({
         orderId:       order.id,
@@ -221,7 +229,7 @@ export class RingBuilderOrdersService {
         status: CadFileStatus.UPLOADED,
       }));
     } catch (err) {
-      this.logger.warn(`Failed to save Ring Builder reference image for ${order.poNumber}:`, err);
+      this.logger.warn(`Failed to save Ring Builder reference image ${label} for ${order.poNumber}:`, err);
     }
   }
 
@@ -289,9 +297,10 @@ export class RingBuilderOrdersService {
       }));
       newlyCreated.push(order);
 
-      if (item.imageUrl) {
-        await this.saveReferenceImage(order, item.imageUrl, customer.email);
-      }
+      // imageUrl (legacy single-image field) plus imageUrls (multi-angle),
+      // deduped so a client sending the same URL in both doesn't double it up.
+      const imageUrls = Array.from(new Set([item.imageUrl, ...(item.imageUrls || [])].filter((u): u is string => Boolean(u))));
+      await Promise.all(imageUrls.map((url, i) => this.saveReferenceImage(order, url, customer.email, i + 1)));
 
       results.push({
         externalOrderId: item.externalOrderId,
