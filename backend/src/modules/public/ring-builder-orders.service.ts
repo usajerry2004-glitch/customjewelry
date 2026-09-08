@@ -195,6 +195,11 @@ export class RingBuilderOrdersService {
   // sourced from a URL instead of a multipart upload. Never blocks order
   // creation: a failed fetch just means no reference image, logged and
   // otherwise ignored.
+  //
+  // designerNotes must be exactly 'Reference image' or 'Customer reference
+  // image' — the order detail page ([id].tsx) buckets a CadFile into the
+  // Reference Files vs. Design Files section by matching that string
+  // literally, there's no dedicated isReference column.
   private async saveReferenceImage(order: Order, imageUrl: string, uploadedBy: string): Promise<void> {
     try {
       const res = await fetch(imageUrl);
@@ -212,7 +217,7 @@ export class RingBuilderOrdersService {
         thumbnailPath: uploaded.thumbnailPath,
         uploadedBy,
         revisionNumber: 1,
-        designerNotes: 'Ring Builder configuration render',
+        designerNotes: 'Customer reference image',
         status: CadFileStatus.UPLOADED,
       }));
     } catch (err) {
