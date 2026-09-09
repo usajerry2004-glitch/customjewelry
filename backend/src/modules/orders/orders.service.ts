@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, NotFoundException, ForbiddenException, BadReq
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { Repository, In, Between, Not, SelectQueryBuilder } from 'typeorm';
+import { Repository, In, Between, Not, IsNull, LessThanOrEqual, SelectQueryBuilder } from 'typeorm';
 import { randomBytes, createHmac } from 'crypto';
 import * as Sentry from '@sentry/node';
 import { Order, OrderStatus, StoneStatus, Factory } from '../../database/entities/order.entity';
@@ -22,6 +22,7 @@ import { SkuService } from '../sku/sku.service';
 import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
 import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
+import { businessDaysElapsed } from '../../common/business-days.util';
 
 export { OrderFilterDto };
 
@@ -1013,6 +1014,99 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
+  // ── Monthly feedback digest + follow-ups ──────────────────────────────
+  // Runs every Thursday 9am America/New_York. The digest itself only ever
+  // sends on the first Thursday of the month (day-of-month <= 7 guarantees
+  // that — every other Thursday it's a no-op); follow-ups run every Thursday
+  // regardless, since each is gated on business-days-elapsed from its own
+  // order's feedbackRequestedAt rather than on a calendar date. Combining
+  // both into one cron keeps them from drifting out of sync if one is ever
+  // rescheduled independently.
+  @Cron('0 9 * * 4', { timeZone: 'America/New_York' })
+  async sendScheduledFeedbackDigestAndFollowups(): Promise<void> {
+    const now = new Date();
+    if (now.getDate() <= 7) {
+      await this.sendMonthlyFeedbackDigest(now);
+    }
+    await this.sendFeedbackFollowups(now);
+  }
+
+  // One combined email per customer covering every order they had marked
+  // COMPLETED in the previous calendar month — not one email per order, the
+  // way this used to fire instantly off each individual completion.
+  // feedbackRequestedAt (set on every order in the batch, all to the same
+  // timestamp) is both the "don't re-include next month" guard and the
+  // shared anchor sendFeedbackFollowups uses below.
+  async sendMonthlyFeedbackDigest(now: Date): Promise<void> {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const completed = await this.orderRepo.find({
+      where: { status: OrderStatus.COMPLETED, completedAt: Between(start, end), feedbackRequestedAt: IsNull() },
+    });
+
+    const byCustomer = new Map<string, Order[]>();
+    for (const order of completed) {
+      if (!order.customerEmail || !order.trackingToken) continue;
+      const key = order.customerEmail.toLowerCase();
+      if (!byCustomer.has(key)) byCustomer.set(key, []);
+      byCustomer.get(key)!.push(order);
+    }
+
+    for (const orders of byCustomer.values()) {
+      await this.emailService.sendMonthlyFeedbackDigest({
+        to: orders[0].customerEmail!,
+        customerName: orders[0].customerFullName || orders[0].storeName || 'Valued Customer',
+        orders: orders.map(o => ({ poNumber: o.poNumber, orderType: o.orderType || '—', trackingToken: o.trackingToken! })),
+      }).catch(err => this.logger.warn('Monthly feedback digest email failed:', err));
+
+      await this.orderRepo.update(orders.map(o => o.id), { feedbackRequestedAt: now });
+    }
+  }
+
+  async sendFeedbackFollowups(now: Date): Promise<void> {
+    await this.sendFeedbackFollowupStage(now, 5, 'feedbackFollowup1SentAt');
+    await this.sendFeedbackFollowupStage(now, 10, 'feedbackFollowup2SentAt');
+  }
+
+  // Calendar-day prefilter (LessThanOrEqual) can only over-select, never miss
+  // a row — same reasoning as the CAD approval-stall survey's own cutoff —
+  // with the exact business-day check applied per candidate right after.
+  private async sendFeedbackFollowupStage(
+    now: Date,
+    businessDaysThreshold: number,
+    sentAtField: 'feedbackFollowup1SentAt' | 'feedbackFollowup2SentAt',
+  ): Promise<void> {
+    const cutoff = new Date(now.getTime() - businessDaysThreshold * 24 * 60 * 60 * 1000);
+    const candidates = await this.orderRepo.find({
+      where: {
+        feedbackRequestedAt: LessThanOrEqual(cutoff),
+        feedbackRespondedAt: IsNull(),
+        [sentAtField]: IsNull(),
+      } as any,
+    });
+
+    const byCustomer = new Map<string, Order[]>();
+    for (const order of candidates) {
+      if (!order.feedbackRequestedAt || !order.customerEmail || !order.trackingToken) continue;
+      if (businessDaysElapsed(new Date(order.feedbackRequestedAt), now) < businessDaysThreshold) continue;
+      const key = order.customerEmail.toLowerCase();
+      if (!byCustomer.has(key)) byCustomer.set(key, []);
+      byCustomer.get(key)!.push(order);
+    }
+
+    for (const orders of byCustomer.values()) {
+      await this.emailService.sendMonthlyFeedbackDigest({
+        to: orders[0].customerEmail!,
+        customerName: orders[0].customerFullName || orders[0].storeName || 'Valued Customer',
+        orders: orders.map(o => ({ poNumber: o.poNumber, orderType: o.orderType || '—', trackingToken: o.trackingToken! })),
+        isReminder: true,
+      }).catch(err => this.logger.warn('Feedback digest follow-up email failed:', err));
+
+      await this.orderRepo.update(orders.map(o => o.id), { [sentAtField]: now } as any);
+    }
+  }
+
   async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<Order & { companyViewerAccessEnabled?: boolean }> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
@@ -1572,20 +1666,10 @@ export class OrdersService implements OnModuleInit {
           orderId: updated.id,
         }).catch(err => this.logger.warn('Order delivered email failed:', err));
 
-        // Temporarily disabled — feedback request email paused per request
-        // (2026-09-02). Re-enable by uncommenting below; left the trackingToken
-        // guard/setup intact so nothing else needs to change to turn it back on.
-        // if (updated.trackingToken) {
-        //   this.emailService.sendFeedbackRequest({
-        //     to: updated.customerEmail,
-        //     poNumber: updated.poNumber,
-        //     customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-        //     orderType: updated.orderType || '—',
-        //     trackingToken: updated.trackingToken,
-        //   }).catch(err => this.logger.warn('Feedback request email failed:', err));
-        //   updated.feedbackRequestedAt = new Date();
-        //   await this.orderRepo.update(updated.id, { feedbackRequestedAt: updated.feedbackRequestedAt });
-        // }
+        // Feedback survey is no longer sent per-order here — see
+        // sendMonthlyFeedbackDigest below, which batches this (and every
+        // other order the customer completes this month) into one email on
+        // the first Thursday of next month.
       }
       this.notifyRingBuilderCompleted(updated).catch(err => this.logger.warn('Ring Builder completed-webhook failed:', err));
     }

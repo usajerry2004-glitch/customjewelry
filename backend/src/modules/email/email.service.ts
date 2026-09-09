@@ -682,28 +682,46 @@ export class EmailService {
     });
   }
 
-  // Sent alongside sendOrderDelivered when an order completes — links to the
-  // public, no-login /feedback/:token page (star ratings + a comments box),
-  // not an AMP/interactive-email body: that would only render for Gmail
-  // recipients with the sender pre-registered with Google, so a normal email
-  // linking to a real page is what actually works everywhere.
-  async sendFeedbackRequest(opts: {
+  // Replaces the old instant per-order "How did we do?" email — OrdersService
+  // batches every order a customer completes in a calendar month into one of
+  // these, sent on the first Thursday of the following month, plus up to two
+  // reminders (business-day 5 and 10) for whichever orders in the batch are
+  // still unanswered. Each order keeps its own /feedback/:token link (star
+  // ratings + a comments box) — not an AMP/interactive-email body, since that
+  // only renders for Gmail recipients with the sender pre-registered with
+  // Google, so a normal email linking to a real page is what actually works
+  // everywhere.
+  async sendMonthlyFeedbackDigest(opts: {
     to: string;
-    poNumber: string;
     customerName: string;
-    orderType: string;
-    trackingToken: string;
+    orders: { poNumber: string; orderType: string; trackingToken: string }[];
+    isReminder?: boolean;
   }) {
-    const link = this.feedbackUrl(opts.trackingToken);
+    const count = opts.orders.length;
+    const orderRows = opts.orders.map(o => `
+      <div style="border:1px solid #E8E4DC;border-radius:8px;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;color:#1A2740;font-size:13px">${o.poNumber}</div>
+          <div style="font-size:12px;color:#6B7280">${o.orderType || '—'}</div>
+        </div>
+        <a href="${this.feedbackUrl(o.trackingToken)}" style="${btnStyle('#C09B58')}">Share Feedback →</a>
+      </div>
+    `).join('');
+
+    const intro = opts.isReminder
+      ? `We still haven't heard back on ${count === 1 ? 'the order' : `${count} orders`} below — it only takes a minute each, and we'd really value your thoughts.`
+      : `You had ${count} order${count === 1 ? '' : 's'} completed with us this past month — we'd love to hear how each one went.`;
+
     return this.send({
       to: opts.to,
-      subject: `How did we do? — ${opts.poNumber}`,
+      subject: opts.isReminder
+        ? `Reminder — we'd still love your feedback${count > 1 ? ` (${count} orders)` : ''}`
+        : `How did we do? — your completed order${count === 1 ? '' : 's'} this month`,
       html: emailLayout(`
-        <h2 style="color:#C09B58;margin:0 0 16px">We'd Love Your Feedback</h2>
+        <h2 style="color:#C09B58;margin:0 0 16px">${opts.isReminder ? 'Just Checking In' : "We'd Love Your Feedback"}</h2>
         <p>Hi ${opts.customerName},</p>
-        <p>Now that your order has been completed, we'd love to hear how everything went. It only takes a minute and helps us keep improving.</p>
-        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
-        <a href="${link}" style="${btnStyle('#C09B58')}">Share Your Feedback →</a>
+        <p>${intro}</p>
+        ${orderRows}
       `),
     });
   }

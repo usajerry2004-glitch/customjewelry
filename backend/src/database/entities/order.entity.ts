@@ -311,14 +311,29 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   approvalStallRespondedAt: Date | null;
 
-  // Post-completion feedback survey — emailed once, when the order moves to
-  // COMPLETED (see OrdersService.updateStatus). Three 1-5 ratings plus a free-
-  // text "how can we improve" answer, all optional until the customer submits.
+  // Post-completion feedback survey — NOT sent per-order anymore. Instead,
+  // OrdersService.sendMonthlyFeedbackDigest batches every order a customer
+  // completed in a calendar month into one email, sent on the first Thursday
+  // of the following month; feedbackRequestedAt is that batch's send date,
+  // shared by every order in it, and also the anchor for the two follow-ups
+  // below. Three 1-5 ratings plus a free-text "how can we improve" answer,
+  // all optional until the customer submits (see EmailService.feedbackUrl —
+  // still one link per order, unchanged by the batching).
   @Column({ type: 'timestamp', nullable: true })
   feedbackRequestedAt: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })
   feedbackRespondedAt: Date | null;
+
+  // First follow-up: sent on the first Thursday on/after 5 business days
+  // past feedbackRequestedAt, only if still no response. Second follow-up:
+  // same, at 10 business days. Both independently anchored to the original
+  // feedbackRequestedAt, not to each other.
+  @Column({ type: 'timestamp', nullable: true })
+  feedbackFollowup1SentAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  feedbackFollowup2SentAt: Date | null;
 
   @Column({ type: 'int', nullable: true })
   feedbackExperienceRating: number | null;
