@@ -61,6 +61,13 @@ const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail'
 // Admin-only fields editable via PUT /orders/:id outside the status-change flow
 const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isPriorityCustomer', 'viewerEmbedUrl'];
 
+// The only fields a FACTORY_MANAGER may set via PUT /orders/:id (the Shipping
+// card on the order detail page) — that endpoint otherwise accepts any Partial<Order>
+// field for its normally-allowed roles (Admin/Sales Rep/Authorizer), so a
+// Factory Manager's access is capped to this allowlist rather than opened to
+// the whole endpoint.
+const FACTORY_MANAGER_EDITABLE_KEYS = ['trackingNumber', 'shippedDate', 'shipMethod', 'qcDone'];
+
 // Human-readable labels for the CSV export — mirrors STATUS_CONFIG/
 // SUPPLY_SOURCE_CONFIG/FACTORY_CONFIG in frontend/src/utils/types.ts, since
 // the export should read the way the order detail page reads.
@@ -1328,6 +1335,13 @@ export class OrdersService implements OnModuleInit {
 
   async update(id: string, dto: Partial<Order>, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.findOne(id, user);
+    // Factory Manager only reaches this endpoint for the Shipping card (tracking
+    // number/ship date/ship via/QC done) — capped to that allowlist rather than
+    // the full Partial<Order> body every other allowed role can send.
+    if (user?.role === UserRole.FACTORY_MANAGER
+        && Object.keys(dto).some(k => !FACTORY_MANAGER_EDITABLE_KEYS.includes(k))) {
+      throw new ForbiddenException('Factory Manager can only update shipping details.');
+    }
     if (dto.committedShipDate !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can set the committed ship date.');

@@ -235,9 +235,9 @@ export class OrdersController {
   }
 
   @Put(':id')
-  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER)
+  @Roles(UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.FACTORY_MANAGER)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Update order' })
+  @ApiOperation({ summary: 'Update order (Factory Manager is further capped to shipping fields only — see OrdersService.update)' })
   update(@Param('id') id: string, @Body() dto: Partial<Order>, @Request() req: any) {
     return this.ordersService.update(id, dto, req.user);
   }
