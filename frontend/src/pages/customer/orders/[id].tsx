@@ -73,6 +73,9 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cad.originalName}</div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '2px', alignItems: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
+                {cad.revisionNumber > 1 && (
+                  <span style={{ fontSize: '11px', background: 'rgba(139,92,246,0.15)', color: '#8B5CF6', padding: '1px 8px', borderRadius: '99px', fontWeight: 700 }}>Revised</span>
+                )}
                 <span style={{ fontSize: '11px', background: `${cs.color}18`, color: cs.color, padding: '1px 8px', borderRadius: '99px', fontWeight: 700 }}>{cs.label}</span>
                 {cads.length > 1 && (
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{idx + 1} / {cads.length}</span>
@@ -534,6 +537,9 @@ export default function CustomerOrderDetail() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
                               <span style={{ fontSize: '10px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', padding: '2px 8px', borderRadius: '99px' }}>Awaiting Your Approval</span>
+                              {cad.revisionNumber > 1 && (
+                                <span style={{ fontSize: '10px', background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>Revised</span>
+                              )}
                               <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
                             </div>
                             {cad.designerNotes && cad.designerNotes !== 'Reference image' && (
@@ -597,6 +603,9 @@ export default function CustomerOrderDetail() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{cad.originalName}</span>
                             <span style={{ fontSize: '10px', background: `${cs.color}15`, color: cs.color, padding: '2px 8px', borderRadius: '99px' }}>{cs.label}</span>
+                            {cad.revisionNumber > 1 && (
+                              <span style={{ fontSize: '10px', background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>Revised</span>
+                            )}
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Rev #{cad.revisionNumber}</span>
                           </div>
                           {cad.designerNotes && cad.designerNotes !== 'Reference image' && (

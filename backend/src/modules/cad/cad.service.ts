@@ -674,11 +674,6 @@ export class CadService {
     return this.cadRepo.find({ order: { createdAt: 'DESC' } });
   }
 
-  async isVisibleToCustomer(orderId: string): Promise<boolean> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    return !!(order?.sentToCustomer);
-  }
-
   async assertCustomerOwnsOrder(orderId: string, customer: { email: string; id?: string; companyId?: string | null }): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     const owns = !!order && (
