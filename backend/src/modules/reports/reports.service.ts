@@ -7,7 +7,7 @@ import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity'
 import { OrderEvent } from '../../database/entities/order-event.entity';
 import { UserRole } from '../../database/entities/user.entity';
 import { EmailService } from '../email/email.service';
-import { buildWeeklyReportPdf, WeeklyStats } from './weekly-report-pdf.util';
+import { buildWeeklyReportPdf, SalesPeriodSummary, WeeklyStats } from './weekly-report-pdf.util';
 
 const REFERENCE_NOTE_TAGS = new Set(['Reference image', 'Customer reference image']);
 const MANUFACTURING_LIMIT_DAYS = 6;
@@ -89,13 +89,14 @@ export class ReportsService {
     const prevWeekEnd = new Date(weekStart.getTime() - 1);
     const prevWeekStart = new Date(weekStart.getTime() - 7 * DAY_MS);
 
-    const [core, prevCore, designers, stages, shippedThisWeek, customerGroups] = await Promise.all([
+    const [core, prevCore, designers, stages, shippedThisWeek, customerGroups, salesSummary] = await Promise.all([
       this.computeCoreMetrics(weekStart, weekEnd),
       this.computeCoreMetrics(prevWeekStart, prevWeekEnd),
       this.computeDesignerStats(weekStart, weekEnd),
       this.computeStageDurations(weekStart, weekEnd),
       this.getShippedRecords(weekStart, weekEnd),
       this.computeCustomerGroups(weekStart, weekEnd),
+      this.getSalesSummaries(weekStart, weekEnd),
     ]);
 
     const onTimeJudged = shippedThisWeek.filter(s => s.onTime !== null);
@@ -172,6 +173,59 @@ export class ReportsService {
       topCustomers,
       leadCustomerName: topCustomers[0]?.name || null,
       leadCustomerOrders: topCustomers[0]?.orders || null,
+      salesSummary,
+    };
+  }
+
+  // "Pcs" is total order count (each order = one piece for this summary).
+  // Customer grouping uses the same key as computeCustomerGroups so the
+  // counts line up with the "CUSTOMERS THIS WEEK" table above. No
+  // status/isArchived filter, matching that table's existing behavior (it
+  // counts every order created in the window, cancelled or $0 ones included).
+  private async computeSalesSummary(start: Date, end: Date): Promise<{ customers: number; pcs: number; value: number }> {
+    const orders = await this.orderRepo.find({ where: { createdAt: Between(start, end) } });
+    const customerKeys = new Set<string>();
+    let value = 0;
+    for (const o of orders) {
+      customerKeys.add(o.companyId || o.customerId || o.customerEmail || o.id);
+      value += o.quotedCost ? Number(o.quotedCost) : 0;
+    }
+    return { customers: customerKeys.size, pcs: orders.length, value };
+  }
+
+  private fmtMonthYear(d: Date): string {
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+
+  // Anchored on weekEnd (the last day this report's data actually covers),
+  // not "now" — the report always sends the Monday after, so "now" would
+  // pull in a few hours of the new week that the rest of the report doesn't
+  // reflect yet.
+  private async getSalesSummaries(weekStart: Date, weekEnd: Date): Promise<{
+    lastWeek: SalesPeriodSummary;
+    monthToDate: SalesPeriodSummary;
+    lastMonth: SalesPeriodSummary;
+    yearToDate: SalesPeriodSummary;
+  }> {
+    const monthStart = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), 1, 0, 0, 0, 0);
+    const lastMonthStart = new Date(weekEnd.getFullYear(), weekEnd.getMonth() - 1, 1, 0, 0, 0, 0);
+    const lastMonthEnd = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), 0, 23, 59, 59, 999);
+    const yearStart = new Date(weekEnd.getFullYear(), 0, 1, 0, 0, 0, 0);
+
+    const weekRange = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+    const [lastWeek, monthToDate, lastMonth, yearToDate] = await Promise.all([
+      this.computeSalesSummary(weekStart, weekEnd),
+      this.computeSalesSummary(monthStart, weekEnd),
+      this.computeSalesSummary(lastMonthStart, lastMonthEnd),
+      this.computeSalesSummary(yearStart, weekEnd),
+    ]);
+
+    return {
+      lastWeek: { title: 'Last Week', sublabel: weekRange, ...lastWeek },
+      monthToDate: { title: 'Month to Date', sublabel: this.fmtMonthYear(weekEnd), ...monthToDate },
+      lastMonth: { title: 'Last Month', sublabel: this.fmtMonthYear(lastMonthStart), ...lastMonth },
+      yearToDate: { title: 'Year to Date', sublabel: String(weekEnd.getFullYear()), ...yearToDate },
     };
   }
 

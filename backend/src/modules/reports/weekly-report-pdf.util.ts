@@ -19,6 +19,14 @@ export interface TopCustomer {
   orderDetails: { poNumber: string; orderType: string | null; value: number }[];
 }
 
+export interface SalesPeriodSummary {
+  title: string;
+  sublabel: string;
+  customers: number;
+  pcs: number;
+  value: number;
+}
+
 export interface WeeklyStats {
   weekStart: Date;
   weekEnd: Date;
@@ -40,6 +48,12 @@ export interface WeeklyStats {
   topCustomers: TopCustomer[];
   leadCustomerName: string | null;
   leadCustomerOrders: number | null;
+  salesSummary: {
+    lastWeek: SalesPeriodSummary;
+    monthToDate: SalesPeriodSummary;
+    lastMonth: SalesPeriodSummary;
+    yearToDate: SalesPeriodSummary;
+  };
 }
 
 const NAVY = '#1A2740';
@@ -118,6 +132,27 @@ function drawTile(doc: PDFKit.PDFDocument, x: number, y: number, w: number, valu
     .text(label.toUpperCase(), x + 4, y + 31, { width: w - 8, align: 'center', characterSpacing: 0.2 });
   if (trendText) {
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor(trendColor).text(trendText, x, y + 47, { width: w, align: 'center' });
+  }
+}
+
+const SALES_CARD_HEIGHT = 96;
+
+function drawSalesCard(doc: PDFKit.PDFDocument, x: number, y: number, w: number, s: SalesPeriodSummary) {
+  doc.roundedRect(x, y, w, SALES_CARD_HEIGHT, 6).lineWidth(1).strokeColor(BORDER).stroke();
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(GOLD).text(s.title.toUpperCase(), x + 10, y + 10, { width: w - 20, characterSpacing: 0.4 });
+  doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(s.sublabel, x + 10, y + 22, { width: w - 20 });
+  doc.moveTo(x + 10, y + 36).lineTo(x + w - 10, y + 36).lineWidth(0.5).strokeColor(BORDER).stroke();
+
+  const rows: [string, string][] = [
+    ['Customers', String(s.customers)],
+    ['Pcs', String(s.pcs)],
+    ['Value', formatMoney(s.value)],
+  ];
+  let ry = y + 44;
+  for (const [label, val] of rows) {
+    doc.font('Helvetica').fontSize(9).fillColor(TEXT2).text(label, x + 10, ry, { width: w - 20 });
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(NAVY).text(val, x + 10, ry, { width: w - 20, align: 'right' });
+    ry += 15;
   }
 }
 
@@ -304,11 +339,36 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
 
   y = Math.max(leftY, rightY) + 20;
 
+  // pageBottom/pageBreakIfNeeded/ensureRoom are declared here (rather than
+  // right above the customer table that most relies on them) so the sales
+  // summary cards below can also use them — both sections manage their own
+  // page breaks instead of assuming everything fits on one page.
+  const pageBottom = doc.page.height - MARGIN;
+
+  // Starts a fresh page if `needed` more points of room aren't left, with no
+  // other side effect — used once, up front, before anything has been drawn
+  // yet so there's no running header to continue.
+  function pageBreakIfNeeded(needed: number): boolean {
+    if (y + needed <= pageBottom) return false;
+    doc.addPage();
+    y = MARGIN;
+    return true;
+  }
+
+  // ── Sales summary ──
+  pageBreakIfNeeded(18 + SALES_CARD_HEIGHT + 16);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('SALES SUMMARY', MARGIN, y, { characterSpacing: 0.8 });
+  y += 18;
+  const salesCardGap = 8;
+  const salesCardW = (CONTENT_WIDTH - salesCardGap * 3) / 4;
+  const salesCards = [s.salesSummary.lastWeek, s.salesSummary.monthToDate, s.salesSummary.lastMonth, s.salesSummary.yearToDate];
+  salesCards.forEach((card, i) => drawSalesCard(doc, MARGIN + i * (salesCardW + salesCardGap), y, salesCardW, card));
+  y += SALES_CARD_HEIGHT + 20;
+
   // This section now lists every customer with an order this week (not just
   // the top 3) plus every individual order under each — for a busy week that
   // can run to several pages, so unlike the fixed single-page layout above,
   // it manages its own page breaks rather than assuming everything fits.
-  const pageBottom = doc.page.height - MARGIN;
   const custCols = [
     { label: 'CUSTOMER', w: CONTENT_WIDTH - 260, align: 'left' as const },
     { label: 'ORDERS', w: 80, align: 'right' as const },
@@ -326,16 +386,6 @@ export async function buildWeeklyReportPdf(s: WeeklyStats): Promise<Buffer> {
     y += 12;
     doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_WIDTH, y).lineWidth(0.75).strokeColor(BORDER).stroke();
     y += 8;
-  }
-
-  // Starts a fresh page if `needed` more points of room aren't left, with no
-  // other side effect — used once, up front, before anything has been drawn
-  // yet so there's no running header to continue.
-  function pageBreakIfNeeded(needed: number): boolean {
-    if (y + needed <= pageBottom) return false;
-    doc.addPage();
-    y = MARGIN;
-    return true;
   }
 
   // Same, but re-draws the running column header for continuity — for use
