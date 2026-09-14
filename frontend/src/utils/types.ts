@@ -103,6 +103,7 @@ export interface Order {
   customerCode?: string | null;
   customerCodeName?: string | null;
   committedShipDate?: string | null;
+  factoryCommittedDate?: string | null;
   shippedDate?: string | null;
   shipMethod?: string | null;
   qcDone?: boolean;

@@ -583,6 +583,8 @@ export default function OrderDetail() {
   const [savingPo, setSavingPo] = useState(false);
   const [shipDateInput, setShipDateInput] = useState('');
   const [savingShipDate, setSavingShipDate] = useState(false);
+  const [factoryShipDateInput, setFactoryShipDateInput] = useState('');
+  const [savingFactoryShipDate, setSavingFactoryShipDate] = useState(false);
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [shippedDateInput, setShippedDateInput] = useState('');
   const [shipViaInput, setShipViaInput] = useState('');
@@ -719,6 +721,7 @@ export default function OrderDetail() {
           setCustomerCodeInput(o.customerCode ? `${o.customerCodeName || ''} (${o.customerCode})` : '');
           setCustomerPoInput(o.refCustomerPo || '');
           setShipDateInput(o.committedShipDate ? String(o.committedShipDate).slice(0, 10) : '');
+          setFactoryShipDateInput(o.factoryCommittedDate ? String(o.factoryCommittedDate).slice(0, 10) : '');
           setTrackingNumberInput(o.trackingNumber || '');
           setShippedDateInput(o.shippedDate ? String(o.shippedDate).slice(0, 10) : '');
           setShipViaInput(o.shipMethod || '');
@@ -1014,6 +1017,27 @@ export default function OrderDetail() {
       toast.error('Failed to save committed ship date — check your connection and try again.');
     } finally {
       setSavingShipDate(false);
+    }
+  };
+
+  const saveFactoryCommittedDate = async () => {
+    if (!order?.id || !factoryShipDateInput) return;
+    setSavingFactoryShipDate(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ factoryCommittedDate: factoryShipDateInput }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save factory committed date.'));
+      }
+    } catch {
+      toast.error('Failed to save factory committed date — check your connection and try again.');
+    } finally {
+      setSavingFactoryShipDate(false);
     }
   };
 
@@ -2352,6 +2376,41 @@ export default function OrderDetail() {
                 <div style={{ fontSize: '20px', fontWeight: 700, color: order.committedShipDate ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
                   {order.committedShipDate
                     ? new Date(order.committedShipDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Not set yet'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Factory Committed Date — internal-only estimate from the assigned
+              Factory Manager (or Admin), separate from the customer-facing
+              Committed Ship Date above. Never shown on the customer portal. */}
+          {userRole !== UserRole.CUSTOMER
+            && ![OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED].includes(order.status!) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Factory Committed Date
+              </div>
+              {(userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.ADMIN) ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={factoryShipDateInput}
+                    onChange={e => setFactoryShipDateInput(e.target.value)}
+                    style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={saveFactoryCommittedDate}
+                    disabled={savingFactoryShipDate || !factoryShipDateInput}
+                    style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (savingFactoryShipDate || !factoryShipDateInput) ? 0.5 : 1 }}
+                  >
+                    {savingFactoryShipDate ? '…' : 'Save'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '20px', fontWeight: 700, color: order.factoryCommittedDate ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'Cormorant Garamond, Georgia, serif' }}>
+                  {order.factoryCommittedDate
+                    ? new Date(order.factoryCommittedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                     : 'Not set yet'}
                 </div>
               )}

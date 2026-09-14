@@ -66,7 +66,7 @@ const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isP
 // field for its normally-allowed roles (Admin/Sales Rep/Authorizer), so a
 // Factory Manager's access is capped to this allowlist rather than opened to
 // the whole endpoint.
-const FACTORY_MANAGER_EDITABLE_KEYS = ['trackingNumber', 'shippedDate', 'shipMethod', 'qcDone'];
+const FACTORY_MANAGER_EDITABLE_KEYS = ['trackingNumber', 'shippedDate', 'shipMethod', 'qcDone', 'factoryCommittedDate'];
 
 // Human-readable labels for the CSV export — mirrors STATUS_CONFIG/
 // SUPPLY_SOURCE_CONFIG/FACTORY_CONFIG in frontend/src/utils/types.ts, since
@@ -200,6 +200,7 @@ const TRACKED_FIELD_LABELS: Record<string, string> = {
   quotedCost: 'Price',
   customerCode: 'Customer number',
   committedShipDate: 'Ship date',
+  factoryCommittedDate: 'Factory committed date',
   metalType: 'Metal type',
   metalColor: 'Metal color',
   size: 'Size',
@@ -1345,6 +1346,10 @@ export class OrdersService implements OnModuleInit {
     if (dto.committedShipDate !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can set the committed ship date.');
+    }
+    if (dto.factoryCommittedDate !== undefined
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.FACTORY_MANAGER) {
+      throw new ForbiddenException('Only Factory Manager or Admin can set the factory committed date.');
     }
     if (EDITABLE_SPEC_KEYS.some(k => (dto as any)[k] !== undefined)
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {

@@ -204,6 +204,13 @@ export class Order {
   @Column({ type: 'date', nullable: true })
   committedShipDate: string;
 
+  // Internal-only estimate set by the assigned Factory Manager (or Admin) —
+  // distinct from committedShipDate, which is the customer-facing promised
+  // date. Never surfaced on the customer portal or public tracking endpoint,
+  // only on the internal order detail page.
+  @Column({ type: 'date', nullable: true })
+  factoryCommittedDate: string | null;
+
   // The actual date the order left the building — distinct from committedShipDate,
   // which is the promised date set ahead of time.
   @Column({ type: 'date', nullable: true })
