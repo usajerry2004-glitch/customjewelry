@@ -1939,6 +1939,35 @@ export default function OrderDetail() {
                           ✕
                         </button>
                       )}
+                      {/* Admin-only override — approved/rejected files are otherwise
+                          undeletable (preserves a record of what was approved), so
+                          this requires a reason, which the backend logs to the
+                          order's audit trail rather than silently deleting. */}
+                      {userRole === UserRole.ADMIN &&
+                        (cad.status === 'APPROVED' || cad.status === 'REJECTED') && (
+                        <button
+                          onClick={async () => {
+                            const reason = window.prompt(
+                              `"${cad.originalName}" (Rev #${cad.revisionNumber}) is ${cs.label}. Deleting it is permanent and will be logged to this order's audit trail.\n\nReason for deleting it:`,
+                            );
+                            if (reason === null) return;
+                            if (!reason.trim()) { toast.error('A reason is required to delete an approved or rejected file.'); return; }
+                            const res = await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
+                            if (res.ok) {
+                              const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                              if (cRes.ok) setCads(await cRes.json());
+                            } else {
+                              toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to delete file.'));
+                            }
+                          }}
+                          title={`Delete ${cs.label.toLowerCase()} file (Admin override)`}
+                          style={{ background: 'transparent', border: 'none', padding: '4px 6px', fontSize: '14px', color: '#9CA3AF', cursor: 'pointer', lineHeight: 1, borderRadius: '4px' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#9CA3AF')}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

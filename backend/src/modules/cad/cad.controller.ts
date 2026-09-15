@@ -154,9 +154,9 @@ export class CadController {
   @Delete(':id')
   @Roles(UserRole.CAD_DESIGNER, UserRole.ADMIN)
   @UseGuards(RolesGuard)
-  @ApiOperation({ summary: 'Delete a CAD file (CAD Designer or Admin, only if not yet approved/rejected)' })
-  async deleteFile(@Param('id') id: string) {
-    await this.cadService.deleteFile(id);
+  @ApiOperation({ summary: 'Delete a CAD file (CAD Designer or Admin, only if not yet approved/rejected — Admin may force-delete an approved/rejected file by also giving a reason)' })
+  async deleteFile(@Param('id') id: string, @Body('reason') reason: string, @Request() req: any) {
+    await this.cadService.deleteFile(id, req.user, reason);
     return { deleted: true };
   }
 

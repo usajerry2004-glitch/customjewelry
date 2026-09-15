@@ -662,10 +662,22 @@ export class CadService {
     return saved;
   }
 
-  async deleteFile(id: string): Promise<void> {
+  // Approved/rejected files are normally undeletable — that's what preserves
+  // a record of exactly what a customer approved. Admin can override this
+  // (e.g. a file approved by mistake) but only with a reason, which gets
+  // logged to the order's audit trail so the correction itself isn't silent.
+  async deleteFile(id: string, requestedBy?: { id?: string; email?: string; role?: string }, reason?: string): Promise<void> {
     const cad = await this.findOne(id);
-    if (cad.status === CadFileStatus.APPROVED || cad.status === CadFileStatus.REJECTED) {
-      throw new ForbiddenException('Cannot delete a file that has already been approved or rejected');
+    const isLocked = cad.status === CadFileStatus.APPROVED || cad.status === CadFileStatus.REJECTED;
+    if (isLocked) {
+      if (requestedBy?.role !== UserRole.ADMIN) {
+        throw new ForbiddenException('Cannot delete a file that has already been approved or rejected');
+      }
+      if (!reason?.trim()) {
+        throw new BadRequestException('A reason is required to delete an approved or rejected CAD file.');
+      }
+      this.logEvent(cad.orderId, 'CAD_FILE_DELETED', requestedBy, cad.status, undefined,
+        `${requestedBy.email || 'Admin'} deleted ${cad.status.toLowerCase()} file "${cad.originalName}" (Rev #${cad.revisionNumber ?? '—'}): ${reason.trim()}`);
     }
     await this.cadRepo.delete(id);
   }
