@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { OrderCard } from '../../components/orders/OrderCard';
 import { Order, STATUS_CONFIG, getCadSubLabel } from '../../utils/types';
-import { apiFetch, API } from '../../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
+import { toast } from '../../utils/toast';
 
 interface KanbanColumn { status: string; orders: Partial<Order>[]; count: number; }
 
@@ -61,6 +62,7 @@ export default function KanbanPage() {
   const [userRole, setUserRole] = useState('');
   const [cadCounts, setCadCounts] = useState<Record<string, number>>({});
   const [cadSubFilter, setCadSubFilter] = useState<string | null>(null);
+  const [resyncing, setResyncing] = useState(false);
 
   useEffect(() => {
     try { const u = localStorage.getItem('jf_user'); if (u) setUserRole(JSON.parse(u).role || ''); } catch {}
@@ -104,6 +106,44 @@ export default function KanbanPage() {
     });
   };
 
+  // Admin-only fix for a "Pending CAD" (or other CAD sub-bucket) count that
+  // looks stuck — resyncs every CAD_IN_PROGRESS order's cached stage fields
+  // from what its actual CAD files say, then refetches so the board reflects
+  // the correction immediately.
+  const resyncCadStages = async () => {
+    setResyncing(true);
+    try {
+      const res = await apiFetch(`${API}/cad/reconcile-stages`, { method: 'POST' });
+      if (!res.ok) {
+        toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to resync CAD stages.'));
+        return;
+      }
+      const result: { checked: number; corrected: { orderId: string; poNumber: string; from: string; to: string }[] } = await res.json();
+      toast.success(
+        result.corrected.length
+          ? `Resynced ${result.corrected.length} of ${result.checked} orders — counts updated.`
+          : `Checked ${result.checked} orders — everything already matched, nothing to fix.`,
+      );
+      const [kanbanRes, cadRes] = await Promise.all([
+        apiFetch(`${API}/orders/kanban`),
+        apiFetch(`${API}/cad/status-counts`),
+      ]);
+      if (kanbanRes.ok) {
+        const data: KanbanColumn[] = await kanbanRes.json();
+        setColumns(
+          [...data]
+            .sort((a, b) => COLUMN_ORDER.indexOf(a.status) - COLUMN_ORDER.indexOf(b.status))
+            .filter(col => COLUMN_ORDER.includes(col.status)),
+        );
+      }
+      if (cadRes.ok) setCadCounts(await cadRes.json());
+    } catch {
+      toast.error('Failed to resync CAD stages — check your connection and try again.');
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   const getColumn = (status: string) => columns.find(c => c.status === status);
   const rawSelectedCol = getColumn(selected);
   const selectedCol = selected === 'CAD_IN_PROGRESS' && cadSubFilter
@@ -119,12 +159,24 @@ export default function KanbanPage() {
       title="Pipeline Board"
       subtitle={`${totalOrders} active orders · ${columns.length} stages`}
       actions={
-        <button
-          onClick={() => router.push('/orders')}
-          style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
-        >
-          ☰ List view
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {userRole === 'ADMIN' && (
+            <button
+              onClick={resyncCadStages}
+              disabled={resyncing}
+              title="Resync CAD_IN_PROGRESS orders' Pending/Awaiting Quote/Awaiting Approval/Revision bucket from their actual CAD file status"
+              style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: resyncing ? 'not-allowed' : 'pointer', fontWeight: 500, opacity: resyncing ? 0.6 : 1 }}
+            >
+              {resyncing ? '…' : '🔄 Resync CAD Stages'}
+            </button>
+          )}
+          <button
+            onClick={() => router.push('/orders')}
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 16px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}
+          >
+            ☰ List view
+          </button>
+        </div>
       }
     >
       {loading ? (

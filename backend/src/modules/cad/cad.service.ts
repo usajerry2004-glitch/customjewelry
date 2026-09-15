@@ -334,6 +334,60 @@ export class CadService {
     return this.orderRepo.findOne({ where: { id: orderId } }) as Promise<Order>;
   }
 
+  // Resyncs cadSubStatus/sentToCustomer for every CAD_IN_PROGRESS order from
+  // what its actual CAD files say — the fix for orders where those two cached
+  // fields drifted from reality (historically possible before
+  // notifyBatchUploaded()'s PRE_VPO_STATUSES guard existed) and have stayed
+  // stuck under the wrong bucket ever since, since nothing else re-derives
+  // them. Ground truth is the order's most recently uploaded non-reference
+  // file — older files are history from a prior revision cycle, not the
+  // order's current stage. Only orders that actually disagree are touched,
+  // and each correction is logged to that order's audit trail, so this is
+  // safe to run repeatedly (a no-op once nothing disagrees).
+  async reconcileCadSubStages(user?: { id?: string; email?: string; role?: string }): Promise<{
+    checked: number;
+    corrected: { orderId: string; poNumber: string; from: string; to: string }[];
+  }> {
+    if (user?.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only Admin can resync CAD stages.');
+    }
+
+    const orders = await this.orderRepo.find({ where: { status: OrderStatus.CAD_IN_PROGRESS } });
+    const corrected: { orderId: string; poNumber: string; from: string; to: string }[] = [];
+
+    for (const order of orders) {
+      const files = await this.cadRepo.find({ where: { orderId: order.id }, order: { createdAt: 'DESC' } });
+      const latest = files.find(f => f.designerNotes !== 'Reference image' && f.designerNotes !== 'Customer reference image');
+
+      let target: { cadSubStatus: string | null; sentToCustomer: boolean } | null = null;
+      if (!latest) {
+        target = { cadSubStatus: null, sentToCustomer: false };
+      } else if (latest.status === CadFileStatus.REVISION_REQUESTED) {
+        target = { cadSubStatus: 'REVISION', sentToCustomer: false };
+      } else if (latest.status === CadFileStatus.SENT_FOR_APPROVAL) {
+        target = { cadSubStatus: 'UPLOADED', sentToCustomer: true };
+      } else if (latest.status === CadFileStatus.UPLOADED) {
+        target = { cadSubStatus: 'UPLOADED', sentToCustomer: false };
+      }
+      // The latest file being APPROVED/REJECTED while the order is still
+      // CAD_IN_PROGRESS is a different, deeper inconsistency (the order
+      // should have moved on already) — left alone here rather than guessed at.
+      if (!target) continue;
+
+      const currentCadSubStatus = order.cadSubStatus ?? null;
+      if (currentCadSubStatus === target.cadSubStatus && order.sentToCustomer === target.sentToCustomer) continue;
+
+      const from = `cadSubStatus=${currentCadSubStatus ?? 'null'}, sentToCustomer=${order.sentToCustomer}`;
+      const to = `cadSubStatus=${target.cadSubStatus ?? 'null'}, sentToCustomer=${target.sentToCustomer}`;
+      await this.orderRepo.update(order.id, { cadSubStatus: target.cadSubStatus, sentToCustomer: target.sentToCustomer });
+      this.logEvent(order.id, 'CAD_STAGE_RESYNCED', user, undefined, undefined,
+        `CAD stage resynced from actual file status (${from} → ${to})`);
+      corrected.push({ orderId: order.id, poNumber: order.poNumber, from, to });
+    }
+
+    return { checked: orders.length, corrected };
+  }
+
   // Admin/Authorizer manually nudges a customer who hasn't approved/rejected yet.
   // Rate-limited to once per 24h (checked against the last approval or reminder email).
   async sendApprovalReminder(orderId: string): Promise<{ sent: true }> {
@@ -716,14 +770,24 @@ export class CadService {
     return map;
   }
 
+  // Mirrors getCadSubLabel() (frontend/src/utils/types.ts) exactly, including
+  // its priority order — sentToCustomer is the authoritative "customer can
+  // see this" signal and is checked first, ahead of cadSubStatus, since
+  // cadSubStatus can lag behind it (e.g. a manual file-status fix that
+  // skipped that field). Previously this split UPLOADED into Awaiting
+  // Quote/Approval by whether quotedCost was set, which drifts from reality
+  // whenever a price is entered before the files are actually sent to the
+  // customer — that made this aggregate disagree with every per-order label
+  // in the app and could leave orders parked under the wrong bucket here
+  // indefinitely.
   async getStatusCounts(): Promise<Record<string, number>> {
     const rows: { label: string; count: string }[] = await this.orderRepo.query(`
       SELECT
         CASE
+          WHEN "sentToCustomer" = true                                        THEN 'AWAITING_APPROVAL'
           WHEN "cadSubStatus" IS NULL                                         THEN 'PENDING_CAD'
           WHEN "cadSubStatus" = 'REVISION'                                    THEN 'REVISION'
-          WHEN "cadSubStatus" = 'UPLOADED' AND "quotedCost" IS NOT NULL       THEN 'AWAITING_APPROVAL'
-          WHEN "cadSubStatus" = 'UPLOADED' AND "quotedCost" IS NULL           THEN 'AWAITING_QUOTE'
+          WHEN "cadSubStatus" = 'UPLOADED'                                    THEN 'AWAITING_QUOTE'
           ELSE "cadSubStatus"
         END AS label,
         COUNT(*) AS count

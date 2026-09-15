@@ -22,6 +22,14 @@ export class CadController {
     return this.cadService.getStatusCounts();
   }
 
+  @Post('reconcile-stages')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: "Admin: resync CAD_IN_PROGRESS orders' cadSubStatus/sentToCustomer from their actual CAD file status, fixing any that have drifted out of sync (e.g. a 'Pending CAD' count that never moves)" })
+  async reconcileCadSubStages(@Request() req: any) {
+    return this.cadService.reconcileCadSubStages(req.user);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER)
   @UseGuards(RolesGuard)
