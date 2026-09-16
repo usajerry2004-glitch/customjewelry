@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 type PeriodType = 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
-type TileKey = 'direct' | 'cads' | 'samples' | 'rejected' | 'revisions' | 'inProgress' | 'totalRevisions';
+type TileKey = 'direct' | 'cads' | 'samples' | 'rejected' | 'revisions' | 'inProgress';
 // The four "simple metric" tiles all share the same {byPerson,byCustomer,byTime}
 // shape (uploaded + one outcome field) and the same made-this-period cohort as
 // CADs Made, so they render through one shared code path below.
@@ -17,20 +17,16 @@ interface CadTimeAgg { bucket: string; made: number; approved: number; rejected:
 interface SimpleMetricPersonAgg { name: string; uploaded: number; [metric: string]: string | number }
 interface SimpleMetricCustomerAgg { name: string; [metric: string]: string | number }
 interface SimpleMetricTimeAgg { bucket: string; [metric: string]: string | number }
-interface CountPersonAgg { name: string; count: number }
-interface CountCustomerAgg { name: string; count: number }
-interface CountTimeAgg { bucket: string; count: number }
 
 interface ReportData {
   period: { type: PeriodType; from: string; to: string; label: string };
-  kpis: { directOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; rejected: Kpi; awaitingRevision: Kpi; inProgress: Kpi; totalRevisions: Kpi };
+  kpis: { directOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; rejected: Kpi; awaitingRevision: Kpi; inProgress: Kpi };
   direct: { byCustomer: DirectCustomerGroup[] };
   cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[] };
   samples: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
   rejected: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
   revisions: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
   inProgress: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
-  totalRevisions: { byPerson: CountPersonAgg[]; byCustomer: CountCustomerAgg[]; byTime: CountTimeAgg[] };
 }
 
 const CADS_SERIES = [
@@ -62,13 +58,11 @@ const TILES: { key: TileKey; label: string; bg: string; color: string; caption: 
     caption: 'Of the styles made this period, how many currently sit at Revision Requested (not yet resubmitted).' },
   { key: 'inProgress', label: 'Still In Progress', bg: '#FEF3C7', color: '#B45309', inferred: false,
     caption: 'Of the styles made this period, how many have no outcome yet — uploaded or sent for approval, awaiting a decision.' },
-  { key: 'totalRevisions', label: 'Total Revisions', bg: '#FCE7F3', color: '#BE185D', inferred: true,
-    caption: "Revision rounds finished this period — not part of Made above. One style can be revised more than once, and this can include styles made in an earlier period." },
 ];
 
 const TILE_KPI_KEY: Record<TileKey, keyof ReportData['kpis']> = {
   direct: 'directOrders', cads: 'cadsMade', samples: 'samplesApproved', rejected: 'rejected',
-  revisions: 'awaitingRevision', inProgress: 'inProgress', totalRevisions: 'totalRevisions',
+  revisions: 'awaitingRevision', inProgress: 'inProgress',
 };
 
 const cardStyle: React.CSSProperties = {
@@ -181,8 +175,8 @@ export const MonthlyProductionReport: React.FC = () => {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTile, setSelectedTile] = useState<TileKey | null>(null);
-  const [breakdownMode, setBreakdownMode] = useState<Record<Exclude<TileKey, 'direct'>, BreakdownMode>>({ cads: 'person', samples: 'person', rejected: 'person', revisions: 'person', inProgress: 'person', totalRevisions: 'person' });
-  const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', cads: 'simple', samples: 'simple', rejected: 'simple', revisions: 'simple', inProgress: 'simple', totalRevisions: 'simple' });
+  const [breakdownMode, setBreakdownMode] = useState<Record<Exclude<TileKey, 'direct'>, BreakdownMode>>({ cads: 'person', samples: 'person', rejected: 'person', revisions: 'person', inProgress: 'person' });
+  const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', cads: 'simple', samples: 'simple', rejected: 'simple', revisions: 'simple', inProgress: 'simple' });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -244,7 +238,7 @@ export const MonthlyProductionReport: React.FC = () => {
     const mode = breakdownMode[key];
     const view = viewMode[key];
     const color = TILES.find(t => t.key === key)!.color;
-    const simple = key !== 'cads' && key !== 'totalRevisions' ? SIMPLE_METRICS[key] : null;
+    const simple = key !== 'cads' ? SIMPLE_METRICS[key] : null;
 
     let body: React.ReactNode = null;
 
@@ -266,24 +260,6 @@ export const MonthlyProductionReport: React.FC = () => {
                 <tr>
                   <td style={{ ...tdStyle, textAlign: 'left', borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
                   {CADS_SERIES.map(s => <td key={s.key} style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', color: s.color, fontWeight: 700 }}>{data.cads.byTime.reduce((a, b) => a + (b as any)[s.key], 0)}</td>)}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        );
-      } else if (key === 'totalRevisions') {
-        const rows = data.totalRevisions.byTime;
-        const buckets = rows.map(b => b.bucket);
-        const values = rows.map(b => b.count);
-        body = view === 'graph' ? <TimeBarChart buckets={buckets} series={[{ label: 'Total Revisions', color, values }]} unit={unit} /> : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>{unit === 'day' ? 'Day' : 'Month'}</th><th style={thStyle}>Total Revisions</th></tr></thead>
-              <tbody>
-                {rows.map(b => <tr key={b.bucket}><td style={{ ...tdStyle, textAlign: 'left' }}>{bucketFullLabel(b.bucket, unit)}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{b.count}</td></tr>)}
-                <tr>
-                  <td style={{ ...tdStyle, textAlign: 'left', borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
-                  <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', color, fontWeight: 700 }}>{values.reduce((a, b) => a + b, 0)}</td>
                 </tr>
               </tbody>
             </table>
@@ -328,15 +304,6 @@ export const MonthlyProductionReport: React.FC = () => {
             </tbody>
           </table>
         </div>
-      );
-    } else if (key === 'totalRevisions') {
-      const rows = mode === 'person' ? data.totalRevisions.byPerson : data.totalRevisions.byCustomer;
-      body = view === 'graph' ? <div>{rows.map(r => <HBarRow key={r.name} label={r.name} value={r.count} max={Math.max(1, ...rows.map(x => x.count))} color={color} />)}</div> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>{mode === 'person' ? 'CAD Person' : 'Customer'}</th><th style={thStyle}>Total Revisions</th></tr></thead>
-          <tbody>{rows.map(r => <tr key={r.name}><td style={nameCellStyle}>{r.name}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{r.count}</td></tr>)}
-          {rows.length === 0 && <tr><td style={tdStyle} colSpan={2}>No revisions completed this period.</td></tr>}</tbody>
-        </table>
       );
     } else {
       const { metricKey, metricLabel, emptyMsg } = simple!;
@@ -383,8 +350,6 @@ export const MonthlyProductionReport: React.FC = () => {
             ? 'Made / Approved / Rejected / Revised reflect files created this period, by current status.'
             : key === 'samples'
             ? 'A proxy metric — see the note above.'
-            : key === 'totalRevisions'
-            ? 'A throughput count, not part of the Made partition — see the note above.'
             : "Reflects each style's current status, not a one-time completion event — a style can cycle through revision more than once."}
         </div>
       </>

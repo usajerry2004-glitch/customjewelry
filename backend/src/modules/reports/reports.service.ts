@@ -44,7 +44,6 @@ type ProductionPeriodType = 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
 const PRODUCTION_PERIOD_MONTHS: Record<ProductionPeriodType, number> = { monthly: 1, quarterly: 3, halfyearly: 6, yearly: 12 };
 
 interface CadAggregate { made: number; approved: number; rejected: number; revised: number }
-interface RevisionEvent { customer: string; cadPersonName: string; completedAt: Date }
 
 @Injectable()
 export class ReportsService {
@@ -527,7 +526,7 @@ export class ReportsService {
 
   // ── Monthly Production Report ───────────────────────────────────────
   // Direct Orders Received, CADs Made, Samples Approved, Rejected, Awaiting
-  // Revision, Still In Progress. The last five are all read off the exact
+  // Revision, Still In Progress. The last four are all read off the exact
   // same made-in-this-window cohort (see computeProductionWindow's cadRows)
   // so they form one clean partition: Made = Approved + Rejected + Awaiting
   // Revision + Still In Progress — every time, by construction, not just
@@ -538,17 +537,6 @@ export class ReportsService {
   // Made. "Samples Approved" is still a proxy (no physical-sample stage
   // exists in the app); "Awaiting Revision" is a direct read of
   // CadFile.status, not reconstructed from timestamps.
-  //
-  // Total Revisions is a different, deliberately separate kind of number —
-  // not a slice of Made, but a throughput count of revision *rounds*
-  // finished in this window (a style can cycle through revision more than
-  // once, so this can exceed the made-this-window cohort's own size, and can
-  // count a style made in an earlier period). It's inferred: whenever a CAD
-  // file sits at REVISION_REQUESTED and a later file is uploaded for the
-  // same order, that later file's createdAt is treated as the revision's
-  // completion — a batch of several files uploaded together as one response
-  // still only counts once, since only the first of them closes out the
-  // REVISION_REQUESTED file.
 
   async getMonthlyProductionReport(periodType: ProductionPeriodType, anchorMonth: string) {
     const months = PRODUCTION_PERIOD_MONTHS[periodType] || 1;
@@ -558,12 +546,8 @@ export class ReportsService {
     const prevTo = from;
     const prevFrom = new Date(y, m - months * 2, 1);
 
-    // Revision-completion events are inferred from each order's full file history,
-    // not just files created inside the window — compute once, then filter by date.
-    const revisionEvents = await this.computeRevisionEvents();
-
-    const current = await this.computeProductionWindow(from, to, periodType, revisionEvents);
-    const previous = await this.computeProductionWindow(prevFrom, prevTo, periodType, revisionEvents);
+    const current = await this.computeProductionWindow(from, to, periodType);
+    const previous = await this.computeProductionWindow(prevFrom, prevTo, periodType);
 
     const pct = (cur: number, prev: number): number | null => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
     const lastDay = new Date(to.getTime() - DAY_MS);
@@ -581,7 +565,6 @@ export class ReportsService {
         rejected:           { value: current.rejectedTotal, deltaPct: pct(current.rejectedTotal, previous.rejectedTotal), inferred: false },
         awaitingRevision:   { value: current.awaitingRevisionTotal, deltaPct: pct(current.awaitingRevisionTotal, previous.awaitingRevisionTotal), inferred: false },
         inProgress:         { value: current.inProgressTotal, deltaPct: pct(current.inProgressTotal, previous.inProgressTotal), inferred: false },
-        totalRevisions:     { value: current.totalRevisionsTotal, deltaPct: pct(current.totalRevisionsTotal, previous.totalRevisionsTotal), inferred: true },
       },
       direct: current.direct,
       cads: current.cads,
@@ -589,57 +572,7 @@ export class ReportsService {
       rejected: current.rejected,
       revisions: current.revisions,
       inProgress: current.inProgress,
-      totalRevisions: current.totalRevisions,
     };
-  }
-
-  // Every non-reference CAD file, per order, oldest-first — used to detect a
-  // "revision completed" event: a file uploaded right after that same order's
-  // most recent file sat at REVISION_REQUESTED. Scoped to orders that have ever
-  // had a REVISION_REQUESTED file, so this doesn't scan the whole cad_files table.
-  private async computeRevisionEvents(): Promise<RevisionEvent[]> {
-    const revisedOrderIds = await this.cadRepo.createQueryBuilder('cf')
-      .select('cf.orderId', 'orderId')
-      .distinct(true)
-      .where('cf.status = :rev', { rev: CadFileStatus.REVISION_REQUESTED })
-      .getRawMany();
-    const orderIds = revisedOrderIds.map((r: any) => r.orderId);
-    if (!orderIds.length) return [];
-
-    const files = await this.cadRepo.createQueryBuilder('cf')
-      .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
-      .where('cf.orderId IN (:...ids)', { ids: orderIds })
-      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
-      .select('cf.orderId', 'orderId')
-      .addSelect('cf.status', 'status')
-      .addSelect('cf.cadPersonName', 'cadPersonName')
-      .addSelect('cf.createdAt', 'createdAt')
-      .addSelect('o.storeName', 'storeName')
-      .addSelect('o.customerFullName', 'customerFullName')
-      .orderBy('cf.orderId', 'ASC')
-      .addOrderBy('cf.createdAt', 'ASC')
-      .getRawMany();
-
-    const byOrder = new Map<string, any[]>();
-    for (const f of files) {
-      if (!byOrder.has(f.orderId)) byOrder.set(f.orderId, []);
-      byOrder.get(f.orderId)!.push(f);
-    }
-
-    const events: RevisionEvent[] = [];
-    for (const rows of byOrder.values()) {
-      for (let i = 0; i < rows.length - 1; i++) {
-        if (rows[i].status === CadFileStatus.REVISION_REQUESTED) {
-          const next = rows[i + 1];
-          events.push({
-            customer: next.storeName || next.customerFullName || 'Unknown',
-            cadPersonName: next.cadPersonName || 'Unassigned',
-            completedAt: new Date(next.createdAt),
-          });
-        }
-      }
-    }
-    return events;
   }
 
   // Local-calendar-based formatting throughout (never toISOString on a local-constructed
@@ -668,7 +601,7 @@ export class ReportsService {
 
   private emptyCadAgg(): CadAggregate { return { made: 0, approved: 0, rejected: 0, revised: 0 }; }
 
-  private async computeProductionWindow(from: Date, to: Date, periodType: ProductionPeriodType, revisionEvents: RevisionEvent[]) {
+  private async computeProductionWindow(from: Date, to: Date, periodType: ProductionPeriodType) {
     // ── Direct Orders Received — grouped by customer ──
     const directOrders = await this.orderRepo.createQueryBuilder('o')
       .where('o.salesRepName = :webOrder', { webOrder: 'Web Order' })
@@ -763,10 +696,9 @@ export class ReportsService {
     // of style groups. "Approved" is a proxy (no physical-sample stage
     // exists in the app); "Awaiting Revision" is a direct read of each
     // group's current CadFile.status — it means the style is currently
-    // sitting at Revision Requested, not that a revision was finished (see
-    // Total Revisions below for that). "Still In Progress" is whatever's
-    // left of Made once the other three are accounted for (Uploaded or Sent
-    // For Approval, i.e. no outcome yet).
+    // sitting at Revision Requested, not that a revision was finished.
+    // "Still In Progress" is whatever's left of Made once the other three
+    // are accounted for (Uploaded or Sent For Approval, i.e. no outcome yet).
     const inProgressOf = (agg: CadAggregate) => Math.max(0, agg.made - agg.approved - agg.rejected - agg.revised);
 
     const samples = {
@@ -797,35 +729,12 @@ export class ReportsService {
     };
     const inProgressTotal = inProgressOf(cadsTotal);
 
-    // ── Total Revisions — a genuine throughput count of revision *rounds*
-    // finished in this window (pre-computed events, filtered to this window
-    // by completion date). Deliberately NOT part of the Made partition above
-    // — a style can be revised more than once, so this can exceed the size
-    // of the made-this-window cohort, and can count a style made earlier.
-    const windowRevisions = revisionEvents.filter(e => e.completedAt >= from && e.completedAt < to);
-    const totalRevisionsByPerson = new Map<string, number>();
-    const totalRevisionsByCustomer = new Map<string, number>();
-    const totalRevisionsByTime = new Map<string, number>();
-    for (const e of windowRevisions) {
-      totalRevisionsByPerson.set(e.cadPersonName, (totalRevisionsByPerson.get(e.cadPersonName) || 0) + 1);
-      totalRevisionsByCustomer.set(e.customer, (totalRevisionsByCustomer.get(e.customer) || 0) + 1);
-      const bucket = this.bucketKey(e.completedAt, periodType);
-      totalRevisionsByTime.set(bucket, (totalRevisionsByTime.get(bucket) || 0) + 1);
-    }
-    const totalRevisions = {
-      byPerson: Array.from(totalRevisionsByPerson.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-      byCustomer: Array.from(totalRevisionsByCustomer.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-      byTime: this.bucketRange(from, to, periodType).map(bucket => ({ bucket, count: totalRevisionsByTime.get(bucket) || 0 })),
-    };
-    const totalRevisionsTotal = windowRevisions.length;
-
     return {
       directTotal, direct, cadsTotal, cads,
       samplesApprovedTotal, samples,
       rejectedTotal, rejected,
       awaitingRevisionTotal, revisions,
       inProgressTotal, inProgress,
-      totalRevisionsTotal, totalRevisions,
     };
   }
 
