@@ -669,16 +669,38 @@ export class ReportsService {
     const directTotal = directOrders.length;
 
     // ── CADs Made — every non-reference file created in the window, by current status ──
-    const cadRows = await this.cadRepo.createQueryBuilder('cf')
+    const cadFileRows = await this.cadRepo.createQueryBuilder('cf')
       .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
       .where('cf.createdAt >= :from AND cf.createdAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
       .select('cf.status', 'status')
       .addSelect('cf.cadPersonName', 'cadPersonName')
       .addSelect('cf.createdAt', 'createdAt')
+      .addSelect('cf.orderId', 'orderId')
       .addSelect('o.storeName', 'storeName')
       .addSelect('o.customerFullName', 'customerFullName')
+      .orderBy('cf.createdAt', 'ASC')
       .getRawMany();
+
+    // A designer re-uploading 2-3 files for the same order (revisions,
+    // re-exports) is one style, not several — collapse every (order,
+    // designer) pair down to a single row per window: dated by its earliest
+    // file here (when the style was first made), classified by its latest
+    // file's status (the style's current outcome). Without this, Made/
+    // Approved/Rejected/Revised weren't a clean partition of distinct styles
+    // — one order's several files could each add to a different column, or
+    // pile onto the same one, well past its actual number of styles.
+    const cadGroups = new Map<string, { cadPersonName: string | null; createdAt: string; status: string; storeName: string | null; customerFullName: string | null }>();
+    for (const r of cadFileRows) {
+      const key = `${r.orderId}::${(r.cadPersonName || 'Unassigned').trim().toLowerCase()}`;
+      const g = cadGroups.get(key);
+      if (!g) {
+        cadGroups.set(key, { cadPersonName: r.cadPersonName, createdAt: r.createdAt, status: r.status, storeName: r.storeName, customerFullName: r.customerFullName });
+      } else {
+        g.status = r.status; // rows are ASC by createdAt — the last one seen is this group's latest
+      }
+    }
+    const cadRows = Array.from(cadGroups.values());
 
     const byPersonMap = new Map<string, CadAggregate>();
     const byCustomerMap = new Map<string, CadAggregate>();
@@ -711,16 +733,31 @@ export class ReportsService {
     };
 
     // ── Samples Approved — CAD files approved in the window (event-based, proxy metric) ──
-    const approvedRows = await this.cadRepo.createQueryBuilder('cf')
+    const approvedFileRows = await this.cadRepo.createQueryBuilder('cf')
       .leftJoin(Order, 'o', 'o.id::text = cf.orderId')
       .where('cf.status = :approved', { approved: CadFileStatus.APPROVED })
       .andWhere('cf.approvedAt >= :from AND cf.approvedAt < :to', { from, to })
       .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
       .select('cf.cadPersonName', 'cadPersonName')
       .addSelect('cf.approvedAt', 'approvedAt')
+      .addSelect('cf.orderId', 'orderId')
       .addSelect('o.storeName', 'storeName')
       .addSelect('o.customerFullName', 'customerFullName')
+      .orderBy('cf.approvedAt', 'ASC')
       .getRawMany();
+
+    // Same one-style-per-(order, designer) collapse as above — a style should
+    // count as approved once even if, unusually, more than one file on the
+    // same order was individually marked Approved within this window.
+    const approvedGroups = new Map<string, { cadPersonName: string | null; approvedAt: string; storeName: string | null; customerFullName: string | null }>();
+    for (const r of approvedFileRows) {
+      const key = `${r.orderId}::${(r.cadPersonName || 'Unassigned').trim().toLowerCase()}`;
+      if (!approvedGroups.has(key)) {
+        approvedGroups.set(key, { cadPersonName: r.cadPersonName, approvedAt: r.approvedAt, storeName: r.storeName, customerFullName: r.customerFullName });
+      }
+    }
+    const approvedRows = Array.from(approvedGroups.values());
+
     const uploadedByPerson = new Map<string, number>();
     for (const r of cadRows) uploadedByPerson.set(r.cadPersonName || 'Unassigned', (uploadedByPerson.get(r.cadPersonName || 'Unassigned') || 0) + 1);
     const samplesByPerson = new Map<string, number>();
@@ -808,13 +845,31 @@ export class ReportsService {
       .orderBy('cf.createdAt', 'ASC')
       .getRawMany();
 
-    const records = rows.map(r => ({
+    const rawRecords = rows.map(r => ({
       d: this.dayKey(new Date(r.createdAt)),
       p: r.cadPersonName || 'Unassigned',
       s: r.poNumber || r.orderId,
       f: this.classifyFamily(r.storeName, r.customerFullName, r.customerCodeName),
       a: r.status === CadFileStatus.APPROVED,
     }));
+
+    // A designer uploading 2-3 files for the same style on the same day (e.g.
+    // a .3dm plus a render together) is one style touched, not several —
+    // every count below (Style Count, Channel report, Approval Rate) was
+    // counting raw file rows despite being labeled "styles." Collapse to one
+    // row per (person, style, day), keeping the latest file's approval
+    // outcome for that day. Touching the same style again on a LATER day
+    // still counts separately here — that's real day-by-day activity, and
+    // Revision Activity below relies on exactly that to detect a style
+    // touched on more than one day.
+    const dayGroups = new Map<string, { d: string; p: string; s: string; f: 'Kira' | 'V+V'; a: boolean }>();
+    for (const r of rawRecords) {
+      const key = `${r.p}::${r.s}::${r.d}`;
+      const g = dayGroups.get(key);
+      if (!g) dayGroups.set(key, { ...r });
+      else g.a = r.a; // rows are ASC by createdAt — the last one seen is this day's latest
+    }
+    const records = Array.from(dayGroups.values());
 
     const dates = Array.from(new Set(records.map(r => r.d))).sort();
     const dateLabels: Record<string, string> = {};
