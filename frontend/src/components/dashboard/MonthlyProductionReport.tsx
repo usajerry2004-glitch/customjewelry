@@ -19,7 +19,7 @@ interface RevisionTimeAgg { bucket: string; revised: number }
 
 interface ReportData {
   period: { type: PeriodType; from: string; to: string; label: string };
-  kpis: { directOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; revisionsCompleted: Kpi };
+  kpis: { directOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; awaitingRevision: Kpi };
   direct: { byCustomer: DirectCustomerGroup[] };
   cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[] };
   samples: { byPerson: SamplePersonAgg[]; byCustomer: SampleCustomerAgg[]; byTime: SampleTimeAgg[] };
@@ -39,9 +39,9 @@ const TILES: { key: TileKey; label: string; bg: string; color: string; caption: 
   { key: 'cads', label: 'CADs Made', bg: '#EEF2FF', color: '#4338CA', inferred: false,
     caption: 'Design files uploaded by the CAD team this period.' },
   { key: 'samples', label: 'Samples Approved', bg: '#D1FAE5', color: '#047857', inferred: true,
-    caption: 'Proxy: CAD files marked Approved. No physical-sample stage exists in the app.' },
-  { key: 'revisions', label: 'Revisions Completed', bg: '#EDE9FE', color: '#6D28D9', inferred: true,
-    caption: 'Next file uploaded after a Revision Requested status — not a stored event.' },
+    caption: 'Proxy: of the styles made this period, how many are Approved as of now. No physical-sample stage exists in the app.' },
+  { key: 'revisions', label: 'Awaiting Revision', bg: '#EDE9FE', color: '#6D28D9', inferred: false,
+    caption: 'Of the styles made this period, how many currently sit at Revision Requested (not yet resubmitted).' },
 ];
 
 const cardStyle: React.CSSProperties = {
@@ -246,7 +246,7 @@ export const MonthlyProductionReport: React.FC = () => {
       } else {
         const rows = key === 'samples' ? data.samples.byTime : data.revisions.byTime;
         const metricKey = key === 'samples' ? 'approved' : 'revised';
-        const metricLabel = key === 'samples' ? 'CADs Approved' : 'Revisions Completed';
+        const metricLabel = key === 'samples' ? 'CADs Approved' : 'Awaiting Revision';
         const values = rows.map((b: any) => b[metricKey] as number);
         body = view === 'graph' ? <TimeBarChart buckets={buckets} series={[{ label: metricLabel, color, values }]} unit={unit} /> : (
           <div style={{ overflowX: 'auto' }}>
@@ -310,18 +310,18 @@ export const MonthlyProductionReport: React.FC = () => {
           const rows = data.revisions.byPerson;
           body = view === 'graph' ? <div>{rows.map(r => <HBarRow key={r.name} label={r.name} value={r.revised} max={Math.max(1, ...rows.map(x => x.revised))} color={color} />)}</div> : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>CAD Person</th><th style={thStyle}>CADs Uploaded</th><th style={thStyle}>Revisions Completed</th></tr></thead>
+              <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>CAD Person</th><th style={thStyle}>CADs Uploaded</th><th style={thStyle}>Awaiting Revision</th></tr></thead>
               <tbody>{rows.map(r => <tr key={r.name}><td style={nameCellStyle}>{r.name}</td><td style={tdStyle}>{r.uploaded}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{r.revised}</td></tr>)}
-              {rows.length === 0 && <tr><td style={tdStyle} colSpan={3}>No revisions completed this period.</td></tr>}</tbody>
+              {rows.length === 0 && <tr><td style={tdStyle} colSpan={3}>No styles awaiting revision this period.</td></tr>}</tbody>
             </table>
           );
         } else {
           const rows = data.revisions.byCustomer;
           body = view === 'graph' ? <div>{rows.map(r => <HBarRow key={r.name} label={r.name} value={r.revised} max={Math.max(1, ...rows.map(x => x.revised))} color={color} />)}</div> : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>Customer</th><th style={thStyle}>Revisions Completed</th></tr></thead>
+              <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>Customer</th><th style={thStyle}>Awaiting Revision</th></tr></thead>
               <tbody>{rows.map(r => <tr key={r.name}><td style={nameCellStyle}>{r.name}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{r.revised}</td></tr>)}
-              {rows.length === 0 && <tr><td style={tdStyle} colSpan={2}>No revisions completed this period.</td></tr>}</tbody>
+              {rows.length === 0 && <tr><td style={tdStyle} colSpan={2}>No styles awaiting revision this period.</td></tr>}</tbody>
             </table>
           );
         }
@@ -346,7 +346,11 @@ export const MonthlyProductionReport: React.FC = () => {
         </div>
         {body}
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '12px' }}>
-          {key !== 'cads' ? 'Rows are inferred — see the note above.' : 'Made / Approved / Rejected / Revised reflect files created this period, by current status.'}
+          {key === 'cads'
+            ? 'Made / Approved / Rejected / Revised reflect files created this period, by current status.'
+            : key === 'samples'
+            ? 'A proxy metric — see the note above.'
+            : "Reflects each style's current status, not a one-time completion event — a style can cycle through revision more than once."}
         </div>
       </>
     );
@@ -380,7 +384,7 @@ export const MonthlyProductionReport: React.FC = () => {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '16px', marginBottom: '18px' }}>
             {TILES.map(t => {
-              const kpi = data.kpis[t.key === 'direct' ? 'directOrders' : t.key === 'cads' ? 'cadsMade' : t.key === 'samples' ? 'samplesApproved' : 'revisionsCompleted'];
+              const kpi = data.kpis[t.key === 'direct' ? 'directOrders' : t.key === 'cads' ? 'cadsMade' : t.key === 'samples' ? 'samplesApproved' : 'awaitingRevision'];
               const isSelected = selectedTile === t.key;
               const up = (kpi.deltaPct ?? 0) >= 0;
               return (
