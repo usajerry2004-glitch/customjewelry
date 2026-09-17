@@ -560,6 +560,7 @@ export class ReportsService {
       period: { type: periodType, from: from.toISOString().slice(0, 10), to: lastDay.toISOString().slice(0, 10), label },
       kpis: {
         directOrders:      { value: current.directTotal, deltaPct: pct(current.directTotal, previous.directTotal) },
+        vvOrders:           { value: current.vvTotal, deltaPct: pct(current.vvTotal, previous.vvTotal) },
         cadsMade:           { value: current.cadsTotal.made, deltaPct: pct(current.cadsTotal.made, previous.cadsTotal.made) },
         samplesApproved:    { value: current.samplesApprovedTotal, deltaPct: pct(current.samplesApprovedTotal, previous.samplesApprovedTotal), inferred: true },
         rejected:           { value: current.rejectedTotal, deltaPct: pct(current.rejectedTotal, previous.rejectedTotal), inferred: false },
@@ -567,6 +568,7 @@ export class ReportsService {
         inProgress:         { value: current.inProgressTotal, deltaPct: pct(current.inProgressTotal, previous.inProgressTotal), inferred: false },
       },
       direct: current.direct,
+      vv: current.vv,
       cads: current.cads,
       samples: current.samples,
       rejected: current.rejected,
@@ -627,6 +629,30 @@ export class ReportsService {
         .sort((a, b) => b.orders - a.orders),
     };
     const directTotal = directOrders.length;
+
+    // ── Vow and Vine Orders Received — the exact complement of Direct
+    // Orders above (same window, same match, just without the NOT), so
+    // Direct + V+V always equals every order received this period.
+    const vvOrders = await this.orderRepo.createQueryBuilder('o')
+      .where("concat_ws(' ', o.storeName, o.customerFullName, o.customerCodeName) ILIKE '%vow%' AND concat_ws(' ', o.storeName, o.customerFullName, o.customerCodeName) ILIKE '%vine%'")
+      .andWhere('o.createdAt >= :from AND o.createdAt < :to', { from, to })
+      .andWhere('o.isArchived = false')
+      .select('o.poNumber', 'poNumber')
+      .addSelect('o.storeName', 'storeName')
+      .addSelect('o.customerFullName', 'customerFullName')
+      .getRawMany();
+    const vvMap = new Map<string, string[]>();
+    for (const o of vvOrders) {
+      const key = o.storeName || o.customerFullName || 'Unknown';
+      if (!vvMap.has(key)) vvMap.set(key, []);
+      vvMap.get(key)!.push(o.poNumber);
+    }
+    const vv = {
+      byCustomer: Array.from(vvMap.entries())
+        .map(([customer, poNumbers]) => ({ customer, orders: poNumbers.length, poNumbers }))
+        .sort((a, b) => b.orders - a.orders),
+    };
+    const vvTotal = vvOrders.length;
 
     // ── CADs Made — every non-reference file created in the window, by current status ──
     const cadFileRows = await this.cadRepo.createQueryBuilder('cf')
@@ -734,7 +760,7 @@ export class ReportsService {
     const inProgressTotal = inProgressOf(cadsTotal);
 
     return {
-      directTotal, direct, cadsTotal, cads,
+      directTotal, direct, vvTotal, vv, cadsTotal, cads,
       samplesApprovedTotal, samples,
       rejectedTotal, rejected,
       awaitingRevisionTotal, revisions,

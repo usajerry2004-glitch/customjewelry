@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 type PeriodType = 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
-type TileKey = 'direct' | 'cads' | 'samples' | 'rejected' | 'revisions' | 'inProgress';
+type TileKey = 'direct' | 'vv' | 'cads' | 'samples' | 'rejected' | 'revisions' | 'inProgress';
 // The four "simple metric" tiles all share the same {byPerson,byCustomer,byTime}
 // shape (uploaded + one outcome field) and the same made-this-period cohort as
 // CADs Made, so they render through one shared code path below.
@@ -20,8 +20,9 @@ interface SimpleMetricTimeAgg { bucket: string; [metric: string]: string | numbe
 
 interface ReportData {
   period: { type: PeriodType; from: string; to: string; label: string };
-  kpis: { directOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; rejected: Kpi; awaitingRevision: Kpi; inProgress: Kpi };
+  kpis: { directOrders: Kpi; vvOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; rejected: Kpi; awaitingRevision: Kpi; inProgress: Kpi };
   direct: { byCustomer: DirectCustomerGroup[] };
+  vv: { byCustomer: DirectCustomerGroup[] };
   cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[] };
   samples: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
   rejected: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
@@ -48,6 +49,8 @@ const SIMPLE_METRICS: Record<SimpleMetricKey, { dataKey: SimpleMetricKey; metric
 const TILES: { key: TileKey; label: string; bg: string; color: string; caption: string; inferred: boolean }[] = [
   { key: 'direct', label: 'Direct Orders Received', bg: '#E0F2FE', color: '#0369A1', inferred: false,
     caption: 'Every order this period except Vow and Vine’s.' },
+  { key: 'vv', label: 'Vow and Vine Orders', bg: '#EDE9FE', color: '#6D28D9', inferred: false,
+    caption: 'Every Vow and Vine order this period — the exact complement of Direct Orders. Direct + V+V = every order received.' },
   { key: 'cads', label: 'CADs Made', bg: '#EEF2FF', color: '#4338CA', inferred: false,
     caption: 'Design files uploaded by the CAD team this period.' },
   { key: 'samples', label: 'Samples Approved', bg: '#D1FAE5', color: '#047857', inferred: true,
@@ -61,7 +64,7 @@ const TILES: { key: TileKey; label: string; bg: string; color: string; caption: 
 ];
 
 const TILE_KPI_KEY: Record<TileKey, keyof ReportData['kpis']> = {
-  direct: 'directOrders', cads: 'cadsMade', samples: 'samplesApproved', rejected: 'rejected',
+  direct: 'directOrders', vv: 'vvOrders', cads: 'cadsMade', samples: 'samplesApproved', rejected: 'rejected',
   revisions: 'awaitingRevision', inProgress: 'inProgress',
 };
 
@@ -175,8 +178,8 @@ export const MonthlyProductionReport: React.FC = () => {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTile, setSelectedTile] = useState<TileKey | null>(null);
-  const [breakdownMode, setBreakdownMode] = useState<Record<Exclude<TileKey, 'direct'>, BreakdownMode>>({ cads: 'person', samples: 'person', rejected: 'person', revisions: 'person', inProgress: 'person' });
-  const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', cads: 'simple', samples: 'simple', rejected: 'simple', revisions: 'simple', inProgress: 'simple' });
+  const [breakdownMode, setBreakdownMode] = useState<Record<Exclude<TileKey, 'direct' | 'vv'>, BreakdownMode>>({ cads: 'person', samples: 'person', rejected: 'person', revisions: 'person', inProgress: 'person' });
+  const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', vv: 'simple', cads: 'simple', samples: 'simple', rejected: 'simple', revisions: 'simple', inProgress: 'simple' });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -199,15 +202,17 @@ export const MonthlyProductionReport: React.FC = () => {
 
   const unit = bucketUnit(periodType);
 
-  const renderDirectDetail = () => {
+  const renderOrdersDetail = (key: 'direct' | 'vv') => {
     if (!data) return null;
-    const rows = data.direct.byCustomer;
+    const rows = data[key].byCustomer;
+    const emptyMsg = key === 'direct' ? 'No direct orders this period.' : 'No Vow and Vine orders this period.';
+    const barColor = key === 'direct' ? '#0EA5E9' : '#6D28D9';
     return (
       <>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <Segmented options={[{ value: 'simple', label: '▤ Simple' }, { value: 'graph', label: '📊 Graph' }]} value={viewMode.direct} onChange={v => setViewMode(m => ({ ...m, direct: v as ViewMode }))} />
+          <Segmented options={[{ value: 'simple', label: '▤ Simple' }, { value: 'graph', label: '📊 Graph' }]} value={viewMode[key]} onChange={v => setViewMode(m => ({ ...m, [key]: v as ViewMode }))} />
         </div>
-        {viewMode.direct === 'simple' ? (
+        {viewMode[key] === 'simple' ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>Customer / Store</th><th style={{ ...thStyle, textAlign: 'center' }}>Orders</th><th style={{ ...thStyle, textAlign: 'left' }}>PO Numbers</th></tr></thead>
@@ -221,19 +226,19 @@ export const MonthlyProductionReport: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td style={tdStyle} colSpan={3}>No direct orders this period.</td></tr>}
+                {rows.length === 0 && <tr><td style={tdStyle} colSpan={3}>{emptyMsg}</td></tr>}
               </tbody>
             </table>
           </div>
         ) : (
-          <div>{rows.map(g => <HBarRow key={g.customer} label={g.customer} value={g.orders} max={Math.max(1, ...rows.map(r => r.orders))} color="#0EA5E9" />)}</div>
+          <div>{rows.map(g => <HBarRow key={g.customer} label={g.customer} value={g.orders} max={Math.max(1, ...rows.map(r => r.orders))} color={barColor} />)}</div>
         )}
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '12px' }}>One row per customer — multiple orders in the period list all their PO numbers together.</div>
       </>
     );
   };
 
-  const renderGroupedMetricDetail = (key: Exclude<TileKey, 'direct'>) => {
+  const renderGroupedMetricDetail = (key: Exclude<TileKey, 'direct' | 'vv'>) => {
     if (!data) return null;
     const mode = breakdownMode[key];
     const view = viewMode[key];
@@ -411,7 +416,7 @@ export const MonthlyProductionReport: React.FC = () => {
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{TILES.find(t => t.key === selectedTile)!.label} — {data.period.label}</div>
                 <button onClick={() => setSelectedTile(null)} style={{ border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, borderRadius: '7px', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>← Back to summary</button>
               </div>
-              {selectedTile === 'direct' ? renderDirectDetail() : renderGroupedMetricDetail(selectedTile)}
+              {selectedTile === 'direct' || selectedTile === 'vv' ? renderOrdersDetail(selectedTile) : renderGroupedMetricDetail(selectedTile)}
             </div>
           )}
         </>
