@@ -9,7 +9,7 @@ interface PersonRow {
   approvalStyles: number; approvalApproved: number; approvalDetail: ApprovalDetail[];
   revisionStyles: RevisionStyle[]; distinctStyles: number; totalEntries: number; revisions: number;
 }
-interface CadRecord { d: string; p: string; s: string; f: string; a: boolean }
+interface CadRecord { d: string; p: string; s: string; f: string; a: boolean; n: 'N' | 'R'; img: string | null }
 interface CadTrackingData {
   dates: string[]; dateLabels: Record<string, string>; people: PersonRow[];
   channel: Record<string, { styles: number; approvals: number }>; records: CadRecord[];
@@ -72,11 +72,35 @@ function DrillRow({ colSpan, title, sub, rows, onClose }: { colSpan: number; tit
         </div>
         <div style={{ overflowX: 'auto', maxHeight: '260px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '6px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Date</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Person</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Style No.</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Family</th><th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Approved</th></tr></thead>
+            <thead><tr>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Date</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Person</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Style No.</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Family</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }} title="New design (first upload) or a resubmission after a revision request">New/Rev</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Image</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Approved</th>
+            </tr></thead>
             <tbody>
               {rows.length ? rows.map((r, i) => (
-                <tr key={i}><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{fullDate(r.d)}</td><td style={{ ...tdStyle, background: 'var(--bg-card)', fontWeight: 600 }}>{r.p}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.s}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.f}</td><td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.a ? '✅' : '—'}</td></tr>
-              )) : <tr><td colSpan={5} style={{ ...tdStyle, background: 'var(--bg-card)', textAlign: 'center', color: 'var(--text-muted)' }}>No rows match.</td></tr>}
+                <tr key={i}>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{fullDate(r.d)}</td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)', fontWeight: 600 }}>{r.p}</td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.s}</td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.f}</td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '5px', fontSize: '10.5px', fontWeight: 700, background: r.n === 'R' ? 'var(--accent-light)' : 'var(--bg-input)', color: r.n === 'R' ? 'var(--accent-dark)' : 'var(--text-secondary)', border: '1px solid var(--border)' }} title={r.n === 'R' ? 'Revision — resubmitted after a revision request' : 'New design — first upload for this style'}>{r.n}</span>
+                  </td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>
+                    {r.img ? (
+                      <img src={r.img} alt={r.s} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} />
+                    ) : (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.a ? '✅' : '—'}</td>
+                </tr>
+              )) : <tr><td colSpan={7} style={{ ...tdStyle, background: 'var(--bg-card)', textAlign: 'center', color: 'var(--text-muted)' }}>No rows match.</td></tr>}
             </tbody>
           </table>
         </div>

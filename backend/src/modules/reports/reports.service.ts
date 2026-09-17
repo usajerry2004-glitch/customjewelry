@@ -807,6 +807,10 @@ export class ReportsService {
       .addSelect('cf.cadPersonName', 'cadPersonName')
       .addSelect('cf.createdAt', 'createdAt')
       .addSelect('cf.status', 'status')
+      .addSelect('cf.originalName', 'originalName')
+      .addSelect('cf.fileName', 'fileName')
+      .addSelect('cf.filePath', 'filePath')
+      .addSelect('cf.thumbnailPath', 'thumbnailPath')
       .addSelect('o.poNumber', 'poNumber')
       .addSelect('o.storeName', 'storeName')
       .addSelect('o.customerFullName', 'customerFullName')
@@ -814,12 +818,41 @@ export class ReportsService {
       .orderBy('cf.createdAt', 'ASC')
       .getRawMany();
 
+    // Whether a file is a fresh design or a resubmission after a revision
+    // request — needs each order's FULL non-reference file history, not
+    // just this window, since the revision request that explains a file in
+    // this window may have happened before the window started.
+    const orderIds = Array.from(new Set(rows.map(r => r.orderId)));
+    const historyRows = orderIds.length ? await this.cadRepo.createQueryBuilder('cf')
+      .where('cf.orderId IN (:...ids)', { ids: orderIds })
+      .andWhere('(cf.designerNotes IS NULL OR cf.designerNotes NOT IN (:...refs))', { refs: Array.from(REFERENCE_NOTE_TAGS) })
+      .select('cf.orderId', 'orderId')
+      .addSelect('cf.createdAt', 'createdAt')
+      .addSelect('cf.status', 'status')
+      .getRawMany() : [];
+    const revisionRequestTimesByOrder = new Map<string, Date[]>();
+    for (const h of historyRows) {
+      if (h.status !== CadFileStatus.REVISION_REQUESTED) continue;
+      if (!revisionRequestTimesByOrder.has(h.orderId)) revisionRequestTimesByOrder.set(h.orderId, []);
+      revisionRequestTimesByOrder.get(h.orderId)!.push(new Date(h.createdAt));
+    }
+    const isResubmission = (orderId: string, createdAt: Date): boolean => {
+      const times = revisionRequestTimesByOrder.get(orderId);
+      return !!times && times.some(t => t < createdAt);
+    };
+    const isImageFile = (name: string): boolean => {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      return ext === 'jpg' || ext === 'jpeg' || ext === 'png';
+    };
+
     const rawRecords = rows.map(r => ({
       d: this.dayKey(new Date(r.createdAt)),
       p: r.cadPersonName || 'Unassigned',
       s: r.poNumber || r.orderId,
       f: this.classifyFamily(r.storeName, r.customerFullName, r.customerCodeName),
       a: r.status === CadFileStatus.APPROVED,
+      n: (isResubmission(r.orderId, new Date(r.createdAt)) ? 'R' : 'N') as 'N' | 'R',
+      img: isImageFile(r.originalName || r.fileName || '') ? (r.thumbnailPath || r.filePath || `/uploads/cad/${r.fileName}`) : null,
     }));
 
     // A designer uploading 2-3 files for the same style on the same day (e.g.
@@ -827,16 +860,21 @@ export class ReportsService {
     // every count below (Style Count, Channel report, Approval Rate) was
     // counting raw file rows despite being labeled "styles." Collapse to one
     // row per (person, style, day), keeping the latest file's approval
-    // outcome for that day. Touching the same style again on a LATER day
-    // still counts separately here — that's real day-by-day activity, and
-    // Revision Activity below relies on exactly that to detect a style
-    // touched on more than one day.
-    const dayGroups = new Map<string, { d: string; p: string; s: string; f: 'Kira' | 'V+V'; a: boolean }>();
+    // outcome (and New/Revision flag) for that day, and keeping any image
+    // thumbnail seen that day even if a later same-day file isn't an image.
+    // Touching the same style again on a LATER day still counts separately
+    // here — that's real day-by-day activity, and Revision Activity below
+    // relies on exactly that to detect a style touched on more than one day.
+    const dayGroups = new Map<string, { d: string; p: string; s: string; f: 'Kira' | 'V+V'; a: boolean; n: 'N' | 'R'; img: string | null }>();
     for (const r of rawRecords) {
       const key = `${r.p}::${r.s}::${r.d}`;
       const g = dayGroups.get(key);
       if (!g) dayGroups.set(key, { ...r });
-      else g.a = r.a; // rows are ASC by createdAt — the last one seen is this day's latest
+      else {
+        g.a = r.a; // rows are ASC by createdAt — the last one seen is this day's latest
+        g.n = r.n;
+        if (r.img) g.img = r.img;
+      }
     }
     const records = Array.from(dayGroups.values());
 
