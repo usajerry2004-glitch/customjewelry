@@ -147,10 +147,8 @@ export const CadTrackingSection: React.FC = () => {
   useEffect(() => {
     if (!viewingImage) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewingImage(null); };
-    const close = () => setViewingImage(null);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', close, true);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('scroll', close, true); };
+    return () => window.removeEventListener('keydown', onKey);
   }, [viewingImage]);
 
   useEffect(() => {
@@ -541,10 +539,12 @@ export const CadTrackingSection: React.FC = () => {
       </div>
 
       {viewingImage && (() => {
+        const BOX_W = 420;
+        const BOX_H = 460;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const anchorRight = viewingImage.x > vw / 2;
-        const anchorBottom = viewingImage.y > vh / 2;
+        const left = Math.max(16, Math.min(viewingImage.x - BOX_W / 2, vw - BOX_W - 16));
+        const top = Math.max(16, Math.min(viewingImage.y - BOX_H / 2, vh - BOX_H - 16));
         return (
           <div
             onClick={() => setViewingImage(null)}
@@ -554,9 +554,9 @@ export const CadTrackingSection: React.FC = () => {
               onClick={e => e.stopPropagation()}
               style={{
                 position: 'fixed',
-                ...(anchorRight ? { right: Math.max(16, vw - viewingImage.x + 12) } : { left: Math.max(16, viewingImage.x + 12) }),
-                ...(anchorBottom ? { bottom: Math.max(16, vh - viewingImage.y + 12) } : { top: Math.max(16, viewingImage.y + 12) }),
-                maxWidth: 'min(420px, calc(100vw - 32px))',
+                left,
+                top,
+                width: `${BOX_W}px`,
                 background: 'var(--bg-card)',
                 borderRadius: '10px',
                 padding: '10px',
@@ -564,7 +564,7 @@ export const CadTrackingSection: React.FC = () => {
                 border: '1px solid var(--border)',
               }}
             >
-              <img src={viewingImage.src} alt={viewingImage.label} style={{ maxWidth: '400px', maxHeight: '360px', width: '100%', objectFit: 'contain', borderRadius: '6px', display: 'block' }} />
+              <img src={viewingImage.src} alt={viewingImage.label} style={{ width: '100%', maxHeight: '360px', objectFit: 'contain', borderRadius: '6px', display: 'block' }} />
               <div style={{ marginTop: '8px', fontSize: '12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>{viewingImage.label}</div>
               <button
                 onClick={() => setViewingImage(null)}
