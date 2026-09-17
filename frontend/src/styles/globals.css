@@ -715,10 +715,15 @@ textarea {
   50%       { box-shadow: 0 0 0 4px rgba(192,155,88,0); }
 }
 
-/* Page fade-in */
+/* Page fade-in — opacity only. A transform here (even the identity
+   translateY(0) the "forwards" fill mode leaves behind after the
+   animation ends) turns this scrollable container into the containing
+   block for every position:fixed descendant, so fixed modals/popovers
+   end up positioned against its scrolled box instead of the real
+   viewport. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .main-content-pad {
   animation: fadeIn 0.25s ease forwards;
