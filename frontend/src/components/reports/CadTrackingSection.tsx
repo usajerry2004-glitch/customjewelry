@@ -59,7 +59,7 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
 // somewhere disconnected from what you were looking at (a fixed-position
 // popover computed once at click time visually drifts if anything scrolls
 // the page afterward; an inline row can't).
-function DrillRow({ colSpan, title, sub, rows, onClose }: { colSpan: number; title: string; sub: string; rows: CadRecord[]; onClose: () => void }) {
+function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpan: number; title: string; sub: string; rows: CadRecord[]; onClose: () => void; onImageClick: (src: string, label: string) => void }) {
   return (
     <tr style={{ background: 'var(--bg-input)' }}>
       <td colSpan={colSpan} style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-light)' }}>
@@ -93,7 +93,11 @@ function DrillRow({ colSpan, title, sub, rows, onClose }: { colSpan: number; tit
                   </td>
                   <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>
                     {r.img ? (
-                      <img src={r.img} alt={r.s} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)', display: 'block' }} />
+                      <img
+                        src={r.img} alt={r.s}
+                        onClick={() => onImageClick(r.img!, `${r.s} — ${r.p}, ${fullDate(r.d)}`)}
+                        style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)', display: 'block', cursor: 'pointer' }}
+                      />
                     ) : (
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
                     )}
@@ -116,6 +120,7 @@ export const CadTrackingSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [gridDrill, setGridDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
   const [channelDrill, setChannelDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
+  const [viewingImage, setViewingImage] = useState<{ src: string; label: string } | null>(null);
 
   const [channelLens, setChannelLens] = useState<'all' | 'Kira' | 'V+V'>('all');
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(new Set());
@@ -134,6 +139,13 @@ export const CadTrackingSection: React.FC = () => {
   const [revShowAll, setRevShowAll] = useState(false);
 
   const SHOW_LIMIT = 5;
+
+  useEffect(() => {
+    if (!viewingImage) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewingImage(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewingImage]);
 
   useEffect(() => {
     setLoading(true);
@@ -250,7 +262,7 @@ export const CadTrackingSection: React.FC = () => {
                         </>
                       )}
                       {gridDrill?.key.startsWith(`${p.name}::`) && (
-                        <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} />
+                        <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
                       )}
                     </React.Fragment>
                   );
@@ -263,7 +275,7 @@ export const CadTrackingSection: React.FC = () => {
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700, color: 'var(--accent-dark)' }}>{grand}</td>
                 </tr>
                 {gridDrill && gridDrill.key.startsWith('__day__') && (
-                  <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} />
+                  <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
                 )}
               </tbody>
             </table>
@@ -354,7 +366,7 @@ export const CadTrackingSection: React.FC = () => {
                     </>
                   )}
                   {channelDrill && (channelDrill.key === p.name || channelDrill.key === `${p.name}-Kira` || channelDrill.key === `${p.name}-V+V`) && (
-                    <DrillRow colSpan={dates.length + 2} title={channelDrill.title} sub={channelDrill.sub} rows={channelDrill.rows} onClose={() => setChannelDrill(null)} />
+                    <DrillRow colSpan={dates.length + 2} title={channelDrill.title} sub={channelDrill.sub} rows={channelDrill.rows} onClose={() => setChannelDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
                   )}
                 </React.Fragment>
               ))}
@@ -521,6 +533,22 @@ export const CadTrackingSection: React.FC = () => {
         </div>
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>More precise than the dashboard's inferred Revisions Completed tile.</p>
       </div>
+
+      {viewingImage && (
+        <div
+          onClick={() => setViewingImage(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', cursor: 'zoom-out' }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <img src={viewingImage.src} alt={viewingImage.label} style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '8px', display: 'block', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }} />
+            <div style={{ marginTop: '10px', color: '#fff', fontSize: '13px', textAlign: 'center', fontWeight: 600 }}>{viewingImage.label}</div>
+            <button
+              onClick={() => setViewingImage(null)}
+              style={{ position: 'absolute', top: '-16px', right: '-16px', width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+            >✕</button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
