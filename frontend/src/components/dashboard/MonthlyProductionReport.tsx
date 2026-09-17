@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { apiFetch, API } from '../../utils/apiFetch';
 
 type PeriodType = 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
@@ -17,6 +18,9 @@ interface CadTimeAgg { bucket: string; made: number; approved: number; rejected:
 interface SimpleMetricPersonAgg { name: string; uploaded: number; [metric: string]: string | number }
 interface SimpleMetricCustomerAgg { name: string; [metric: string]: string | number }
 interface SimpleMetricTimeAgg { bucket: string; [metric: string]: string | number }
+// One real order behind a simple-metric count — enough to show "which orders
+// is this number counting" and link straight to each one.
+interface OrderRecord { personName: string; customerName: string; poNumber: string; orderId: string; bucket: string }
 
 interface ReportData {
   period: { type: PeriodType; from: string; to: string; label: string };
@@ -24,10 +28,10 @@ interface ReportData {
   direct: { byCustomer: DirectCustomerGroup[] };
   vv: { byCustomer: DirectCustomerGroup[] };
   cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[] };
-  samples: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
-  rejected: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
-  revisions: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
-  inProgress: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[] };
+  samples: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
+  rejected: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
+  revisions: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
+  inProgress: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
 }
 
 const CADS_SERIES = [
@@ -116,6 +120,35 @@ function HBarRow({ label, value, max, color }: { label: string; value: number; m
   );
 }
 
+// Inline expansion row — inserted right after the clicked Person-wise/
+// Customer-wise/Day-wise row, listing the exact orders behind that number.
+// Same "insert into the table flow, not a floating popover" idea used
+// elsewhere, so it never ends up disconnected from what was clicked.
+function OrderDrillRow({ colSpan, rows, onClose, onOpenOrder }: { colSpan: number; rows: OrderRecord[]; onClose: () => void; onOpenOrder: (orderId: string) => void }) {
+  return (
+    <tr style={{ background: 'var(--bg-input)' }}>
+      <td colSpan={colSpan} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700 }}>{rows.length} order{rows.length === 1 ? '' : 's'} — click one to open it</span>
+          <button onClick={onClose} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', width: '22px', height: '22px', cursor: 'pointer', fontSize: '10px', color: 'var(--text-secondary)' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {rows.map(r => (
+            <span
+              key={r.orderId + r.bucket}
+              onClick={() => onOpenOrder(r.orderId)}
+              style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--accent-dark)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
+            >
+              {r.poNumber} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {r.customerName}</span>
+            </span>
+          ))}
+          {rows.length === 0 && <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>No orders found.</span>}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function GroupedBarChart({ rows }: { rows: CadAgg[] }) {
   const max = Math.max(1, ...rows.flatMap(r => CADS_SERIES.map(s => (r as any)[s.key] as number)));
   const minWidth = Math.max(100, rows.length * 60);
@@ -173,6 +206,7 @@ function TimeBarChart({ buckets, series, unit }: { buckets: string[]; series: { 
 }
 
 export const MonthlyProductionReport: React.FC = () => {
+  const router = useRouter();
   const [periodType, setPeriodType] = useState<PeriodType>('monthly');
   const [anchorMonth, setAnchorMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   const [data, setData] = useState<ReportData | null>(null);
@@ -180,8 +214,20 @@ export const MonthlyProductionReport: React.FC = () => {
   const [selectedTile, setSelectedTile] = useState<TileKey | null>(null);
   const [breakdownMode, setBreakdownMode] = useState<Record<Exclude<TileKey, 'direct' | 'vv'>, BreakdownMode>>({ cads: 'person', samples: 'person', rejected: 'person', revisions: 'person', inProgress: 'person' });
   const [viewMode, setViewMode] = useState<Record<TileKey, ViewMode>>({ direct: 'simple', vv: 'simple', cads: 'simple', samples: 'simple', rejected: 'simple', revisions: 'simple', inProgress: 'simple' });
+  // Which Person-wise/Customer-wise/Day-wise row has its order list open —
+  // null when nothing's expanded; cleared whenever the mode/tile changes.
+  const [drillRowKey, setDrillRowKey] = useState<string | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const openOrder = (orderId: string) => router.push(`/orders/${orderId}`);
+  const getDrillRows = (dataKey: SimpleMetricKey, mode: BreakdownMode, rowValue: string): OrderRecord[] => {
+    if (!data) return [];
+    const records = data[dataKey].records;
+    if (mode === 'person') return records.filter(r => r.personName === rowValue);
+    if (mode === 'customer') return records.filter(r => r.customerName === rowValue);
+    return records.filter(r => r.bucket === rowValue);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -279,7 +325,20 @@ export const MonthlyProductionReport: React.FC = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>{unit === 'day' ? 'Day' : 'Month'}</th><th style={thStyle}>{metricLabel}</th></tr></thead>
               <tbody>
-                {rows.map(b => <tr key={b.bucket}><td style={{ ...tdStyle, textAlign: 'left' }}>{bucketFullLabel(b.bucket, unit)}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{b[metricKey]}</td></tr>)}
+                {rows.map(b => {
+                  const val = b[metricKey] as number;
+                  const rowKey = `time::${b.bucket}`;
+                  const open = drillRowKey === rowKey;
+                  return (
+                    <React.Fragment key={b.bucket}>
+                      <tr>
+                        <td style={{ ...tdStyle, textAlign: 'left' }}>{bucketFullLabel(b.bucket, unit)}</td>
+                        <td style={{ ...tdStyle, color, fontWeight: 700, cursor: val > 0 ? 'pointer' : 'default' }} onClick={() => val > 0 && setDrillRowKey(open ? null : rowKey)}>{val}</td>
+                      </tr>
+                      {open && <OrderDrillRow colSpan={2} rows={getDrillRows(simple!.dataKey, 'time', b.bucket)} onClose={() => setDrillRowKey(null)} onOpenOrder={openOrder} />}
+                    </React.Fragment>
+                  );
+                })}
                 <tr>
                   <td style={{ ...tdStyle, textAlign: 'left', borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', color, fontWeight: 700 }}>{values.reduce((a, b) => a + b, 0)}</td>
@@ -317,7 +376,21 @@ export const MonthlyProductionReport: React.FC = () => {
         body = view === 'graph' ? <div>{rows.map(r => <HBarRow key={r.name} label={r.name} value={r[metricKey] as number} max={Math.max(1, ...rows.map(x => x[metricKey] as number))} color={color} />)}</div> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>CAD Person</th><th style={thStyle}>CADs Uploaded</th><th style={thStyle}>{metricLabel}</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.name}><td style={nameCellStyle}>{r.name}</td><td style={tdStyle}>{r.uploaded}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{r[metricKey]}</td></tr>)}
+            <tbody>{rows.map(r => {
+              const val = r[metricKey] as number;
+              const rowKey = `person::${r.name}`;
+              const open = drillRowKey === rowKey;
+              return (
+                <React.Fragment key={r.name}>
+                  <tr>
+                    <td style={nameCellStyle}>{r.name}</td>
+                    <td style={tdStyle}>{r.uploaded}</td>
+                    <td style={{ ...tdStyle, color, fontWeight: 700, cursor: val > 0 ? 'pointer' : 'default' }} onClick={() => val > 0 && setDrillRowKey(open ? null : rowKey)}>{val}</td>
+                  </tr>
+                  {open && <OrderDrillRow colSpan={3} rows={getDrillRows(simple!.dataKey, 'person', r.name)} onClose={() => setDrillRowKey(null)} onOpenOrder={openOrder} />}
+                </React.Fragment>
+              );
+            })}
             {rows.length === 0 && <tr><td style={tdStyle} colSpan={3}>{emptyMsg}</td></tr>}</tbody>
           </table>
         );
@@ -326,7 +399,20 @@ export const MonthlyProductionReport: React.FC = () => {
         body = view === 'graph' ? <div>{rows.map(r => <HBarRow key={r.name} label={r.name} value={r[metricKey] as number} max={Math.max(1, ...rows.map(x => x[metricKey] as number))} color={color} />)}</div> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>Customer</th><th style={thStyle}>{metricLabel}</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.name}><td style={nameCellStyle}>{r.name}</td><td style={{ ...tdStyle, color, fontWeight: 700 }}>{r[metricKey]}</td></tr>)}
+            <tbody>{rows.map(r => {
+              const val = r[metricKey] as number;
+              const rowKey = `customer::${r.name}`;
+              const open = drillRowKey === rowKey;
+              return (
+                <React.Fragment key={r.name}>
+                  <tr>
+                    <td style={nameCellStyle}>{r.name}</td>
+                    <td style={{ ...tdStyle, color, fontWeight: 700, cursor: val > 0 ? 'pointer' : 'default' }} onClick={() => val > 0 && setDrillRowKey(open ? null : rowKey)}>{val}</td>
+                  </tr>
+                  {open && <OrderDrillRow colSpan={2} rows={getDrillRows(simple!.dataKey, 'customer', r.name)} onClose={() => setDrillRowKey(null)} onOpenOrder={openOrder} />}
+                </React.Fragment>
+              );
+            })}
             {rows.length === 0 && <tr><td style={tdStyle} colSpan={2}>{emptyMsg}</td></tr>}</tbody>
           </table>
         );
@@ -341,7 +427,7 @@ export const MonthlyProductionReport: React.FC = () => {
             <Segmented
               options={[{ value: 'person', label: 'CAD Person-wise' }, { value: 'customer', label: 'Customer-wise' }, { value: 'time', label: unit === 'day' ? 'Day-wise' : 'Month-wise' }]}
               value={mode}
-              onChange={v => setBreakdownMode(m => ({ ...m, [key]: v as BreakdownMode }))}
+              onChange={v => { setBreakdownMode(m => ({ ...m, [key]: v as BreakdownMode })); setDrillRowKey(null); }}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -356,6 +442,7 @@ export const MonthlyProductionReport: React.FC = () => {
             : key === 'samples'
             ? 'A proxy metric — see the note above.'
             : "Reflects each style's current status, not a one-time completion event — a style can cycle through revision more than once."}
+          {key !== 'cads' && ' Click any number above (in Simple view) to see the exact orders behind it, and open one directly.'}
         </div>
       </>
     );
@@ -393,7 +480,7 @@ export const MonthlyProductionReport: React.FC = () => {
               const isSelected = selectedTile === t.key;
               const up = (kpi.deltaPct ?? 0) >= 0;
               return (
-                <button key={t.key} onClick={() => setSelectedTile(isSelected ? null : t.key)}
+                <button key={t.key} onClick={() => { setSelectedTile(isSelected ? null : t.key); setDrillRowKey(null); }}
                   style={{ background: t.bg, borderRadius: '10px', padding: '14px 16px', border: `1.5px ${t.inferred ? 'dashed' : 'solid'} ${isSelected ? 'var(--navy)' : 'transparent'}`, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: isSelected ? 'var(--shadow-md)' : 'none' }}
                 >
                   <div style={{ fontSize: '10px', letterSpacing: '0.6px', textTransform: 'uppercase', fontWeight: 700, color: t.color, display: 'flex', alignItems: 'center', gap: '5px' }}>

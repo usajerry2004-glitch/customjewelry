@@ -663,6 +663,7 @@ export class ReportsService {
       .addSelect('cf.cadPersonName', 'cadPersonName')
       .addSelect('cf.createdAt', 'createdAt')
       .addSelect('cf.orderId', 'orderId')
+      .addSelect('o.poNumber', 'poNumber')
       .addSelect('o.storeName', 'storeName')
       .addSelect('o.customerFullName', 'customerFullName')
       .orderBy('cf.createdAt', 'ASC')
@@ -676,12 +677,12 @@ export class ReportsService {
     // Approved/Rejected/Revised weren't a clean partition of distinct styles
     // — one order's several files could each add to a different column, or
     // pile onto the same one, well past its actual number of styles.
-    const cadGroups = new Map<string, { cadPersonName: string | null; createdAt: string; status: string; storeName: string | null; customerFullName: string | null }>();
+    const cadGroups = new Map<string, { orderId: string; poNumber: string | null; cadPersonName: string | null; createdAt: string; status: string; storeName: string | null; customerFullName: string | null }>();
     for (const r of cadFileRows) {
       const key = `${r.orderId}::${(r.cadPersonName || 'Unassigned').trim().toLowerCase()}`;
       const g = cadGroups.get(key);
       if (!g) {
-        cadGroups.set(key, { cadPersonName: r.cadPersonName, createdAt: r.createdAt, status: r.status, storeName: r.storeName, customerFullName: r.customerFullName });
+        cadGroups.set(key, { orderId: r.orderId, poNumber: r.poNumber, cadPersonName: r.cadPersonName, createdAt: r.createdAt, status: r.status, storeName: r.storeName, customerFullName: r.customerFullName });
       } else {
         g.status = r.status; // rows are ASC by createdAt — the last one seen is this group's latest
       }
@@ -731,10 +732,25 @@ export class ReportsService {
     // are accounted for (Uploaded or Sent For Approval, i.e. no outcome yet).
     const inProgressOf = (agg: CadAggregate) => Math.max(0, agg.made - agg.approved - agg.rejected - agg.revised);
 
+    // The exact order behind each number on these four tiles — one row per
+    // style group matching that bucket, so a click on any Person-wise/
+    // Customer-wise/Day-wise cell can show which real orders it's counting
+    // (and link straight to them), not just the count.
+    const toOrderRecords = (statusFilter: (status: string) => boolean) => cadRows
+      .filter(r => statusFilter(r.status))
+      .map(r => ({
+        personName: r.cadPersonName || 'Unassigned',
+        customerName: r.storeName || r.customerFullName || 'Unknown',
+        poNumber: r.poNumber || r.orderId,
+        orderId: r.orderId,
+        bucket: this.bucketKey(new Date(r.createdAt), periodType),
+      }));
+
     const samples = {
       byPerson: cads.byPerson.map(p => ({ name: p.name, uploaded: p.made, approved: p.approved })).sort((a, b) => b.approved - a.approved),
       byCustomer: cads.byCustomer.map(c => ({ name: c.name, approved: c.approved })).sort((a, b) => b.approved - a.approved),
       byTime: cads.byTime.map(t => ({ bucket: t.bucket, approved: t.approved })),
+      records: toOrderRecords(s => s === CadFileStatus.APPROVED),
     };
     const samplesApprovedTotal = cadsTotal.approved;
 
@@ -742,6 +758,7 @@ export class ReportsService {
       byPerson: cads.byPerson.map(p => ({ name: p.name, uploaded: p.made, rejected: p.rejected })).sort((a, b) => b.rejected - a.rejected),
       byCustomer: cads.byCustomer.map(c => ({ name: c.name, rejected: c.rejected })).sort((a, b) => b.rejected - a.rejected),
       byTime: cads.byTime.map(t => ({ bucket: t.bucket, rejected: t.rejected })),
+      records: toOrderRecords(s => s === CadFileStatus.REJECTED),
     };
     const rejectedTotal = cadsTotal.rejected;
 
@@ -749,6 +766,7 @@ export class ReportsService {
       byPerson: cads.byPerson.map(p => ({ name: p.name, uploaded: p.made, revised: p.revised })).sort((a, b) => b.revised - a.revised),
       byCustomer: cads.byCustomer.map(c => ({ name: c.name, revised: c.revised })).sort((a, b) => b.revised - a.revised),
       byTime: cads.byTime.map(t => ({ bucket: t.bucket, revised: t.revised })),
+      records: toOrderRecords(s => s === CadFileStatus.REVISION_REQUESTED),
     };
     const awaitingRevisionTotal = cadsTotal.revised;
 
@@ -756,6 +774,7 @@ export class ReportsService {
       byPerson: cads.byPerson.map(p => ({ name: p.name, uploaded: p.made, inProgress: inProgressOf(p) })).sort((a, b) => b.inProgress - a.inProgress),
       byCustomer: cads.byCustomer.map(c => ({ name: c.name, inProgress: inProgressOf(c) })).sort((a, b) => b.inProgress - a.inProgress),
       byTime: cads.byTime.map(t => ({ bucket: t.bucket, inProgress: inProgressOf(t) })),
+      records: toOrderRecords(s => s !== CadFileStatus.APPROVED && s !== CadFileStatus.REJECTED && s !== CadFileStatus.REVISION_REQUESTED),
     };
     const inProgressTotal = inProgressOf(cadsTotal);
 
