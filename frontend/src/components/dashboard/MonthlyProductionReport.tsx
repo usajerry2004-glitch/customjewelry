@@ -47,7 +47,7 @@ const SIMPLE_METRICS: Record<SimpleMetricKey, { dataKey: SimpleMetricKey; metric
 
 const TILES: { key: TileKey; label: string; bg: string; color: string; caption: string; inferred: boolean }[] = [
   { key: 'direct', label: 'Direct Orders Received', bg: '#E0F2FE', color: '#0369A1', inferred: false,
-    caption: 'Submitted directly via the customer portal — salesRepName = "Web Order".' },
+    caption: 'Every order this period except Vow and Vine’s.' },
   { key: 'cads', label: 'CADs Made', bg: '#EEF2FF', color: '#4338CA', inferred: false,
     caption: 'Design files uploaded by the CAD team this period.' },
   { key: 'samples', label: 'Samples Approved', bg: '#D1FAE5', color: '#047857', inferred: true,

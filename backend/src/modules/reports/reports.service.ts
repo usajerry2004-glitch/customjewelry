@@ -602,9 +602,13 @@ export class ReportsService {
   private emptyCadAgg(): CadAggregate { return { made: 0, approved: 0, rejected: 0, revised: 0 }; }
 
   private async computeProductionWindow(from: Date, to: Date, periodType: ProductionPeriodType) {
-    // ── Direct Orders Received — grouped by customer ──
+    // ── Direct Orders Received — every order except Vow and Vine's, grouped
+    // by customer. Same "vow" + "vine" substring match as classifyFamily()
+    // below, applied to the combined storeName/customerFullName/
+    // customerCodeName fields (the name shows up inconsistently across which
+    // of those three is populated).
     const directOrders = await this.orderRepo.createQueryBuilder('o')
-      .where('o.salesRepName = :webOrder', { webOrder: 'Web Order' })
+      .where("NOT (concat_ws(' ', o.storeName, o.customerFullName, o.customerCodeName) ILIKE '%vow%' AND concat_ws(' ', o.storeName, o.customerFullName, o.customerCodeName) ILIKE '%vine%')")
       .andWhere('o.createdAt >= :from AND o.createdAt < :to', { from, to })
       .andWhere('o.isArchived = false')
       .select('o.poNumber', 'poNumber')
