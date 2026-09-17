@@ -59,7 +59,7 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
 // somewhere disconnected from what you were looking at (a fixed-position
 // popover computed once at click time visually drifts if anything scrolls
 // the page afterward; an inline row can't).
-function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpan: number; title: string; sub: string; rows: CadRecord[]; onClose: () => void; onImageClick: (src: string, label: string) => void }) {
+function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpan: number; title: string; sub: string; rows: CadRecord[]; onClose: () => void; onImageClick: (src: string, label: string, rect: DOMRect) => void }) {
   return (
     <tr style={{ background: 'var(--bg-input)' }}>
       <td colSpan={colSpan} style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-light)' }}>
@@ -95,7 +95,7 @@ function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpa
                     {r.img ? (
                       <img
                         src={r.img} alt={r.s}
-                        onClick={() => onImageClick(r.img!, `${r.s} — ${r.p}, ${fullDate(r.d)}`)}
+                        onClick={e => onImageClick(r.img!, `${r.s} — ${r.p}, ${fullDate(r.d)}`, e.currentTarget.getBoundingClientRect())}
                         style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border)', display: 'block', cursor: 'pointer' }}
                       />
                     ) : (
@@ -120,7 +120,11 @@ export const CadTrackingSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [gridDrill, setGridDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
   const [channelDrill, setChannelDrill] = useState<{ key: string; title: string; sub: string; rows: CadRecord[] } | null>(null);
-  const [viewingImage, setViewingImage] = useState<{ src: string; label: string } | null>(null);
+  // Anchored to the thumbnail that was clicked (x/y = its viewport center at
+  // click time) so the preview opens right in front of it instead of
+  // wherever the whole viewport happens to be centered — closes on scroll
+  // rather than trying to track the anchor, since this is a quick peek.
+  const [viewingImage, setViewingImage] = useState<{ src: string; label: string; x: number; y: number } | null>(null);
 
   const [channelLens, setChannelLens] = useState<'all' | 'Kira' | 'V+V'>('all');
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(new Set());
@@ -143,8 +147,10 @@ export const CadTrackingSection: React.FC = () => {
   useEffect(() => {
     if (!viewingImage) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewingImage(null); };
+    const close = () => setViewingImage(null);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('scroll', close, true); };
   }, [viewingImage]);
 
   useEffect(() => {
@@ -262,7 +268,7 @@ export const CadTrackingSection: React.FC = () => {
                         </>
                       )}
                       {gridDrill?.key.startsWith(`${p.name}::`) && (
-                        <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
+                        <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label, rect) => setViewingImage({ src, label, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })} />
                       )}
                     </React.Fragment>
                   );
@@ -275,7 +281,7 @@ export const CadTrackingSection: React.FC = () => {
                   <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700, color: 'var(--accent-dark)' }}>{grand}</td>
                 </tr>
                 {gridDrill && gridDrill.key.startsWith('__day__') && (
-                  <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
+                  <DrillRow colSpan={dates.length + 3} title={gridDrill.title} sub={gridDrill.sub} rows={gridDrill.rows} onClose={() => setGridDrill(null)} onImageClick={(src, label, rect) => setViewingImage({ src, label, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })} />
                 )}
               </tbody>
             </table>
@@ -366,7 +372,7 @@ export const CadTrackingSection: React.FC = () => {
                     </>
                   )}
                   {channelDrill && (channelDrill.key === p.name || channelDrill.key === `${p.name}-Kira` || channelDrill.key === `${p.name}-V+V`) && (
-                    <DrillRow colSpan={dates.length + 2} title={channelDrill.title} sub={channelDrill.sub} rows={channelDrill.rows} onClose={() => setChannelDrill(null)} onImageClick={(src, label) => setViewingImage({ src, label })} />
+                    <DrillRow colSpan={dates.length + 2} title={channelDrill.title} sub={channelDrill.sub} rows={channelDrill.rows} onClose={() => setChannelDrill(null)} onImageClick={(src, label, rect) => setViewingImage({ src, label, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })} />
                   )}
                 </React.Fragment>
               ))}
@@ -534,21 +540,40 @@ export const CadTrackingSection: React.FC = () => {
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '10px' }}>More precise than the dashboard's inferred Revisions Completed tile.</p>
       </div>
 
-      {viewingImage && (
-        <div
-          onClick={() => setViewingImage(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', cursor: 'zoom-out' }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
-            <img src={viewingImage.src} alt={viewingImage.label} style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '8px', display: 'block', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }} />
-            <div style={{ marginTop: '10px', color: '#fff', fontSize: '13px', textAlign: 'center', fontWeight: 600 }}>{viewingImage.label}</div>
-            <button
-              onClick={() => setViewingImage(null)}
-              style={{ position: 'absolute', top: '-16px', right: '-16px', width: '32px', height: '32px', borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
-            >✕</button>
+      {viewingImage && (() => {
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const anchorRight = viewingImage.x > vw / 2;
+        const anchorBottom = viewingImage.y > vh / 2;
+        return (
+          <div
+            onClick={() => setViewingImage(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.15)', zIndex: 1000, cursor: 'zoom-out' }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                ...(anchorRight ? { right: Math.max(16, vw - viewingImage.x + 12) } : { left: Math.max(16, viewingImage.x + 12) }),
+                ...(anchorBottom ? { bottom: Math.max(16, vh - viewingImage.y + 12) } : { top: Math.max(16, viewingImage.y + 12) }),
+                maxWidth: 'min(420px, calc(100vw - 32px))',
+                background: 'var(--bg-card)',
+                borderRadius: '10px',
+                padding: '10px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <img src={viewingImage.src} alt={viewingImage.label} style={{ maxWidth: '400px', maxHeight: '360px', width: '100%', objectFit: 'contain', borderRadius: '6px', display: 'block' }} />
+              <div style={{ marginTop: '8px', fontSize: '12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>{viewingImage.label}</div>
+              <button
+                onClick={() => setViewingImage(null)}
+                style={{ position: 'absolute', top: '-14px', right: '-14px', width: '28px', height: '28px', borderRadius: '50%', background: '#fff', border: '1px solid var(--border)', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+              >✕</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 };
