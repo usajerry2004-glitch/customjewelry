@@ -20,14 +20,14 @@ interface SimpleMetricCustomerAgg { name: string; [metric: string]: string | num
 interface SimpleMetricTimeAgg { bucket: string; [metric: string]: string | number }
 // One real order behind a simple-metric count — enough to show "which orders
 // is this number counting" and link straight to each one.
-interface OrderRecord { personName: string; customerName: string; poNumber: string; orderId: string; bucket: string }
+interface OrderRecord { personName: string; customerName: string; poNumber: string; orderId: string; bucket: string; status?: string }
 
 interface ReportData {
   period: { type: PeriodType; from: string; to: string; label: string };
   kpis: { directOrders: Kpi; vvOrders: Kpi; cadsMade: Kpi; samplesApproved: Kpi; rejected: Kpi; awaitingRevision: Kpi; inProgress: Kpi };
   direct: { byCustomer: DirectCustomerGroup[] };
   vv: { byCustomer: DirectCustomerGroup[] };
-  cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[] };
+  cads: { byPerson: CadAgg[]; byCustomer: CadAgg[]; byTime: CadTimeAgg[]; records: OrderRecord[] };
   samples: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
   rejected: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
   revisions: { byPerson: SimpleMetricPersonAgg[]; byCustomer: SimpleMetricCustomerAgg[]; byTime: SimpleMetricTimeAgg[]; records: OrderRecord[] };
@@ -228,6 +228,23 @@ export const MonthlyProductionReport: React.FC = () => {
     if (mode === 'customer') return records.filter(r => r.customerName === rowValue);
     return records.filter(r => r.bucket === rowValue);
   };
+  // CADs Made table: every column drills the same records, "made" showing
+  // all of them and the other three filtered to the status that column counts.
+  const CAD_COLUMN_STATUS: Record<(typeof CADS_SERIES)[number]['key'], string | null> = {
+    made: null,
+    approved: 'APPROVED',
+    rejected: 'REJECTED',
+    revised: 'REVISION_REQUESTED',
+  };
+  const getCadDrillRows = (mode: BreakdownMode, rowValue: string, column: (typeof CADS_SERIES)[number]['key']): OrderRecord[] => {
+    if (!data) return [];
+    let records = data.cads.records;
+    if (mode === 'person') records = records.filter(r => r.personName === rowValue);
+    else if (mode === 'customer') records = records.filter(r => r.customerName === rowValue);
+    else records = records.filter(r => r.bucket === rowValue);
+    const status = CAD_COLUMN_STATUS[column];
+    return status ? records.filter(r => r.status === status) : records;
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -302,12 +319,22 @@ export const MonthlyProductionReport: React.FC = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>{unit === 'day' ? 'Day' : 'Month'}</th>{CADS_SERIES.map(s => <th key={s.key} style={thStyle}>{s.label}</th>)}</tr></thead>
               <tbody>
-                {data.cads.byTime.map(b => (
-                  <tr key={b.bucket}>
-                    <td style={{ ...tdStyle, textAlign: 'left' }}>{bucketFullLabel(b.bucket, unit)}</td>
-                    {CADS_SERIES.map(s => <td key={s.key} style={{ ...tdStyle, color: s.color, fontWeight: 700 }}>{(b as any)[s.key]}</td>)}
-                  </tr>
-                ))}
+                {data.cads.byTime.map(b => {
+                  const openCol = drillRowKey && drillRowKey.startsWith(`cads::time::${b.bucket}::`) ? drillRowKey.split('::')[3] : null;
+                  return (
+                    <React.Fragment key={b.bucket}>
+                      <tr>
+                        <td style={{ ...tdStyle, textAlign: 'left' }}>{bucketFullLabel(b.bucket, unit)}</td>
+                        {CADS_SERIES.map(s => {
+                          const val = (b as any)[s.key] as number;
+                          const rowKey = `cads::time::${b.bucket}::${s.key}`;
+                          return <td key={s.key} style={{ ...tdStyle, color: s.color, fontWeight: 700, cursor: val > 0 ? 'pointer' : 'default' }} onClick={() => val > 0 && setDrillRowKey(drillRowKey === rowKey ? null : rowKey)}>{val}</td>;
+                        })}
+                      </tr>
+                      {openCol && <OrderDrillRow colSpan={1 + CADS_SERIES.length} rows={getCadDrillRows('time', b.bucket, openCol as any)} onClose={() => setDrillRowKey(null)} onOpenOrder={openOrder} />}
+                    </React.Fragment>
+                  );
+                })}
                 <tr>
                   <td style={{ ...tdStyle, textAlign: 'left', borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
                   {CADS_SERIES.map(s => <td key={s.key} style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', color: s.color, fontWeight: 700 }}>{data.cads.byTime.reduce((a, b) => a + (b as any)[s.key], 0)}</td>)}
@@ -355,15 +382,22 @@ export const MonthlyProductionReport: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><th style={{ ...thStyle, textAlign: 'left' }}>{mode === 'person' ? 'CAD Person' : 'Customer'}</th><th style={thStyle}>CADs Made</th><th style={thStyle}>Approved</th><th style={thStyle}>Rejected</th><th style={thStyle}>Revised</th></tr></thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.name}>
-                  <td style={nameCellStyle}>{r.name}</td>
-                  <td style={{ ...tdStyle, color: '#4338CA', fontWeight: 700 }}>{r.made}</td>
-                  <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 700 }}>{r.approved}</td>
-                  <td style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 700 }}>{r.rejected}</td>
-                  <td style={{ ...tdStyle, color: '#8B5CF6', fontWeight: 700 }}>{r.revised}</td>
-                </tr>
-              ))}
+              {rows.map(r => {
+                const openCol = drillRowKey && drillRowKey.startsWith(`cads::${mode}::${r.name}::`) ? drillRowKey.split('::')[3] : null;
+                return (
+                  <React.Fragment key={r.name}>
+                    <tr>
+                      <td style={nameCellStyle}>{r.name}</td>
+                      {CADS_SERIES.map(s => {
+                        const val = (r as any)[s.key] as number;
+                        const rowKey = `cads::${mode}::${r.name}::${s.key}`;
+                        return <td key={s.key} style={{ ...tdStyle, color: s.color, fontWeight: 700, cursor: val > 0 ? 'pointer' : 'default' }} onClick={() => val > 0 && setDrillRowKey(drillRowKey === rowKey ? null : rowKey)}>{val}</td>;
+                      })}
+                    </tr>
+                    {openCol && <OrderDrillRow colSpan={1 + CADS_SERIES.length} rows={getCadDrillRows(mode, r.name, openCol as any)} onClose={() => setDrillRowKey(null)} onOpenOrder={openOrder} />}
+                  </React.Fragment>
+                );
+              })}
               {rows.length === 0 && <tr><td style={tdStyle} colSpan={5}>No CAD files this period.</td></tr>}
             </tbody>
           </table>
@@ -442,7 +476,7 @@ export const MonthlyProductionReport: React.FC = () => {
             : key === 'samples'
             ? 'A proxy metric — see the note above.'
             : "Reflects each style's current status, not a one-time completion event — a style can cycle through revision more than once."}
-          {key !== 'cads' && ' Click any number above (in Simple view) to see the exact orders behind it, and open one directly.'}
+          {' Click any number above (in Simple view) to see the exact orders behind it, and open one directly.'}
         </div>
       </>
     );

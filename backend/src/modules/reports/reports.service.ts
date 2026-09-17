@@ -717,6 +717,18 @@ export class ReportsService {
       byPerson: sortedAgg(byPersonMap),
       byCustomer: sortedAgg(byCustomerMap),
       byTime: this.bucketRange(from, to, periodType).map(bucket => ({ bucket, ...(byTimeMap.get(bucket) || this.emptyCadAgg()) })),
+      // One row per style group, every status included (unlike the four
+      // records lists below, which are each pre-filtered to one status) —
+      // lets the CADs Made table's own Made/Approved/Rejected/Revised
+      // columns each drill into exactly the orders behind that cell.
+      records: cadRows.map(r => ({
+        personName: r.cadPersonName || 'Unassigned',
+        customerName: r.storeName || r.customerFullName || 'Unknown',
+        poNumber: r.poNumber || r.orderId,
+        orderId: r.orderId,
+        bucket: this.bucketKey(new Date(r.createdAt), periodType),
+        status: r.status,
+      })),
     };
 
     // ── Samples Approved, Rejected, Awaiting Revision, Still In Progress —
