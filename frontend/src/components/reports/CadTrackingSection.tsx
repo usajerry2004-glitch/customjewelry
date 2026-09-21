@@ -182,6 +182,14 @@ export const CadTrackingSection: React.FC = () => {
   const revAllRows = [...people].sort((a, b) => b.revisions - a.revisions);
   const revVisibleRows = revShowAll ? revAllRows : revAllRows.slice(0, SHOW_LIMIT);
 
+  // Same row shape as the DrillRow detail table (minus Image, which a CSV
+  // cell can't hold) — used so every "Download CSV" button can include the
+  // full detail behind its numbers, not just the grid totals.
+  const detailRows = (rows: CadRecord[]): (string | number)[][] =>
+    [...rows]
+      .sort((a, b) => a.d.localeCompare(b.d) || a.p.localeCompare(b.p))
+      .map(r => [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', r.os ? (STATUS_CONFIG[r.os]?.label || r.os) : '']);
+
   const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
     setGridDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
   };
@@ -208,7 +216,17 @@ export const CadTrackingSection: React.FC = () => {
             </div>
             <p style={descStyle}>How many styles each CAD person touched, per day. Click a name to split it into Kira vs V+V; click any number to see the exact style rows behind it.</p>
           </div>
-          <button style={downloadBtnStyle} onClick={() => downloadCsv(`Daily_Per_Person_Style_Count_${dateFrom}_${dateTo}.csv`, ['Person', ...dates.map(d => dateLabels[d]), 'Total'], people.map(p => [p.name, ...personCounts(p), p.total]))}>⬇ Download CSV</button>
+          <button style={downloadBtnStyle} onClick={() => downloadCsv(
+            `Daily_Per_Person_Style_Count_${dateFrom}_${dateTo}.csv`,
+            ['Person', ...dates.map(d => dateLabels[d]), 'Total'],
+            [
+              ...people.map(p => [p.name, ...personCounts(p), p.total]),
+              [],
+              ['Detail rows — every style behind the grid above (what you\'d see clicking each number)'],
+              ['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Order Status'],
+              ...detailRows(records),
+            ],
+          )}>⬇ Download CSV</button>
         </div>
 
         {channelLens !== 'all' && (
@@ -346,6 +364,10 @@ export const CadTrackingSection: React.FC = () => {
             <button style={downloadBtnStyle} onClick={() => {
               const rows: (string | number)[][] = [];
               people.forEach(p => { rows.push([p.name, '', ...p.counts, p.total]); if (!ccCollapsed) { rows.push(['↳ Kira', '', ...p.kira, p.kiraTotal]); rows.push(['↳ V+V', '', ...p.vv, p.vvTotal]); } });
+              rows.push([]);
+              rows.push(['Detail rows — every style behind the grid above (what you\'d see clicking a person)']);
+              rows.push(['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Order Status']);
+              rows.push(...detailRows(records));
               downloadCsv(`Cad_Report_by_Channel_${dateFrom}_${dateTo}.csv`, ['Person', 'Channel', ...dates.map(d => dateLabels[d]), 'Total'], rows);
             }}>⬇ Download CSV</button>
           </div>
@@ -404,8 +426,15 @@ export const CadTrackingSection: React.FC = () => {
               <button style={pillStyle(arSort === 'styles')} onClick={() => { setArSort('styles'); setArShowAll(false); }}>By Styles Made</button>
               <button style={pillStyle(arSort === 'rate')} onClick={() => { setArSort('rate'); setArShowAll(false); }}>By Approval Rate</button>
             </div>
-            <button style={downloadBtnStyle} onClick={() => downloadCsv(`Approval_Rate_${dateFrom}_${dateTo}.csv`, ['Person', 'Styles Made', 'Approved', 'Approval Rate %'],
-              people.filter(p => p.approvalStyles > 0).map(p => [p.name, p.approvalStyles, p.approvalApproved, (p.approvalApproved / p.approvalStyles * 100).toFixed(1)]))}>⬇ Download CSV</button>
+            <button style={downloadBtnStyle} onClick={() => {
+              const arRows = people.filter(p => p.approvalStyles > 0);
+              const rows: (string | number)[][] = arRows.map(p => [p.name, p.approvalStyles, p.approvalApproved, (p.approvalApproved / p.approvalStyles * 100).toFixed(1)]);
+              rows.push([]);
+              rows.push(['Detail rows — every style behind each person\'s numbers above (what you\'d see clicking a person)']);
+              rows.push(['Person', 'Style No.', 'Date', 'Family', 'Approved']);
+              arRows.forEach(p => p.approvalDetail.forEach(s => rows.push([p.name, s.style, dateLabels[s.date] || s.date, s.family, s.approved ? 'Yes' : 'No'])));
+              downloadCsv(`Approval_Rate_${dateFrom}_${dateTo}.csv`, ['Person', 'Styles Made', 'Approved', 'Approval Rate %'], rows);
+            }}>⬇ Download CSV</button>
           </div>
         </div>
         <div style={{ overflowX: 'auto', marginTop: '14px' }}>
@@ -502,8 +531,14 @@ export const CadTrackingSection: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={titleStyle}>Revision Activity</span></div>
             <p style={descStyle}>Orders touched more than once by the same person — a real, per-style revision count, not inferred. Click a person to see which styles.</p>
           </div>
-          <button style={downloadBtnStyle} onClick={() => downloadCsv(`Revision_Activity_${dateFrom}_${dateTo}.csv`, ['Person', 'Distinct Styles', 'Total Entries', 'Revisions'],
-            revAllRows.map(p => [p.name, p.distinctStyles, p.totalEntries, p.revisions]))}>⬇ Download CSV</button>
+          <button style={downloadBtnStyle} onClick={() => {
+            const rows: (string | number)[][] = revAllRows.map(p => [p.name, p.distinctStyles, p.totalEntries, p.revisions]);
+            rows.push([]);
+            rows.push(['Detail rows — every style behind each person\'s numbers above (what you\'d see clicking a person)']);
+            rows.push(['Person', 'Style No.', 'Days Touched', 'Count']);
+            revAllRows.forEach(p => p.revisionStyles.forEach(s => rows.push([p.name, s.style, s.dates.map(d => dateLabels[d] || d).join('; '), s.count])));
+            downloadCsv(`Revision_Activity_${dateFrom}_${dateTo}.csv`, ['Person', 'Distinct Styles', 'Total Entries', 'Revisions'], rows);
+          }}>⬇ Download CSV</button>
         </div>
         <div style={{ overflowX: 'auto', marginTop: '14px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
