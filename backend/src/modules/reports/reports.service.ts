@@ -846,6 +846,7 @@ export class ReportsService {
       .addSelect('o.storeName', 'storeName')
       .addSelect('o.customerFullName', 'customerFullName')
       .addSelect('o.customerCodeName', 'customerCodeName')
+      .addSelect('o.status', 'orderStatus')
       .orderBy('cf.createdAt', 'ASC')
       .getRawMany();
 
@@ -882,6 +883,7 @@ export class ReportsService {
       s: r.poNumber || r.orderId,
       f: this.classifyFamily(r.storeName, r.customerFullName, r.customerCodeName),
       a: r.status === CadFileStatus.APPROVED,
+      os: r.orderStatus as string | null,
       n: (isResubmission(r.orderId, new Date(r.createdAt)) ? 'R' : 'N') as 'N' | 'R',
       img: isImageFile(r.originalName || r.fileName || '') ? (r.thumbnailPath || r.filePath || `/uploads/cad/${r.fileName}`) : null,
     }));
@@ -896,13 +898,14 @@ export class ReportsService {
     // Touching the same style again on a LATER day still counts separately
     // here — that's real day-by-day activity, and Revision Activity below
     // relies on exactly that to detect a style touched on more than one day.
-    const dayGroups = new Map<string, { d: string; p: string; s: string; f: 'Kira' | 'V+V'; a: boolean; n: 'N' | 'R'; img: string | null }>();
+    const dayGroups = new Map<string, { d: string; p: string; s: string; f: 'Kira' | 'V+V'; a: boolean; os: string | null; n: 'N' | 'R'; img: string | null }>();
     for (const r of rawRecords) {
       const key = `${r.p}::${r.s}::${r.d}`;
       const g = dayGroups.get(key);
       if (!g) dayGroups.set(key, { ...r });
       else {
         g.a = r.a; // rows are ASC by createdAt — the last one seen is this day's latest
+        g.os = r.os; // the order's current status, not this file's — same on every row for the order, but keep in step with the rest
         g.n = r.n;
         if (r.img) g.img = r.img;
       }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { downloadCsv } from '../../utils/csvExport';
+import { STATUS_CONFIG } from '../../utils/types';
 
 interface ApprovalDetail { style: string; date: string; approved: boolean; family: string }
 interface RevisionStyle { style: string; dates: string[]; count: number }
@@ -9,7 +10,7 @@ interface PersonRow {
   approvalStyles: number; approvalApproved: number; approvalDetail: ApprovalDetail[];
   revisionStyles: RevisionStyle[]; distinctStyles: number; totalEntries: number; revisions: number;
 }
-interface CadRecord { d: string; p: string; s: string; f: string; a: boolean; n: 'N' | 'R'; img: string | null }
+interface CadRecord { d: string; p: string; s: string; f: string; a: boolean; os: string | null; n: 'N' | 'R'; img: string | null }
 interface CadTrackingData {
   dates: string[]; dateLabels: Record<string, string>; people: PersonRow[];
   channel: Record<string, { styles: number; approvals: number }>; records: CadRecord[];
@@ -79,7 +80,7 @@ function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpa
               <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Family</th>
               <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }} title="New design (first upload) or a resubmission after a revision request">New/Rev</th>
               <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Image</th>
-              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Approved</th>
+              <th style={{ ...thStyle, position: 'sticky', top: 0, background: 'var(--bg-input)' }}>Order Status</th>
             </tr></thead>
             <tbody>
               {rows.length ? rows.map((r, i) => (
@@ -102,7 +103,12 @@ function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpa
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
                     )}
                   </td>
-                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>{r.a ? '✅' : '—'}</td>
+                  <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>
+                    {r.os ? (() => {
+                      const cfg = STATUS_CONFIG[r.os] || { label: r.os, color: 'var(--text-secondary)', bg: 'var(--bg-input)' };
+                      return <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, color: cfg.color, background: cfg.bg, borderRadius: '5px', padding: '2px 8px' }}>{cfg.label}</span>;
+                    })() : <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>}
+                  </td>
                 </tr>
               )) : <tr><td colSpan={7} style={{ ...tdStyle, background: 'var(--bg-card)', textAlign: 'center', color: 'var(--text-muted)' }}>No rows match.</td></tr>}
             </tbody>
