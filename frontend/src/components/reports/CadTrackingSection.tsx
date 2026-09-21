@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { downloadCsv } from '../../utils/csvExport';
-import { STATUS_CONFIG } from '../../utils/types';
+import { STATUS_CONFIG, getCadSubLabel } from '../../utils/types';
 
 interface ApprovalDetail { style: string; date: string; approved: boolean; family: string }
 interface RevisionStyle { style: string; dates: string[]; count: number }
@@ -10,7 +10,7 @@ interface PersonRow {
   approvalStyles: number; approvalApproved: number; approvalDetail: ApprovalDetail[];
   revisionStyles: RevisionStyle[]; distinctStyles: number; totalEntries: number; revisions: number;
 }
-interface CadRecord { d: string; p: string; s: string; f: string; a: boolean; os: string | null; n: 'N' | 'R'; img: string | null }
+interface CadRecord { d: string; p: string; s: string; f: string; a: boolean; os: string | null; cadSubStatus: string | null; sentToCustomer: boolean; n: 'N' | 'R'; img: string | null }
 interface CadTrackingData {
   dates: string[]; dateLabels: Record<string, string>; people: PersonRow[];
   channel: Record<string, { styles: number; approvals: number }>; records: CadRecord[];
@@ -106,7 +106,8 @@ function DrillRow({ colSpan, title, sub, rows, onClose, onImageClick }: { colSpa
                   <td style={{ ...tdStyle, background: 'var(--bg-card)' }}>
                     {r.os ? (() => {
                       const cfg = STATUS_CONFIG[r.os] || { label: r.os, color: 'var(--text-secondary)', bg: 'var(--bg-input)' };
-                      return <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, color: cfg.color, background: cfg.bg, borderRadius: '5px', padding: '2px 8px' }}>{cfg.label}</span>;
+                      const subLabel = r.os === 'CAD_IN_PROGRESS' ? getCadSubLabel(r) : null;
+                      return <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, color: cfg.color, background: cfg.bg, borderRadius: '5px', padding: '2px 8px' }}>{subLabel || cfg.label}</span>;
                     })() : <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>}
                   </td>
                 </tr>
@@ -188,7 +189,11 @@ export const CadTrackingSection: React.FC = () => {
   const detailRows = (rows: CadRecord[]): (string | number)[][] =>
     [...rows]
       .sort((a, b) => a.d.localeCompare(b.d) || a.p.localeCompare(b.p))
-      .map(r => [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', r.os ? (STATUS_CONFIG[r.os]?.label || r.os) : '']);
+      .map(r => {
+        const subLabel = r.os === 'CAD_IN_PROGRESS' ? getCadSubLabel(r) : null;
+        const statusLabel = r.os ? (subLabel || STATUS_CONFIG[r.os]?.label || r.os) : '';
+        return [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', statusLabel];
+      });
 
   const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
     setGridDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
