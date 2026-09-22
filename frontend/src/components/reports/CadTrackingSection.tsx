@@ -183,16 +183,16 @@ export const CadTrackingSection: React.FC = () => {
   const revAllRows = [...people].sort((a, b) => b.revisions - a.revisions);
   const revVisibleRows = revShowAll ? revAllRows : revAllRows.slice(0, SHOW_LIMIT);
 
-  // Same row shape as the DrillRow detail table (minus Image, which a CSV
-  // cell can't hold) — used so every "Download CSV" button can include the
-  // full detail behind its numbers, not just the grid totals.
+  // Same row shape as the DrillRow detail table — a CSV cell can't hold an
+  // embedded thumbnail, so Image is the image's direct URL instead (opens
+  // the picture in a click, same as clicking the thumbnail on the dashboard).
   const detailRows = (rows: CadRecord[]): (string | number)[][] =>
     [...rows]
       .sort((a, b) => a.d.localeCompare(b.d) || a.p.localeCompare(b.p))
       .map(r => {
         const subLabel = r.os === 'CAD_IN_PROGRESS' ? getCadSubLabel(r) : null;
         const statusLabel = r.os ? (subLabel || STATUS_CONFIG[r.os]?.label || r.os) : '';
-        return [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', statusLabel];
+        return [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', r.img || '', statusLabel];
       });
 
   const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
@@ -228,7 +228,7 @@ export const CadTrackingSection: React.FC = () => {
               ...people.map(p => [p.name, ...personCounts(p), p.total]),
               [],
               ['Detail rows — every style behind the grid above (what you\'d see clicking each number)'],
-              ['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Order Status'],
+              ['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Image', 'Order Status'],
               ...detailRows(records),
             ],
           )}>⬇ Download CSV</button>
@@ -371,7 +371,7 @@ export const CadTrackingSection: React.FC = () => {
               people.forEach(p => { rows.push([p.name, '', ...p.counts, p.total]); if (!ccCollapsed) { rows.push(['↳ Kira', '', ...p.kira, p.kiraTotal]); rows.push(['↳ V+V', '', ...p.vv, p.vvTotal]); } });
               rows.push([]);
               rows.push(['Detail rows — every style behind the grid above (what you\'d see clicking a person)']);
-              rows.push(['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Order Status']);
+              rows.push(['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Image', 'Order Status']);
               rows.push(...detailRows(records));
               downloadCsv(`Cad_Report_by_Channel_${dateFrom}_${dateTo}.csv`, ['Person', 'Channel', ...dates.map(d => dateLabels[d]), 'Total'], rows);
             }}>⬇ Download CSV</button>
