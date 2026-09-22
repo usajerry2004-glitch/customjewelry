@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Request, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -93,5 +94,15 @@ export class ReportsController {
   @ApiOperation({ summary: 'Admin-only Reports tab: per-CAD-person daily style counts, split by Kira/V+V channel, approval rate, and revision activity, computed live from cad_files + orders (?dateFrom/?dateTo, YYYY-MM-DD, default last 7 days).' })
   cadTracking(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
     return this.reportsService.getCadTrackingReport(dateFrom, dateTo);
+  }
+
+  @Get('cad-tracking/export')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Same data as GET cad-tracking, as a downloadable .xlsx workbook (Style Count + By Channel + Detail sheets, Detail with each style\'s thumbnail actually embedded, not just linked).' })
+  async exportCadTracking(@Query('dateFrom') dateFrom: string, @Query('dateTo') dateTo: string, @Res() res: Response) {
+    const buffer = await this.reportsService.exportCadTrackingWorkbook(dateFrom, dateTo);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="CAD_Tracking_${dateFrom}_${dateTo}.xlsx"`);
+    res.send(buffer);
   }
 }

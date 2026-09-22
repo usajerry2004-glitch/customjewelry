@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch, API } from '../../utils/apiFetch';
 import { downloadCsv } from '../../utils/csvExport';
 import { STATUS_CONFIG, getCadSubLabel } from '../../utils/types';
+import { toast } from '../../utils/toast';
 
 interface ApprovalDetail { style: string; date: string; approved: boolean; family: string }
 interface RevisionStyle { style: string; dates: string[]; count: number }
@@ -184,15 +185,17 @@ export const CadTrackingSection: React.FC = () => {
   const revVisibleRows = revShowAll ? revAllRows : revAllRows.slice(0, SHOW_LIMIT);
 
   // Same row shape as the DrillRow detail table — a CSV cell can't hold an
-  // embedded thumbnail, so Image is the image's direct URL instead (opens
-  // the picture in a click, same as clicking the thumbnail on the dashboard).
+  // embedded thumbnail, so Image is a =HYPERLINK(...) formula instead: Excel
+  // (and Sheets) evaluate a leading "=" in an opened CSV as a real formula,
+  // rendering a clickable "View Image" link rather than a raw URL string.
   const detailRows = (rows: CadRecord[]): (string | number)[][] =>
     [...rows]
       .sort((a, b) => a.d.localeCompare(b.d) || a.p.localeCompare(b.p))
       .map(r => {
         const subLabel = r.os === 'CAD_IN_PROGRESS' ? getCadSubLabel(r) : null;
         const statusLabel = r.os ? (subLabel || STATUS_CONFIG[r.os]?.label || r.os) : '';
-        return [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', r.img || '', statusLabel];
+        const imageCell = r.img ? `=HYPERLINK("${r.img}","View Image")` : '';
+        return [dateLabels[r.d] || r.d, r.p, r.s, r.f, r.n === 'R' ? 'Revision' : 'New', imageCell, statusLabel];
       });
 
   const toggleGridDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
@@ -200,6 +203,32 @@ export const CadTrackingSection: React.FC = () => {
   };
   const toggleChannelDrill = (key: string, title: string, sub: string, filter: (r: CadRecord) => boolean) => {
     setChannelDrill(cur => cur?.key === key ? null : { key, title, sub, rows: records.filter(filter) });
+  };
+
+  // A CSV cell can't hold an embedded picture — this hits a backend endpoint
+  // that builds a real .xlsx (Style Count + By Channel + Detail, Detail with
+  // each style's actual thumbnail embedded) and downloads it as a file, same
+  // auth-then-blob pattern used for CAD file downloads elsewhere.
+  const [exportingWorkbook, setExportingWorkbook] = useState(false);
+  const downloadWorkbook = async () => {
+    setExportingWorkbook(true);
+    try {
+      const res = await apiFetch(`${API}/reports/cad-tracking/export?dateFrom=${dateFrom}&dateTo=${dateTo}`);
+      if (!res.ok) { toast.error('Failed to generate the Excel file. Please try again.'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CAD_Tracking_${dateFrom}_${dateTo}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally {
+      setExportingWorkbook(false);
+    }
   };
 
   return (
@@ -221,17 +250,22 @@ export const CadTrackingSection: React.FC = () => {
             </div>
             <p style={descStyle}>How many styles each CAD person touched, per day. Click a name to split it into Kira vs V+V; click any number to see the exact style rows behind it.</p>
           </div>
-          <button style={downloadBtnStyle} onClick={() => downloadCsv(
-            `Daily_Per_Person_Style_Count_${dateFrom}_${dateTo}.csv`,
-            ['Person', ...dates.map(d => dateLabels[d]), 'Total'],
-            [
-              ...people.map(p => [p.name, ...personCounts(p), p.total]),
-              [],
-              ['Detail rows — every style behind the grid above (what you\'d see clicking each number)'],
-              ['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Image', 'Order Status'],
-              ...detailRows(records),
-            ],
-          )}>⬇ Download CSV</button>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <button style={downloadBtnStyle} onClick={() => downloadCsv(
+              `Daily_Per_Person_Style_Count_${dateFrom}_${dateTo}.csv`,
+              ['Person', ...dates.map(d => dateLabels[d]), 'Total'],
+              [
+                ...people.map(p => [p.name, ...personCounts(p), p.total]),
+                [],
+                ['Detail rows — every style behind the grid above (what you\'d see clicking each number)'],
+                ['Date', 'Person', 'Style No.', 'Family', 'New/Rev', 'Image', 'Order Status'],
+                ...detailRows(records),
+              ],
+            )}>⬇ Download CSV</button>
+            <button style={downloadBtnStyle} onClick={downloadWorkbook} disabled={exportingWorkbook}>
+              {exportingWorkbook ? 'Generating…' : '⬇ Download Excel (with images)'}
+            </button>
+          </div>
         </div>
 
         {channelLens !== 'all' && (

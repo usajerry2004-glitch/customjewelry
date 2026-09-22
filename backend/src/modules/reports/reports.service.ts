@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, ILike, In, Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
+import * as ExcelJS from 'exceljs';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { CadFile, CadFileStatus } from '../../database/entities/cad-file.entity';
 import { OrderEvent } from '../../database/entities/order-event.entity';
@@ -13,6 +14,38 @@ const REFERENCE_NOTE_TAGS = new Set(['Reference image', 'Customer reference imag
 const MANUFACTURING_LIMIT_DAYS = 6;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REPORT_RECIPIENT = 'mehul@kirajewels.one';
+
+// Mirrors STATUS_CONFIG's labels (frontend/src/utils/types.ts) — kept as a
+// small local map here rather than shared, since it only needs to feed one
+// export column and rarely changes.
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  NEW: 'New',
+  CAD_IN_PROGRESS: 'CAD In Progress',
+  VPO_ISSUED: 'VPO Issued',
+  MANUFACTURED: 'Manufactured',
+  SHIPPED: 'Shipped',
+  REPAIR: 'Repair',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+// Mirrors getCadSubLabel() (frontend/src/utils/types.ts) exactly, including
+// checking sentToCustomer ahead of cadSubStatus — see that function's own
+// comment for why.
+function cadSubLabel(cadSubStatus: string | null, sentToCustomer: boolean): string | null {
+  if (sentToCustomer) return 'Awaiting Approval';
+  if (!cadSubStatus) return 'Pending CAD';
+  if (cadSubStatus === 'REVISION') return 'Revision';
+  if (cadSubStatus === 'REJECTED') return 'Rejected';
+  if (cadSubStatus === 'UPLOADED') return 'Awaiting Quote';
+  return null;
+}
+
+function orderStatusLabel(os: string | null, cadSubStatus: string | null, sentToCustomer: boolean): string {
+  if (!os) return '';
+  const sub = os === 'CAD_IN_PROGRESS' ? cadSubLabel(cadSubStatus, sentToCustomer) : null;
+  return sub || ORDER_STATUS_LABELS[os] || os;
+}
 
 const msToDays = (ms: number | null): number | null => (ms === null ? null : ms / DAY_MS);
 const avg = (arr: number[]): number | null => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
@@ -957,5 +990,87 @@ export class ReportsService {
     });
 
     return { dates, dateLabels, people, channel, records };
+  }
+
+  // Builds the same data as getCadTrackingReport() into a real .xlsx, with
+  // the Detail sheet's Image column holding actual embedded thumbnails
+  // rather than a URL/link — a plain CSV can't hold an embedded image at
+  // all, and even a =HYPERLINK() formula still needs a click-through.
+  async exportCadTrackingWorkbook(dateFromParam?: string, dateToParam?: string): Promise<Buffer> {
+    const { dates, dateLabels, people, records } = await this.getCadTrackingReport(dateFromParam, dateToParam);
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'JewelFlow OS';
+    wb.created = new Date();
+
+    const countSheet = wb.addWorksheet('Style Count');
+    countSheet.addRow(['Person', ...dates.map(d => dateLabels[d]), 'Total']).font = { bold: true };
+    for (const p of people) countSheet.addRow([p.name, ...p.counts, p.total]);
+
+    const channelSheet = wb.addWorksheet('By Channel');
+    channelSheet.addRow(['Person', 'Channel', ...dates.map(d => dateLabels[d]), 'Total']).font = { bold: true };
+    for (const p of people) {
+      channelSheet.addRow([p.name, '', ...p.counts, p.total]);
+      channelSheet.addRow(['↳ Kira', '', ...p.kira, p.kiraTotal]);
+      channelSheet.addRow(['↳ V+V', '', ...p.vv, p.vvTotal]);
+    }
+
+    const detailSheet = wb.addWorksheet('Detail');
+    detailSheet.columns = [
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Person', key: 'person', width: 16 },
+      { header: 'Style No.', key: 'style', width: 14 },
+      { header: 'Family', key: 'family', width: 10 },
+      { header: 'New/Rev', key: 'newRev', width: 10 },
+      { header: 'Image', key: 'image', width: 14 },
+      { header: 'Order Status', key: 'status', width: 18 },
+    ];
+    detailSheet.getRow(1).font = { bold: true };
+
+    const sortedRecords = [...records].sort((a, b) => a.d.localeCompare(b.d) || a.p.localeCompare(b.p));
+
+    // Fetch every distinct image up front, in parallel — a week of activity
+    // can have 100+ image rows, and fetching one at a time per row would
+    // make this endpoint painfully slow. Capped so an unusually wide date
+    // range can't turn this into an unbounded fetch storm.
+    const MAX_EMBEDDED_IMAGES = 400;
+    const imageUrls = Array.from(new Set(sortedRecords.map(r => r.img).filter((u): u is string => !!u))).slice(0, MAX_EMBEDDED_IMAGES);
+    const imageBuffers = new Map<string, { buffer: Buffer; extension: 'jpeg' | 'png' | 'gif' }>();
+    await Promise.all(imageUrls.map(async url => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const lower = url.toLowerCase();
+        const extension: 'jpeg' | 'png' | 'gif' = lower.endsWith('.png') ? 'png' : lower.endsWith('.gif') ? 'gif' : 'jpeg';
+        imageBuffers.set(url, { buffer, extension });
+      } catch {
+        // Leave that row's Image cell blank rather than failing the whole export.
+      }
+    }));
+
+    sortedRecords.forEach((r, i) => {
+      const rowNumber = i + 2; // header occupies row 1
+      detailSheet.addRow({
+        date: dateLabels[r.d] || r.d,
+        person: r.p,
+        style: r.s,
+        family: r.f,
+        newRev: r.n === 'R' ? 'Revision' : 'New',
+        image: '',
+        status: orderStatusLabel(r.os, r.cadSubStatus, r.sentToCustomer),
+      });
+      detailSheet.getRow(rowNumber).height = 60;
+      const img = r.img ? imageBuffers.get(r.img) : undefined;
+      if (img) {
+        // exceljs's bundled .d.ts predates @types/node's generic Buffer<T> —
+        // a real Buffer at runtime either way, this is a type-decl mismatch only.
+        const imageId = wb.addImage({ buffer: img.buffer as any, extension: img.extension });
+        detailSheet.addImage(imageId, { tl: { col: 5, row: rowNumber - 1 }, ext: { width: 60, height: 60 } });
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }
