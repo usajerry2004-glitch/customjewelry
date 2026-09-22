@@ -508,7 +508,7 @@ export const MonthlyProductionReport: React.FC = () => {
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px', marginTop: '16px', marginBottom: '18px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${TILES.length}, 1fr)`, gap: '12px', marginTop: '16px', marginBottom: '18px', overflowX: 'auto' }}>
             {TILES.map(t => {
               const kpi = data.kpis[TILE_KPI_KEY[t.key]];
               const isSelected = selectedTile === t.key;
