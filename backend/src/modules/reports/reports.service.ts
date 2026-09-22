@@ -997,7 +997,7 @@ export class ReportsService {
   // rather than a URL/link — a plain CSV can't hold an embedded image at
   // all, and even a =HYPERLINK() formula still needs a click-through.
   async exportCadTrackingWorkbook(dateFromParam?: string, dateToParam?: string): Promise<Buffer> {
-    const { dates, dateLabels, people, records } = await this.getCadTrackingReport(dateFromParam, dateToParam);
+    const { dates, dateLabels, people, channel, records } = await this.getCadTrackingReport(dateFromParam, dateToParam);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'JewelFlow OS';
@@ -1014,6 +1014,31 @@ export class ReportsService {
       channelSheet.addRow(['↳ Kira', '', ...p.kira, p.kiraTotal]);
       channelSheet.addRow(['↳ V+V', '', ...p.vv, p.vvTotal]);
     }
+
+    const approvalRows = people.filter(p => p.approvalStyles > 0);
+    const approvalSheet = wb.addWorksheet('Approval Rate');
+    approvalSheet.addRow(['Person', 'Styles Made', 'Approved', 'Approval Rate %']).font = { bold: true };
+    for (const p of approvalRows) approvalSheet.addRow([p.name, p.approvalStyles, p.approvalApproved, Number((p.approvalApproved / p.approvalStyles * 100).toFixed(1))]);
+    approvalSheet.addRow([]);
+    approvalSheet.addRow(['Detail — every style behind each person\'s numbers above']).font = { italic: true };
+    approvalSheet.addRow(['Person', 'Style No.', 'Date', 'Family', 'Approved']).font = { bold: true };
+    for (const p of approvalRows) for (const s of p.approvalDetail) approvalSheet.addRow([p.name, s.style, dateLabels[s.date] || s.date, s.family, s.approved ? 'Yes' : 'No']);
+
+    const comparisonSheet = wb.addWorksheet('Channel Comparison');
+    comparisonSheet.addRow(['Channel', 'Styles', 'Approvals', 'Approval Rate %']).font = { bold: true };
+    for (const ch of ['Kira', 'V+V'] as const) {
+      const c = channel[ch] || { styles: 0, approvals: 0 };
+      comparisonSheet.addRow([ch, c.styles, c.approvals, c.styles ? Number((c.approvals / c.styles * 100).toFixed(1)) : 0]);
+    }
+
+    const revRows = [...people].sort((a, b) => b.revisions - a.revisions);
+    const revisionSheet = wb.addWorksheet('Revision Activity');
+    revisionSheet.addRow(['Person', 'Distinct Styles', 'Total Entries', 'Revisions']).font = { bold: true };
+    for (const p of revRows) revisionSheet.addRow([p.name, p.distinctStyles, p.totalEntries, p.revisions]);
+    revisionSheet.addRow([]);
+    revisionSheet.addRow(['Detail — every style behind each person\'s numbers above']).font = { italic: true };
+    revisionSheet.addRow(['Person', 'Style No.', 'Days Touched', 'Count']).font = { bold: true };
+    for (const p of revRows) for (const s of p.revisionStyles) revisionSheet.addRow([p.name, s.style, s.dates.map(d => dateLabels[d] || d).join('; '), s.count]);
 
     const detailSheet = wb.addWorksheet('Detail');
     detailSheet.columns = [
