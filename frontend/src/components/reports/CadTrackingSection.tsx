@@ -150,6 +150,8 @@ export const CadTrackingSection: React.FC = () => {
   const [revExpanded, setRevExpanded] = useState<Set<string>>(new Set());
   const [revShowAll, setRevShowAll] = useState(false);
 
+  const [exportingWorkbook, setExportingWorkbook] = useState(false);
+
   const SHOW_LIMIT = 5;
 
   useEffect(() => {
@@ -209,7 +211,6 @@ export const CadTrackingSection: React.FC = () => {
   // that builds a real .xlsx (Style Count + By Channel + Detail, Detail with
   // each style's actual thumbnail embedded) and downloads it as a file, same
   // auth-then-blob pattern used for CAD file downloads elsewhere.
-  const [exportingWorkbook, setExportingWorkbook] = useState(false);
   const downloadWorkbook = async () => {
     setExportingWorkbook(true);
     try {
