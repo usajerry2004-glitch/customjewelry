@@ -6,6 +6,9 @@ import { formatCurrency } from '../../utils/format';
 
 const API = '/api/proxy';
 
+// See the matching constant in pages/orders/[id].tsx for what this does.
+const IJEWEL3D_DRIVE_SCOPE = process.env.NEXT_PUBLIC_IJEWEL3D_DRIVE_SCOPE || '';
+
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 const STEPS = [
@@ -375,16 +378,19 @@ export default function TrackPage() {
               )}
 
               {/* 3D Viewer (iJewel3D) — gated by Company.viewerAccessEnabled (paid add-on).
-                  viewerEmbedUrl is pasted by Admin per-order after uploading the model to
-                  iJewel3D's own dashboard; nothing to show here until that's done. */}
-              {order.viewerAccessEnabled && order.viewerEmbedUrl && (
+                  Auto-embeds by tagging the model in iJewel3D Drive with this order's PO
+                  number (see IJEWEL3D_DRIVE_SCOPE); falls back to a legacy manually-pasted
+                  order.viewerEmbedUrl if one was set before this existed. */}
+              {order.viewerAccessEnabled && (order.viewerEmbedUrl || IJEWEL3D_DRIVE_SCOPE) && (
                 <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8E4DC', padding: '24px 28px', marginBottom: 20 }}>
                   <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>3D Viewer</div>
                   <iframe
-                    src={order.viewerEmbedUrl}
+                    src={order.viewerEmbedUrl || `https://ijewel3d.com/drive/files/embedded?tag=${encodeURIComponent(order.poNumber)}&scope=${encodeURIComponent(IJEWEL3D_DRIVE_SCOPE)}`}
                     title="Interactive 3D preview"
+                    loading="lazy"
                     style={{ width: '100%', aspectRatio: '4 / 3', border: '1px solid #E8E4DC', borderRadius: 8, background: '#FAF9F6' }}
-                    allow="fullscreen; xr-spatial-tracking"
+                    allow="autoplay; fullscreen; xr-spatial-tracking; web-share"
+                    allowFullScreen
                   />
                 </div>
               )}
