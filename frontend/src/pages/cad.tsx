@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
-import { apiFetch, API } from '../utils/apiFetch';
+import { apiFetch, API, getErrorMessage } from '../utils/apiFetch';
 import { toast } from '../utils/toast';
-import { CAD_PERSON_OPTIONS, CAD_PERSON_OTHER } from '../utils/cadPersons';
+import { CatalogOption, fetchCadPersonOptions, addCadPersonOption } from '../utils/catalog';
 
 interface Order { id: string; poNumber: string; storeName?: string; customerFullName?: string; status?: string; cadSubStatus?: string | null; }
 
@@ -15,8 +15,11 @@ export default function CADPage() {
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [notes, setNotes] = useState('');
   const [cadPersonSelect, setCadPersonSelect] = useState('');
-  const [cadPersonOther, setCadPersonOther] = useState('');
-  const cadPersonName = cadPersonSelect === CAD_PERSON_OTHER ? cadPersonOther.trim() : cadPersonSelect;
+  const cadPersonName = cadPersonSelect;
+  const [cadPersonOptions, setCadPersonOptions] = useState<CatalogOption[]>([]);
+  const [addingCadPerson, setAddingCadPerson] = useState(false);
+  const [newCadPersonName, setNewCadPersonName] = useState('');
+  const [savingCadPerson, setSavingCadPerson] = useState(false);
   const [verifiedByName, setVerifiedByName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedFileCount, setSelectedFileCount] = useState(0);
@@ -45,6 +48,29 @@ export default function CADPage() {
     });
   }, []);
 
+  useEffect(() => { fetchCadPersonOptions().then(setCadPersonOptions); }, []);
+
+  const submitNewCadPerson = async () => {
+    if (!newCadPersonName.trim()) return;
+    setSavingCadPerson(true);
+    try {
+      const res = await addCadPersonOption(newCadPersonName.trim());
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        setCadPersonOptions(opts => [...opts, { key: data.key, label: data.label }]);
+        setCadPersonSelect(data.key);
+        setNewCadPersonName('');
+        setAddingCadPerson(false);
+      } else {
+        toast.error(getErrorMessage(data, 'Failed to add name.'));
+      }
+    } catch {
+      toast.error('Failed to add name — check your connection and try again.');
+    } finally {
+      setSavingCadPerson(false);
+    }
+  };
+
   const upload = async () => {
     const files = fileRef.current?.files;
     if (!files || files.length === 0 || !selectedOrderId || !cadPersonName.trim() || !verifiedByName.trim()) return;
@@ -60,7 +86,6 @@ export default function CADPage() {
         toast.success('CAD file uploaded.');
         setNotes('');
         setCadPersonSelect('');
-        setCadPersonOther('');
         setVerifiedByName('');
         setSelectedOrderId('');
         setSelectedFileCount(0);
@@ -130,7 +155,6 @@ export default function CADPage() {
         setBulkItems([]);
         setNotes('');
         setCadPersonSelect('');
-        setCadPersonOther('');
         setVerifiedByName('');
         if (bulkFileRef.current) bulkFileRef.current.value = '';
       }
@@ -278,18 +302,31 @@ export default function CADPage() {
 
           <div className="cad-upload-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'end', marginTop: '12px' }}>
             <div>
-              <label style={lbl}>CAD Person Name *</label>
-              <select value={cadPersonSelect} onChange={e => setCadPersonSelect(e.target.value)} style={inp}>
-                <option value="">Select…</option>
-                {CAD_PERSON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              {cadPersonSelect === CAD_PERSON_OTHER && (
-                <input
-                  value={cadPersonOther}
-                  onChange={e => setCadPersonOther(e.target.value)}
-                  placeholder="Enter their name"
-                  style={{ ...inp, marginTop: '8px' }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>CAD Person Name *</label>
+                <button type="button" onClick={() => setAddingCadPerson(a => !a)} style={{ background: 'none', border: 'none', color: 'var(--navy)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                  {addingCadPerson ? 'Cancel' : '+ Add Name'}
+                </button>
+              </div>
+              {addingCadPerson ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    value={newCadPersonName}
+                    onChange={e => setNewCadPersonName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNewCadPerson(); } }}
+                    placeholder="New CAD person's name"
+                    autoFocus
+                    style={{ ...inp, flex: 1 }}
+                  />
+                  <button type="button" onClick={submitNewCadPerson} disabled={savingCadPerson || !newCadPersonName.trim()} style={{ background: 'var(--navy)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '0 14px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: savingCadPerson ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                    {savingCadPerson ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
+              ) : (
+                <select value={cadPersonSelect} onChange={e => setCadPersonSelect(e.target.value)} style={inp}>
+                  <option value="">Select…</option>
+                  {cadPersonOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
               )}
             </div>
             <div>

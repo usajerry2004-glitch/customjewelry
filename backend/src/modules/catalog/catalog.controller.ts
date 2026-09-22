@@ -29,6 +29,12 @@ export class CatalogController {
     return this.svc.findAll(CatalogItemKind.SUPPLY_SOURCE);
   }
 
+  @Get('cad-persons')
+  @ApiOperation({ summary: 'List CAD designers selectable on the CAD upload forms' })
+  findCadPersons() {
+    return this.svc.findAll(CatalogItemKind.CAD_PERSON);
+  }
+
   @Post('factories')
   @Roles(UserRole.ADMIN)
   @UseGuards(RolesGuard)
@@ -43,5 +49,13 @@ export class CatalogController {
   @ApiOperation({ summary: 'Add a new stone supplier to the assignable list (Admin only)' })
   createSupplySource(@Body() body: CreateCatalogItemDto) {
     return this.svc.create(CatalogItemKind.SUPPLY_SOURCE, body.label);
+  }
+
+  @Post('cad-persons')
+  @Roles(UserRole.ADMIN, UserRole.CAD_DESIGNER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Add a new CAD designer to the assignable list (Admin or CAD Designer)' })
+  createCadPerson(@Body() body: CreateCatalogItemDto) {
+    return this.svc.create(CatalogItemKind.CAD_PERSON, body.label);
   }
 }

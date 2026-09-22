@@ -8,8 +8,7 @@ import { AppLayout } from '../../components/layout/AppLayout';
 import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
-import { CAD_PERSON_OPTIONS, CAD_PERSON_OTHER } from '../../utils/cadPersons';
-import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions } from '../../utils/catalog';
+import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, fetchCadPersonOptions, addCadPersonOption } from '../../utils/catalog';
 import { OrderConversation } from '../../components/OrderConversation';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
@@ -619,8 +618,11 @@ export default function OrderDetail() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadCadPersonSelect, setUploadCadPersonSelect] = useState('');
-  const [uploadCadPersonOther, setUploadCadPersonOther] = useState('');
-  const uploadCadPerson = uploadCadPersonSelect === CAD_PERSON_OTHER ? uploadCadPersonOther.trim() : uploadCadPersonSelect;
+  const uploadCadPerson = uploadCadPersonSelect;
+  const [cadPersonOptions, setCadPersonOptions] = useState<CatalogOption[]>([]);
+  const [addingCadPerson, setAddingCadPerson] = useState(false);
+  const [newCadPersonName, setNewCadPersonName] = useState('');
+  const [savingCadPerson, setSavingCadPerson] = useState(false);
   const [uploadVerifiedBy, setUploadVerifiedBy] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const uploadFileRef = useRef<HTMLInputElement>(null);
@@ -646,6 +648,8 @@ export default function OrderDetail() {
     fetchFactoryOptions().then(setFactories);
     fetchSupplySourceOptions().then(setSupplySources);
   }, [currentUser]);
+
+  useEffect(() => { fetchCadPersonOptions().then(setCadPersonOptions); }, []);
 
   // Work-time tracking — just enough state to render Start vs Stop; the
   // actual duration/log is never shown here, only recorded server-side.
@@ -1220,6 +1224,27 @@ export default function OrderDetail() {
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
   const canManageSupplier = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
 
+  const submitNewCadPerson = async () => {
+    if (!newCadPersonName.trim()) return;
+    setSavingCadPerson(true);
+    try {
+      const res = await addCadPersonOption(newCadPersonName.trim());
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        setCadPersonOptions(opts => [...opts, { key: data.key, label: data.label }]);
+        setUploadCadPersonSelect(data.key);
+        setNewCadPersonName('');
+        setAddingCadPerson(false);
+      } else {
+        toast.error(getErrorMessage(data, 'Failed to add name.'));
+      }
+    } catch {
+      toast.error('Failed to add name — check your connection and try again.');
+    } finally {
+      setSavingCadPerson(false);
+    }
+  };
+
   const handleUploadFiles = async () => {
     if (!order?.id || !uploadFiles.length || !uploadCadPerson.trim() || !uploadVerifiedBy.trim()) return;
     setUploadingFiles(true);
@@ -1237,7 +1262,6 @@ export default function OrderDetail() {
         setShowUploadModal(false);
         setUploadFiles([]);
         setUploadCadPersonSelect('');
-        setUploadCadPersonOther('');
         setUploadVerifiedBy('');
       } else {
         const err = await res.json().catch(() => null);
@@ -2917,26 +2941,39 @@ export default function OrderDetail() {
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
               {uploadFiles.length} file{uploadFiles.length === 1 ? '' : 's'} selected. Both fields are required before uploading.
             </p>
-            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
-              CAD Person Name *
-            </label>
-            <select
-              value={uploadCadPersonSelect}
-              onChange={e => setUploadCadPersonSelect(e.target.value)}
-              autoFocus
-              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: uploadCadPersonSelect === CAD_PERSON_OTHER ? '8px' : '14px' }}
-            >
-              <option value="">Select…</option>
-              {CAD_PERSON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            {uploadCadPersonSelect === CAD_PERSON_OTHER && (
-              <input
-                type="text"
-                value={uploadCadPersonOther}
-                onChange={e => setUploadCadPersonOther(e.target.value)}
-                placeholder="Enter their name"
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                CAD Person Name *
+              </label>
+              <button type="button" onClick={() => setAddingCadPerson(a => !a)} style={{ background: 'none', border: 'none', color: 'var(--navy)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                {addingCadPerson ? 'Cancel' : '+ Add Name'}
+              </button>
+            </div>
+            {addingCadPerson ? (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                <input
+                  type="text"
+                  value={newCadPersonName}
+                  onChange={e => setNewCadPersonName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNewCadPerson(); } }}
+                  placeholder="New CAD person's name"
+                  autoFocus
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+                <button type="button" onClick={submitNewCadPerson} disabled={savingCadPerson || !newCadPersonName.trim()} style={{ background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '0 16px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: savingCadPerson ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                  {savingCadPerson ? 'Adding…' : 'Add'}
+                </button>
+              </div>
+            ) : (
+              <select
+                value={uploadCadPersonSelect}
+                onChange={e => setUploadCadPersonSelect(e.target.value)}
+                autoFocus
                 style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '14px' }}
-              />
+              >
+                <option value="">Select…</option>
+                {cadPersonOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+              </select>
             )}
             <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
               Verified By Name *
@@ -2950,7 +2987,7 @@ export default function OrderDetail() {
               style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
             />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); setUploadCadPersonSelect(''); setUploadCadPersonOther(''); setUploadVerifiedBy(''); }} disabled={uploadingFiles}
+              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); setUploadCadPersonSelect(''); setAddingCadPerson(false); setUploadVerifiedBy(''); }} disabled={uploadingFiles}
                 style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
                 Cancel
               </button>

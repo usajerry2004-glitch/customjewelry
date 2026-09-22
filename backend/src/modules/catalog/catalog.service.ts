@@ -20,6 +20,12 @@ const DEFAULT_SUPPLY_SOURCES = [
   { key: 'KIRA', label: 'Kira' },
   { key: 'KIRA_JEWELS_USA', label: 'Kira Jewels Usa' },
 ];
+// key === label here (see CatalogItem.key) — this used to be the hardcoded
+// CAD_PERSON_OPTIONS array in frontend/utils/cadPersons.ts.
+const DEFAULT_CAD_PERSONS = [
+  'Abhishek', 'Dharmedra', 'Ganesh', 'HARSH', 'Harshal', 'Kashinath', 'Manoj',
+  'Neha', 'Prabhita', 'Sahil', 'Sayali Takke', 'Siddharth', 'Siddhesh',
+].map(name => ({ key: name, label: name }));
 
 @Injectable()
 export class CatalogService implements OnModuleInit {
@@ -33,6 +39,7 @@ export class CatalogService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.seedMissing(CatalogItemKind.FACTORY, DEFAULT_FACTORIES);
     await this.seedMissing(CatalogItemKind.SUPPLY_SOURCE, DEFAULT_SUPPLY_SOURCES);
+    await this.seedMissing(CatalogItemKind.CAD_PERSON, DEFAULT_CAD_PERSONS);
   }
 
   private async seedMissing(kind: CatalogItemKind, defaults: { key: string; label: string }[]): Promise<void> {
@@ -51,7 +58,9 @@ export class CatalogService implements OnModuleInit {
   async create(kind: CatalogItemKind, label: string): Promise<CatalogItem> {
     const trimmed = label.trim();
     if (!trimmed) throw new ConflictException('Name is required.');
-    const key = this.slugify(trimmed);
+    // CAD_PERSON has no separate internal code — the key IS the display name,
+    // since that's what gets written straight onto CadFile.cadPersonName.
+    const key = kind === CatalogItemKind.CAD_PERSON ? trimmed : this.slugify(trimmed);
     if (!key) throw new ConflictException('Name must contain at least one letter or number.');
 
     const existing = await this.repo.findOne({ where: { kind, key } });

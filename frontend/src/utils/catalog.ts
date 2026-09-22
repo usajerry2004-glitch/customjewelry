@@ -14,8 +14,14 @@ export const fetchFactoryOptions = (): Promise<CatalogOption[]> =>
 export const fetchSupplySourceOptions = (): Promise<CatalogOption[]> =>
   apiFetch(`${API}/catalog/supply-sources`).then(r => r.ok ? r.json() : []).catch(() => []);
 
+export const fetchCadPersonOptions = (): Promise<CatalogOption[]> =>
+  apiFetch(`${API}/catalog/cad-persons`).then(r => r.ok ? r.json() : []).catch(() => []);
+
 export const addFactoryOption = (label: string): Promise<Response> =>
   apiFetch(`${API}/catalog/factories`, { method: 'POST', body: JSON.stringify({ label }) });
 
 export const addSupplySourceOption = (label: string): Promise<Response> =>
   apiFetch(`${API}/catalog/supply-sources`, { method: 'POST', body: JSON.stringify({ label }) });
+
+export const addCadPersonOption = (label: string): Promise<Response> =>
+  apiFetch(`${API}/catalog/cad-persons`, { method: 'POST', body: JSON.stringify({ label }) });
