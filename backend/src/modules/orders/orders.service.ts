@@ -231,6 +231,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 @Injectable()
 export class OrdersService implements OnModuleInit {
   private readonly logger = new Logger(OrdersService.name);
+  private readonly frontendUrl: string;
 
   constructor(
     @InjectRepository(Order)        private readonly orderRepo: Repository<Order>,
@@ -246,28 +247,33 @@ export class OrdersService implements OnModuleInit {
     private readonly skuService: SkuService,
     private readonly config: ConfigService,
     private readonly catalogService: CatalogService,
-  ) {}
+  ) {
+    this.frontendUrl = (this.config.get('FRONTEND_URL', 'http://localhost:3000') as string).split(',')[0].trim();
+  }
 
-  // Fire-and-forget push to the Ring Builder website when one of its orders
-  // completes. Follows their published integration spec: HMAC-SHA256-signed
-  // over the exact request body bytes (x-jewelflow-signature: sha256=<hex>),
-  // body shaped like their receiver expects (externalOrderId/externalCartId
-  // required, plus a status/event pair). `status` is always the literal
-  // "COMPLETED" — this call site only ever fires at that one transition, so
-  // no other internal pipeline stage is ever exposed through it, matching
-  // the same "completed-only" restriction as the poll endpoint this
-  // complements (RingBuilderOrdersService.getOrderByExternalId). Only fires
-  // for orders that actually came from Ring Builder; a manually-entered
-  // order has no externalOrderId the website would recognize.
-  private async notifyRingBuilderCompleted(order: Order): Promise<void> {
-    if (order.source !== 'RING_BUILDER' || !order.externalOrderId) return;
+  // Fire-and-forget push to the Kira website on every order's status change
+  // (and on a shipping-field-only edit — see the `update()` call site).
+  // Follows their published integration spec: HMAC-SHA256-signed over the
+  // exact request body bytes (x-jewelflow-signature: sha256=<hex>), body
+  // shaped exactly like RingBuilderOrdersService.getOrderByExternalId's
+  // response plus an `event` name — their spec explicitly asks for "the
+  // same object the status GET already returns" so neither side maintains
+  // a second schema.
+  //
+  // Started out Ring-Builder-only (externalOrderId set by their checkout).
+  // Widened to every order: one that didn't originate on their site has no
+  // externalOrderId/externalCartId for them to match against, so this falls
+  // back to our own poNumber for both — their receiver is expected to treat
+  // an unrecognized id as "a new order to create," not drop it, for exactly
+  // this case (confirmed with their side before this was built).
+  private async notifyRingBuilderWebhook(order: Order): Promise<void> {
     const url = this.config.get<string>('RING_BUILDER_WEBHOOK_URL');
     if (!url) {
       // Logged (not silently skipped) — a config value that isn't reaching
       // this process (e.g. set on the wrong App Platform component) would
       // otherwise look identical to a network failure from the outside,
       // with nothing to tell them apart in the logs.
-      this.logger.log(`Ring Builder completed-webhook skipped for ${order.poNumber}: RING_BUILDER_WEBHOOK_URL not configured on this process.`);
+      this.logger.log(`Ring Builder webhook skipped for ${order.poNumber}: RING_BUILDER_WEBHOOK_URL not configured on this process.`);
       return;
     }
     const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
@@ -277,12 +283,42 @@ export class OrdersService implements OnModuleInit {
     // guaranteed to reproduce identical bytes, and the signature has to be
     // computed over exactly what gets sent.
     const bodyString = JSON.stringify({
-      event: 'order.completed',
-      externalOrderId: order.externalOrderId,
-      externalCartId:  order.externalCartId,
-      poNumber:        order.poNumber,
-      status:          'COMPLETED',
-      updatedAt:       (order.completedAt ?? order.updatedAt).toISOString(),
+      event: order.status === OrderStatus.COMPLETED ? 'order.completed' : 'order.updated',
+      externalOrderId:   order.externalOrderId || order.poNumber,
+      externalCartId:    order.externalCartId || order.poNumber,
+      poNumber:          order.poNumber,
+      status:            order.status,
+      cadSubStatus:      order.cadSubStatus,
+      stoneStatus:       order.stoneStatus,
+      trackingNumber:    order.trackingNumber || null,
+      courierName:       order.courierName || null,
+      shipMethod:        order.shipMethod || null,
+      committedShipDate: order.committedShipDate || null,
+      shippedDate:       order.shippedDate || null,
+      trackingUrl:       `${this.frontendUrl}/track/${order.trackingToken}`,
+      updatedAt:         (order.status === OrderStatus.COMPLETED ? (order.completedAt ?? order.updatedAt) : order.updatedAt).toISOString(),
+      // Full order details — needed so their receiver can create a real
+      // record for an order it's never seen (anything not from Ring
+      // Builder). Sent on every delivery rather than only the first, since
+      // detecting "first time" would need extra state on our side for no
+      // real benefit — their spec already says unknown/extra fields are
+      // ignored, so the repetition costs nothing on their end.
+      customerFullName:       order.customerFullName || null,
+      customerEmail:          order.customerEmail || null,
+      phoneNumber:            order.phoneNumber || null,
+      storeName:              order.storeName || null,
+      orderType:              order.orderType || null,
+      metalType:              order.metalType || null,
+      metalColor:             order.metalColor || null,
+      size:                   order.size || null,
+      centerStoneShape:       order.centerStoneShape || null,
+      approximateCaratWeight: order.approximateCaratWeight || null,
+      quantity:               order.quantity ?? null,
+      quotedCost:             order.quotedCost ?? null,
+      referenceWeblink:       order.referenceWeblink || null,
+      customerNotes:          order.customerNotes || null,
+      salesRepName:           order.salesRepName || null,
+      createdAt:              order.createdAt ? order.createdAt.toISOString() : null,
     });
     const signature = 'sha256=' + createHmac('sha256', secret).update(bodyString).digest('hex');
 
@@ -301,7 +337,7 @@ export class OrdersService implements OnModuleInit {
         clearTimeout(timeout);
 
         if (res.ok) {
-          this.logger.log(`Ring Builder completed-webhook delivered for ${order.poNumber} (attempt ${attempt}).`);
+          this.logger.log(`Ring Builder webhook delivered for ${order.poNumber} (attempt ${attempt}).`);
           return;
         }
 
@@ -311,14 +347,14 @@ export class OrdersService implements OnModuleInit {
         // signature, bad shape — and retrying identically won't fix that;
         // it needs a human, so stop here rather than burning the retry.
         if (res.status < 500) {
-          this.logger.warn(`Ring Builder completed-webhook rejected for ${order.poNumber}: ${res.status} from ${url} — ${responseBody.slice(0, 300)}`);
+          this.logger.warn(`Ring Builder webhook rejected for ${order.poNumber}: ${res.status} from ${url} — ${responseBody.slice(0, 300)}`);
           Sentry.captureMessage(`Ring Builder webhook rejected (${res.status}) for ${order.poNumber}: ${responseBody.slice(0, 300)}`);
           return;
         }
         throw new Error(`Webhook responded ${res.status} from ${url}${responseBody ? ` — ${responseBody.slice(0, 300)}` : ''}`);
       } catch (err) {
         if (attempt === 2) {
-          this.logger.warn(`Ring Builder completed-webhook failed for ${order.poNumber} after 2 attempts (target: ${url}):`, err);
+          this.logger.warn(`Ring Builder webhook failed for ${order.poNumber} after 2 attempts (target: ${url}):`, err);
           Sentry.captureException(err);
         } else {
           await new Promise(r => setTimeout(r, 2000));
@@ -1381,11 +1417,25 @@ export class OrdersService implements OnModuleInit {
     // audit log captures *what* changed on this edit, not just that an edit happened.
     const changes = this.diffTrackedFields(order, dto);
 
+    // Ring Builder cares about shipping details independent of status (e.g.
+    // Factory Manager adds a tracking number while the order stays
+    // MANUFACTURED) — checked before Object.assign overwrites `order` with
+    // the incoming values. Skipped when dto.status is set: that's a status
+    // transition routed here from updateStatus(), which already dispatches
+    // its own webhook covering this same save.
+    const RING_BUILDER_WEBHOOK_FIELDS = ['trackingNumber', 'courierName', 'shipMethod', 'committedShipDate', 'shippedDate'] as const;
+    const shippingFieldsChanged = dto.status === undefined && RING_BUILDER_WEBHOOK_FIELDS.some(k =>
+      dto[k] !== undefined && String(dto[k] ?? '') !== String((order as any)[k] ?? ''));
+
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
 
     if (changes.length) {
       this.logEvent(id, 'ORDER_UPDATED', user, undefined, undefined, changes.join('\n'));
+    }
+
+    if (shippingFieldsChanged) {
+      this.notifyRingBuilderWebhook(saved).catch(err => this.logger.warn('Ring Builder webhook failed:', err));
     }
 
     // When quoted price is saved on CAD_IN_PROGRESS order (not yet sent/approved) → auto-send to customer
@@ -1673,25 +1723,25 @@ export class OrdersService implements OnModuleInit {
       ));
     }
 
-    // COMPLETED — email customer, and push to the Ring Builder website if
-    // this order came from there.
-    if (status === OrderStatus.COMPLETED) {
-      if (updated.customerEmail) {
-        this.emailService.sendOrderDelivered({
-          to: updated.customerEmail,
-          poNumber: updated.poNumber,
-          customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
-          orderType: updated.orderType || '—',
-          orderId: updated.id,
-        }).catch(err => this.logger.warn('Order delivered email failed:', err));
+    // COMPLETED — email customer.
+    if (status === OrderStatus.COMPLETED && updated.customerEmail) {
+      this.emailService.sendOrderDelivered({
+        to: updated.customerEmail,
+        poNumber: updated.poNumber,
+        customerName: updated.customerFullName || updated.storeName || 'Valued Customer',
+        orderType: updated.orderType || '—',
+        orderId: updated.id,
+      }).catch(err => this.logger.warn('Order delivered email failed:', err));
 
-        // Feedback survey is no longer sent per-order here — see
-        // sendMonthlyFeedbackDigest below, which batches this (and every
-        // other order the customer completes this month) into one email on
-        // the first Thursday of next month.
-      }
-      this.notifyRingBuilderCompleted(updated).catch(err => this.logger.warn('Ring Builder completed-webhook failed:', err));
+      // Feedback survey is no longer sent per-order here — see
+      // sendMonthlyFeedbackDigest below, which batches this (and every
+      // other order the customer completes this month) into one email on
+      // the first Thursday of next month.
     }
+
+    // Push every status change to the Ring Builder website (a no-op inside
+    // notifyRingBuilderWebhook for anything that isn't a Ring Builder order).
+    this.notifyRingBuilderWebhook(updated).catch(err => this.logger.warn('Ring Builder webhook failed:', err));
 
     return updated;
   }

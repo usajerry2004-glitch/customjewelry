@@ -365,21 +365,53 @@ export class RingBuilderOrdersService {
     }
   }
 
-  // ── Poll: only whether the order is done, nothing about internal stages ──
-  // Deliberately narrow: the website should only ever learn "completed or
-  // not" — none of NEW/CAD_IN_PROGRESS/VPO_ISSUED/MANUFACTURED/SHIPPED/etc.
-  // are exposed here, since those are internal production stages, not
-  // something the customer-facing site should reflect.
+  // ── Poll: same shape the completion webhook sends (OrdersService.notifyRingBuilderWebhook),
+  // so the website has one schema for both push and pull, and can use this
+  // as a reconciliation fallback for a webhook delivery it never got.
+  // Falls back to a poNumber lookup: an order that didn't originate on their
+  // site has no externalOrderId column value at all — its webhook deliveries
+  // use poNumber in that field instead (see notifyRingBuilderWebhook), so a
+  // poll for that same id has to resolve the same way.
   async getOrderByExternalId(externalOrderId: string) {
-    const order = await this.orderRepo.findOne({ where: { externalOrderId } });
+    const order = (await this.orderRepo.findOne({ where: { externalOrderId } }))
+      || (await this.orderRepo.findOne({ where: { poNumber: externalOrderId } }));
     if (!order) throw new NotFoundException('Order not found');
 
     return {
-      externalOrderId: order.externalOrderId,
-      externalCartId:  order.externalCartId,
-      poNumber:        order.poNumber,
-      completed:       order.status === OrderStatus.COMPLETED,
-      completedAt:     order.completedAt,
+      externalOrderId:   order.externalOrderId || order.poNumber,
+      externalCartId:    order.externalCartId || order.poNumber,
+      poNumber:          order.poNumber,
+      status:            order.status,
+      cadSubStatus:      order.cadSubStatus,
+      stoneStatus:       order.stoneStatus,
+      trackingNumber:    order.trackingNumber || null,
+      courierName:       order.courierName || null,
+      shipMethod:        order.shipMethod || null,
+      committedShipDate: order.committedShipDate || null,
+      shippedDate:       order.shippedDate || null,
+      trackingUrl:       this.trackingUrl(order.trackingToken),
+      updatedAt:         (order.status === OrderStatus.COMPLETED ? (order.completedAt ?? order.updatedAt) : order.updatedAt).toISOString(),
+      // Full order details — see the matching fields in
+      // OrdersService.notifyRingBuilderWebhook for why these are here.
+      customerFullName:       order.customerFullName || null,
+      customerEmail:          order.customerEmail || null,
+      phoneNumber:            order.phoneNumber || null,
+      storeName:              order.storeName || null,
+      orderType:              order.orderType || null,
+      metalType:              order.metalType || null,
+      metalColor:             order.metalColor || null,
+      size:                   order.size || null,
+      centerStoneShape:       order.centerStoneShape || null,
+      approximateCaratWeight: order.approximateCaratWeight || null,
+      quantity:               order.quantity ?? null,
+      quotedCost:             order.quotedCost ?? null,
+      referenceWeblink:       order.referenceWeblink || null,
+      customerNotes:          order.customerNotes || null,
+      salesRepName:           order.salesRepName || null,
+      createdAt:              order.createdAt ? order.createdAt.toISOString() : null,
+      // Kept for any caller still reading the old narrow shape.
+      completed:         order.status === OrderStatus.COMPLETED,
+      completedAt:       order.completedAt,
     };
   }
 }

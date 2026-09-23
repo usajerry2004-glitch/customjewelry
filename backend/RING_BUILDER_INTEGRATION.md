@@ -91,48 +91,100 @@ Store `poNumber` and `trackingUrl` against the website's own order — you'll ne
 
 ## 2. Poll status — `GET /public/ring-builder/orders/:externalOrderId`
 
-Call this whenever the customer views their order/account page on the website.
+Call this whenever the customer views their order/account page on the website, or to reconcile against a webhook delivery you never got (§3).
 
-**Deliberately narrow on purpose**: this only tells you whether the order is completed — none of the internal production stages (CAD, VPO, manufacturing, shipping, etc.) are exposed. Those are internal-only; the website should just show "in progress" until `completed` flips to `true`.
-
-**Response:**
+**Response** — same shape §3 pushes, so there's one schema for both push and pull:
 ```json
 {
   "externalOrderId": "wc_order_10432_item_1",
   "externalCartId": "wc_order_10432",
   "poNumber": "C00312",
+  "status": "MANUFACTURED",
+  "cadSubStatus": null,
+  "stoneStatus": "STONE_RECEIVED",
+  "trackingNumber": null,
+  "courierName": null,
+  "shipMethod": null,
+  "committedShipDate": "2026-09-01",
+  "shippedDate": null,
+  "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",
+  "updatedAt": "2026-08-20T14:32:00.000Z",
+  "customerFullName": "Jane Doe",
+  "customerEmail": "jane@example.com",
+  "phoneNumber": "555-0100",
+  "storeName": "Sherwood Management",
+  "orderType": "Ring",
+  "metalType": "14K",
+  "metalColor": "Yellow",
+  "size": "7",
+  "centerStoneShape": "Round",
+  "approximateCaratWeight": "0.20 ct",
+  "quantity": 1,
+  "quotedCost": 940,
+  "referenceWeblink": "https://.../share?token=...",
+  "customerNotes": "optional",
+  "salesRepName": "Ring Builder",
+  "createdAt": "2026-08-18T00:00:00.000Z",
   "completed": false,
   "completedAt": null
 }
 ```
-
-Once the order finishes: `completed: true`, `completedAt: "2026-08-20T14:32:00.000Z"`.
+Full customer/product/price fields are included on every response now, not just on the order's first appearance — needed so your side can create a complete record for an order that originated in the dashboard, not just a status stub.
+`completed`/`completedAt` are kept alongside the richer fields for any caller still reading the old narrow shape — new integrations should read `status === "COMPLETED"` instead.
 
 The customer also automatically gets an email at every internal status change (order confirmed, in production, shipped, delivered) — that's existing behavior, unrelated to and unchanged by this endpoint.
 
-## 3. Outbound push when an order completes
+## 3. Outbound push on every status change (and shipping-field edits) — now every order, not just Ring Builder
 
-In addition to polling, we also push to your site the moment an order is marked completed on our end — so you don't strictly need to poll at all if you'd rather just receive this. Built to match `kira-app-sigma.vercel.app`'s published receiver spec.
+We push to your site whenever **any** order's status changes, and whenever its shipping fields (tracking number, courier, ship method, committed/shipped date) get set independent of a status change — not just Ring Builder ones. So you don't strictly need to poll at all if you'd rather just receive this. Built to match kirajewels.one's published receiver spec.
+
+**Important for orders you didn't originate**: an order entered directly by our staff, or submitted through our web form, has no `externalOrderId`/`externalCartId` your site gave it — there was never a checkout on your end to reference. For these, we send our own PO number as both `externalOrderId` and `externalCartId`. Since your receiver spec currently drops anything it can't match to an existing order, **please treat an unrecognized id here as "create a new order record," not "drop it,"** or these will silently disappear on your end. This was the agreed approach for surfacing every dashboard order on your site, not just Ring Builder ones.
 
 **Setup needed on our side** (once you give us a URL and a shared secret): set these two in the backend environment —
 ```
-RING_BUILDER_WEBHOOK_URL=https://kira-app-sigma.vercel.app/api/webhooks/jewelflow
+RING_BUILDER_WEBHOOK_URL=https://kirajewels.one/api/webhooks/jewelflow
 RING_BUILDER_WEBHOOK_SECRET=<the shared secret you generate and send us>
 ```
-Nothing fires until `RING_BUILDER_WEBHOOK_URL` is set — no webhook target configured means no calls go out.
+Nothing fires until `RING_BUILDER_WEBHOOK_URL` is set — no webhook target configured means no calls go out. Do a `GET` on that URL first (their receiver spec has this as a connectivity/secret check) before relying on the first real `POST`.
 
-**What we send**, `POST` to that URL:
+**What we send**, `POST` to that URL — identical shape to the poll response in §2 (full order details included), plus `event`:
 ```json
 {
-  "event": "order.completed",
+  "event": "order.updated",
   "externalOrderId": "wc_order_10432_item_1",
   "externalCartId": "wc_order_10432",
   "poNumber": "C00312",
-  "status": "COMPLETED",
-  "updatedAt": "2026-08-20T14:32:00.000Z"
+  "status": "MANUFACTURED",
+  "cadSubStatus": null,
+  "stoneStatus": "STONE_RECEIVED",
+  "trackingNumber": null,
+  "courierName": null,
+  "shipMethod": null,
+  "committedShipDate": "2026-09-01",
+  "shippedDate": null,
+  "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",
+  "updatedAt": "2026-08-20T14:32:00.000Z",
+  "customerFullName": "Jane Doe",
+  "customerEmail": "jane@example.com",
+  "phoneNumber": "555-0100",
+  "storeName": "Sherwood Management",
+  "orderType": "Ring",
+  "metalType": "14K",
+  "metalColor": "Yellow",
+  "size": "7",
+  "centerStoneShape": "Round",
+  "approximateCaratWeight": "0.20 ct",
+  "quantity": 1,
+  "quotedCost": 940,
+  "referenceWeblink": "https://.../share?token=...",
+  "customerNotes": "optional",
+  "salesRepName": "Ring Builder",
+  "createdAt": "2026-08-18T00:00:00.000Z"
 }
 ```
-`status` here is always the literal `"COMPLETED"` — this webhook only ever fires at that one transition, so no other internal pipeline stage (CAD, VPO, manufacturing, shipping, etc.) is ever sent through it, same restriction as the poll endpoint above.
+`event` is `"order.completed"` when `status` is `"COMPLETED"`, else `"order.updated"` — the receiver spec's own delivery-handling logic keys off `status`, not `event`, so treat `event` as informational only.
+
+**Status vocabulary** (the full enum a JewelFlow order can hold): `NEW`, `CAD_IN_PROGRESS`, `VPO_ISSUED`, `MANUFACTURED`, `SHIPPED`, `REPAIR`, `COMPLETED`, `CANCELLED`. **`COMPLETED` is the one that means "finished and physically ready for you to take over shipping to the customer"** — it's the only status this integration has ever pushed as a completion signal, it's the status Admin sets to close out a Ring Builder order, and it's what triggers the order-delivered customer email. `SHIPPED` exists in the enum but, as of this integration, no code path in the app ever transitions an order *into* it — it looks like a leftover from before Ring Builder existed, when this app may have handled shipping to the customer directly. Treat `MANUFACTURED`/`SHIPPED`/`REPAIR`/`CANCELLED` as "not done yet" (or, for `CANCELLED`, "never will be") until told otherwise.
 
 **Signing**: header `x-jewelflow-signature: sha256=<hex>` — an HMAC-SHA256 of the exact request body bytes, keyed with the shared secret above. Recompute it the same way on your end and compare; reject anything that doesn't match.
 
