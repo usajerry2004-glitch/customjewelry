@@ -373,26 +373,34 @@ export class RingBuilderOrdersService {
   // use poNumber in that field instead (see notifyRingBuilderWebhook), so a
   // poll for that same id has to resolve the same way.
   // Same "design supersedes reference" priority as
-  // OrdersService.getOrderImageUrl — kept as its own copy here rather than a
-  // shared import, matching how REFERENCE_NOTE_TAGS-style constants are
-  // duplicated per-module elsewhere in this codebase.
-  private async getOrderImageUrl(orderId: string): Promise<string | null> {
+  // OrdersService.getOrderImageAndCadFile — kept as its own copy here rather
+  // than a shared import, matching how REFERENCE_NOTE_TAGS-style constants
+  // are duplicated per-module elsewhere in this codebase.
+  private async getOrderImageAndCadFile(orderId: string): Promise<{ imageUrl: string | null; cadFileUrl: string | null; cadFileName: string | null }> {
     const files = await this.cadRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
-    if (!files.length) return null;
+    if (!files.length) return { imageUrl: null, cadFileUrl: null, cadFileName: null };
     const isImage = (f: CadFile) => /\.(jpe?g|png)$/i.test(f.originalName || f.fileName || '');
     const isReference = (f: CadFile) => f.designerNotes === 'Reference image' || f.designerNotes === 'Customer reference image';
 
-    const design = files.find(f => isImage(f) && !isReference(f));
-    if (design) return design.thumbnailPath || design.filePath || null;
-    const reference = files.find(f => isImage(f) && isReference(f));
-    return reference ? (reference.thumbnailPath || reference.filePath || null) : null;
+    const designImage = files.find(f => isImage(f) && !isReference(f));
+    const referenceImage = files.find(f => isImage(f) && isReference(f));
+    const imageUrl = designImage
+      ? (designImage.thumbnailPath || designImage.filePath || null)
+      : (referenceImage ? (referenceImage.thumbnailPath || referenceImage.filePath || null) : null);
+
+    const latestDesignFile = files.find(f => !isReference(f));
+    return {
+      imageUrl,
+      cadFileUrl:  latestDesignFile?.filePath || null,
+      cadFileName: latestDesignFile?.originalName || latestDesignFile?.fileName || null,
+    };
   }
 
   async getOrderByExternalId(externalOrderId: string) {
     const order = (await this.orderRepo.findOne({ where: { externalOrderId } }))
       || (await this.orderRepo.findOne({ where: { poNumber: externalOrderId } }));
     if (!order) throw new NotFoundException('Order not found');
-    const imageUrl = await this.getOrderImageUrl(order.id);
+    const { imageUrl, cadFileUrl, cadFileName } = await this.getOrderImageAndCadFile(order.id);
 
     return {
       externalOrderId:   order.externalOrderId || order.poNumber,
@@ -409,6 +417,8 @@ export class RingBuilderOrdersService {
       trackingUrl:       this.trackingUrl(order.trackingToken),
       updatedAt:         (order.status === OrderStatus.COMPLETED ? (order.completedAt ?? order.updatedAt) : order.updatedAt).toISOString(),
       imageUrl,
+      cadFileUrl,
+      cadFileName,
       // Full order details — see the matching fields in
       // OrdersService.notifyRingBuilderWebhook for why these are here.
       customerFullName:       order.customerFullName || null,

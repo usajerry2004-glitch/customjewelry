@@ -277,7 +277,7 @@ export class OrdersService implements OnModuleInit {
       return;
     }
     const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
-    const imageUrl = await this.getOrderImageUrl(order.id);
+    const { imageUrl, cadFileUrl, cadFileName } = await this.getOrderImageAndCadFile(order.id);
 
     // Serialized once and reused as both the signature input and the actual
     // request body — re-serializing the same object a second time isn't
@@ -299,8 +299,13 @@ export class OrdersService implements OnModuleInit {
       trackingUrl:       `${this.frontendUrl}/track/${order.trackingToken}`,
       updatedAt:         (order.status === OrderStatus.COMPLETED ? (order.completedAt ?? order.updatedAt) : order.updatedAt).toISOString(),
       // Latest actual CAD design image if one's been uploaded, else the
-      // customer's reference photo — see getOrderImageUrl.
+      // customer's reference photo — see getOrderImageAndCadFile.
       imageUrl:          imageUrl,
+      // The actual uploaded design file itself (.3dm/.stl/.jpg/.pdf/etc.),
+      // not just a viewable preview — cadFileName is the original filename
+      // since the URL alone doesn't always make the format obvious.
+      cadFileUrl:        cadFileUrl,
+      cadFileName:       cadFileName,
       // Full order details — needed so their receiver can create a real
       // record for an order it's never seen (anything not from Ring
       // Builder). Sent on every delivery rather than only the first, since
@@ -367,21 +372,34 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  // Latest actual CAD design image if the design team has uploaded one, else
-  // the customer's reference photo — same "design supersedes reference"
-  // priority as everywhere else images are picked for an order (e.g.
-  // buildFactoryOrderPdfAttachment). Raw model files (.3dm/.stl/etc.) are
-  // skipped since neither is renderable as a plain <img>.
-  private async getOrderImageUrl(orderId: string): Promise<string | null> {
+  // imageUrl: latest actual CAD design image if the design team has uploaded
+  // one, else the customer's reference photo — same "design supersedes
+  // reference" priority as everywhere else images are picked for an order
+  // (e.g. buildFactoryOrderPdfAttachment). Only jpg/jpeg/png count as an
+  // "image" here, same as the reports drill-down thumbnails.
+  //
+  // cadFileUrl/cadFileName: the actual latest uploaded design file, whatever
+  // format it is (.3dm/.stl/.jpg/.pdf/etc.) — not just the renderable
+  // image above, and never the customer's reference photo (that's not a CAD
+  // file). filePath (not thumbnailPath) so it's the real file, not a preview.
+  private async getOrderImageAndCadFile(orderId: string): Promise<{ imageUrl: string | null; cadFileUrl: string | null; cadFileName: string | null }> {
     const files = await this.cadRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
-    if (!files.length) return null;
+    if (!files.length) return { imageUrl: null, cadFileUrl: null, cadFileName: null };
     const isImage = (f: CadFile) => /\.(jpe?g|png)$/i.test(f.originalName || f.fileName || '');
     const isReference = (f: CadFile) => !!f.designerNotes && OrdersService.REFERENCE_NOTE_TAGS.has(f.designerNotes);
 
-    const design = files.find(f => isImage(f) && !isReference(f));
-    if (design) return design.thumbnailPath || design.filePath || null;
-    const reference = files.find(f => isImage(f) && isReference(f));
-    return reference ? (reference.thumbnailPath || reference.filePath || null) : null;
+    const designImage = files.find(f => isImage(f) && !isReference(f));
+    const referenceImage = files.find(f => isImage(f) && isReference(f));
+    const imageUrl = designImage
+      ? (designImage.thumbnailPath || designImage.filePath || null)
+      : (referenceImage ? (referenceImage.thumbnailPath || referenceImage.filePath || null) : null);
+
+    const latestDesignFile = files.find(f => !isReference(f));
+    return {
+      imageUrl,
+      cadFileUrl:  latestDesignFile?.filePath || null,
+      cadFileName: latestDesignFile?.originalName || latestDesignFile?.fileName || null,
+    };
   }
 
   // One-time startup fix: TypeORM's synchronize didn't drop the old DB-level
