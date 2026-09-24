@@ -277,6 +277,7 @@ export class OrdersService implements OnModuleInit {
       return;
     }
     const secret = this.config.get<string>('RING_BUILDER_WEBHOOK_SECRET', '');
+    const imageUrl = await this.getOrderImageUrl(order.id);
 
     // Serialized once and reused as both the signature input and the actual
     // request body — re-serializing the same object a second time isn't
@@ -297,6 +298,9 @@ export class OrdersService implements OnModuleInit {
       shippedDate:       order.shippedDate || null,
       trackingUrl:       `${this.frontendUrl}/track/${order.trackingToken}`,
       updatedAt:         (order.status === OrderStatus.COMPLETED ? (order.completedAt ?? order.updatedAt) : order.updatedAt).toISOString(),
+      // Latest actual CAD design image if one's been uploaded, else the
+      // customer's reference photo — see getOrderImageUrl.
+      imageUrl:          imageUrl,
       // Full order details — needed so their receiver can create a real
       // record for an order it's never seen (anything not from Ring
       // Builder). Sent on every delivery rather than only the first, since
@@ -361,6 +365,23 @@ export class OrdersService implements OnModuleInit {
         }
       }
     }
+  }
+
+  // Latest actual CAD design image if the design team has uploaded one, else
+  // the customer's reference photo — same "design supersedes reference"
+  // priority as everywhere else images are picked for an order (e.g.
+  // buildFactoryOrderPdfAttachment). Raw model files (.3dm/.stl/etc.) are
+  // skipped since neither is renderable as a plain <img>.
+  private async getOrderImageUrl(orderId: string): Promise<string | null> {
+    const files = await this.cadRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
+    if (!files.length) return null;
+    const isImage = (f: CadFile) => /\.(jpe?g|png)$/i.test(f.originalName || f.fileName || '');
+    const isReference = (f: CadFile) => !!f.designerNotes && OrdersService.REFERENCE_NOTE_TAGS.has(f.designerNotes);
+
+    const design = files.find(f => isImage(f) && !isReference(f));
+    if (design) return design.thumbnailPath || design.filePath || null;
+    const reference = files.find(f => isImage(f) && isReference(f));
+    return reference ? (reference.thumbnailPath || reference.filePath || null) : null;
   }
 
   // One-time startup fix: TypeORM's synchronize didn't drop the old DB-level

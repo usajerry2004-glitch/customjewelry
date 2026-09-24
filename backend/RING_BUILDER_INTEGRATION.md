@@ -109,6 +109,7 @@ Call this whenever the customer views their order/account page on the website, o
   "shippedDate": null,
   "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",
   "updatedAt": "2026-08-20T14:32:00.000Z",
+  "imageUrl": "https://customjewelry.nyc3.digitaloceanspaces.com/cad/1789...-thumb.jpg",
   "customerFullName": "Jane Doe",
   "customerEmail": "jane@example.com",
   "phoneNumber": "555-0100",
@@ -131,6 +132,7 @@ Call this whenever the customer views their order/account page on the website, o
 ```
 Full customer/product/price fields are included on every response now, not just on the order's first appearance — needed so your side can create a complete record for an order that originated in the dashboard, not just a status stub.
 `completed`/`completedAt` are kept alongside the richer fields for any caller still reading the old narrow shape — new integrations should read `status === "COMPLETED"` instead.
+`imageUrl` is the latest actual CAD design image once our design team has uploaded one, otherwise the customer's original reference photo, otherwise `null` if neither exists yet (e.g. a brand-new order with no attachments). Always a single direct image URL, never an array.
 
 The customer also automatically gets an email at every internal status change (order confirmed, in production, shipped, delivered) — that's existing behavior, unrelated to and unchanged by this endpoint.
 
@@ -164,6 +166,7 @@ Nothing fires until `RING_BUILDER_WEBHOOK_URL` is set — no webhook target conf
   "shippedDate": null,
   "trackingUrl": "https://portal.kirajewels.one/track/a1b2c3...",
   "updatedAt": "2026-08-20T14:32:00.000Z",
+  "imageUrl": "https://customjewelry.nyc3.digitaloceanspaces.com/cad/1789...-thumb.jpg",
   "customerFullName": "Jane Doe",
   "customerEmail": "jane@example.com",
   "phoneNumber": "555-0100",
