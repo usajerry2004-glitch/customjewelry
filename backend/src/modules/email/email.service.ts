@@ -525,6 +525,41 @@ export class EmailService {
     });
   }
 
+  // Sent to the Factory Manager(s) tagged to whichever factory the order was
+  // routed to (plus STANDING_FACTORY_RECIPIENTS) when it's cancelled — same
+  // audience as sendFactoryAssignedAlert, since they're the ones who'd
+  // otherwise keep manufacturing something no longer needed.
+  async sendFactoryOrderCancelledAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
+    if (!opts.to.length) { this.warnNoRecipients('sendFactoryOrderCancelledAlert', opts.poNumber); return; }
+    return this.send({
+      to: opts.to,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Cancelled] ${opts.poNumber}`,
+      html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
+        <h2 style="color:#DC2626;margin:0 0 16px">Order Cancelled — Stop Work</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been cancelled. Please stop any in-progress manufacturing on it.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#DC2626')}">Open Order →</a>
+      `),
+    });
+  }
+
+  // Sent to the Stone Manager(s) tagged to whichever supply source the order
+  // was routed to when it's cancelled — same audience as
+  // sendStoneSupplierAssignedAlert, so they don't keep sourcing stones for it.
+  async sendStoneOrderCancelledAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {
+    if (!opts.to.length) { this.warnNoRecipients('sendStoneOrderCancelledAlert', opts.poNumber); return; }
+    return this.send({
+      to: opts.to,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Cancelled] ${opts.poNumber}`,
+      html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
+        <h2 style="color:#DC2626;margin:0 0 16px">Order Cancelled — Stop Sourcing</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been cancelled. Please stop sourcing stones for it.</p>
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#DC2626')}">Open Order →</a>
+      `),
+    });
+  }
+
   // Sent to Admin + Authorizer when an order is marked Manufactured — mirrors
   // the Admin+Authorizer alert already sent when the VPO is issued.
   async sendOrderManufacturedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean }) {

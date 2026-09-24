@@ -1494,6 +1494,10 @@ export class OrdersService implements OnModuleInit {
       // Recorded so reactivateOrder() below knows what to restore — this
       // transition previously wasn't logged at all, unlike every other one.
       this.logEvent(id, 'STATUS_CHANGE', user, beforeCancel.status, OrderStatus.CANCELLED);
+      this.notifyFactoryAndStoneOfCancellation(cancelled).catch(err => {
+        this.logger.warn(`Cancellation notification failed for ${cancelled.poNumber}:`, err);
+        Sentry.captureException(err);
+      });
       return cancelled;
     }
 
@@ -1744,6 +1748,67 @@ export class OrdersService implements OnModuleInit {
     this.notifyRingBuilderWebhook(updated).catch(err => this.logger.warn('Ring Builder webhook failed:', err));
 
     return updated;
+  }
+
+  // Fire-and-forget: notifies whoever's already been routed the order (its
+  // tagged factory and/or stone-supplier team) the moment it's cancelled —
+  // same recipient logic as assignSupplier()'s "order issued" alerts, since
+  // they're exactly the people who'd otherwise keep working something no
+  // longer needed. A no-op for an order cancelled before VPO issuance, when
+  // neither is assigned yet.
+  private async notifyFactoryAndStoneOfCancellation(order: Order): Promise<void> {
+    if (!order.assignedFactory && !order.supplySource) return;
+
+    const [factoryUsers, stoneUsers] = await Promise.all([
+      order.assignedFactory ? this.userRepo.find({ where: { assignedFactory: order.assignedFactory } }) : Promise.resolve([]),
+      order.supplySource ? this.userRepo.find({ where: { assignedSupplySource: order.supplySource } }) : Promise.resolve([]),
+    ]);
+
+    await Promise.all([
+      ...factoryUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `Order Cancelled — ${order.poNumber}`,
+          message: `Order ${order.poNumber} has been cancelled. Please stop any in-progress work on it.`,
+          orderId: order.id,
+          targetUserId: u.id,
+          isPriority: order.isPriorityCustomer,
+        })),
+      ),
+      ...stoneUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `Order Cancelled — ${order.poNumber}`,
+          message: `Order ${order.poNumber} has been cancelled. Please stop sourcing stones for it.`,
+          orderId: order.id,
+          targetUserId: u.id,
+          isPriority: order.isPriorityCustomer,
+        })),
+      ),
+    ]);
+
+    const factoryEmails = order.assignedFactory ? Array.from(new Set([
+      ...factoryUsers.map(u => u.email).filter(Boolean),
+      ...(STANDING_FACTORY_RECIPIENTS[order.assignedFactory] || []),
+    ])) : [];
+    const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
+
+    await Promise.all([
+      this.emailService.sendFactoryOrderCancelledAlert({
+        to: factoryEmails,
+        poNumber: order.poNumber,
+        orderType: order.orderType || '—',
+        orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
+      }).catch(err => this.logger.warn('Factory order-cancelled alert failed:', err)),
+      this.emailService.sendStoneOrderCancelledAlert({
+        to: stoneEmails,
+        poNumber: order.poNumber,
+        orderType: order.orderType || '—',
+        orderId: order.id,
+        isPriorityCustomer: order.isPriorityCustomer,
+      }).catch(err => this.logger.warn('Stone order-cancelled alert failed:', err)),
+    ]);
   }
 
   // Admin-only: un-cancels an order, restoring whichever status it was in
