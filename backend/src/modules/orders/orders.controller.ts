@@ -1,8 +1,9 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, Res, UseGuards, UseInterceptors, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
-import { IsArray, IsString, ArrayMinSize } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize, IsIn, IsNumber, Min, IsOptional } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
+import { SHIP_VIA_OPTIONS, TERMS_OPTIONS } from './rightclick-invoice-pdf.util';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { UpdateStatusDto, AssignSupplierDto, BulkAssignSupplierDto } from './update-status.dto';
 import { UpdateQuoteOptionsDto } from './dto/quote-options.dto';
@@ -28,6 +29,34 @@ class BulkOrderIdsDto {
   @IsString({ each: true })
   @ArrayMinSize(1)
   orderIds: string[];
+}
+
+class GenerateRightClickInvoiceDto {
+  @IsIn(SHIP_VIA_OPTIONS)
+  shipVia: string;
+
+  @IsIn(TERMS_OPTIONS)
+  terms: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  otherCharges?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  shipping?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tax?: number;
 }
 
 @ApiTags('Orders')
@@ -315,6 +344,31 @@ export class OrdersController {
   @ApiOperation({ summary: 'Re-send the "order issued to your factory" email for an already-assigned order — recovery lever for when the original send failed silently' })
   resendFactoryAlert(@Param('id') id: string) {
     return this.ordersService.resendFactoryAssignedAlert(id);
+  }
+
+  @Post(':id/rightclick-invoice')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Generate (or regenerate) this order\'s invoice PDF — fetches the linked RightClick order (read-only) and renders our own PDF from it; never calls RightClick\'s own Create Invoice API. Body carries the admin-picked Ship Via/Terms (not tracked per-order in JewelFlow). Stores the PDF and returns the updated order. Requires rcOrderNumber to be set first. Admin/Authorizer only.' })
+  generateRightClickInvoice(@Param('id') id: string, @Body() body: GenerateRightClickInvoiceDto) {
+    return this.ordersService.generateRightClickInvoice(id, body.shipVia, body.terms, {
+      otherCharges: body.otherCharges ?? 0,
+      shipping: body.shipping ?? 0,
+      discount: body.discount ?? 0,
+      tax: body.tax ?? 0,
+    });
+  }
+
+  @Get(':id/rightclick-invoice/download')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Download the already-generated invoice PDF for this order (see POST :id/rightclick-invoice to generate one first). Admin/Authorizer only.' })
+  async downloadRightClickInvoice(@Param('id') id: string, @Res() res: Response) {
+    const { stream, contentType, filename } = await this.ordersService.getRightClickInvoiceDownload(id);
+    const safeName = filename.replace(/[\r\n"]/g, '');
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
+    stream.pipe(res);
   }
 
   @Post('backfill-cad-approvals')

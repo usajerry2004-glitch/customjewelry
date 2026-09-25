@@ -23,6 +23,9 @@ import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
 import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
 import { businessDaysElapsed } from '../../common/business-days.util';
+import { RightClickService } from './rightclick.service';
+import { buildRightClickInvoicePdf, SHIP_VIA_OPTIONS, TERMS_OPTIONS, InvoiceCharges } from './rightclick-invoice-pdf.util';
+import { SpacesService } from '../spaces/spaces.service';
 
 export { OrderFilterDto };
 
@@ -247,6 +250,8 @@ export class OrdersService implements OnModuleInit {
     private readonly skuService: SkuService,
     private readonly config: ConfigService,
     private readonly catalogService: CatalogService,
+    private readonly rightClickService: RightClickService,
+    private readonly spacesService: SpacesService,
   ) {
     this.frontendUrl = (this.config.get('FRONTEND_URL', 'http://localhost:3000') as string).split(',')[0].trim();
   }
@@ -1295,6 +1300,75 @@ export class OrdersService implements OnModuleInit {
     return `C${String((maxSeq ?? 0) + 1).padStart(5, '0')}`;
   }
 
+  // JewelFlow's own auto-incrementing invoice sequence: "INV-00001", ... —
+  // deliberately a separate, distinctly-prefixed series from whatever's
+  // already sitting in Order.invoiceNumber from historical CSV imports of
+  // real RightClick invoice numbers (those are arbitrary, unprefixed
+  // strings), so the two never collide or get confused with each other. Only
+  // rows already matching our own "INV-#####" shape count toward the max, same
+  // pattern as generatePoNumber() ignoring legacy "CO#####" numbers.
+  private async generateInvoiceNumber(): Promise<string> {
+    const [{ maxSeq }]: { maxSeq: number | null }[] = await this.orderRepo.query(
+      `SELECT MAX(CAST(SUBSTRING("invoiceNumber" FROM 5) AS INTEGER)) AS "maxSeq" FROM orders WHERE "invoiceNumber" ~ '^INV-[0-9]+$'`,
+    );
+    return `INV-${String((maxSeq ?? 0) + 1).padStart(5, '0')}`;
+  }
+
+  // Fetches the linked RightClick order (read-only — never calls RightClick's
+  // own Create Invoice/Create Order APIs, which post real transactions to
+  // their General Ledger), builds our own invoice PDF from it, and stores it
+  // in Spaces so it shows up on the order detail page without needing to be
+  // regenerated. The invoice number is assigned once per order and reused on
+  // every later regeneration; the PDF itself is stored under a stable
+  // per-order key, so regenerating overwrites it in place rather than piling
+  // up orphaned versions.
+  async generateRightClickInvoice(id: string, shipVia: string, terms: string, charges: InvoiceCharges): Promise<Order> {
+    if (!SHIP_VIA_OPTIONS.includes(shipVia as any)) {
+      throw new BadRequestException('Invalid Ship Via option.');
+    }
+    if (!TERMS_OPTIONS.includes(terms as any)) {
+      throw new BadRequestException('Invalid Terms option.');
+    }
+    for (const [key, value] of Object.entries(charges)) {
+      if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+        throw new BadRequestException(`Invalid ${key} — must be a number 0 or greater.`);
+      }
+    }
+
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (!order.rcOrderNumber) {
+      throw new BadRequestException('Link a RightClick order number to this order first.');
+    }
+
+    const rcOrder = await this.rightClickService.lookupOrder(order.rcOrderNumber);
+
+    if (!order.invoiceNumber) {
+      order.invoiceNumber = await this.generateInvoiceNumber();
+    }
+
+    const pdf = await buildRightClickInvoicePdf(order, order.invoiceNumber, rcOrder, shipVia, terms, charges);
+    const key = `invoices/${order.id}.pdf`;
+    await this.spacesService.uploadBuffer(pdf, key, 'application/pdf');
+    order.invoicePdfKey = key;
+
+    return this.orderRepo.save(order);
+  }
+
+  async getRightClickInvoiceDownload(id: string): Promise<{ stream: NodeJS.ReadableStream; contentType: string; filename: string }> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found.');
+    if (!order.invoicePdfKey) {
+      throw new BadRequestException('No invoice has been generated for this order yet.');
+    }
+    const obj = await this.spacesService.getObject(order.invoicePdfKey);
+    return {
+      stream: obj.Body as unknown as NodeJS.ReadableStream,
+      contentType: obj.ContentType || 'application/pdf',
+      filename: `Invoice_${order.poNumber}.pdf`,
+    };
+  }
+
   async create(dto: Partial<Order>, user?: { id: string; email: string; firstName?: string; lastName?: string; role: string; [key: string]: any }): Promise<Order> {
     if (!dto.diamondType) {
       throw new BadRequestException('Diamond Type is required.');
@@ -1425,6 +1499,10 @@ export class OrdersService implements OnModuleInit {
     if (dto.factoryCommittedDate !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.FACTORY_MANAGER) {
       throw new ForbiddenException('Only Factory Manager or Admin can set the factory committed date.');
+    }
+    if (dto.rcOrderNumber !== undefined
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
+      throw new ForbiddenException('Only Admin or Authorizer can link a RightClick order number.');
     }
     if (EDITABLE_SPEC_KEYS.some(k => (dto as any)[k] !== undefined)
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {

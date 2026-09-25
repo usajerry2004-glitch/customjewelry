@@ -528,6 +528,15 @@ const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail'
 
 const SHIP_VIA_OPTIONS = ['FedEx', 'UPS', 'DHL', 'USPS', 'Brinks', 'Malca-Amit'];
 
+// RightClick invoice generation modal — must stay in sync with SHIP_VIA_OPTIONS/
+// TERMS_OPTIONS in backend/src/modules/orders/rightclick-invoice-pdf.util.ts
+// (the backend validates against that copy; the frontend can't import it directly).
+const INVOICE_SHIP_VIA_OPTIONS = ['FedEx', 'FedEx Overnight', 'Pickup'];
+const INVOICE_TERMS_OPTIONS = [
+  'Cash On Delivery', 'Advance', 'Received Payment',
+  '5 days', '7 days', '15 days', '30 days', '45 days', '60 days', '90 days', '120 days', '180 days', '210 days',
+];
+
 const MAX_REFERENCE_IMAGES = 10;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
 
@@ -592,6 +601,17 @@ export default function OrderDetail() {
   const [shipViaInput, setShipViaInput] = useState('');
   const [qcDoneInput, setQcDoneInput] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
+  const [rcOrderNumberInput, setRcOrderNumberInput] = useState('');
+  const [savingRcOrderNumber, setSavingRcOrderNumber] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [invoiceModal, setInvoiceModal] = useState(false);
+  const [invoiceShipVia, setInvoiceShipVia] = useState(INVOICE_SHIP_VIA_OPTIONS[0]);
+  const [invoiceTerms, setInvoiceTerms] = useState('7 days');
+  const [invoiceOtherCharges, setInvoiceOtherCharges] = useState('');
+  const [invoiceShipping, setInvoiceShipping] = useState('');
+  const [invoiceDiscount, setInvoiceDiscount] = useState('');
+  const [invoiceTax, setInvoiceTax] = useState('');
   const [savingPriority, setSavingPriority] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
@@ -733,6 +753,7 @@ export default function OrderDetail() {
           setShippedDateInput(o.shippedDate ? String(o.shippedDate).slice(0, 10) : '');
           setShipViaInput(o.shipMethod || '');
           setQcDoneInput(!!o.qcDone);
+          setRcOrderNumberInput(o.rcOrderNumber || '');
           const specs: Record<string, string> = {};
           EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = k === 'hasGemstone' ? (o[k] ? 'Yes' : 'No') : (o[k] ?? ''); });
           setSpecInputs(specs);
@@ -1053,6 +1074,82 @@ export default function OrderDetail() {
       toast.error('Failed to save shipping info — check your connection and try again.');
     } finally {
       setSavingShipping(false);
+    }
+  };
+
+  const saveRcOrderNumber = async () => {
+    if (!order?.id) return;
+    setSavingRcOrderNumber(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ rcOrderNumber: rcOrderNumberInput || null }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save RightClick order number.'));
+      }
+    } catch {
+      toast.error('Failed to save RightClick order number — check your connection and try again.');
+    } finally {
+      setSavingRcOrderNumber(false);
+    }
+  };
+
+  const generateInvoice = async () => {
+    if (!order?.id) return;
+    setGeneratingInvoice(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/rightclick-invoice`, {
+        method: 'POST',
+        body: JSON.stringify({
+          shipVia: invoiceShipVia,
+          terms: invoiceTerms,
+          otherCharges: parseFloat(invoiceOtherCharges) || 0,
+          shipping: parseFloat(invoiceShipping) || 0,
+          discount: parseFloat(invoiceDiscount) || 0,
+          tax: parseFloat(invoiceTax) || 0,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to generate invoice.'));
+        return;
+      }
+      setOrder(await res.json());
+      setInvoiceModal(false);
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
+
+  const downloadInvoice = async () => {
+    if (!order?.id) return;
+    setDownloadingInvoice(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/rightclick-invoice/download`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to download invoice.'));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice_${order.poNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Cannot connect to server. Please check your connection.');
+    } finally {
+      setDownloadingInvoice(false);
     }
   };
 
@@ -2533,6 +2630,56 @@ export default function OrderDetail() {
             ))}
           </div>
 
+          {/* RightClick — link this order to its RightClick order number, then
+              generate an invoice PDF from it. Read-only against RightClick
+              (never calls their Create Invoice API); JewelFlow renders its own
+              PDF and assigns its own invoice number the first time this runs. */}
+          {(userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER) && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                RightClick
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>RightClick Order #</div>
+                <input
+                  value={rcOrderNumberInput}
+                  onChange={e => setRcOrderNumberInput(e.target.value)}
+                  placeholder="e.g. 10432"
+                  style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <button
+                onClick={saveRcOrderNumber}
+                disabled={savingRcOrderNumber || rcOrderNumberInput === (order.rcOrderNumber || '')}
+                style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (savingRcOrderNumber || rcOrderNumberInput === (order.rcOrderNumber || '')) ? 0.5 : 1, marginBottom: '10px' }}
+              >
+                {savingRcOrderNumber ? '…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setInvoiceModal(true)}
+                disabled={generatingInvoice || !order.rcOrderNumber}
+                title={!order.rcOrderNumber ? 'Save a RightClick order number first' : undefined}
+                style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (generatingInvoice || !order.rcOrderNumber) ? 0.5 : 1 }}
+              >
+                {generatingInvoice ? 'Generating…' : (order.invoicePdfKey ? 'Regenerate Invoice' : 'Generate Invoice')}
+              </button>
+              {order.invoicePdfKey && (
+                <>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '10px 0 6px', textAlign: 'center' }}>
+                    Invoice {order.invoiceNumber} on file
+                  </div>
+                  <button
+                    onClick={downloadInvoice}
+                    disabled={downloadingInvoice}
+                    style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: downloadingInvoice ? 0.5 : 1 }}
+                  >
+                    {downloadingInvoice ? '…' : '⬇ Download Invoice'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Shipping — tracking number, ship date, and courier, independent of order status */}
           {userRole !== UserRole.CUSTOMER
             && ![OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED].includes(order.status!) && (
@@ -2693,6 +2840,76 @@ export default function OrderDetail() {
                 disabled={!pendingPrice || parseFloat(pendingPrice) <= 0}
                 style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!pendingPrice || parseFloat(pendingPrice) <= 0) ? 0.5 : 1 }}>
                 Confirm & Issue VPO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RightClick Invoice Modal — Ship Via/Terms aren't tracked per-order in
+          JewelFlow, so the admin picks them fresh each time an invoice is generated */}
+      {invoiceModal && (
+        <div className="modal-bg" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(26,39,64,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px 32px', width: '440px', maxWidth: '92vw', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Generate Invoice
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Pick the Ship Via, Terms, and any charges for this invoice — these print on the PDF but aren't stored on the order.
+            </p>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Ship Via
+            </label>
+            <select
+              value={invoiceShipVia}
+              onChange={e => setInvoiceShipVia(e.target.value)}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }}
+            >
+              {INVOICE_SHIP_VIA_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Terms
+            </label>
+            <select
+              value={invoiceTerms}
+              onChange={e => setInvoiceTerms(e.target.value)}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+            >
+              {INVOICE_TERMS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              {[
+                { label: 'Other Charges ($)', value: invoiceOtherCharges, set: setInvoiceOtherCharges },
+                { label: 'Shipping ($)', value: invoiceShipping, set: setInvoiceShipping },
+                { label: 'Discount ($)', value: invoiceDiscount, set: setInvoiceDiscount },
+                { label: 'Tax ($)', value: invoiceTax, set: setInvoiceTax },
+              ].map(f => (
+                <div key={f.label}>
+                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+                    {f.label}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={f.value}
+                    onChange={e => f.set(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setInvoiceModal(false)}
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
+                Cancel
+              </button>
+              <button
+                onClick={generateInvoice}
+                disabled={generatingInvoice}
+                style={{ flex: 2, background: 'var(--navy)', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: generatingInvoice ? 0.5 : 1 }}>
+                {generatingInvoice ? 'Generating…' : 'Generate'}
               </button>
             </div>
           </div>

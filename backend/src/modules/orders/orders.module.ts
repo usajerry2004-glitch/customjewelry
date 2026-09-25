@@ -11,13 +11,15 @@ import { Company } from '../../database/entities/company.entity';
 import { CustomerCode } from '../../database/entities/customer-code.entity';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { RightClickService } from './rightclick.service';
 import { SkuModule } from '../sku/sku.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { SpacesModule } from '../spaces/spaces.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent, OrderMessage, Sku, Company, CustomerCode]), SkuModule, CatalogModule],
+  imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent, OrderMessage, Sku, Company, CustomerCode]), SkuModule, CatalogModule, SpacesModule],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, RightClickService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

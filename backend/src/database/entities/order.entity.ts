@@ -194,6 +194,12 @@ export class Order {
   @Column({ nullable: true })
   invoiceNumber: string;
 
+  // DO Spaces object key for the generated RightClick invoice PDF — set once
+  // generateRightClickInvoice() first runs, overwritten in place on every
+  // later regeneration so the order always links to just one current PDF.
+  @Column({ nullable: true })
+  invoicePdfKey: string;
+
   @Column({ nullable: true })
   shipMethod: string;
 

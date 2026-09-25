@@ -121,6 +121,9 @@ export interface Order {
   companyId?: string | null;
   companyViewerAccessEnabled?: boolean;
   viewerEmbedUrl?: string | null;
+  rcOrderNumber?: string | null;
+  invoiceNumber?: string | null;
+  invoicePdfKey?: string | null;
   source?: string;
   externalOrderId?: string | null;
   createdAt: string;
