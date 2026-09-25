@@ -124,4 +124,25 @@ export class UsersController {
   findCompanyRepDrift() {
     return this.usersService.findCompanyRepDrift();
   }
+
+  @Get('admin/orphaned-orders')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Read-only: finds orders with no linked customer account (customerId IS NULL) whose typed storeName/contact name/email loosely matches ?search= — e.g. staff typed a close-but-not-exact company name/contact instead of using the customer picker, so the order never showed up under that customer\'s "View Orders" (which matches on exact customerId/companyId/customerEmail only). The drift that left order C01129 invisible under "Sino Fine Jewelry & Diamonds LLC". Never writes anything.' })
+  findOrphanedOrders(@Query('search') search?: string) {
+    return this.usersService.findOrphanedOrders(search || '');
+  }
+
+  @Post('admin/relink-orders')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: attaches specific orphaned orders (see admin/orphaned-orders) to an existing customer account by setting customerId/companyId/salesRep*. Deliberately leaves storeName/customerFullName/customerEmail untouched — that\'s the real contact who placed the order, which may be a different person at the same company. Dry-run unless ?apply=true.' })
+  relinkOrders(@Body() body: { orderIds: string[]; customerId: string }, @Query('apply') apply?: string) {
+    return this.usersService.relinkOrdersToCustomer(body.orderIds, body.customerId, apply === 'true');
+  }
+
+  @Post('admin/fix-sino-fine-jewelry-orders')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: links every un-linked order with storeName "Sino Fine Jewelry" to the "Sino Fine Jewelry & Diamonds LLC" customer account and rewrites their storeName to match, so they show up under that customer. Dry-run unless ?apply=true.' })
+  fixSinoFineJewelryOrders(@Query('apply') apply?: string) {
+    return this.usersService.fixSinoFineJewelryOrders(apply === 'true');
+  }
 }

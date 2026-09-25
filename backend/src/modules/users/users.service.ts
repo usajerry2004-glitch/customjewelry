@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional, IsEnum, IsBoolean, ValidateIf, IsArray } from 'class-validator';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -474,6 +474,96 @@ export class UsersService {
       });
     }
     return results;
+  }
+
+  // Read-only diagnostic: getCustomerOrders() only ever matches an order to
+  // a customer by exact customerId/companyId/customerEmail equality — it
+  // never looks at storeName or the typed contact name. So an order entered
+  // with a close-but-not-identical company name or a different contact's
+  // email (e.g. staff typed "Sino Fine Jewelry" / a different person's email
+  // instead of using the picker for "Sino Fine Jewelry & Diamonds LLC")
+  // stays customerId: null forever and is invisible on that customer's "View
+  // Orders", even though the Customers page's own search box would happily
+  // fuzzy-match the two names. This surfaces exactly those orphaned orders
+  // for manual review — never writes anything.
+  async findOrphanedOrders(search: string): Promise<{
+    id: string; poNumber: string; storeName: string | null; customerFullName: string | null;
+    customerEmail: string | null; createdAt: Date; status: string;
+  }[]> {
+    const q = `%${search.trim()}%`;
+    const qb = this.orderRepo.createQueryBuilder('o').where('o."customerId" IS NULL');
+    if (search.trim()) {
+      qb.andWhere('(o."storeName" ILIKE :q OR o."customerFullName" ILIKE :q OR o."customerEmail" ILIKE :q)', { q });
+    }
+    const orders = await qb.orderBy('o."createdAt"', 'DESC').getMany();
+    return orders.map(o => ({
+      id: o.id, poNumber: o.poNumber, storeName: o.storeName, customerFullName: o.customerFullName,
+      customerEmail: o.customerEmail, createdAt: o.createdAt, status: o.status,
+    }));
+  }
+
+  // One-off tool to fix what findOrphanedOrders() surfaces: attaches the
+  // given orders to an existing customer account by setting
+  // customerId/companyId/salesRep* — the same linkage fields
+  // getCustomerOrders() actually matches on. Deliberately does NOT touch
+  // storeName/customerFullName/customerEmail: those record who really
+  // placed the order (which may be a different teammate than the primary
+  // account), and overwriting them would destroy that. Dry-run unless
+  // apply=true.
+  async relinkOrdersToCustomer(orderIds: string[], customerId: string, apply: boolean): Promise<{
+    customer: string; orders: { id: string; poNumber: string }[];
+  }> {
+    const customer = await this.userRepo.findOne({ where: { id: customerId, role: UserRole.CUSTOMER } });
+    if (!customer) throw new NotFoundException('Customer not found.');
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds) } });
+    if (orders.length !== orderIds.length) throw new BadRequestException('One or more order IDs not found.');
+
+    const repSourceId = customer.companyId
+      ? (await this.companyRepo.findOne({ where: { id: customer.companyId } }))?.salesRepId
+      : customer.salesRepId;
+    const repPatch = await this.buildOrderRepPatch(repSourceId);
+    const patch: Partial<Order> = { customerId: customer.id, companyId: customer.companyId, ...repPatch };
+
+    if (apply) {
+      await this.orderRepo.update({ id: In(orderIds) }, patch);
+    }
+
+    return {
+      customer: `${customer.storeName?.trim() || `${customer.firstName} ${customer.lastName}`.trim() || customer.email} (${customer.id})`,
+      orders: orders.map(o => ({ id: o.id, poNumber: o.poNumber })),
+    };
+  }
+
+  // One-off fix: orders were entered with storeName "Sino Fine Jewelry" — a
+  // shorter, different typed name than the real customer account "Sino Fine
+  // Jewelry & Diamonds LLC" — so they never got a customerId and stayed
+  // invisible under that customer's "View Orders" (see findOrphanedOrders()
+  // for why). Finds every un-linked order with that exact storeName, links
+  // it to the "Sino Fine Jewelry & Diamonds LLC" account, and rewrites its
+  // storeName to the canonical company name so it reads consistently
+  // everywhere. Leaves customerFullName/customerEmail untouched — those
+  // record the actual person who placed each order. Dry-run unless
+  // apply=true.
+  async fixSinoFineJewelryOrders(apply: boolean): Promise<{ customer: string; orders: { id: string; poNumber: string; storeName: string | null }[] }> {
+    const customer = await this.userRepo.findOne({ where: { role: UserRole.CUSTOMER, storeName: 'Sino Fine Jewelry & Diamonds LLC' } });
+    if (!customer) throw new NotFoundException('"Sino Fine Jewelry & Diamonds LLC" customer account not found.');
+
+    const orders = await this.orderRepo.find({ where: { storeName: 'Sino Fine Jewelry', customerId: IsNull() } });
+
+    const repSourceId = customer.companyId
+      ? (await this.companyRepo.findOne({ where: { id: customer.companyId } }))?.salesRepId
+      : customer.salesRepId;
+    const repPatch = await this.buildOrderRepPatch(repSourceId);
+    const patch: Partial<Order> = { customerId: customer.id, companyId: customer.companyId, storeName: customer.storeName, ...repPatch };
+
+    if (apply && orders.length) {
+      await this.orderRepo.update({ id: In(orders.map(o => o.id)) }, patch);
+    }
+
+    return {
+      customer: `${customer.storeName} (${customer.id})`,
+      orders: orders.map(o => ({ id: o.id, poNumber: o.poNumber, storeName: o.storeName })),
+    };
   }
 
   // Companion to mergeDuplicateCompanies(): handles the accounts that method
