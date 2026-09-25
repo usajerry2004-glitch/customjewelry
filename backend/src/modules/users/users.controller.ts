@@ -132,6 +132,13 @@ export class UsersController {
     return this.usersService.findOrphanedOrders(search || '');
   }
 
+  @Get('admin/orders-by-search')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Read-only: like admin/orphaned-orders but without the "unlinked only" filter — shows every order matching ?search= against storeName/contact/email, including its current customerId/companyId (whether null or already set, possibly to the wrong account). Use this when orphaned-orders unexpectedly returns nothing for a company known to have orders. Never writes anything.' })
+  findOrdersBySearch(@Query('search') search?: string) {
+    return this.usersService.findOrdersBySearch(search || '');
+  }
+
   @Post('admin/relink-orders')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'One-off: attaches specific orphaned orders (see admin/orphaned-orders) to an existing customer account by setting customerId/companyId/salesRep*. Deliberately leaves storeName/customerFullName/customerEmail untouched — that\'s the real contact who placed the order, which may be a different person at the same company. Dry-run unless ?apply=true.' })

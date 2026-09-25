@@ -502,6 +502,31 @@ export class UsersService {
     }));
   }
 
+  // Read-only diagnostic: like findOrphanedOrders() but without the
+  // customerId IS NULL filter — shows every order matching ?search=,
+  // including its CURRENT customerId/companyId, whether null or already set
+  // (possibly to the wrong account). Built to debug the case where
+  // findOrphanedOrders() unexpectedly returns nothing for a company the
+  // business owner knows has orders — that means the order isn't actually
+  // unlinked, it's linked to something. Never writes anything.
+  async findOrdersBySearch(search: string): Promise<{
+    id: string; poNumber: string; storeName: string | null; customerFullName: string | null;
+    customerEmail: string | null; customerId: string | null; companyId: string | null;
+    createdAt: Date; status: string;
+  }[]> {
+    const q = `%${search.trim()}%`;
+    const qb = this.orderRepo.createQueryBuilder('o');
+    if (search.trim()) {
+      qb.where('(o."storeName" ILIKE :q OR o."customerFullName" ILIKE :q OR o."customerEmail" ILIKE :q)', { q });
+    }
+    const orders = await qb.orderBy('o."createdAt"', 'DESC').getMany();
+    return orders.map(o => ({
+      id: o.id, poNumber: o.poNumber, storeName: o.storeName, customerFullName: o.customerFullName,
+      customerEmail: o.customerEmail, customerId: o.customerId, companyId: o.companyId,
+      createdAt: o.createdAt, status: o.status,
+    }));
+  }
+
   // One-off tool to fix what findOrphanedOrders() surfaces: attaches the
   // given orders to an existing customer account by setting
   // customerId/companyId/salesRep* — the same linkage fields
