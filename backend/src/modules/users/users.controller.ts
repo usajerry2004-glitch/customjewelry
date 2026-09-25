@@ -1,11 +1,50 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { IsArray, IsString, ArrayMinSize, IsOptional, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 import { UsersService, CreateUserDto, UpdateUserDto, InviteUserDto } from './users.service';
 import { EmailService } from '../email/email.service';
+
+// Plain class DTOs (not inline @Body() object types) — this project doesn't
+// enable the @nestjs/swagger CLI plugin, so an inline type gives Swagger
+// nothing to introspect and its "Try it out" form renders no request-body
+// box at all for that route, silently. A class (even with no explicit
+// @ApiProperty — the class-validator decorators are enough) fixes that.
+class ResolveDuplicateGroupDto {
+  @IsArray() @IsString({ each: true }) @ArrayMinSize(1)
+  emails: string[];
+
+  @IsOptional() @IsString()
+  salesRepId?: string;
+
+  @IsOptional() @IsString()
+  companyName?: string;
+}
+
+class ResolveDuplicateGroupsDto {
+  @IsArray() @ValidateNested({ each: true }) @Type(() => ResolveDuplicateGroupDto)
+  groups: ResolveDuplicateGroupDto[];
+}
+
+class MergeCustomerAccountsDto {
+  @IsArray() @IsString({ each: true }) @ArrayMinSize(2)
+  userIds: string[];
+
+  @IsOptional() @IsString()
+  companyName?: string;
+}
+
+class RelinkOrdersDto {
+  @IsArray() @IsString({ each: true }) @ArrayMinSize(1)
+  orderIds: string[];
+
+  @IsString()
+  customerId: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -114,14 +153,14 @@ export class UsersController {
   @Post('admin/resolve-duplicate-groups')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'One-off: merge specific named groups of accounts (by email) onto a shared company with a chosen Sales Rep — for cases the automatic merges skipped over a rep disagreement.' })
-  resolveDuplicateGroups(@Body() body: { groups: { emails: string[]; salesRepId?: string; companyName?: string }[] }) {
+  resolveDuplicateGroups(@Body() body: ResolveDuplicateGroupsDto) {
     return this.usersService.resolveDuplicateGroups(body.groups);
   }
 
   @Post('admin/merge-customer-accounts')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'One-off: same as resolve-duplicate-groups but keyed by explicit user IDs instead of emails — for confirmed-duplicate accounts whose display names differ (so the automatic display-name merge never grouped them), e.g. "Sino Fine Jewelry" vs "Sino Fine Jewelry & Diamonds LLC". Puts all given accounts on one shared company and cascades to their orders — which also makes any order placed under these accounts in the future show up under the merged company automatically. Dry-run unless ?apply=true.' })
-  mergeCustomerAccounts(@Body() body: { userIds: string[]; companyName?: string }, @Query('apply') apply?: string) {
+  mergeCustomerAccounts(@Body() body: MergeCustomerAccountsDto, @Query('apply') apply?: string) {
     return this.usersService.mergeCustomerAccountsByIds(body.userIds, body.companyName, apply === 'true');
   }
 
@@ -149,7 +188,7 @@ export class UsersController {
   @Post('admin/relink-orders')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'One-off: attaches specific orphaned orders (see admin/orphaned-orders) to an existing customer account by setting customerId/companyId/salesRep*. Deliberately leaves storeName/customerFullName/customerEmail untouched — that\'s the real contact who placed the order, which may be a different person at the same company. Dry-run unless ?apply=true.' })
-  relinkOrders(@Body() body: { orderIds: string[]; customerId: string }, @Query('apply') apply?: string) {
+  relinkOrders(@Body() body: RelinkOrdersDto, @Query('apply') apply?: string) {
     return this.usersService.relinkOrdersToCustomer(body.orderIds, body.customerId, apply === 'true');
   }
 
