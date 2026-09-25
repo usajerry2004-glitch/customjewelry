@@ -1374,6 +1374,11 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException('Diamond Type is required.');
     }
     const data: Partial<Order> = { ...dto };
+    // Same unvalidated-body gap as customerId below (this endpoint's `Partial<Order>`
+    // body type bypasses the global ValidationPipe's whitelist check) — companyId
+    // must only ever come from the resolved, verified customer further down, never
+    // straight from the client, so it's discarded here regardless of what was sent.
+    delete (data as any).companyId;
 
     // Always auto-generate PO number and tracking token — ignore any client-supplied values
     data.poNumber      = await this.generatePoNumber();
@@ -1395,6 +1400,22 @@ export class OrdersService implements OnModuleInit {
       data.salesRepId = user.id;
       data.salesRepEmail = user.email;
     }
+
+    // A staff-supplied customerId must actually reference a Customer account.
+    // This endpoint takes `Partial<Order>` as its body type, which erases to
+    // `Object` at runtime and so skips the global ValidationPipe's
+    // whitelist/forbidNonWhitelisted checks entirely — nothing else stops a
+    // caller (a direct API call bypassing the dashboard's customer picker)
+    // from passing any user id here, including their own. Confirmed root
+    // cause of 8 orders getting linked to the staff member who placed them
+    // instead of the actual customer. Falls through to the email self-heal
+    // below rather than hard-rejecting the request, since the rest of the
+    // order (specs, pricing) is still valid even if this one field wasn't.
+    if (data.customerId && user?.role !== 'CUSTOMER') {
+      const validCustomer = await this.userRepo.findOne({ where: { id: data.customerId, role: UserRole.CUSTOMER } });
+      if (!validCustomer) data.customerId = null as any;
+    }
+
     // Linking to an existing customer (via the picker) is encouraged — it's
     // what gives company-wide order sharing and Sales Rep attribution — but
     // not required: any staff role with order-creation access can place an
