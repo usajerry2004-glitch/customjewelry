@@ -118,6 +118,13 @@ export class UsersController {
     return this.usersService.resolveDuplicateGroups(body.groups);
   }
 
+  @Post('admin/merge-customer-accounts')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'One-off: same as resolve-duplicate-groups but keyed by explicit user IDs instead of emails — for confirmed-duplicate accounts whose display names differ (so the automatic display-name merge never grouped them), e.g. "Sino Fine Jewelry" vs "Sino Fine Jewelry & Diamonds LLC". Puts all given accounts on one shared company and cascades to their orders — which also makes any order placed under these accounts in the future show up under the merged company automatically. Dry-run unless ?apply=true.' })
+  mergeCustomerAccounts(@Body() body: { userIds: string[]; companyName?: string }, @Query('apply') apply?: string) {
+    return this.usersService.mergeCustomerAccountsByIds(body.userIds, body.companyName, apply === 'true');
+  }
+
   @Get('admin/company-rep-drift')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Read-only: finds companies whose own salesRepId is missing or disagrees with a teammate\'s individually-set salesRepId — the same drift that left order C00204 invisible to its rep at Crockers Jewelers. Never writes anything.' })

@@ -714,6 +714,51 @@ export class UsersService {
     return { resolved };
   }
 
+  // Same operation as resolveDuplicateGroups(), keyed by explicit user IDs
+  // instead of emails — for a case like "Sino Fine Jewelry", where separate
+  // orders had ended up on 2-3 different customer accounts that were never
+  // linked into one company (findDuplicateDisplayNames() didn't catch it
+  // because the accounts' display names weren't identical strings — "Sino
+  // Fine Jewelry" vs "Sino Fine Jewelry & Diamonds LLC" — so an admin found
+  // and confirmed the accounts belong together by hand instead). Puts all
+  // given accounts on one shared Company (adopting whichever one already has
+  // one, or creating a new one) and cascades companyId/storeName/salesRep*
+  // to every order tied to any of them by customerId or email — which is
+  // also what makes this durable for orders placed after this runs: any
+  // future order that resolves its customerId to one of these accounts (the
+  // existing exact-email self-heal in orders.service.ts already does that)
+  // inherits the shared companyId automatically via getCustomerOrders()'s
+  // companyId match, with no further merge needed. Dry-run unless apply=true.
+  async mergeCustomerAccountsByIds(userIds: string[], companyName: string | undefined, apply: boolean): Promise<{ company: string; accounts: { id: string; email: string }[] }> {
+    const users = await this.userRepo.find({ where: { id: In(userIds), role: UserRole.CUSTOMER } });
+    if (users.length !== userIds.length) {
+      throw new BadRequestException('One or more user IDs were not found, or are not Customer accounts.');
+    }
+
+    const linkedElsewhere = users.find(u => u.companyId);
+    const existingCompany = linkedElsewhere ? await this.companyRepo.findOne({ where: { id: linkedElsewhere.companyId! } }) : null;
+    const salesRepId = (existingCompany?.salesRepId ?? users.find(u => u.salesRepId)?.salesRepId ?? null) as any;
+
+    const companyPatch = { name: (companyName?.trim() || existingCompany?.name || users[0].storeName?.trim() || `${users[0].firstName} ${users[0].lastName}`.trim()), salesRepId };
+    const company = apply
+      ? (existingCompany ? await this.companyRepo.save({ ...existingCompany, ...companyPatch }) : await this.companyRepo.save(this.companyRepo.create(companyPatch)))
+      : { id: existingCompany?.id || '(new)', ...companyPatch };
+
+    if (apply) {
+      const repPatch = await this.buildOrderRepPatch(company.salesRepId);
+      for (const u of users) {
+        await this.userRepo.update(u.id, { companyId: company.id, storeName: company.name, salesRepId: company.salesRepId as any });
+        await this.orderRepo.update({ customerId: u.id }, { companyId: company.id, storeName: company.name, ...repPatch });
+        await this.orderRepo.update({ customerEmail: u.email }, { companyId: company.id, storeName: company.name, ...repPatch });
+      }
+    }
+
+    return {
+      company: `"${company.name}" (${company.id}) — rep ${company.salesRepId || '(none)'}`,
+      accounts: users.map(u => ({ id: u.id, email: u.email })),
+    };
+  }
+
   async togglePriority(id: string): Promise<User> {
     const user = await this.findOne(id);
     user.isPriority = !user.isPriority;
