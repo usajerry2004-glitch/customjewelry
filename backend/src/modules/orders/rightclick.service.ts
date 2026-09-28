@@ -80,6 +80,13 @@ export class RightClickService {
   // by testing directly against their test environment. Both headers are sent
   // per their own docs' Testing section ("All API calls need Content-Type set to
   // application/json").
+  //
+  // Any network-level failure (unreachable host, DNS failure, malformed
+  // RIGHTCLICK_BASE_URL, or the LOOKUP_TIMEOUT_MS abort firing) throws a plain
+  // Error/TypeError here rather than rejecting cleanly — left uncaught, that
+  // becomes an unhandled exception NestJS's default filter turns into an
+  // opaque "Internal server error" with no useful detail. Caught and
+  // rewrapped into a BadRequestException with the actual reason instead.
   private async fetchJson(url: string): Promise<{ ok: boolean; status: number; body: RightClickApiResponse | null }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
@@ -90,6 +97,11 @@ export class RightClickService {
       });
       const body = (await res.json().catch(() => null)) as RightClickApiResponse | null;
       return { ok: res.ok, status: res.status, body };
+    } catch (err: any) {
+      const reason = err?.name === 'AbortError'
+        ? `RightClick did not respond within ${LOOKUP_TIMEOUT_MS / 1000}s.`
+        : `Could not reach RightClick at "${this.baseUrl()}" — ${err?.message || err}. Check RIGHTCLICK_BASE_URL.`;
+      throw new BadRequestException(reason);
     } finally {
       clearTimeout(timeout);
     }
@@ -99,7 +111,10 @@ export class RightClickService {
     const url = `${this.baseUrl()}/?serial=${encodeURIComponent(this.serial())}&apikey=${encodeURIComponent(this.apiKey())}&apipassword=${encodeURIComponent(this.apiPassword())}`;
     const { ok, status, body } = await this.fetchJson(url);
     if (!ok || !body?.Success || !body.SessionId) {
-      throw new Error(body?.Message || `RightClick authentication failed (HTTP ${status}).`);
+      // Was a plain `new Error(...)` — also silently became an opaque 500
+      // instead of surfacing RightClick's own rejection reason (e.g. "Invalid
+      // credentials").
+      throw new BadRequestException(body?.Message || `RightClick authentication failed (HTTP ${status}).`);
     }
     this.sessionId = body.SessionId;
     this.sessionObtainedAt = Date.now();
