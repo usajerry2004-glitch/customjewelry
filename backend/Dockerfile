@@ -8,6 +8,10 @@ RUN ls dist/main.js
 # tsc only emits compiled .js — non-.ts assets like the bundled customer-codes
 # CSV need to be copied into dist by hand or they're missing at runtime.
 RUN mkdir -p dist/database/seeds/data && cp -r src/database/seeds/data/. dist/database/seeds/data/
+# Same deal for the RightClick invoice PDF's logo image — nest-cli.json's
+# "assets" glob only applies to `nest build`, which this Dockerfile doesn't
+# use, so it silently never copies here without this.
+RUN mkdir -p dist/modules/orders/assets && cp -r src/modules/orders/assets/. dist/modules/orders/assets/
 
 FROM node:20-alpine AS production
 WORKDIR /app
