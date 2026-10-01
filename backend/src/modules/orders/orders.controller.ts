@@ -59,6 +59,20 @@ class GenerateRightClickInvoiceDto {
   @IsNumber()
   @Min(0)
   tax?: number;
+
+  // Free text — the frontend sends one of SPECIAL_INSTRUCTIONS_OPTIONS, or
+  // whatever was typed when "Other" was picked, so this isn't constrained to
+  // that list server-side.
+  @IsOptional()
+  @IsString()
+  specialInstructions?: string;
+
+  // Other orders to combine onto this same invoice — must all belong to the
+  // same customer account as the order this is posted to (enforced server-side).
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  otherOrderIds?: string[];
 }
 
 @ApiTags('Orders')
@@ -358,7 +372,7 @@ export class OrdersController {
       shipping: body.shipping ?? 0,
       discount: body.discount ?? 0,
       tax: body.tax ?? 0,
-    });
+    }, body.specialInstructions, body.otherOrderIds);
   }
 
   @Get(':id/rightclick-invoice/download')

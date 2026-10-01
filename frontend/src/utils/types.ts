@@ -61,6 +61,7 @@ export enum UserRole {
 export interface Order {
   id: string;
   poNumber: string;
+  customerId?: string | null;
   kiraSkuNumber?: string;
   trackingNumber?: string;
   status: OrderStatus;

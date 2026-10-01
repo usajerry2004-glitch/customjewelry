@@ -55,6 +55,9 @@ export const TERMS_OPTIONS = [
   'Cash On Delivery', 'Advance', 'Received Payment',
   '5 days', '7 days', '15 days', '30 days', '45 days', '60 days', '90 days', '120 days', '180 days', '210 days',
 ] as const;
+// "Other" lets the admin free-type anything not on this list — handled on
+// the frontend/controller, not validated against this list server-side.
+export const SPECIAL_INSTRUCTIONS_OPTIONS = ['Hand Carry', 'Customer Label', 'Non-FedEx Courier', 'Hold', 'Other'] as const;
 
 // "30 days" -> "Net 030 Days", matching the real invoices' formatting;
 // non-day terms (Cash On Delivery, Advance, Received Payment) print as-is.
@@ -327,7 +330,19 @@ export interface InvoiceCharges {
   tax: number;
 }
 
-export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: string, rcOrder: RightClickCustomerOrder | null, shipVia: string, terms: string, charges: InvoiceCharges): Promise<Buffer> {
+export interface InvoiceOrderPair {
+  order: Order;
+  rcOrder: RightClickCustomerOrder | null;
+}
+
+// `orderPairs` holds one or more orders being invoiced together — more than
+// one only when combining several of the same customer's orders onto a
+// single invoice (see OrdersService.generateRightClickInvoice). The first
+// pair is treated as primary: its billing/shipping identity, customer #,
+// and salesperson drive the header, since combining is only allowed across
+// orders already verified to share the same customer account.
+export async function buildRightClickInvoicePdf(orderPairs: InvoiceOrderPair[], invoiceNumber: string, shipVia: string, terms: string, charges: InvoiceCharges, specialInstructions?: string): Promise<Buffer> {
+  const { order, rcOrder } = orderPairs[0];
   // bufferPages lets the accurate page count (only known once every line
   // item — and any pagination it triggers — has been drawn) be written back
   // onto page 1's "Page #: 1 of N" afterward, instead of only ever being
@@ -373,9 +388,21 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   const dueDate = computeDueDate(issueDate, terms);
   const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 
+  // The P.O. # cell is single-line/fixed-height (see drawLabelValueCell) —
+  // fine for one order, but a combined invoice with many orders would
+  // overflow it and visually collide with everything drawn below. Truncated
+  // here; the full list prints as its own wrapped line underneath instead
+  // when there's more than a couple.
+  const poNumbers = orderPairs.map(p => p.order.poNumber).filter(Boolean);
+  // That cell is narrow (one of 5 across the row) and single-line — even
+  // "C00541, C00542 +23 more" overflows it once there's more than one order.
+  // The full list prints as its own wrapped line below instead; this cell
+  // just needs to always fit.
+  const poNumbersCell = poNumbers.length <= 1 ? (poNumbers[0] || '—') : `${poNumbers.length} Orders`;
+
   const infoRows: { label: string; value: string }[][] = [
     [
-      { label: 'P.O. #:', value: order.poNumber || '—' },
+      { label: 'P.O. #:', value: poNumbersCell },
       { label: 'Customer #:', value: order.customerCode || '—' },
       { label: 'Date:', value: fmtDate(issueDate) },
       { label: 'Due Date:', value: fmtDate(dueDate) },
@@ -388,14 +415,26 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
       { label: 'Ship Via:', value: shipVia || '—' },
     ],
   ];
-  if (order.certificateNumbers?.length) {
-    infoRows.push([{ label: 'Certificate #(s):', value: order.certificateNumbers.join(', ') }]);
+  const allCertNumbers = [...new Set(orderPairs.flatMap(p => p.order.certificateNumbers || []))];
+  if (allCertNumbers.length) {
+    infoRows.push([{ label: 'Certificate #(s):', value: allCertNumbers.join(', ') }]);
+  }
+  if (specialInstructions?.trim()) {
+    infoRows.push([{ label: 'Special Instructions:', value: specialInstructions.trim() }]);
   }
   y = drawInfoGrid(doc, infoRows, y);
   y += 14;
 
-  // ── Line items ──
-  const items = buildLineItems(order, rcOrder);
+  // Full P.O. # list, wrapped — only when it didn't already fit in the
+  // info grid cell above.
+  if (poNumbers.length > 1) {
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text('COMBINED ORDERS: ', MARGIN, y, { continued: true, width: CONTENT_WIDTH, characterSpacing: 0.3 });
+    doc.font('Helvetica').fontSize(8).fillColor(INK).text(poNumbers.join(', '));
+    y = doc.y + 10;
+  }
+
+  // ── Line items — one order's items after another, in the order given ──
+  const items = orderPairs.flatMap(p => buildLineItems(p.order, p.rcOrder));
   y = drawItemsTable(doc, items, y);
 
   const subtotal = items.reduce((s, it) => s + it.amount, 0);
@@ -417,7 +456,20 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   const totalsX = MARGIN + legalW + 20;
   const totalsW = CONTENT_WIDTH - legalW - 20;
 
-  const footerReserve = 40;
+  // Computed up front (not just drawn at the end) so its height can be
+  // reserved alongside the legal block — otherwise, when the legal block is
+  // pinned near the bottom of the page, this note gets squeezed into
+  // whatever's left and can print right on top of the footer.
+  const unmatchedPoNumbers = orderPairs.filter(p => !p.rcOrder).map(p => p.order.poNumber);
+  const unmatchedNote = unmatchedPoNumbers.length
+    ? (orderPairs.length === 1
+      ? 'Note: no matching order was found in RightClick for this order number — the figures above reflect JewelFlow\'s own order record only.'
+      : `Note: no matching RightClick order was found for: ${unmatchedPoNumbers.join(', ')} — those orders' figures above reflect JewelFlow's own order record only.`)
+    : null;
+  doc.font('Helvetica-Oblique').fontSize(5);
+  const unmatchedNoteHeight = unmatchedNote ? doc.heightOfString(unmatchedNote, { width: CONTENT_WIDTH }) + 14 : 0;
+
+  const footerReserve = 40 + unmatchedNoteHeight;
   const legalBlockHeight = measureLegalBlockHeight(doc, legalW);
   const bottomAnchoredY = doc.page.height - MARGIN - footerReserve - legalBlockHeight;
   let legalStartY = Math.max(y + 20, bottomAnchoredY);
@@ -449,9 +501,9 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   doc.moveTo(totalsX, doc.y + 20).lineTo(totalsX + totalsW, doc.y + 20).lineWidth(0.5).strokeColor(BORDER).stroke();
   doc.font('Helvetica').fontSize(4.5).fillColor(INK).text('Authorized Signatory Company Chop & Signature', totalsX, doc.y + 24, { width: totalsW });
 
-  if (!rcOrder) {
+  if (unmatchedNote) {
     doc.font('Helvetica-Oblique').fontSize(5).fillColor(INK)
-      .text('Note: no matching order was found in RightClick for this order number — the figures above reflect JewelFlow\'s own order record only.', MARGIN, Math.max(legalEndY, doc.y) + 14, { width: CONTENT_WIDTH });
+      .text(unmatchedNote, MARGIN, Math.max(legalEndY, doc.y) + 14, { width: CONTENT_WIDTH });
   }
 
   // ── Footer ──

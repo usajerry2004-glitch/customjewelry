@@ -537,6 +537,7 @@ const INVOICE_TERMS_OPTIONS = [
   'Cash On Delivery', 'Advance', 'Received Payment',
   '5 days', '7 days', '15 days', '30 days', '45 days', '60 days', '90 days', '120 days', '180 days', '210 days',
 ];
+const INVOICE_SPECIAL_INSTRUCTIONS_OPTIONS = ['None', 'Hand Carry', 'Customer Label', 'Non-FedEx Courier', 'Hold', 'Other'];
 
 const MAX_REFERENCE_IMAGES = 10;
 const DESIGN_FILES_COLLAPSED_COUNT = 2;
@@ -617,6 +618,11 @@ export default function OrderDetail() {
   const [invoiceShipping, setInvoiceShipping] = useState('');
   const [invoiceDiscount, setInvoiceDiscount] = useState('');
   const [invoiceTax, setInvoiceTax] = useState('');
+  const [invoiceSpecialInstructions, setInvoiceSpecialInstructions] = useState('None');
+  const [invoiceSpecialInstructionsOther, setInvoiceSpecialInstructionsOther] = useState('');
+  const [combineCandidates, setCombineCandidates] = useState<Order[]>([]);
+  const [combineOrderIds, setCombineOrderIds] = useState<string[]>([]);
+  const [loadingCombineCandidates, setLoadingCombineCandidates] = useState(false);
   const [savingPriority, setSavingPriority] = useState(false);
   const [specInputs, setSpecInputs] = useState<Record<string, string>>({});
   const [savingSpecKey, setSavingSpecKey] = useState<string | null>(null);
@@ -1137,6 +1143,25 @@ export default function OrderDetail() {
     }
   };
 
+  const openInvoiceModal = async () => {
+    setInvoiceModal(true);
+    setCombineOrderIds([]);
+    setCombineCandidates([]);
+    if (!order?.customerId) return;
+    setLoadingCombineCandidates(true);
+    try {
+      const res = await apiFetch(`${API}/users/${order.customerId}/orders`);
+      if (res.ok) {
+        const data = await res.json();
+        setCombineCandidates((data.orders || []).filter((o: Order) => o.id !== order.id));
+      }
+    } catch {
+      // Combining is optional — a failed fetch here just leaves the list empty, not an error worth a toast.
+    } finally {
+      setLoadingCombineCandidates(false);
+    }
+  };
+
   const generateInvoice = async () => {
     if (!order?.id) return;
     setGeneratingInvoice(true);
@@ -1150,6 +1175,12 @@ export default function OrderDetail() {
           shipping: parseFloat(invoiceShipping) || 0,
           discount: parseFloat(invoiceDiscount) || 0,
           tax: parseFloat(invoiceTax) || 0,
+          specialInstructions: invoiceSpecialInstructions === 'None'
+            ? undefined
+            : invoiceSpecialInstructions === 'Other'
+            ? (invoiceSpecialInstructionsOther.trim() || undefined)
+            : invoiceSpecialInstructions,
+          otherOrderIds: combineOrderIds.length ? combineOrderIds : undefined,
         }),
       });
       if (!res.ok) {
@@ -2741,7 +2772,7 @@ export default function OrderDetail() {
               </button>
 
               <button
-                onClick={() => setInvoiceModal(true)}
+                onClick={openInvoiceModal}
                 disabled={generatingInvoice || !order.rcOrderNumber}
                 title={!order.rcOrderNumber ? 'Save a RightClick order number first' : undefined}
                 style={{ width: '100%', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (generatingInvoice || !order.rcOrderNumber) ? 0.5 : 1 }}
@@ -2962,6 +2993,50 @@ export default function OrderDetail() {
             >
               {INVOICE_TERMS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Special Instructions
+            </label>
+            <select
+              value={invoiceSpecialInstructions}
+              onChange={e => setInvoiceSpecialInstructions(e.target.value)}
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: invoiceSpecialInstructions === 'Other' ? '12px' : '20px' }}
+            >
+              {INVOICE_SPECIAL_INSTRUCTIONS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {invoiceSpecialInstructions === 'Other' && (
+              <input
+                value={invoiceSpecialInstructionsOther}
+                onChange={e => setInvoiceSpecialInstructionsOther(e.target.value)}
+                placeholder="Describe the special instructions"
+                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box', marginBottom: '20px' }}
+              />
+            )}
+            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+              Combine With Other Orders (optional)
+            </label>
+            {!order.customerId ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '20px' }}>
+                Link this order to a customer account to combine it with that customer's other orders on one invoice.
+              </div>
+            ) : loadingCombineCandidates ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Loading this customer's other orders…</div>
+            ) : combineCandidates.length === 0 ? (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>No other orders found for this customer.</div>
+            ) : (
+              <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '20px' }}>
+                {combineCandidates.map(c => (
+                  <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', fontSize: '12.5px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={combineOrderIds.includes(c.id)}
+                      onChange={e => setCombineOrderIds(ids => e.target.checked ? [...ids, c.id] : ids.filter(id => id !== c.id))}
+                    />
+                    <span style={{ fontWeight: 600 }}>{c.poNumber}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>— {c.status}{c.quotedCost != null ? ` — ${formatCurrency(c.quotedCost)}` : ''}</span>
+                  </label>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
               {[
                 { label: 'Other Charges ($)', value: invoiceOtherCharges, set: setInvoiceOtherCharges },

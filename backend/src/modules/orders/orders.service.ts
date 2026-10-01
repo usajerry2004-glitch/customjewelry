@@ -1322,7 +1322,16 @@ export class OrdersService implements OnModuleInit {
   // every later regeneration; the PDF itself is stored under a stable
   // per-order key, so regenerating overwrites it in place rather than piling
   // up orphaned versions.
-  async generateRightClickInvoice(id: string, shipVia: string, terms: string, charges: InvoiceCharges): Promise<Order> {
+  //
+  // otherOrderIds combines additional orders onto this same invoice — all
+  // must belong to the same customer account as `id` (the primary, whose
+  // billing/shipping identity drives the header). Every combined order gets
+  // stamped with the same invoiceNumber and invoicePdfKey, so "download" from
+  // any one of them returns the same combined PDF. Only the primary order is
+  // required to have a RightClick link; the others fall back to their own
+  // JewelFlow spec data if they don't (same fallback the single-order path
+  // already has).
+  async generateRightClickInvoice(id: string, shipVia: string, terms: string, charges: InvoiceCharges, specialInstructions?: string, otherOrderIds?: string[]): Promise<Order> {
     if (!SHIP_VIA_OPTIONS.includes(shipVia as any)) {
       throw new BadRequestException('Invalid Ship Via option.');
     }
@@ -1344,18 +1353,43 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException('Link a RightClick order number to this order first.');
     }
 
-    const rcOrder = await this.rightClickService.lookupOrder(order.rcOrderNumber);
+    let combinedOrders = [order];
+    const extraIds = [...new Set((otherOrderIds || []).filter(oid => oid && oid !== id))];
+    if (extraIds.length) {
+      if (!order.customerId) {
+        throw new BadRequestException('Link this order to a customer account before combining invoices.');
+      }
+      const others = await this.orderRepo.find({ where: { id: In(extraIds) } });
+      if (others.length !== extraIds.length) {
+        throw new NotFoundException('One or more orders to combine were not found.');
+      }
+      const mismatched = others.find(o => o.customerId !== order.customerId);
+      if (mismatched) {
+        throw new BadRequestException(`Order ${mismatched.poNumber} is not linked to the same customer account — only orders for the same customer can be combined onto one invoice.`);
+      }
+      combinedOrders = [order, ...others];
+    }
+
+    const rcOrders = await Promise.all(combinedOrders.map(o => o.rcOrderNumber ? this.rightClickService.lookupOrder(o.rcOrderNumber) : Promise.resolve(null)));
 
     if (!order.invoiceNumber) {
       order.invoiceNumber = await this.generateInvoiceNumber();
     }
 
-    const pdf = await buildRightClickInvoicePdf(order, order.invoiceNumber, rcOrder, shipVia, terms, charges);
+    const pdf = await buildRightClickInvoicePdf(
+      combinedOrders.map((o, i) => ({ order: o, rcOrder: rcOrders[i] })),
+      order.invoiceNumber, shipVia, terms, charges, specialInstructions,
+    );
     const key = `invoices/${order.id}.pdf`;
     await this.spacesService.uploadBuffer(pdf, key, 'application/pdf');
-    order.invoicePdfKey = key;
 
-    return this.orderRepo.save(order);
+    for (const o of combinedOrders) {
+      o.invoiceNumber = order.invoiceNumber;
+      o.invoicePdfKey = key;
+    }
+    await this.orderRepo.save(combinedOrders);
+
+    return order;
   }
 
   async getRightClickInvoiceDownload(id: string): Promise<{ stream: NodeJS.ReadableStream; contentType: string; filename: string }> {
@@ -1527,6 +1561,16 @@ export class OrdersService implements OnModuleInit {
     if (dto.rcOrderNumber !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can link a RightClick order number.');
+    }
+    // Nothing else stops two JewelFlow orders from pointing at the same
+    // RightClick order — without this, generating an invoice for either one
+    // would silently pull the same RightClick line items/customer, correct
+    // for at most one of them.
+    if (dto.rcOrderNumber && dto.rcOrderNumber !== order.rcOrderNumber) {
+      const conflict = await this.orderRepo.findOne({ where: { rcOrderNumber: dto.rcOrderNumber, id: Not(order.id) } });
+      if (conflict) {
+        throw new BadRequestException(`RightClick order number "${dto.rcOrderNumber}" is already linked to order ${conflict.poNumber}.`);
+      }
     }
     if ((dto.shipToName !== undefined || dto.shipToAddress !== undefined || dto.shipToPhone !== undefined)
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
