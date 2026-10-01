@@ -375,6 +375,13 @@ export class Order {
   @Column({ nullable: true })
   refCustomerPo: string;
 
+  // Diamond/gemstone certificate numbers (GIA, IGI, etc.) — an order can
+  // carry more than one (e.g. multiple stones), so this is a flat list
+  // rather than a single field. Printed on the RightClick invoice alongside
+  // the order details.
+  @Column({ type: 'simple-array', nullable: true })
+  certificateNumbers: string[] | null;
+
   // Where this order originated — 'MANUAL' (staff-entered), 'WEB_FORM' (the
   // WordPress contact-form intake), or 'RING_BUILDER' (the website's ring
   // configurator checkout). Purely informational/for reporting; doesn't

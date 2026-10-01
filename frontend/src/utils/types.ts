@@ -98,6 +98,7 @@ export interface Order {
   hasGemstone?: boolean;
   customerNotes?: string;
   refCustomerPo?: string;
+  certificateNumbers?: string[] | null;
   quotedCost?: number;
   quoteOptions?: { label: string; price: number }[] | null;
   customerCode?: string | null;

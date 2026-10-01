@@ -108,7 +108,7 @@ function addressFromOrder(order: Order): AddressBlock {
 
 interface InvoiceLineItem {
   itemCode: string;
-  customerItemCode: string;
+  customerName: string;
   size: string;
   description: string;
   quantity: string;
@@ -117,6 +117,7 @@ interface InvoiceLineItem {
 }
 
 function buildLineItems(order: Order, rcOrder: RightClickCustomerOrder | null): InvoiceLineItem[] {
+  const customerName = order.customerFullName || rcOrder?.customer?.name || order.storeName || order.customerCodeName || '—';
   const rcItems = rcOrder?.lineitems;
   if (rcItems && rcItems.length) {
     return rcItems.map((li: RightClickLineItem) => {
@@ -125,7 +126,7 @@ function buildLineItems(order: Order, rcOrder: RightClickCustomerOrder | null): 
       const amount = li.amount !== undefined ? parseMoney(li.amount) : price * parseMoney(qty as any || 1);
       return {
         itemCode: li.itemcode || order.kiraSkuNumber || '—',
-        customerItemCode: order.refCustomerPo || '—',
+        customerName,
         size: order.size || '—',
         description: li.description || '—',
         quantity: String(qty),
@@ -145,7 +146,7 @@ function buildLineItems(order: Order, rcOrder: RightClickCustomerOrder | null): 
 
   return [{
     itemCode: order.kiraSkuNumber || '—',
-    customerItemCode: order.refCustomerPo || '—',
+    customerName,
     size: order.size || '—',
     description: specParts || order.orderType || 'Custom Jewelry',
     quantity: String(order.quantity ?? 1),
@@ -188,9 +189,9 @@ function drawAddressBox(doc: PDFKit.PDFDocument, label: string, addr: AddressBlo
 const ITEMS_TABLE_COLS = [
   { key: '#', width: 18, align: 'left' as const },
   { key: 'Item #', width: 60, align: 'left' as const },
-  { key: 'Cust Item #', width: 75, align: 'left' as const },
+  { key: 'Customer', width: 85, align: 'left' as const },
   { key: 'Size', width: 30, align: 'left' as const },
-  { key: 'Description', width: CONTENT_WIDTH - 18 - 60 - 75 - 30 - 28 - 52 - 55, align: 'left' as const },
+  { key: 'Description', width: CONTENT_WIDTH - 18 - 60 - 85 - 30 - 28 - 52 - 55, align: 'left' as const },
   { key: 'Qty', width: 28, align: 'right' as const },
   { key: 'Price', width: 52, align: 'right' as const },
   { key: 'Amount', width: 55, align: 'right' as const },
@@ -226,7 +227,7 @@ function drawItemsTable(doc: PDFKit.PDFDocument, items: InvoiceLineItem[], start
   let y = drawItemsTableHeader(doc, colX, startY);
 
   items.forEach((item, i) => {
-    const values = [String(i + 1), item.itemCode, item.customerItemCode, item.size, item.description, item.quantity, money(item.price), money(item.amount)];
+    const values = [String(i + 1), item.itemCode, item.customerName, item.size, item.description, item.quantity, money(item.price), money(item.amount)];
     doc.font('Helvetica').fontSize(8.5);
     const rowHeight = Math.max(doc.heightOfString(item.description, { width: ITEMS_TABLE_COLS[4].width - 8 }) + 10, 22);
 
@@ -359,7 +360,7 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   const dueDate = computeDueDate(issueDate, terms);
   const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 
-  y = drawInfoGrid(doc, [
+  const infoRows: { label: string; value: string }[][] = [
     [
       { label: 'P.O. #:', value: order.poNumber || '—' },
       { label: 'Customer #:', value: order.customerCode || '—' },
@@ -373,7 +374,11 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
       { label: 'Phone #:', value: rcOrder?.customer?.phone || order.phoneNumber || '—' },
       { label: 'Ship Via:', value: shipVia || '—' },
     ],
-  ], y);
+  ];
+  if (order.certificateNumbers?.length) {
+    infoRows.push([{ label: 'Certificate #(s):', value: order.certificateNumbers.join(', ') }]);
+  }
+  y = drawInfoGrid(doc, infoRows, y);
   y += 14;
 
   // ── Line items ──

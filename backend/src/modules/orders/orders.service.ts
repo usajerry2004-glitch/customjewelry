@@ -56,7 +56,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIM
 }
 
 // Product spec fields — editable via PUT /orders/:id, Admin/Authorizer only
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'centerStoneShape', 'approximateCaratWeight', 'certificateNumbers'];
 
 // Customer detail fields — editable via PUT /orders/:id, Admin only
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];

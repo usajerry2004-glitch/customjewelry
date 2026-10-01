@@ -516,12 +516,13 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'centerStoneShape', label: 'Stone Shape' },
       { key: 'approximateCaratWeight', label: 'Carat Weight' },
       { key: 'hasGemstone', label: 'Gemstone', format: (v) => v ? 'Yes' : 'No' },
+      { key: 'certificateNumbers', label: 'Certificate #(s)', format: (v) => Array.isArray(v) && v.length ? v.join(', ') : '—' },
     ],
   },
 ];
 
 // Product spec fields — editable inline, Admin/Authorizer only, any order status
-const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'mountingOption', 'centerStoneShape', 'approximateCaratWeight', 'hasGemstone'];
+const EDITABLE_SPEC_KEYS = ['metalType', 'metalColor', 'size', 'quantity', 'stamping', 'diamondType', 'diamondQuality', 'mountingOption', 'centerStoneShape', 'approximateCaratWeight', 'hasGemstone', 'certificateNumbers'];
 
 // Customer detail fields — editable inline, Admin only, any order status
 const EDITABLE_CUSTOMER_KEYS = ['storeName', 'customerFullName', 'customerEmail', 'phoneNumber', 'customerNotes'];
@@ -755,7 +756,11 @@ export default function OrderDetail() {
           setQcDoneInput(!!o.qcDone);
           setRcOrderNumberInput(o.rcOrderNumber || '');
           const specs: Record<string, string> = {};
-          EDITABLE_SPEC_KEYS.forEach(k => { specs[k] = k === 'hasGemstone' ? (o[k] ? 'Yes' : 'No') : (o[k] ?? ''); });
+          EDITABLE_SPEC_KEYS.forEach(k => {
+            specs[k] = k === 'hasGemstone' ? (o[k] ? 'Yes' : 'No')
+              : k === 'certificateNumbers' ? (Array.isArray(o[k]) ? o[k].join(', ') : '')
+              : (o[k] ?? '');
+          });
           setSpecInputs(specs);
           const customerFields: Record<string, string> = {};
           EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
@@ -920,6 +925,8 @@ export default function OrderDetail() {
         ? Math.max(1, parseInt(specInputs[key], 10) || 1)
         : key === 'hasGemstone'
         ? specInputs[key] === 'Yes'
+        : key === 'certificateNumbers'
+        ? (() => { const list = (specInputs[key] || '').split(',').map(s => s.trim()).filter(Boolean); return list.length ? list : null; })()
         : (specInputs[key]?.trim() || null);
       const res = await apiFetch(`${API}/orders/${order.id}`, {
         method: 'PUT',
@@ -1572,7 +1579,7 @@ export default function OrderDetail() {
                               <input
                                 value={specInputs[key] ?? ''}
                                 onChange={e => setSpecInputs(s => ({ ...s, [key]: e.target.value }))}
-                                placeholder={label}
+                                placeholder={key === 'certificateNumbers' ? 'e.g. GIA1234, GIA5678' : label}
                                 style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
                               />
                             )}
