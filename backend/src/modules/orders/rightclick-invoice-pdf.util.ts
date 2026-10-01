@@ -388,26 +388,35 @@ export async function buildRightClickInvoicePdf(orderPairs: InvoiceOrderPair[], 
   const dueDate = computeDueDate(issueDate, terms);
   const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 
-  // The P.O. # cell is single-line/fixed-height (see drawLabelValueCell) —
-  // fine for one order, but a combined invoice with many orders would
-  // overflow it and visually collide with everything drawn below. Truncated
-  // here; the full list prints as its own wrapped line underneath instead
-  // when there's more than a couple.
   const poNumbers = orderPairs.map(p => p.order.poNumber).filter(Boolean);
-  // That cell is narrow (one of 5 across the row) and single-line — even
-  // "C00541, C00542 +23 more" overflows it once there's more than one order.
-  // The full list prints as its own wrapped line below instead; this cell
-  // just needs to always fit.
-  const poNumbersCell = poNumbers.length <= 1 ? (poNumbers[0] || '—') : `${poNumbers.length} Orders`;
+
+  // The info grid's cells are single-line/fixed-height (see
+  // drawLabelValueCell) — fine for one PO #, but every number needs to
+  // actually show for a combined invoice, and that cell is nowhere near wide
+  // enough to fit them all on one line without wrapping over neighboring
+  // cells. So with more than one order, P.O. # gets its own full-width
+  // wrapping line above the grid instead of a slot inside it.
+  if (poNumbers.length > 1) {
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text('P.O. #: ', MARGIN, y, { continued: true, width: CONTENT_WIDTH, characterSpacing: 0.3 });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(INK).text(poNumbers.join(', '));
+    y = doc.y + 10;
+  }
 
   const infoRows: { label: string; value: string }[][] = [
-    [
-      { label: 'P.O. #:', value: poNumbersCell },
-      { label: 'Customer #:', value: order.customerCode || '—' },
-      { label: 'Date:', value: fmtDate(issueDate) },
-      { label: 'Due Date:', value: fmtDate(dueDate) },
-      { label: 'Terms:', value: formatTermsLabel(terms) },
-    ],
+    poNumbers.length <= 1
+      ? [
+          { label: 'P.O. #:', value: poNumbers[0] || '—' },
+          { label: 'Customer #:', value: order.customerCode || '—' },
+          { label: 'Date:', value: fmtDate(issueDate) },
+          { label: 'Due Date:', value: fmtDate(dueDate) },
+          { label: 'Terms:', value: formatTermsLabel(terms) },
+        ]
+      : [
+          { label: 'Customer #:', value: order.customerCode || '—' },
+          { label: 'Date:', value: fmtDate(issueDate) },
+          { label: 'Due Date:', value: fmtDate(dueDate) },
+          { label: 'Terms:', value: formatTermsLabel(terms) },
+        ],
     [
       { label: 'Type:', value: 'Custom' },
       { label: 'Salesperson:', value: order.salesRepName || '—' },
@@ -424,14 +433,6 @@ export async function buildRightClickInvoicePdf(orderPairs: InvoiceOrderPair[], 
   }
   y = drawInfoGrid(doc, infoRows, y);
   y += 14;
-
-  // Full P.O. # list, wrapped — only when it didn't already fit in the
-  // info grid cell above.
-  if (poNumbers.length > 1) {
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(MUTED).text('COMBINED ORDERS: ', MARGIN, y, { continued: true, width: CONTENT_WIDTH, characterSpacing: 0.3 });
-    doc.font('Helvetica').fontSize(8).fillColor(INK).text(poNumbers.join(', '));
-    y = doc.y + 10;
-  }
 
   // ── Line items — one order's items after another, in the order given ──
   const items = orderPairs.flatMap(p => buildLineItems(p.order, p.rcOrder));
