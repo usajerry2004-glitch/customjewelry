@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request, Res, UseGuards, UseInterceptors, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
-import { IsArray, IsString, ArrayMinSize, IsIn, IsNumber, Min, IsOptional } from 'class-validator';
+import { IsArray, IsString, ArrayMinSize, IsIn, IsNumber, Min, Max, IsOptional } from 'class-validator';
 import { OrdersService, OrderFilterDto } from './orders.service';
 import { SHIP_VIA_OPTIONS, TERMS_OPTIONS } from './rightclick-invoice-pdf.util';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
@@ -48,9 +48,11 @@ class GenerateRightClickInvoiceDto {
   @Min(0)
   shipping?: number;
 
+  // A percent (0-100), not a flat dollar amount.
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(100)
   discount?: number;
 
   @IsOptional()

@@ -99,6 +99,9 @@ export interface Order {
   customerNotes?: string;
   refCustomerPo?: string;
   certificateNumbers?: string[] | null;
+  shipToName?: string | null;
+  shipToAddress?: string | null;
+  shipToPhone?: string | null;
   quotedCost?: number;
   quoteOptions?: { label: string; price: number }[] | null;
   customerCode?: string | null;

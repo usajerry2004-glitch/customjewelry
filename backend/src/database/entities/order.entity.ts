@@ -382,6 +382,21 @@ export class Order {
   @Column({ type: 'simple-array', nullable: true })
   certificateNumbers: string[] | null;
 
+  // Manual Ship To override for the RightClick invoice — when set, takes
+  // priority over whatever RightClick's own `shipto`/`customer` record has,
+  // for orders where the shipping destination genuinely differs from the
+  // billing identity (or where RightClick has no shipto on file at all).
+  @Column({ nullable: true })
+  shipToName: string;
+
+  // Free text — the admin can lay out street/city/state/zip/country however
+  // they like, same as the printed invoice just needs readable lines.
+  @Column({ type: 'text', nullable: true })
+  shipToAddress: string;
+
+  @Column({ nullable: true })
+  shipToPhone: string;
+
   // Where this order originated — 'MANUAL' (staff-entered), 'WEB_FORM' (the
   // WordPress contact-form intake), or 'RING_BUILDER' (the website's ring
   // configurator checkout). Purely informational/for reporting; doesn't

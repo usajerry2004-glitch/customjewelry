@@ -604,6 +604,10 @@ export default function OrderDetail() {
   const [savingShipping, setSavingShipping] = useState(false);
   const [rcOrderNumberInput, setRcOrderNumberInput] = useState('');
   const [savingRcOrderNumber, setSavingRcOrderNumber] = useState(false);
+  const [shipToNameInput, setShipToNameInput] = useState('');
+  const [shipToAddressInput, setShipToAddressInput] = useState('');
+  const [shipToPhoneInput, setShipToPhoneInput] = useState('');
+  const [savingShipToOverride, setSavingShipToOverride] = useState(false);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [invoiceModal, setInvoiceModal] = useState(false);
@@ -755,6 +759,9 @@ export default function OrderDetail() {
           setShipViaInput(o.shipMethod || '');
           setQcDoneInput(!!o.qcDone);
           setRcOrderNumberInput(o.rcOrderNumber || '');
+          setShipToNameInput(o.shipToName || '');
+          setShipToAddressInput(o.shipToAddress || '');
+          setShipToPhoneInput(o.shipToPhone || '');
           const specs: Record<string, string> = {};
           EDITABLE_SPEC_KEYS.forEach(k => {
             specs[k] = k === 'hasGemstone' ? (o[k] ? 'Yes' : 'No')
@@ -1102,6 +1109,31 @@ export default function OrderDetail() {
       toast.error('Failed to save RightClick order number — check your connection and try again.');
     } finally {
       setSavingRcOrderNumber(false);
+    }
+  };
+
+  const saveShipToOverride = async () => {
+    if (!order?.id) return;
+    setSavingShipToOverride(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          shipToName: shipToNameInput.trim() || null,
+          shipToAddress: shipToAddressInput.trim() || null,
+          shipToPhone: shipToPhoneInput.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save Ship To details.'));
+      }
+    } catch {
+      toast.error('Failed to save Ship To details — check your connection and try again.');
+    } finally {
+      setSavingShipToOverride(false);
     }
   };
 
@@ -2662,6 +2694,52 @@ export default function OrderDetail() {
               >
                 {savingRcOrderNumber ? '…' : 'Save'}
               </button>
+
+              <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0 12px' }} />
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                Ship To Override (optional)
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '10px' }}>
+                Only needed if shipping goes somewhere different from the billing contact above — printed on the invoice instead of RightClick's own shipping address when filled in.
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Name</div>
+                <input
+                  value={shipToNameInput}
+                  onChange={e => setShipToNameInput(e.target.value)}
+                  placeholder="Ship To name"
+                  style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Address</div>
+                <textarea
+                  value={shipToAddressInput}
+                  onChange={e => setShipToAddressInput(e.target.value)}
+                  placeholder={'Street\nCity, State ZIP\nCountry'}
+                  rows={3}
+                  style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Phone</div>
+                <input
+                  value={shipToPhoneInput}
+                  onChange={e => setShipToPhoneInput(e.target.value)}
+                  placeholder="Ship To phone"
+                  style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <button
+                onClick={saveShipToOverride}
+                disabled={savingShipToOverride
+                  || (shipToNameInput === (order.shipToName || '') && shipToAddressInput === (order.shipToAddress || '') && shipToPhoneInput === (order.shipToPhone || ''))}
+                style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (savingShipToOverride
+                  || (shipToNameInput === (order.shipToName || '') && shipToAddressInput === (order.shipToAddress || '') && shipToPhoneInput === (order.shipToPhone || ''))) ? 0.5 : 1, marginBottom: '14px' }}
+              >
+                {savingShipToOverride ? '…' : 'Save Ship To'}
+              </button>
+
               <button
                 onClick={() => setInvoiceModal(true)}
                 disabled={generatingInvoice || !order.rcOrderNumber}
@@ -2888,7 +2966,7 @@ export default function OrderDetail() {
               {[
                 { label: 'Other Charges ($)', value: invoiceOtherCharges, set: setInvoiceOtherCharges },
                 { label: 'Shipping ($)', value: invoiceShipping, set: setInvoiceShipping },
-                { label: 'Discount ($)', value: invoiceDiscount, set: setInvoiceDiscount },
+                { label: 'Discount (%)', value: invoiceDiscount, set: setInvoiceDiscount, max: 100, placeholder: '0' },
                 { label: 'Tax ($)', value: invoiceTax, set: setInvoiceTax },
               ].map(f => (
                 <div key={f.label}>
@@ -2898,10 +2976,11 @@ export default function OrderDetail() {
                   <input
                     type="number"
                     min="0"
+                    max={f.max}
                     step="0.01"
                     value={f.value}
                     onChange={e => f.set(e.target.value)}
-                    placeholder="0.00"
+                    placeholder={f.placeholder || '0.00'}
                     style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>

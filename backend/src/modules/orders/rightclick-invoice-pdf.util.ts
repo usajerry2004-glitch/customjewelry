@@ -106,6 +106,18 @@ function addressFromOrder(order: Order): AddressBlock {
   return { name, lines };
 }
 
+// Manual Ship To override — set directly on the order (independent of
+// RightClick) for cases where the shipping destination genuinely differs
+// from the billing identity, or RightClick has no shipto on file at all.
+function shipToOverride(order: Order): AddressBlock | null {
+  if (!order.shipToName && !order.shipToAddress && !order.shipToPhone) return null;
+  const lines = [
+    ...(order.shipToAddress || '').split('\n').map(s => s.trim()).filter(Boolean),
+    order.shipToPhone || null,
+  ].filter(Boolean) as string[];
+  return { name: order.shipToName || '—', lines };
+}
+
 interface InvoiceLineItem {
   itemCode: string;
   customerName: string;
@@ -285,12 +297,12 @@ function measureLegalBlockHeight(doc: PDFKit.PDFDocument, width: number): number
   return h;
 }
 
-function drawTotalsBox(doc: PDFKit.PDFDocument, totals: { subtotal: number; otherCharges: number; shipping: number; discount: number; tax: number; grandTotal: number }, x: number, y: number, w: number): number {
+function drawTotalsBox(doc: PDFKit.PDFDocument, totals: { subtotal: number; otherCharges: number; shipping: number; discountPercent: number; discountAmount: number; tax: number; grandTotal: number }, x: number, y: number, w: number): number {
   const rows: [string, number][] = [
     ['Subtotal:', totals.subtotal],
     ['Other Charges:', totals.otherCharges],
     ['Shipping:', totals.shipping],
-    ['Discount:', totals.discount ? -totals.discount : 0],
+    [totals.discountPercent ? `Discount (${totals.discountPercent}%):` : 'Discount:', totals.discountAmount ? -totals.discountAmount : 0],
     ['Tax:', totals.tax],
   ];
   let ly = y;
@@ -310,6 +322,7 @@ function drawTotalsBox(doc: PDFKit.PDFDocument, totals: { subtotal: number; othe
 export interface InvoiceCharges {
   otherCharges: number;
   shipping: number;
+  // A percent (0-100), not a flat dollar amount — e.g. 5 means "5% off the subtotal".
   discount: number;
   tax: number;
 }
@@ -349,7 +362,7 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   // resolved to one there (fuller, structured address); otherwise whatever
   // contact info JewelFlow itself has for the order.
   const billTo = addressFromRightClick(rcOrder?.customer) || addressFromOrder(order);
-  const shipTo = addressFromRightClick(rcOrder?.shipto) || addressFromRightClick(rcOrder?.customer) || addressFromOrder(order);
+  const shipTo = shipToOverride(order) || addressFromRightClick(rcOrder?.shipto) || addressFromRightClick(rcOrder?.customer) || addressFromOrder(order);
   const colW = (CONTENT_WIDTH - 24) / 2;
   const y1 = drawAddressBox(doc, 'Invoice To', billTo, MARGIN, y, colW);
   const y2 = drawAddressBox(doc, 'Ship To', shipTo, MARGIN + colW + 24, y, colW);
@@ -386,8 +399,12 @@ export async function buildRightClickInvoicePdf(order: Order, invoiceNumber: str
   y = drawItemsTable(doc, items, y);
 
   const subtotal = items.reduce((s, it) => s + it.amount, 0);
-  const grandTotal = subtotal + charges.otherCharges + charges.shipping - charges.discount + charges.tax;
-  const totals = { subtotal, ...charges, grandTotal };
+  // Discount is entered as a percent (e.g. 5 = 5% off), not a flat dollar
+  // amount — computed here against the subtotal before amounts into Grand Total.
+  const discountPercent = charges.discount;
+  const discountAmount = subtotal * (discountPercent / 100);
+  const grandTotal = subtotal + charges.otherCharges + charges.shipping - discountAmount + charges.tax;
+  const totals = { subtotal, otherCharges: charges.otherCharges, shipping: charges.shipping, discountPercent, discountAmount, tax: charges.tax, grandTotal };
 
   // ── Legal text (left) + totals/signature (right), side by side ── pinned
   // near the bottom of the page, just above the footer, with the gap above

@@ -1334,6 +1334,9 @@ export class OrdersService implements OnModuleInit {
         throw new BadRequestException(`Invalid ${key} — must be a number 0 or greater.`);
       }
     }
+    if (charges.discount > 100) {
+      throw new BadRequestException('Discount is a percent — must be 100 or less.');
+    }
 
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException('Order not found.');
@@ -1524,6 +1527,10 @@ export class OrdersService implements OnModuleInit {
     if (dto.rcOrderNumber !== undefined
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can link a RightClick order number.');
+    }
+    if ((dto.shipToName !== undefined || dto.shipToAddress !== undefined || dto.shipToPhone !== undefined)
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
+      throw new ForbiddenException('Only Admin or Authorizer can edit the Ship To override.');
     }
     if (EDITABLE_SPEC_KEYS.some(k => (dto as any)[k] !== undefined)
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
