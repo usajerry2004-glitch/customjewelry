@@ -25,6 +25,101 @@ interface CadFile {
 }
 
 
+// Matches backend/src/modules/orders/orders.service.ts's AUTO_ARCHIVE_REASON.
+// Distinguishes a project the customer closed themselves (reactivating it
+// requires contacting staff) from one the system auto-archived after 30
+// idle days (customer can reactivate it themselves, right here).
+const AUTO_ARCHIVE_REASON = 'Automatically archived — 30 days without approval';
+
+// ── Close Project modal (customer-facing) ─────────────────────────────────
+// Mirrors the exact copy/options given for the client-dashboard "close
+// project" flow. Reason is required (enabled Submit only once one is
+// picked); Additional Context is optional free text. Kept as a fixed list
+// in sync with backend/src/modules/orders/orders.service.ts's
+// CLOSURE_REASON_OPTIONS — the frontend can't import from the backend, same
+// as SHIP_VIA_OPTIONS/TERMS_OPTIONS elsewhere in this app.
+const CLOSURE_REASONS = [
+  'Quote exceeds target price point',
+  'Style does not align with retail assortment',
+  'End customer canceled the order',
+  'Project put on hold indefinitely',
+];
+
+function CloseProjectModal({ onClose, onSubmit, submitting }: { onClose: () => void; onSubmit: (reason: string, additionalContext: string) => void; submitting: boolean }) {
+  const [reason, setReason] = useState('');
+  const [additionalContext, setAdditionalContext] = useState('');
+
+  return (
+    <div
+      className="modal-bg"
+      onClick={e => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+    >
+      <div className="modal-box" style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,0,0,0.3)', width: '100%', maxWidth: '480px', padding: '24px' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Close Project</h3>
+        <p style={{ margin: '0 0 18px', fontSize: '13px', color: 'var(--text-muted)' }}>Reason for closing this project:</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+          {CLOSURE_REASONS.map(r => (
+            <label
+              key={r}
+              onClick={() => !submitting && setReason(r)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px',
+                border: `1px solid ${reason === r ? 'var(--accent)' : 'var(--border)'}`,
+                background: reason === r ? 'rgba(192,155,88,0.08)' : 'var(--bg-input)',
+                borderRadius: 'var(--radius-sm)', cursor: submitting ? 'default' : 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              <span style={{
+                width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                border: `2px solid ${reason === r ? 'var(--accent-dark)' : 'var(--border)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {reason === r && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-dark)' }} />}
+              </span>
+              <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{r}</span>
+            </label>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>
+            Additional Context (Optional)
+          </label>
+          <textarea
+            value={additionalContext}
+            onChange={e => setAdditionalContext(e.target.value)}
+            placeholder="Any additional context to help us better support your team next time?"
+            disabled={submitting}
+            rows={3}
+            style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', fontSize: '13px', color: 'var(--text-primary)', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button onClick={onClose} disabled={submitting}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 16px', fontSize: '13px', color: 'var(--text-secondary)', cursor: submitting ? 'default' : 'pointer' }}>
+            Cancel
+          </button>
+          <button
+            onClick={() => reason && onSubmit(reason, additionalContext)}
+            disabled={!reason || submitting}
+            style={{
+              background: !reason || submitting ? 'var(--border)' : 'var(--navy)',
+              color: !reason || submitting ? 'var(--text-muted)' : '#fff',
+              border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '13px', fontWeight: 700,
+              cursor: !reason || submitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {submitting ? 'Closing…' : 'Close Project'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Inline viewer modal (customer-facing) ─────────────────────────────────
 function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIndex: number; onClose: () => void }) {
   const [idx, setIdx] = useState(initialIndex);
@@ -217,6 +312,9 @@ export default function CustomerOrderDetail() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [viewerState, setViewerState] = useState<{ list: CadFile[]; idx: number } | null>(null);
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closingProject, setClosingProject] = useState(false);
+  const [reactivatingProject, setReactivatingProject] = useState(false);
 
   useEffect(() => {
     try {
@@ -272,6 +370,46 @@ export default function CustomerOrderDetail() {
     }
   };
 
+  const submitCloseProject = async (reason: string, additionalContext: string) => {
+    if (!order?.id) return;
+    setClosingProject(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/close-project`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason, additionalContext: additionalContext.trim() || undefined }),
+      });
+      if (res.ok) {
+        setCloseModalOpen(false);
+        await reload();
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.message || 'Failed to close project — check your connection and try again.');
+      }
+    } catch {
+      alert('Failed to close project — check your connection and try again.');
+    } finally {
+      setClosingProject(false);
+    }
+  };
+
+  const submitReactivateAutoArchived = async () => {
+    if (!order?.id) return;
+    setReactivatingProject(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/reactivate-auto-archived`, { method: 'PATCH' });
+      if (res.ok) {
+        await reload();
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.message || 'Failed to reactivate project — check your connection and try again.');
+      }
+    } catch {
+      alert('Failed to reactivate project — check your connection and try again.');
+    } finally {
+      setReactivatingProject(false);
+    }
+  };
+
   if (loading) {
     return (
       <CustomerLayout title="Order Detail">
@@ -290,9 +428,17 @@ export default function CustomerOrderDetail() {
     );
   }
 
-  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#64748B' };
-  const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
+  // A closed project keeps its real status/cadSubStatus untouched (see
+  // closeProjectByCustomer), so without this override the badge would still
+  // read "Awaiting Approval" even though it's archived.
+  const isClosedProject = !!order.isArchived && order.status !== 'CANCELLED';
+  const cfg = isClosedProject ? STATUS_CONFIG.ARCHIVED : (STATUS_CONFIG[order.status!] || { label: order.status, color: '#64748B' });
+  const cadSubLabel = !isClosedProject && order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
   const currentIdx = TIMELINE.findIndex(t => t.status === order.status);
+  // Matches the backend's own eligibility check in closeProjectByCustomer
+  // (cadSubStatus UPLOADED && sentToCustomer) — only offered while nothing
+  // has shipped to production yet, and not already closed.
+  const canCloseProject = !isClosedProject && getCadSubLabel(order) === 'Awaiting Approval';
 
   return (
     <>
@@ -305,14 +451,50 @@ export default function CustomerOrderDetail() {
         </button>
       }
     >
-      {/* Status + Timeline */}
-      <div style={{ ...card, border: `1px solid ${cfg.color}30`, padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Current Status</div>
-          <div style={{ background: `${cfg.color}18`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
-            {cadSubLabel || customerStatusLabel(order.status)}
+      {/* Archived notice — two very different cases share isClosedProject:
+          a project the customer deliberately closed (staff-only to
+          reactivate, per that feature's own scoping) vs one the system
+          auto-archived after 30 idle days (self-service reactivation here). */}
+      {isClosedProject && order.closureReason === AUTO_ARCHIVE_REASON && (
+        <div style={{ ...card, background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>This project was automatically archived</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            It sat without a response for 30 days, so we moved it here. Nothing is lost — reactivate it below whenever you're ready.
+          </div>
+          <button onClick={submitReactivateAutoArchived} disabled={reactivatingProject}
+            style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: reactivatingProject ? 'not-allowed' : 'pointer', opacity: reactivatingProject ? 0.6 : 1 }}>
+            {reactivatingProject ? 'Reactivating…' : '↺ Reactivate Project'}
+          </button>
+        </div>
+      )}
+      {isClosedProject && order.closureReason !== AUTO_ARCHIVE_REASON && (
+        <div style={{ ...card, background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>This project has been archived</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            {order.closureReason && <>Reason: {order.closureReason}. </>}
+            Contact your Kira representative if you'd like to reactivate it.
           </div>
         </div>
+      )}
+
+      {/* Status + Timeline */}
+      <div style={{ ...card, border: `1px solid ${cfg.color}30`, padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: canCloseProject ? '12px' : '20px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Current Status</div>
+          <div style={{ background: `${cfg.color}18`, color: cfg.color, padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 700 }}>
+            {isClosedProject ? cfg.label : (cadSubLabel || customerStatusLabel(order.status))}
+          </div>
+        </div>
+        {canCloseProject && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+            <button
+              onClick={() => setCloseModalOpen(true)}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              Close Project
+            </button>
+          </div>
+        )}
         {/* Timeline dots */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
           {TIMELINE.map((step, i) => {
@@ -649,6 +831,14 @@ export default function CustomerOrderDetail() {
 
     {viewerState && (
       <CadViewer cads={viewerState.list} initialIndex={viewerState.idx} onClose={() => setViewerState(null)} />
+    )}
+
+    {closeModalOpen && (
+      <CloseProjectModal
+        onClose={() => setCloseModalOpen(false)}
+        onSubmit={submitCloseProject}
+        submitting={closingProject}
+      />
     )}
     </>
   );

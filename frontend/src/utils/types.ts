@@ -129,6 +129,11 @@ export interface Order {
   rcOrderNumber?: string | null;
   invoiceNumber?: string | null;
   invoicePdfKey?: string | null;
+  isArchived?: boolean;
+  closureReason?: string | null;
+  closureNotes?: string | null;
+  closedAt?: string | null;
+  awaitingApprovalSince?: string | null;
   source?: string;
   externalOrderId?: string | null;
   createdAt: string;
@@ -163,6 +168,11 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
   REPAIR:          { label: 'Repair',        color: '#EF4444', bg: '#FEE2E2' },
   COMPLETED:       { label: 'Completed',     color: '#10B981', bg: '#D1FAE5' },
   CANCELLED:       { label: 'Cancelled',     color: '#6B7280', bg: '#F3F4F6' },
+  // Not a real OrderStatus — a pseudo-entry for orders closed via the
+  // client-dashboard "Close Project" flow (isArchived=true, status left
+  // untouched, so cadSubLabel/customerStatusLabel would otherwise still
+  // read as if the order were active). Same muted treatment as Cancelled.
+  ARCHIVED:        { label: 'Archived',      color: '#6B7280', bg: '#F3F4F6' },
 };
 
 export const SUPPLY_SOURCE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {

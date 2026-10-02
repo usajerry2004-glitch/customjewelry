@@ -263,7 +263,7 @@ export class CadService {
   async sendToCustomer(orderId: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-    await this.orderRepo.update(orderId, { sentToCustomer: true, lastApprovalEmailAt: new Date(), ...RESET_STALL_SURVEY_FIELDS });
+    await this.orderRepo.update(orderId, { sentToCustomer: true, lastApprovalEmailAt: new Date(), awaitingApprovalSince: new Date(), ...RESET_STALL_SURVEY_FIELDS });
 
     // Mark all non-reference design files as SENT_FOR_APPROVAL so the customer portal shows approval buttons
     const allCads = await this.cadRepo.find({ where: { orderId } });
@@ -317,6 +317,9 @@ export class CadService {
       cadSubStatus: target.cadSubStatus,
       sentToCustomer: target.sentToCustomer,
       customerEmailApproval: false,
+      // Keeps the 30-day auto-archive clock in sync with this manual
+      // override, same as the real sendToCustomer() trigger.
+      awaitingApprovalSince: target.sentToCustomer ? new Date() : null,
       ...(wasApproved ? { vpoIssuedAt: null as any } : {}),
     });
 
@@ -379,7 +382,11 @@ export class CadService {
 
       const from = `cadSubStatus=${currentCadSubStatus ?? 'null'}, sentToCustomer=${order.sentToCustomer}`;
       const to = `cadSubStatus=${target.cadSubStatus ?? 'null'}, sentToCustomer=${target.sentToCustomer}`;
-      await this.orderRepo.update(order.id, { cadSubStatus: target.cadSubStatus, sentToCustomer: target.sentToCustomer });
+      await this.orderRepo.update(order.id, {
+        cadSubStatus: target.cadSubStatus,
+        sentToCustomer: target.sentToCustomer,
+        awaitingApprovalSince: target.sentToCustomer ? new Date() : null,
+      });
       this.logEvent(order.id, 'CAD_STAGE_RESYNCED', user, undefined, undefined,
         `CAD stage resynced from actual file status (${from} → ${to})`);
       corrected.push({ orderId: order.id, poNumber: order.poNumber, from, to });

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Request,
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { IsArray, IsString, ArrayMinSize, IsIn, IsNumber, Min, Max, IsOptional } from 'class-validator';
-import { OrdersService, OrderFilterDto } from './orders.service';
+import { OrdersService, OrderFilterDto, CLOSURE_REASON_OPTIONS } from './orders.service';
 import { SHIP_VIA_OPTIONS, TERMS_OPTIONS } from './rightclick-invoice-pdf.util';
 import { Order, OrderStatus } from '../../database/entities/order.entity';
 import { UpdateStatusDto, AssignSupplierDto, BulkAssignSupplierDto } from './update-status.dto';
@@ -29,6 +29,15 @@ class BulkOrderIdsDto {
   @IsString({ each: true })
   @ArrayMinSize(1)
   orderIds: string[];
+}
+
+class CloseProjectDto {
+  @IsIn(CLOSURE_REASON_OPTIONS)
+  reason: string;
+
+  @IsOptional()
+  @IsString()
+  additionalContext?: string;
 }
 
 class GenerateRightClickInvoiceDto {
@@ -338,6 +347,30 @@ export class OrdersController {
   @ApiOperation({ summary: 'Admin only — un-cancels an order, restoring whichever status it was in immediately before cancellation' })
   reactivate(@Param('id') id: string, @Request() req: any) {
     return this.ordersService.reactivateOrder(id, req.user);
+  }
+
+  @Patch(':id/close-project')
+  @Roles(UserRole.CUSTOMER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Client dashboard "Close Project" — customer closes/archives their own order, only while it is Awaiting Approval. Reason is required (one of a fixed list); additional context is optional.' })
+  closeProject(@Param('id') id: string, @Body() body: CloseProjectDto, @Request() req: any) {
+    return this.ordersService.closeProjectByCustomer(id, body.reason, body.additionalContext, req.user);
+  }
+
+  @Patch(':id/reactivate-project')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Admin/Authorizer only — reactivates a project the customer closed via Close Project (or a 30-day auto-archived one, if staff get to it first).' })
+  reactivateProject(@Param('id') id: string, @Request() req: any) {
+    return this.ordersService.reactivateClosedProject(id, req.user);
+  }
+
+  @Patch(':id/reactivate-auto-archived')
+  @Roles(UserRole.CUSTOMER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: "Client dashboard self-service reactivation — only works for a project the system auto-archived after 30 days Awaiting Approval, never one the customer closed themselves via Close Project." })
+  reactivateAutoArchived(@Param('id') id: string, @Request() req: any) {
+    return this.ordersService.reactivateAutoArchivedProject(id, req.user);
   }
 
   @Patch(':id/assign-supplier')

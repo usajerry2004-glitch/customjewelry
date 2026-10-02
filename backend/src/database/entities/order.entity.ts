@@ -287,6 +287,32 @@ export class Order {
   @Column({ default: false })
   isArchived: boolean;
 
+  // Customer-initiated "Close Project" (client dashboard, only offered while
+  // the order is Awaiting Approval — see OrdersService.closeProjectByCustomer).
+  // Sets isArchived=true without touching `status`, so the order keeps its
+  // real stage for history/reactivation but drops out of the customer's
+  // active-order tabs into a dedicated Archived one. One of
+  // CLOSURE_REASON_OPTIONS (orders.service.ts); notes is the optional
+  // "Additional Context" free text. Left populated after Admin/Authorizer
+  // reactivation (closeProjectByCustomer's history, not a live state).
+  @Column({ type: 'varchar', nullable: true })
+  closureReason: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  closureNotes: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  closedAt: Date | null;
+
+  // Anchor for the 30-day auto-archive timer (OrdersService.checkAutoArchiveEligibleOrders)
+  // — set whenever the order (re-)enters Awaiting Approval (CadService.sendToCustomer/
+  // setSubStage/reconcileCadSubStages), restarted on self-service reactivation so a
+  // freshly-reactivated order isn't immediately re-archived next cron run. Deliberately
+  // independent of lastApprovalEmailAt, which the day-5/day-10 stall-survey system
+  // refreshes on every reminder — this clock does not reset on those.
+  @Column({ type: 'timestamp', nullable: true })
+  awaitingApprovalSince: Date | null;
+
   @Column({ default: false })
   isPriorityCustomer: boolean;
 

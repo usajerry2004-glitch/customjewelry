@@ -23,6 +23,10 @@ const STATUS_FILTERS = [
   { label: 'Repair',          value: 'REPAIR' },
   { label: 'Completed',       value: 'COMPLETED' },
   { label: 'Cancelled',       value: 'CANCELLED' },
+  // Not a real OrderStatus — see the `archived` query param special-case
+  // below and OrdersService.applyCustomerArchiveScope on the backend.
+  // Projects closed via "Close Project" on the order detail page land here.
+  { label: 'Archived',        value: 'archived' },
 ];
 
 export default function CustomerOrdersPage() {
@@ -46,7 +50,8 @@ export default function CustomerOrdersPage() {
     setLoading(true);
     const params = new URLSearchParams({ limit: '50' });
     if (search.trim()) params.set('search', search.trim());
-    if (statusFilter) params.set('status', statusFilter);
+    if (statusFilter === 'archived') params.set('archived', 'true');
+    else if (statusFilter) params.set('status', statusFilter);
     const timer = setTimeout(() => {
       apiFetch(`${API}/orders?${params.toString()}`)
         .then(r => r.ok ? r.json() : null)
@@ -183,8 +188,12 @@ export default function CustomerOrdersPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {orders.map(order => {
-            const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
-            const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
+            // A closed project's real status/cadSubStatus stay untouched (see
+            // closeProjectByCustomer), so without this override the badge
+            // would still read "Awaiting Approval" even though it's archived.
+            const isClosedProject = !!order.isArchived && order.status !== 'CANCELLED';
+            const cfg = isClosedProject ? STATUS_CONFIG.ARCHIVED : (STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' });
+            const cadSubLabel = !isClosedProject && order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order) : null;
             const statusIdx = STATUS_ORDER.indexOf(order.status!);
             const progress = statusIdx >= 0 ? Math.round((statusIdx / (STATUS_ORDER.length - 1)) * 100) : 0;
             return (
@@ -218,7 +227,7 @@ export default function CustomerOrdersPage() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
                     <div style={{ display: 'inline-block', background: cfg.bg, color: cfg.color, padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
-                      {cadSubLabel || customerStatusLabel(order.status)}
+                      {isClosedProject ? cfg.label : (cadSubLabel || customerStatusLabel(order.status))}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
                       {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}

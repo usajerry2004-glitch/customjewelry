@@ -71,6 +71,27 @@ const ADMIN_ONLY_KEYS = ['supplySource', 'assignedFactory', 'quoteOptions', 'isP
 // the whole endpoint.
 const FACTORY_MANAGER_EDITABLE_KEYS = ['trackingNumber', 'shippedDate', 'shipMethod', 'qcDone', 'factoryCommittedDate'];
 
+// Fixed reason list for the customer-facing "Close Project" modal — see
+// OrdersService.closeProjectByCustomer. Not stored as a DB enum since this
+// is presentation copy the business may want to tweak; validated against
+// this exact list in the controller DTO (@IsIn) rather than left freeform.
+export const CLOSURE_REASON_OPTIONS = [
+  'Quote exceeds target price point',
+  'Style does not align with retail assortment',
+  'End customer canceled the order',
+  'Project put on hold indefinitely',
+] as const;
+
+// closureReason value stamped by the 30-day auto-archive job (see
+// checkAutoArchiveEligibleOrders) — deliberately outside CLOSURE_REASON_OPTIONS
+// so it's never offered as a pickable reason in the Close Project modal, and
+// so reactivateAutoArchivedProject can tell "the system archived this because
+// it went stale" apart from "the customer deliberately closed it" (the latter
+// stays Admin/Authorizer-only to reactivate — see reactivateClosedProject).
+export const AUTO_ARCHIVE_REASON = 'Automatically archived — 30 days without approval';
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 // Human-readable labels for the CSV export — mirrors STATUS_CONFIG/
 // SUPPLY_SOURCE_CONFIG/FACTORY_CONFIG in frontend/src/utils/types.ts, since
 // the export should read the way the order detail page reads.
@@ -843,9 +864,31 @@ export class OrdersService implements OnModuleInit {
   // supplier, date range, search) except pagination and sort, which each
   // caller applies on top for its own purpose (a page of results vs. every
   // matching row for export).
+  // A customer's own order list has no other isArchived-awareness anywhere
+  // in buildOrdersQuery/getStatusCounts, so a project closed via "Close
+  // Project" (isArchived=true, status untouched — see closeProjectByCustomer)
+  // would otherwise keep showing under its original status tab forever.
+  // Scoped to CUSTOMER role only — staff-facing lists/queues have their own
+  // separate isArchived handling elsewhere and aren't affected.
+  // filters.archived==='true' requests the dedicated Archived tab itself;
+  // otherwise every normal tab (including "All") excludes archived-closed
+  // orders. Already-cancelled orders (also isArchived=true) are excluded
+  // from the Archived tab and left alone everywhere else — they keep
+  // appearing under the existing Cancelled tab exactly as before, since an
+  // explicit status=CANCELLED filter satisfies either branch below.
+  private applyCustomerArchiveScope(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'archived'>, user?: OrdersUser): void {
+    if (user?.role !== 'CUSTOMER') return;
+    if (filters.archived === 'true') {
+      qb.andWhere('order.isArchived = true').andWhere('order.status != :archivedExclCancelled', { archivedExclCancelled: OrderStatus.CANCELLED });
+    } else {
+      qb.andWhere('(order.isArchived = false OR order.status = :archivedExclCancelled)', { archivedExclCancelled: OrderStatus.CANCELLED });
+    }
+  }
+
   private buildOrdersQuery(filters: OrderFilterDto, user?: OrdersUser): SelectQueryBuilder<Order> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
+    this.applyCustomerArchiveScope(qb, filters, user);
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
 
@@ -907,6 +950,11 @@ export class OrdersService implements OnModuleInit {
   async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>, user?: OrdersUser): Promise<Record<string, number>> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
+    // Every normal tab's badge (including "All") excludes archived-closed
+    // orders, regardless of which tab is currently selected — see
+    // applyCustomerArchiveScope. The Archived tab gets its own count below,
+    // same pattern as the CAD_DESIGNER pseudo-statuses further down.
+    this.applyCustomerArchiveScope(qb, {}, user);
     this.applyCommonFilters(qb, filters);
 
     const rows = await qb.select('order.status', 'status').addSelect('COUNT(*)', 'count').groupBy('order.status').getRawMany();
@@ -918,6 +966,14 @@ export class OrdersService implements OnModuleInit {
       all += n;
     }
     counts[''] = all;
+
+    if (user?.role === 'CUSTOMER') {
+      const archivedQb = this.orderRepo.createQueryBuilder('order');
+      this.applyRoleScope(archivedQb, user);
+      this.applyCustomerArchiveScope(archivedQb, { archived: 'true' }, user);
+      this.applyCommonFilters(archivedQb, filters);
+      counts['archived'] = await archivedQb.getCount();
+    }
 
     if (user?.role === 'CAD_DESIGNER') {
       const buildSubQb = () => {
@@ -1638,7 +1694,7 @@ export class OrdersService implements OnModuleInit {
           && (c.status === CadFileStatus.UPLOADED || c.status === CadFileStatus.SENT_FOR_APPROVAL),
       );
       if (uploadedDesignFiles.length > 0) {
-        await this.orderRepo.update(id, { sentToCustomer: true, lastApprovalEmailAt: new Date() });
+        await this.orderRepo.update(id, { sentToCustomer: true, lastApprovalEmailAt: new Date(), awaitingApprovalSince: new Date() });
         // Only UPLOADED ones need a status bump; SENT_FOR_APPROVAL already correct
         const toBumpIds = uploadedDesignFiles.filter(c => c.status === CadFileStatus.UPLOADED).map(c => c.id);
         if (toBumpIds.length) {
@@ -2024,6 +2080,194 @@ export class OrdersService implements OnModuleInit {
     const reactivated = await this.update(id, { status: restoredStatus, isArchived: false }, user);
     this.logEvent(id, 'STATUS_CHANGE', user, OrderStatus.CANCELLED, restoredStatus, 'Reactivated by Admin');
     return reactivated;
+  }
+
+  // Client-dashboard "Close Project" — the customer's own equivalent of a
+  // cancellation, offered only while the order is still Awaiting Approval
+  // (nothing has shipped to production yet). Deliberately doesn't go through
+  // updateStatus()/CANCELLED: that path is staff-only, notifies
+  // factory/stone teams that would never have been assigned at this stage,
+  // and would make the order indistinguishable from an internally-cancelled
+  // one. Instead this archives the order in place — `status` is left exactly
+  // as-is for history/reactivation; see applyCustomerArchiveScope for how it
+  // then drops out of the customer's normal tabs into a dedicated Archived
+  // one, and reactivateClosedProject for undoing it (Admin/Authorizer only).
+  async closeProjectByCustomer(id: string, reason: string, additionalContext: string | undefined, user: { id?: string; email: string; role: string; companyId?: string | null }): Promise<Order> {
+    if (!CLOSURE_REASON_OPTIONS.includes(reason as any)) {
+      throw new BadRequestException(`Invalid closure reason: "${reason}".`);
+    }
+    // findOne() already throws NotFoundException for an order this customer
+    // doesn't own (email/customerId/companyId match) — same ownership check
+    // every other customer-facing read on this order already goes through.
+    const order = await this.findOne(id, user);
+    if (order.isArchived) {
+      throw new BadRequestException(`Order ${order.poNumber} is already closed.`);
+    }
+    const isAwaitingApproval = order.cadSubStatus === 'UPLOADED' && order.sentToCustomer === true;
+    if (!isAwaitingApproval) {
+      throw new BadRequestException('A project can only be closed while it is Awaiting Approval.');
+    }
+
+    order.isArchived = true;
+    order.closureReason = reason;
+    order.closureNotes = additionalContext?.trim() || null;
+    order.closedAt = new Date();
+    const saved = await this.orderRepo.save(order);
+
+    this.logEvent(id, 'PROJECT_CLOSED', user, order.status, order.status, `Closed by customer — ${reason}`);
+
+    const customerName = saved.storeName || saved.customerFullName || saved.customerCodeName || '—';
+    const staffUsers = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
+    const staffEmails = Array.from(new Set([...staffUsers.map(u => u.email), saved.salesRepEmail].filter(Boolean))) as string[];
+
+    await Promise.all([
+      this.emailService.sendProjectClosedAlert({
+        to: staffEmails,
+        poNumber: saved.poNumber,
+        customerName,
+        orderType: saved.orderType || '—',
+        orderId: saved.id,
+        reason,
+        additionalContext: saved.closureNotes,
+        isPriorityCustomer: saved.isPriorityCustomer,
+      }).catch(err => this.logger.warn(`Project-closed staff alert failed for ${saved.poNumber}:`, err)),
+      saved.customerEmail
+        ? this.emailService.sendProjectClosedConfirmation({
+            to: saved.customerEmail,
+            poNumber: saved.poNumber,
+            orderType: saved.orderType || '—',
+            orderId: saved.id,
+            reason,
+          }).catch(err => this.logger.warn(`Project-closed customer confirmation failed for ${saved.poNumber}:`, err))
+        : Promise.resolve(),
+      ...staffUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `Project Closed — ${saved.poNumber}`,
+          message: `${customerName} closed this project while it was Awaiting Approval. Reason: ${reason}`,
+          orderId: saved.id,
+          targetUserId: u.id,
+          isPriority: saved.isPriorityCustomer,
+        })),
+      ),
+    ]);
+
+    return saved;
+  }
+
+  // Shared by both reactivation entry points below — staff reactivating any
+  // closed project (manual or auto-archived), and a customer self-service-
+  // reactivating one the system auto-archived. Restarts the 30-day clock
+  // when the project being reactivated was auto-archived, so an order
+  // reactivated right at the 30-day mark isn't immediately swept up again
+  // by the very next cron run.
+  private async performReactivation(order: Order, user: { id?: string; email: string; role: string } | undefined, actorLabel: string): Promise<Order> {
+    const wasAutoArchived = order.closureReason === AUTO_ARCHIVE_REASON;
+    order.isArchived = false;
+    if (wasAutoArchived) {
+      order.awaitingApprovalSince = new Date();
+    }
+    const saved = await this.orderRepo.save(order);
+    this.logEvent(saved.id, 'PROJECT_CLOSED', user, saved.status, saved.status, `Reactivated by ${actorLabel}`);
+    return saved;
+  }
+
+  // Admin/Authorizer only (enforced by the controller's @Roles guard) —
+  // undoes closeProjectByCustomer OR the 30-day auto-archive. Unlike
+  // reactivateOrder (CANCELLED-status specific), `status` was never touched
+  // on close, so this just flips isArchived back off; closureReason/
+  // closureNotes/closedAt are left in place as a historical record of the
+  // most recent closure rather than cleared, matching reactivateOrder's own
+  // precedent of not erasing history.
+  async reactivateClosedProject(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
+    const order = await this.findOne(id);
+    if (!order.isArchived || order.status === OrderStatus.CANCELLED) {
+      throw new BadRequestException(`Order ${order.poNumber} is not a closed project.`);
+    }
+    return this.performReactivation(order, user, 'Admin/Authorizer');
+  }
+
+  // Client-dashboard self-service reactivation — deliberately narrower than
+  // reactivateClosedProject above: only for a project the SYSTEM auto-
+  // archived (AUTO_ARCHIVE_REASON), never one the customer deliberately
+  // closed themselves via closeProjectByCustomer, which stays
+  // Admin/Authorizer-only to undo (see reactivateClosedProject's own doc
+  // comment — that distinction was a deliberate product decision, not an
+  // oversight).
+  async reactivateAutoArchivedProject(id: string, user: { id?: string; email: string; role: string; companyId?: string | null }): Promise<Order> {
+    const order = await this.findOne(id, user);
+    if (!order.isArchived || order.closureReason !== AUTO_ARCHIVE_REASON) {
+      throw new BadRequestException(`Order ${order.poNumber} is not an auto-archived project.`);
+    }
+    return this.performReactivation(order, user, 'customer (self-service)');
+  }
+
+  // ── 30-day auto-archive for projects stalled Awaiting Approval ──────────
+  @Cron('0 10 * * *', { timeZone: 'America/New_York' })
+  async sendScheduledAutoArchiveCheck(): Promise<void> {
+    await this.checkAutoArchiveEligibleOrders(new Date());
+  }
+
+  // Deliberately independent of CadService's day-5/day-10 stall-survey
+  // timeline — this doesn't care whether those emails were sent or
+  // answered, only whether 30 calendar days have passed since the order
+  // entered Awaiting Approval (awaitingApprovalSince, set alongside
+  // sentToCustomer wherever that's set — see CadService.sendToCustomer/
+  // setSubStage/reconcileCadSubStages and this file's own auto-send-on-quote
+  // path). Exported as a plain method taking `now` so it's testable without
+  // waiting on the cron, same convention as CadService.checkStalledCadApprovals.
+  async checkAutoArchiveEligibleOrders(now: Date): Promise<void> {
+    const cutoff = new Date(now.getTime() - THIRTY_DAYS_MS);
+    const stale = await this.orderRepo.find({
+      where: {
+        cadSubStatus: 'UPLOADED',
+        sentToCustomer: true,
+        isArchived: false,
+        awaitingApprovalSince: LessThanOrEqual(cutoff),
+      },
+    });
+    for (const order of stale) {
+      await this.autoArchiveOrder(order).catch(err => {
+        this.logger.warn(`Auto-archive failed for ${order.poNumber}:`, err);
+        Sentry.captureException(err);
+      });
+    }
+  }
+
+  private async autoArchiveOrder(order: Order): Promise<void> {
+    order.isArchived = true;
+    order.closureReason = AUTO_ARCHIVE_REASON;
+    order.closureNotes = null;
+    order.closedAt = new Date();
+    const saved = await this.orderRepo.save(order);
+
+    this.logEvent(saved.id, 'PROJECT_CLOSED', undefined, saved.status, saved.status, 'Auto-archived — 30 days without approval');
+
+    const customerName = saved.storeName || saved.customerFullName || saved.customerCodeName || '—';
+    const staffUsers = await this.userRepo.find({ where: { role: In([UserRole.ADMIN, UserRole.AUTHORIZER]) } });
+    const staffEmails = Array.from(new Set([...staffUsers.map(u => u.email), saved.salesRepEmail].filter(Boolean))) as string[];
+
+    await Promise.all([
+      this.emailService.sendProjectClosedAlert({
+        to: staffEmails, poNumber: saved.poNumber, customerName, orderType: saved.orderType || '—', orderId: saved.id,
+        reason: AUTO_ARCHIVE_REASON, additionalContext: null, isPriorityCustomer: saved.isPriorityCustomer,
+      }).catch(err => this.logger.warn(`Auto-archive staff alert failed for ${saved.poNumber}:`, err)),
+      saved.customerEmail
+        ? this.emailService.sendProjectAutoArchivedConfirmation({
+            to: saved.customerEmail, poNumber: saved.poNumber, orderType: saved.orderType || '—', orderId: saved.id,
+          }).catch(err => this.logger.warn(`Auto-archive customer email failed for ${saved.poNumber}:`, err))
+        : Promise.resolve(),
+      ...staffUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `Project Auto-Archived — ${saved.poNumber}`,
+          message: `${customerName}'s project was automatically archived after 30 days without a response.`,
+          orderId: saved.id,
+          targetUserId: u.id,
+          isPriority: saved.isPriorityCustomer,
+        })),
+      ),
+    ]);
   }
 
   // Admin/Authorizer only — routes an already-approved (VPO_ISSUED) order to a

@@ -11,6 +11,10 @@ export class OrderFilterDto {
   @IsOptional() @IsString() cadSubFilter?: string;
   @IsOptional() @IsString() stoneSubFilter?: string;
   @IsOptional() @IsString() hasCustomerMessage?: string;
+  // 'true' requests the customer dashboard's Archived tab (projects closed via
+  // "Close Project") instead of the normal status tabs — CUSTOMER role only,
+  // see OrdersService.applyCustomerArchiveScope.
+  @IsOptional() @IsIn(['true', 'false']) archived?: string;
   @IsOptional() @IsIn(['asc', 'desc']) sortOrder?: 'asc' | 'desc';
   @IsOptional() @IsString() assignedFactory?: string;
   @IsOptional() @IsString() supplySource?: string;

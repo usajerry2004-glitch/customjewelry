@@ -89,6 +89,12 @@ export class EmailService {
     return `${this.frontendUrl}/orders/${orderId}`;
   }
 
+  // Customer portal's own order route — distinct from orderUrl() (the
+  // internal staff dashboard), which a customer can't log into.
+  customerOrderUrl(orderId: string) {
+    return `${this.frontendUrl}/customer/orders/${orderId}`;
+  }
+
   trackUrl(token: string) {
     return `${this.frontendUrl}/track/${token}`;
   }
@@ -812,6 +818,63 @@ export class EmailService {
       `),
     });
   }
+
+  // Customer used "Close Project" on the client dashboard (only offered while
+  // an order is Awaiting Approval). Sent to the sales rep + all Admin/
+  // Authorizer staff — a separate, customer-facing confirmation goes out via
+  // sendProjectClosedConfirmation below, since the internal order link here
+  // isn't one a customer can open.
+  async sendProjectClosedAlert(opts: { to: string[]; poNumber: string; customerName: string; orderType: string; orderId: string; reason: string; additionalContext?: string | null; isPriorityCustomer?: boolean }) {
+    if (!opts.to.length) { this.warnNoRecipients('sendProjectClosedAlert', opts.poNumber); return; }
+    return this.send({
+      to: opts.to,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[Project Closed] ${opts.poNumber} — closed by customer`,
+      html: emailLayout(`
+        ${priorityBanner(opts.isPriorityCustomer)}
+        <h2 style="color:#6B7280;margin:0 0 16px">Project Closed by Customer</h2>
+        <p>The customer closed the order below while it was awaiting their approval.</p>
+        ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
+        <p style="font-weight:700;color:#1A2740">Reason: ${escapeHtml(opts.reason)}</p>
+        ${opts.additionalContext ? `<p style="color:#4A5968;font-style:italic">"${escapeHtml(opts.additionalContext)}"</p>` : ''}
+        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#6B7280')}">Open Order →</a>
+      `),
+    });
+  }
+
+  // Confirmation copy to the customer themselves — links to the customer
+  // portal, not the internal order page, and omits anything staff-internal.
+  async sendProjectClosedConfirmation(opts: { to: string; poNumber: string; orderType: string; orderId: string; reason: string }) {
+    return this.send({
+      to: opts.to,
+      subject: `We've closed your project — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#1A2740;margin:0 0 16px">Project Closed</h2>
+        <p>As requested, we've closed order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}).</p>
+        <p>Reason on file: <strong>${escapeHtml(opts.reason)}</strong></p>
+        <p style="color:#4A5968">If you'd like to pick this back up, just reach out to your Kira contact.</p>
+        <a href="${this.customerOrderUrl(opts.orderId)}" style="${btnStyle('#1A2740')}">View Project →</a>
+      `),
+    });
+  }
+
+  // System-initiated (not customer-requested) — a project that sat Awaiting
+  // Approval for 30 days with no response. Distinct tone from
+  // sendProjectClosedConfirmation: this wasn't something the customer asked
+  // for, so it leads with why it happened and that they can undo it
+  // themselves, rather than confirming a request.
+  async sendProjectAutoArchivedConfirmation(opts: { to: string; poNumber: string; orderType: string; orderId: string }) {
+    return this.send({
+      to: opts.to,
+      subject: `Your project has been archived — ${opts.poNumber}`,
+      html: emailLayout(`
+        <h2 style="color:#1A2740;margin:0 0 16px">Project Archived</h2>
+        <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been sitting without a response for 30 days, so we've moved it to your Archived projects.</p>
+        <p style="color:#4A5968">Nothing is lost — you can reactivate it yourself anytime from the Archived tab on your dashboard. Since some time has passed, our team will re-confirm pricing and lead time once you do.</p>
+        <a href="${this.customerOrderUrl(opts.orderId)}" style="${btnStyle('#1A2740')}">View Project →</a>
+      `),
+    });
+  }
+
 }
 
 // ── HTML helpers ────────────────────────────────────────────────────────────

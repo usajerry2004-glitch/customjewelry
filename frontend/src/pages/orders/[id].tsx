@@ -457,6 +457,13 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
   );
 }
 
+// Matches backend/src/modules/orders/orders.service.ts's AUTO_ARCHIVE_REASON —
+// the frontend can't import from the backend, same as CLOSURE_REASON_OPTIONS
+// elsewhere in this app. Distinguishes a system-initiated 30-day auto-archive
+// from a deliberate customer Close Project (both set order.isArchived, but
+// only the latter is customer-un-closeable — i.e. staff-reactivate-only).
+const AUTO_ARCHIVE_REASON = 'Automatically archived — 30 days without approval';
+
 // Valid next statuses from each current status (workflow transitions)
 const STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   [OrderStatus.NEW]:             [OrderStatus.CAD_IN_PROGRESS, OrderStatus.CANCELLED],
@@ -889,6 +896,24 @@ export default function OrderDetail() {
       toast.success('Order reactivated.');
     } else {
       toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to reactivate order.'));
+    }
+    setUpdatingStatus(false);
+  };
+
+  // Un-does a customer's "Close Project" (client dashboard) — distinct from
+  // reactivateOrder above, which is CANCELLED-status specific and restores a
+  // prior status. A closed project never changed status, so this only
+  // flips isArchived back off.
+  const reactivateClosedProject = async () => {
+    if (!order?.id) return;
+    if (!confirm('Reactivate this project? It will reappear in the customer\'s active orders.')) return;
+    setUpdatingStatus(true);
+    const res = await apiFetch(`${API}/orders/${order.id}/reactivate-project`, { method: 'PATCH' });
+    if (res.ok) {
+      setOrder(await res.json());
+      toast.success('Project reactivated.');
+    } else {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to reactivate project.'));
     }
     setUpdatingStatus(false);
   };
@@ -2628,6 +2653,37 @@ export default function OrderDetail() {
               <button onClick={reactivateOrder} disabled={updatingStatus}
                 style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', opacity: updatingStatus ? 0.6 : 1 }}>
                 ↺ Reactivate Order
+              </button>
+            </div>
+          )}
+
+          {/* Customer closed this project via the client dashboard — distinct
+              from the CANCELLED/Admin-only case above. Admin and Authorizer
+              can both reactivate it. */}
+          {order.isArchived && order.status !== OrderStatus.CANCELLED
+            && (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER) && (
+            <div style={{ ...cardStyle, borderLeft: '3px solid #6B7280' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                {order.closureReason === AUTO_ARCHIVE_REASON ? 'Auto-Archived — 30 Days Without Approval' : 'Project Closed by Customer'}
+              </div>
+              {order.closureReason === AUTO_ARCHIVE_REASON && (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.5 }}>
+                  The customer hasn't responded in 30 days. They can also reactivate this themselves from their own dashboard.
+                </div>
+              )}
+              {order.closureReason && order.closureReason !== AUTO_ARCHIVE_REASON && (
+                <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '4px' }}>
+                  Reason: {order.closureReason}
+                </div>
+              )}
+              {order.closureNotes && (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '10px', lineHeight: 1.5 }}>
+                  "{order.closureNotes}"
+                </div>
+              )}
+              <button onClick={reactivateClosedProject} disabled={updatingStatus}
+                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', opacity: updatingStatus ? 0.6 : 1 }}>
+                ↺ Reactivate Project
               </button>
             </div>
           )}
