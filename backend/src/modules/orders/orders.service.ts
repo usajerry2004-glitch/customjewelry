@@ -864,20 +864,22 @@ export class OrdersService implements OnModuleInit {
   // supplier, date range, search) except pagination and sort, which each
   // caller applies on top for its own purpose (a page of results vs. every
   // matching row for export).
-  // A customer's own order list has no other isArchived-awareness anywhere
-  // in buildOrdersQuery/getStatusCounts, so a project closed via "Close
-  // Project" (isArchived=true, status untouched — see closeProjectByCustomer)
-  // would otherwise keep showing under its original status tab forever.
-  // Scoped to CUSTOMER role only — staff-facing lists/queues have their own
-  // separate isArchived handling elsewhere and aren't affected.
-  // filters.archived==='true' requests the dedicated Archived tab itself;
-  // otherwise every normal tab (including "All") excludes archived-closed
-  // orders. Already-cancelled orders (also isArchived=true) are excluded
-  // from the Archived tab and left alone everywhere else — they keep
-  // appearing under the existing Cancelled tab exactly as before, since an
-  // explicit status=CANCELLED filter satisfies either branch below.
-  private applyCustomerArchiveScope(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'archived'>, user?: OrdersUser): void {
-    if (user?.role !== 'CUSTOMER') return;
+  // Without this, a project closed via "Close Project" or auto-archived
+  // after 30 days (isArchived=true, status left untouched — see
+  // closeProjectByCustomer/autoArchiveOrder) would keep showing under its
+  // original status tab forever, on every role's list, not just the
+  // customer's own. Applies across every role — Admin/Authorizer/Sales Rep
+  // get a dedicated Archived tab on the internal Orders list the same way
+  // the customer dashboard does; CAD Designer and the factory/stone roles
+  // are unaffected in practice since archived projects are always still
+  // CAD_IN_PROGRESS, which those roles' own status scoping already narrows
+  // around. filters.archived==='true' requests the dedicated Archived tab
+  // itself; otherwise every normal tab (including "All") excludes
+  // archived-closed orders. Already-cancelled orders (also isArchived=true)
+  // are excluded from the Archived tab and left alone everywhere else —
+  // they keep appearing under the existing Cancelled tab exactly as before,
+  // since an explicit status=CANCELLED filter satisfies either branch below.
+  private applyArchiveScope(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'archived'>): void {
     if (filters.archived === 'true') {
       qb.andWhere('order.isArchived = true').andWhere('order.status != :archivedExclCancelled', { archivedExclCancelled: OrderStatus.CANCELLED });
     } else {
@@ -888,7 +890,7 @@ export class OrdersService implements OnModuleInit {
   private buildOrdersQuery(filters: OrderFilterDto, user?: OrdersUser): SelectQueryBuilder<Order> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
-    this.applyCustomerArchiveScope(qb, filters, user);
+    this.applyArchiveScope(qb, filters);
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
 
@@ -952,9 +954,9 @@ export class OrdersService implements OnModuleInit {
     this.applyRoleScope(qb, user);
     // Every normal tab's badge (including "All") excludes archived-closed
     // orders, regardless of which tab is currently selected — see
-    // applyCustomerArchiveScope. The Archived tab gets its own count below,
-    // same pattern as the CAD_DESIGNER pseudo-statuses further down.
-    this.applyCustomerArchiveScope(qb, {}, user);
+    // applyArchiveScope. The Archived tab gets its own count below, same
+    // pattern as the CAD_DESIGNER pseudo-statuses further down.
+    this.applyArchiveScope(qb, {});
     this.applyCommonFilters(qb, filters);
 
     const rows = await qb.select('order.status', 'status').addSelect('COUNT(*)', 'count').groupBy('order.status').getRawMany();
@@ -967,10 +969,10 @@ export class OrdersService implements OnModuleInit {
     }
     counts[''] = all;
 
-    if (user?.role === 'CUSTOMER') {
+    {
       const archivedQb = this.orderRepo.createQueryBuilder('order');
       this.applyRoleScope(archivedQb, user);
-      this.applyCustomerArchiveScope(archivedQb, { archived: 'true' }, user);
+      this.applyArchiveScope(archivedQb, { archived: 'true' });
       this.applyCommonFilters(archivedQb, filters);
       counts['archived'] = await archivedQb.getCount();
     }
@@ -979,6 +981,7 @@ export class OrdersService implements OnModuleInit {
       const buildSubQb = () => {
         const q = this.orderRepo.createQueryBuilder('order');
         this.applyRoleScope(q, user);
+        this.applyArchiveScope(q, {});
         this.applyCommonFilters(q, filters);
         return q;
       };
@@ -2089,7 +2092,7 @@ export class OrdersService implements OnModuleInit {
   // factory/stone teams that would never have been assigned at this stage,
   // and would make the order indistinguishable from an internally-cancelled
   // one. Instead this archives the order in place — `status` is left exactly
-  // as-is for history/reactivation; see applyCustomerArchiveScope for how it
+  // as-is for history/reactivation; see applyArchiveScope for how it
   // then drops out of the customer's normal tabs into a dedicated Archived
   // one, and reactivateClosedProject for undoing it (Admin/Authorizer only).
   async closeProjectByCustomer(id: string, reason: string, additionalContext: string | undefined, user: { id?: string; email: string; role: string; companyId?: string | null }): Promise<Order> {

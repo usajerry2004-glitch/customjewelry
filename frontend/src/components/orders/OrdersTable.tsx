@@ -89,8 +89,12 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
           </thead>
           <tbody>
             {sorted.map(order => {
-              const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
-              const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
+              // See OrderCard.tsx's identical override — a closed/auto-archived
+              // project's real status/cadSubStatus stay untouched, so this
+              // keeps the table badge from showing a stale active-looking label.
+              const isClosedProject = !!(order as any).isArchived && order.status !== 'CANCELLED';
+              const cfg = isClosedProject ? STATUS_CONFIG.ARCHIVED : (STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' });
+              const cadSubLabel = !isClosedProject && order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
               const priority = isPriority(order);
               const age = daysSince(order.createdAt);
               const thumb = order.id ? thumbnails[order.id] : undefined;

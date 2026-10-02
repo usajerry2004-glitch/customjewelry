@@ -19,8 +19,12 @@ function calcPriorityReason(order: Partial<Order>): string | null {
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, hideFinancials = false, referenceImage, currentUserRole }) => {
-  const cfg = STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' };
-  const cadSubLabel = order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
+  // A closed/auto-archived project keeps its real status/cadSubStatus
+  // untouched (see closeProjectByCustomer/autoArchiveOrder), so without this
+  // override the badge would still read "Awaiting Approval" or similar.
+  const isClosedProject = !!(order as any).isArchived && order.status !== 'CANCELLED';
+  const cfg = isClosedProject ? STATUS_CONFIG.ARCHIVED : (STATUS_CONFIG[order.status!] || { label: order.status, color: '#6B7280', bg: '#F3F4F6' });
+  const cadSubLabel = !isClosedProject && order.status === 'CAD_IN_PROGRESS' ? getCadSubLabel(order as any) : null;
   const priorityReason = calcPriorityReason(order);
   const daysSinceCreated = order.createdAt ? Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 86400000)) : null;
 

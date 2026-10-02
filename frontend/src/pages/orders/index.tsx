@@ -24,6 +24,10 @@ function readOrdersReturnState(): any {
   }
 }
 
+// 'archived' isn't a real OrderStatus — see the special-casing in
+// buildFilterParams and the status-counts fetch below, and
+// OrdersService.applyArchiveScope on the backend. Catches projects closed
+// via Close Project and ones the system auto-archived after 30 idle days.
 const ALL_STATUS_FILTERS = [
   { label: 'All',             value: '' },
   { label: 'New',             value: OrderStatus.NEW },
@@ -33,6 +37,7 @@ const ALL_STATUS_FILTERS = [
   { label: 'Repair',          value: OrderStatus.REPAIR },
   { label: 'Completed',       value: OrderStatus.COMPLETED },
   { label: 'Cancelled',       value: OrderStatus.CANCELLED },
+  { label: 'Archived',        value: 'archived' },
 ];
 
 // "Normal Export" (the CSV button + the bulk-selection menu's "Normal Export"
@@ -78,6 +83,7 @@ const ROLE_STATUS_FILTERS: Record<string, typeof ALL_STATUS_FILTERS> = {
     { label: 'Manufactured',    value: OrderStatus.MANUFACTURED },
     { label: 'Completed',       value: OrderStatus.COMPLETED },
     { label: 'Cancelled',       value: OrderStatus.CANCELLED },
+    { label: 'Archived',        value: 'archived' },
   ],
 };
 
@@ -278,7 +284,8 @@ export default function OrdersPage() {
   // these filters" CSV button, so the export always matches what's on screen.
   const buildFilterParams = (): URLSearchParams => {
     const params = new URLSearchParams();
-    if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
+    if (statusFilter === 'archived') params.set('archived', 'true');
+    else if (statusFilter && !isCadSubFilter) params.set('status', statusFilter);
     if (isCadSubFilter) {
       params.set('status', 'CAD_IN_PROGRESS');
       params.set('cadSubFilter', statusFilter);
