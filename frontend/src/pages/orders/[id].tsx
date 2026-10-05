@@ -2626,7 +2626,16 @@ export default function OrderDetail() {
           {(order.salesRepName || order.salesRepEmail) && (
             <div style={cardStyle}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>Created By</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{(order as any).salesRepName || order.salesRepEmail}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {/* salesRepName is literally 'Ring Builder' for every order from
+                    that integration regardless of which site variant submitted
+                    it — externalSource carries the actual site ("kira-website"
+                    is the plain web order form, not the 3D ring configurator),
+                    so a more specific label is shown when we know it. */}
+                {order.source === 'RING_BUILDER' && (order as any).externalSource === 'kira-website'
+                  ? 'Web Order'
+                  : ((order as any).salesRepName || order.salesRepEmail)}
+              </div>
               {(order as any).salesRepName && order.salesRepEmail && (
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>{order.salesRepEmail}</div>
               )}

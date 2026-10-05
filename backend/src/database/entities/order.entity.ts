@@ -444,6 +444,17 @@ export class Order {
   @Column({ nullable: true })
   externalCartId: string | null;
 
+  // Raw `source` value the external intake call itself reported (e.g.
+  // "kira-website") — distinct from the `source` column above, which is
+  // always the literal string 'RING_BUILDER' for every order from this
+  // integration regardless of which site variant submitted it. Used only to
+  // pick a more specific "Created By" label on the order detail page (see
+  // frontend/src/pages/orders/[id].tsx) without having to parse it back out
+  // of customerNotes, where it's also embedded as free text ("Website
+  // Source: ...") for human readability. Null for staff-entered orders.
+  @Column({ nullable: true })
+  externalSource: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

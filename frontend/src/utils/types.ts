@@ -136,6 +136,7 @@ export interface Order {
   awaitingApprovalSince?: string | null;
   source?: string;
   externalOrderId?: string | null;
+  externalSource?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -274,6 +274,7 @@ export class RingBuilderOrdersService {
         trackingToken,
         status: OrderStatus.NEW,
         source: 'RING_BUILDER',
+        externalSource:  dto.source || null,
         externalOrderId: item.externalOrderId,
         externalCartId:  dto.externalCartId,
         customerId:       customer.id,
