@@ -169,6 +169,7 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     { header: 'Stone Shape', value: (o: Order) => o.centerStoneShape || '' },
     { header: 'Carat Weight', value: (o: Order) => o.approximateCaratWeight || '' },
     { header: 'Gemstone', value: (o: Order) => o.hasGemstone ? 'Yes' : 'No' },
+    { header: 'Certificate #(s)', value: (o: Order) => (o.certificateNumbers || []).join(', ') },
     { header: 'Customer Notes', value: (o: Order) => o.customerNotes || '' },
     { header: 'Current Status', value: (o: Order) => CSV_STATUS_LABELS[o.status] || o.status },
     { header: 'Priority', value: (o: Order) => o.isPriorityCustomer ? 'Priority' : 'Regular' },
