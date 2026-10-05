@@ -11,6 +11,7 @@ import { OrderEvent } from '../../database/entities/order-event.entity';
 import { EmailService } from '../email/email.service';
 import { SpacesService } from '../spaces/spaces.service';
 import { SkuService } from '../sku/sku.service';
+import { OrdersService } from '../orders/orders.service';
 import { businessDaysElapsed } from '../../common/business-days.util';
 
 // Reset alongside sentToCustomer/lastApprovalEmailAt wherever those are
@@ -54,6 +55,7 @@ export class CadService {
     private readonly emailService: EmailService,
     private readonly skuService: SkuService,
     private readonly spacesService: SpacesService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   // ── Work-time tracking ────────────────────────────────────────────────
@@ -226,6 +228,14 @@ export class CadService {
   async notifyBatchUploaded(orderId: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
+
+    // Push the newly-uploaded file to the Ring Builder website immediately —
+    // deliberately ahead of the PRE_VPO_STATUSES check below, since that
+    // check is about whether to re-trigger JewelFlow's own internal
+    // review workflow, not about whether the website should see the latest
+    // file. No-ops internally if RING_BUILDER_WEBHOOK_URL isn't configured.
+    this.ordersService.notifyRingBuilderOfCadUpload(orderId)
+      .catch(err => this.logger.warn(`Ring Builder CAD-upload webhook failed for order ${orderId}:`, err));
 
     // Once the order has moved past the CAD approval stage (VPO issued or
     // later), an Admin uploading an additional/revised file shouldn't pull it

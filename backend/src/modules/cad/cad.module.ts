@@ -11,11 +11,15 @@ import { OrderEvent } from '../../database/entities/order-event.entity';
 import { CadService } from './cad.service';
 import { CadController } from './cad.controller';
 import { SkuModule } from '../sku/sku.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([CadFile, Order, User, Notification, CadTimeLog, OrderEvent]),
     SkuModule,
+    // For OrdersService.notifyRingBuilderOfCadUpload — pushes the Ring
+    // Builder webhook whenever a new CAD design file is uploaded.
+    OrdersModule,
     // Memory storage (not direct-to-S3 streaming) so the service layer has
     // the file buffer available to derive an image thumbnail before upload.
     MulterModule.register({

@@ -398,6 +398,19 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
+  // Public entry point for CadService (a separate module) to trigger the
+  // same Ring Builder webhook whenever a new CAD design file is uploaded —
+  // unlike the status/shipping-change call sites above, this fires
+  // regardless of the order's current stage, since the website should
+  // always reflect the latest uploaded file, not just ones uploaded before
+  // VPO issuance. notifyRingBuilderWebhook already retries and logs/catches
+  // its own failures internally, so this never throws.
+  async notifyRingBuilderOfCadUpload(orderId: string): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) return;
+    await this.notifyRingBuilderWebhook(order);
+  }
+
   // imageUrl: latest actual CAD design image if the design team has uploaded
   // one, else the customer's reference photo — same "design supersedes
   // reference" priority as everywhere else images are picked for an order
