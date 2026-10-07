@@ -14,6 +14,7 @@ export const ClientConversionReport: React.FC = () => {
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [clients, setClients] = useState<ClientConversion[]>([]);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const buildParams = () => customRange
     ? `dateFrom=${customRange.from}&dateTo=${customRange.to}`
@@ -21,7 +22,13 @@ export const ClientConversionReport: React.FC = () => {
 
   useEffect(() => {
     apiFetch(`${API}/orders/reports/clients?${buildParams()}`).then(r => r.ok ? r.json() : []).then(setClients).catch(() => {});
+    setShowAll(false);
   }, [monthOffset, customRange]);
+
+  // Already sorted by orders placed (desc) from the backend, so the first 5
+  // are the top 5 — "View more" below just reveals the rest of that same order.
+  const TOP_N = 5;
+  const visibleClients = showAll ? clients : clients.slice(0, TOP_N);
 
   const totals = clients.reduce((acc, c) => ({
     ordersPlaced: acc.ordersPlaced + c.ordersPlaced,
@@ -94,7 +101,7 @@ export const ClientConversionReport: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {clients.map(c => (
+          {visibleClients.map(c => (
             <tr key={c.client}>
               <td style={{ ...tdStyle, fontWeight: 600 }}>{c.client}</td>
               <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
@@ -115,6 +122,19 @@ export const ClientConversionReport: React.FC = () => {
           {clients.length === 0 && <tr><td style={tdStyle} colSpan={5}>No orders in this period.</td></tr>}
         </tbody>
       </table>
+      {clients.length > TOP_N && (
+        <div style={{ textAlign: 'center', marginTop: '10px' }}>
+          <button
+            onClick={() => setShowAll(s => !s)}
+            style={{
+              fontSize: '12px', fontWeight: 600, color: 'var(--accent-dark)', background: 'none',
+              border: '1px solid var(--border)', borderRadius: '20px', padding: '5px 16px', cursor: 'pointer',
+            }}
+          >
+            {showAll ? 'Show Top 5 Only' : `View More (${clients.length - TOP_N} more)`}
+          </button>
+        </div>
+      )}
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
         "CADs Created" excludes reference/inspiration images, and collapses every file uploaded for the same order on the same day into one (several angles or a quick re-export in one sitting is one design touched, not several). "Conversion %" is orders that reached Completed, out of all orders placed by that client in this period.
       </div>
