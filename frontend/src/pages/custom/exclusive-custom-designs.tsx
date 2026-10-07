@@ -257,9 +257,9 @@ export default function ExclusiveCustomDesignsPage() {
                   onClick={() => fileRef.current?.click()}
                   style={{ border: '2px dashed var(--border)', borderRadius: '8px', padding: '18px', textAlign: 'center', cursor: 'pointer', background: 'var(--bg-input)' }}
                 >
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🖼 Click to upload — JPG, PNG or PDF (up to {MAX_FILES})</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>🖼 Click to upload — JPG, PNG, PDF or STL (up to {MAX_FILES})</div>
                 </div>
-                <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={onFilesChosen} />
+                <input ref={fileRef} type="file" multiple accept="image/*,.pdf,.stl" style={{ display: 'none' }} onChange={onFilesChosen} />
               </div>
               <div style={{ marginBottom: '18px' }}>
                 <label style={label}>Reference Link (optional)</label>
