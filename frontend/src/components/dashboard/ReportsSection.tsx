@@ -536,7 +536,7 @@ export const ReportsSection: React.FC = () => {
         </tbody>
       </table>
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
-        "CADs Created" excludes reference/inspiration images — design files only. "Conversion %" is orders that reached Completed, out of all orders placed by that client in this period.
+        "CADs Created" excludes reference/inspiration images, and collapses every file uploaded for the same order on the same day into one (several angles or a quick re-export in one sitting is one design touched, not several). "Conversion %" is orders that reached Completed, out of all orders placed by that client in this period.
       </div>
     </div>
     </>

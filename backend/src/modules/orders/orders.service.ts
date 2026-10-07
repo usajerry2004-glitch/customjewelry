@@ -733,10 +733,17 @@ export class OrdersService implements OnModuleInit {
   }
 
   // Full client-wise breakdown (no Top-5 limit, unlike the reports above) —
-  // orders placed, CAD design files created (reference/customer-reference
-  // images excluded, same convention as buildOrderCsvColumns elsewhere),
-  // and how many of those orders reached COMPLETED — "conversion" meaning
-  // confirmed by the business, not just "progressed to VPO Issued".
+  // orders placed, CADs created, and how many of those orders reached
+  // COMPLETED — "conversion" meaning confirmed by the business, not just
+  // "progressed to VPO Issued".
+  //
+  // "CADs created" collapses every file uploaded for the same order on the
+  // same calendar day into one — same convention as getCadTrackingReport's
+  // (person, style, day) grouping elsewhere in this app: a designer
+  // uploading several files in one sitting (different angles, a quick
+  // re-export) is one design touched, not several. Reference/customer-
+  // reference images are excluded first, same as buildOrderCsvColumns.
+  //
   // cad_files.orderId is stored as text while orders.id is uuid — same
   // mismatch as order_events, needs the explicit cast below or Postgres
   // rejects the join outright.
@@ -747,7 +754,7 @@ export class OrdersService implements OnModuleInit {
       `SELECT
          COALESCE(NULLIF(o."storeName", ''), NULLIF(o."customerFullName", ''), 'Unknown') AS client,
          COUNT(DISTINCT o.id)::int AS "ordersPlaced",
-         COUNT(DISTINCT c.id) FILTER (
+         COUNT(DISTINCT (c."orderId", to_char(c."createdAt", 'YYYY-MM-DD'))) FILTER (
            WHERE c."designerNotes" IS NULL OR c."designerNotes" NOT IN ('Reference image', 'Customer reference image')
          )::int AS "cadsCreated",
          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS "ordersCompleted",
