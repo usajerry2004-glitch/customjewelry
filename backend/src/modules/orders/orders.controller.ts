@@ -182,6 +182,26 @@ export class OrdersController {
     return this.ordersService.getClientConversionReport(month, dateFrom, dateTo);
   }
 
+  @Get('reports/clients/csv')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'CSV download of the Client Conversion report — same ?month or ?dateFrom&?dateTo rules as reports/clients.' })
+  async exportClientConversionCsv(
+    @Query('month') month: string | undefined,
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo') dateTo: string | undefined,
+    @Res() res: Response,
+  ) {
+    const csv = await this.ordersService.exportClientConversionCsv(month, dateFrom, dateTo);
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = dateFrom || dateTo
+      ? `client-conversion-${dateFrom || today}-${dateTo || today}.csv`
+      : `client-conversion-${month || today.slice(0, 7)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  }
+
   @Get('reports/top-customers/orders')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ReportsSection } from '../components/dashboard/ReportsSection';
+import { ClientConversionReport } from '../components/reports/ClientConversionReport';
 import { MonthlyProductionReport } from '../components/dashboard/MonthlyProductionReport';
 import { CadTrackingSection } from '../components/reports/CadTrackingSection';
 import { UserRole } from '../utils/types';
@@ -10,6 +11,7 @@ const RAIL_ITEMS: { id: string; label: string }[] = [
   { id: 'order-activity', label: 'Order Activity' },
   { id: 'top-customers', label: 'Top Customers' },
   { id: 'top-sales-reps', label: 'Top Sales Reps' },
+  { id: 'client-conversion', label: 'Client Conversion' },
   { id: 'monthly-production', label: 'Monthly Production' },
 ];
 const WORKBOOK_ITEMS: { id: string; label: string }[] = [
@@ -67,6 +69,7 @@ export default function ReportsPage() {
 
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <ReportsSection />
+          <ClientConversionReport />
           <div id="monthly-production" style={{ scrollMarginTop: '20px' }}><MonthlyProductionReport /></div>
           <CadTrackingSection />
         </div>

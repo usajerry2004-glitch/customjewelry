@@ -776,6 +776,18 @@ export class OrdersService implements OnModuleInit {
     }));
   }
 
+  // CSV download for the Reports page's Client Conversion report — same
+  // data/date-range rules as getClientConversionReport, just serialized.
+  async exportClientConversionCsv(month?: string, dateFrom?: string, dateTo?: string): Promise<string> {
+    const rows = await this.getClientConversionReport(month, dateFrom, dateTo);
+    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed', 'Conversion %'];
+    const lines = [
+      header.map(csvEscape).join(','),
+      ...rows.map(r => [r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.ordersCompleted), `${r.conversionPct}%`].map(csvEscape).join(',')),
+    ];
+    return lines.join('\n');
+  }
+
   private resolveReportRange(month?: string, dateFrom?: string, dateTo?: string): { start: Date; end: Date } {
     if (dateFrom && dateTo) {
       return { start: new Date(`${dateFrom}T00:00:00`), end: new Date(`${dateTo}T23:59:59.999`) };
