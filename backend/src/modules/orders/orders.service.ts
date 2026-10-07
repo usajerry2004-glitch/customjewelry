@@ -732,6 +732,43 @@ export class OrdersService implements OnModuleInit {
     }));
   }
 
+  // Full client-wise breakdown (no Top-5 limit, unlike the reports above) —
+  // orders placed, CAD design files created (reference/customer-reference
+  // images excluded, same convention as buildOrderCsvColumns elsewhere),
+  // and how many of those orders reached COMPLETED — "conversion" meaning
+  // confirmed by the business, not just "progressed to VPO Issued".
+  // cad_files.orderId is stored as text while orders.id is uuid — same
+  // mismatch as order_events, needs the explicit cast below or Postgres
+  // rejects the join outright.
+  async getClientConversionReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{ client: string; ordersPlaced: number; cadsCreated: number; ordersCompleted: number; conversionPct: number }[]> {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+
+    const rows: { client: string; ordersPlaced: string; cadsCreated: string; ordersCompleted: string; conversionPct: string | null }[] = await this.orderRepo.query(
+      `SELECT
+         COALESCE(NULLIF(o."storeName", ''), NULLIF(o."customerFullName", ''), 'Unknown') AS client,
+         COUNT(DISTINCT o.id)::int AS "ordersPlaced",
+         COUNT(DISTINCT c.id) FILTER (
+           WHERE c."designerNotes" IS NULL OR c."designerNotes" NOT IN ('Reference image', 'Customer reference image')
+         )::int AS "cadsCreated",
+         COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS "ordersCompleted",
+         ROUND(100.0 * COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED') / NULLIF(COUNT(DISTINCT o.id), 0), 1) AS "conversionPct"
+       FROM orders o
+       LEFT JOIN cad_files c ON (o.id)::text = c."orderId"
+       WHERE o."createdAt" BETWEEN $1 AND $2
+       GROUP BY client
+       ORDER BY "ordersPlaced" DESC`,
+      [start, end],
+    );
+
+    return rows.map(r => ({
+      client: r.client,
+      ordersPlaced: Number(r.ordersPlaced),
+      cadsCreated: Number(r.cadsCreated),
+      ordersCompleted: Number(r.ordersCompleted),
+      conversionPct: r.conversionPct != null ? parseFloat(r.conversionPct) : 0,
+    }));
+  }
+
   private resolveReportRange(month?: string, dateFrom?: string, dateTo?: string): { start: Date; end: Date } {
     if (dateFrom && dateTo) {
       return { start: new Date(`${dateFrom}T00:00:00`), end: new Date(`${dateTo}T23:59:59.999`) };

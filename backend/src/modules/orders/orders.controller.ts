@@ -170,6 +170,18 @@ export class OrdersController {
     return this.ordersService.getTopSalesRepsReport(month, dateFrom, dateTo);
   }
 
+  @Get('reports/clients')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Dashboard report: every client\'s orders placed, CAD design files created, and how many of their orders reached Completed ("conversion"), for ?month (YYYY-MM, defaults to current month). Pass ?dateFrom&?dateTo (YYYY-MM-DD) instead for an arbitrary custom range. Full list, not limited to a Top 5.' })
+  getClientConversionReport(
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getClientConversionReport(month, dateFrom, dateTo);
+  }
+
   @Get('reports/top-customers/orders')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

@@ -7,6 +7,7 @@ import { STATUS_CONFIG } from '../../utils/types';
 interface WeeklyDay { date: string; dayLabel: string; received: number; approved: number; manufactured: number; cancelled: number }
 interface TopCustomer { name: string; orderCount: number; amount: number }
 interface TopSalesRep { repId: string; repName: string; customerCount: number; orderCount: number }
+interface ClientConversion { client: string; ordersPlaced: number; cadsCreated: number; ordersCompleted: number; conversionPct: number }
 interface DateRange { from: string; to: string }
 interface DrillOrder { id: string; poNumber: string; status: string; createdAt: string; storeName?: string; customerFullName?: string }
 
@@ -198,6 +199,10 @@ export const ReportsSection: React.FC = () => {
   const [reps, setReps] = useState<TopSalesRep[]>([]);
   const [repsView, setRepsView] = useState<'table' | 'graph'>('table');
 
+  const [clientMonthOffset, setClientMonthOffset] = useState(0);
+  const [clientCustomRange, setClientCustomRange] = useState<DateRange | null>(null);
+  const [clients, setClients] = useState<ClientConversion[]>([]);
+
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
   const [customerOrders, setCustomerOrders] = useState<DrillOrder[]>([]);
   const [customerOrdersLoading, setCustomerOrdersLoading] = useState(false);
@@ -228,6 +233,13 @@ export const ReportsSection: React.FC = () => {
     apiFetch(`${API}/orders/reports/top-sales-reps?${params}`).then(r => r.ok ? r.json() : []).then(setReps).catch(() => {});
     setExpandedRepId(null);
   }, [repsMonthOffset, repsCustomRange]);
+
+  useEffect(() => {
+    const params = clientCustomRange
+      ? `dateFrom=${clientCustomRange.from}&dateTo=${clientCustomRange.to}`
+      : `month=${monthLabel(clientMonthOffset).param}`;
+    apiFetch(`${API}/orders/reports/clients?${params}`).then(r => r.ok ? r.json() : []).then(setClients).catch(() => {});
+  }, [clientMonthOffset, clientCustomRange]);
 
   const goToOrder = (id: string) => router.push(`/orders/${id}`);
 
@@ -267,8 +279,11 @@ export const ReportsSection: React.FC = () => {
   const custTotals = customers.reduce((acc, c) => ({ orderCount: acc.orderCount + c.orderCount, amount: acc.amount + c.amount }), { orderCount: 0, amount: 0 });
   const repMax = Math.max(1, ...reps.map(r => r.orderCount));
   const repTotals = reps.reduce((acc, r) => ({ customerCount: acc.customerCount + r.customerCount, orderCount: acc.orderCount + r.orderCount }), { customerCount: 0, orderCount: 0 });
+  const clientTotals = clients.reduce((acc, c) => ({ ordersPlaced: acc.ordersPlaced + c.ordersPlaced, cadsCreated: acc.cadsCreated + c.cadsCreated, ordersCompleted: acc.ordersCompleted + c.ordersCompleted }), { ordersPlaced: 0, cadsCreated: 0, ordersCompleted: 0 });
+  const clientTotalConversionPct = clientTotals.ordersPlaced ? Math.round((clientTotals.ordersCompleted / clientTotals.ordersPlaced) * 1000) / 10 : 0;
 
   return (
+    <>
     <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
 
       {/* Order Activity */}
@@ -467,5 +482,63 @@ export const ReportsSection: React.FC = () => {
       </div>
 
     </div>
+
+    {/* Client Conversion — full-width, every client (not a Top 5) */}
+    <div id="client-conversion" style={{ ...cardStyle, scrollMarginTop: '20px', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+        <div>
+          <div style={reportTitleStyle}>Client Conversion</div>
+          <div style={periodStyle}>
+            {clientCustomRange ? (
+              <span>{shortDate(clientCustomRange.from)} – {shortDate(clientCustomRange.to)}</span>
+            ) : (
+              <>
+                <span style={arrowBtnStyle} onClick={() => setClientMonthOffset(m => m - 1)}>‹</span>
+                {monthLabel(clientMonthOffset).label}
+                <span style={arrowBtnStyle} onClick={() => setClientMonthOffset(m => m + 1)}>›</span>
+              </>
+            )}
+            <CustomRangeControl active={clientCustomRange} onApply={setClientCustomRange} onClear={() => setClientCustomRange(null)} />
+          </div>
+        </div>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Client</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Orders Placed</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>CADs Created</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Completed</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Conversion %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {clients.map(c => (
+            <tr key={c.client}>
+              <td style={{ ...tdStyle, fontWeight: 600 }}>{c.client}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cadsCreated}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersCompleted}</td>
+              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
+            </tr>
+          ))}
+          {clients.length > 0 && (
+            <tr>
+              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
+              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{clientTotals.ordersPlaced}</td>
+              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{clientTotals.cadsCreated}</td>
+              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{clientTotals.ordersCompleted}</td>
+              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{clientTotalConversionPct}%</td>
+            </tr>
+          )}
+          {clients.length === 0 && <tr><td style={tdStyle} colSpan={5}>No orders in this period.</td></tr>}
+        </tbody>
+      </table>
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
+        "CADs Created" excludes reference/inspiration images — design files only. "Conversion %" is orders that reached Completed, out of all orders placed by that client in this period.
+      </div>
+    </div>
+    </>
   );
 };
