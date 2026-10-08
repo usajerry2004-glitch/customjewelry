@@ -193,6 +193,8 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
                   <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                     {(order as any).externalSource === 'Special Web Order'
                       ? 'Special Web Order'
+                      : (order as any).externalSource === 'kira-website'
+                      ? 'Web Orders'
                       : (order.salesRepName || order.salesRepEmail)}
                   </td>
                 </tr>

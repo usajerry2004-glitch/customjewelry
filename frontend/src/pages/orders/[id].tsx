@@ -2629,6 +2629,8 @@ export default function OrderDetail() {
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 {(order as any).externalSource === 'Special Web Order'
                   ? 'Special Web Order'
+                  : (order as any).externalSource === 'kira-website'
+                  ? 'Web Orders'
                   : ((order as any).salesRepName || order.salesRepEmail)}
               </div>
               {(order as any).salesRepName && order.salesRepEmail && (
