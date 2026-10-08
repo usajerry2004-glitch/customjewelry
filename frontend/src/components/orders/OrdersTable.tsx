@@ -191,7 +191,9 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
                     )}
                   </td>
                   <td style={{ ...tdStyle, color: 'var(--text-secondary)', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                    {order.salesRepName || order.salesRepEmail}
+                    {(order as any).externalSource === 'Special Web Order'
+                      ? 'Special Web Order'
+                      : (order.salesRepName || order.salesRepEmail)}
                   </td>
                 </tr>
               );

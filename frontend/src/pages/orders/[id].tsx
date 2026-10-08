@@ -2627,7 +2627,9 @@ export default function OrderDetail() {
             <div style={cardStyle}>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>Created By</div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {(order as any).salesRepName || order.salesRepEmail}
+                {(order as any).externalSource === 'Special Web Order'
+                  ? 'Special Web Order'
+                  : ((order as any).salesRepName || order.salesRepEmail)}
               </div>
               {(order as any).salesRepName && order.salesRepEmail && (
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>{order.salesRepEmail}</div>

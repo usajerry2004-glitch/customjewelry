@@ -269,6 +269,11 @@ export class RingBuilderOrdersService {
       const trackingToken = randomBytes(32).toString('hex');
       const { shape: parsedShape, caratWeight: parsedCaratWeight } = this.parseStones(item.stones);
 
+      // "Special Web Order" carries compulsory defaults regardless of what
+      // the item itself specifies — this variant is always 14K LGD / lab
+      // grown / F+VS+.
+      const isSpecialWebOrder = dto.source === 'Special Web Order';
+
       const order = await this.orderRepo.save(this.orderRepo.create({
         poNumber,
         trackingToken,
@@ -295,6 +300,9 @@ export class RingBuilderOrdersService {
         customerNotes:    this.buildCustomerNotes(dto, item),
         salesRepName:     'Ring Builder',
         salesRepId:       customer.salesRepId || undefined,
+        stamping:         isSpecialWebOrder ? '14K LGD' : undefined,
+        diamondType:      isSpecialWebOrder ? 'Lab Grown Diamond' : undefined,
+        diamondQuality:   isSpecialWebOrder ? 'F+VS+' : undefined,
       }));
       newlyCreated.push(order);
 

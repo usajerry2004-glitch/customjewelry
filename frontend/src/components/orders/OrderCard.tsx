@@ -154,9 +154,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           })()}
         </div>
 
-        {(order.salesRepName || order.salesRepEmail) && (
+        {((order as any).externalSource === 'Special Web Order' || order.salesRepName || order.salesRepEmail) && (
           <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text-muted)' }}>
-            Created by <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{order.salesRepName || order.salesRepEmail}</span>
+            Created by <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+              {(order as any).externalSource === 'Special Web Order' ? 'Special Web Order' : (order.salesRepName || order.salesRepEmail)}
+            </span>
           </div>
         )}
       </div>
