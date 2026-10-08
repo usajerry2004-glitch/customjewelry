@@ -878,22 +878,9 @@ export class OrdersService implements OnModuleInit {
   // Filters shared between the paginated list (findAll) and the per-status
   // tab counts (getStatusCounts) — everything except status/cadSubFilter/
   // stoneSubFilter, which each caller applies on its own terms.
-  private applyCommonFilters(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo' | 'rep'>): void {
+  private applyCommonFilters(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>): void {
     if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
     if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
-
-    // Rep filter — either one of the three synthetic web-intake buckets, or
-    // a real salesRepName (everything that isn't Ring Builder/kira-website/
-    // Special Web Order is a human rep, stamped on the order at creation).
-    if (filters.rep === 'web_orders') {
-      qb.andWhere(`order.source = 'RING_BUILDER' AND order."externalSource" = 'kira-website'`);
-    } else if (filters.rep === 'special_web_order') {
-      qb.andWhere(`order."externalSource" = 'Special Web Order'`);
-    } else if (filters.rep === 'ring_builder') {
-      qb.andWhere(`order.source = 'RING_BUILDER' AND (order."externalSource" IS NULL OR order."externalSource" NOT IN ('kira-website', 'Special Web Order'))`);
-    } else if (filters.rep) {
-      qb.andWhere('order.salesRepName = :rep', { rep: filters.rep });
-    }
 
     // "Customer texted" — orders with an UNREAD customer chat message: the
     // customer has posted at least one, and no staff member has opened the
@@ -1026,33 +1013,13 @@ export class OrdersService implements OnModuleInit {
     return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
   }
 
-  // Options for the "Rep" filter dropdown on the Orders list — every real
-  // salesRepName that's actually appeared on an order (not every User row,
-  // since a name on an order is a point-in-time stamp and this list should
-  // only offer names a filter click can actually match), plus the three
-  // synthetic web-intake buckets, always offered even with zero current
-  // matches since they're meaningful categories on their own.
-  async getRepFilterOptions(): Promise<{ value: string; label: string }[]> {
-    const rows: { salesRepName: string }[] = await this.orderRepo.query(
-      `SELECT DISTINCT "salesRepName" FROM orders
-       WHERE "salesRepName" IS NOT NULL AND "salesRepName" != '' AND "salesRepName" != 'Ring Builder'
-       ORDER BY "salesRepName" ASC`,
-    );
-    return [
-      { value: 'web_orders', label: 'Web Orders' },
-      { value: 'ring_builder', label: 'Ring Builder' },
-      { value: 'special_web_order', label: 'Special Web Order' },
-      ...rows.map(r => ({ value: r.salesRepName, label: r.salesRepName })),
-    ];
-  }
-
   // Powers the count badge on each status tab on the Orders list — same
   // role-scoping and side filters (factory/supplySource/date/search/customer
   // message) as findAll, minus status itself, grouped by status so every tab
   // gets an accurate count for "if I clicked this tab right now." Also
   // includes the two CAD sub-filter pseudo-statuses (cad_pending/cad_revision)
   // the CAD Designer role's own tab set uses instead of real statuses.
-  async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo' | 'rep'>, user?: OrdersUser): Promise<Record<string, number>> {
+  async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>, user?: OrdersUser): Promise<Record<string, number>> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
     // Every normal tab's badge (including "All") excludes archived-closed
