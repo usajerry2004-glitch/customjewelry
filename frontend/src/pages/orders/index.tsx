@@ -8,7 +8,7 @@ import { Order, OrderStatus, StoneStatus, Permission, MOUNTING_OPTIONS } from '.
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { toast } from '../../utils/toast';
 import { formatName } from '../../utils/name';
-import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions } from '../../utils/catalog';
+import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, RepOption, fetchRepOptions } from '../../utils/catalog';
 
 // Remembers filters, pagination, and scroll position across a visit to an
 // order's detail page, so clicking "Back to Orders" lands where the user
@@ -112,6 +112,7 @@ interface SavedFilterPreset {
   stoneSubFilter: string;
   factoryFilter: string;
   supplySourceFilter: string;
+  repFilter?: string;
   dateFrom: string;
   dateTo: string;
   activeMonth: string;
@@ -216,6 +217,7 @@ export default function OrdersPage() {
   const [stoneSubFilter, setStoneSubFilter] = useState(() => readOrdersReturnState()?.stoneSubFilter ?? '');
   const [factoryFilter, setFactoryFilter] = useState(() => readOrdersReturnState()?.factoryFilter ?? '');
   const [supplySourceFilter, setSupplySourceFilter] = useState(() => readOrdersReturnState()?.supplySourceFilter ?? '');
+  const [repFilter, setRepFilter] = useState(() => readOrdersReturnState()?.repFilter ?? '');
   const [customerFilter, setCustomerFilter] = useState(() => readOrdersReturnState()?.customerFilter ?? '');
   const [customerFilterInput, setCustomerFilterInput] = useState(() => readOrdersReturnState()?.customerFilterInput ?? '');
   const [customerTextedFilter, setCustomerTextedFilter] = useState(() => readOrdersReturnState()?.customerTextedFilter ?? false);
@@ -232,11 +234,13 @@ export default function OrdersPage() {
   const [reassignSupplySource, setReassignSupplySource] = useState('');
   const [factories, setFactories] = useState<CatalogOption[]>([]);
   const [supplySources, setSupplySources] = useState<CatalogOption[]>([]);
+  const [reps, setReps] = useState<RepOption[]>([]);
   const [nudgeStatus, setNudgeStatus] = useState<OrderStatus | ''>('');
 
   useEffect(() => {
     fetchFactoryOptions().then(setFactories);
     fetchSupplySourceOptions().then(setSupplySources);
+    fetchRepOptions().then(setReps);
   }, []);
 
   // Sync statusFilter when URL query changes without a remount (e.g.
@@ -294,6 +298,7 @@ export default function OrdersPage() {
     if (stoneSubFilter) params.set('stoneSubFilter', stoneSubFilter);
     if (factoryFilter) params.set('assignedFactory', factoryFilter);
     if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
+    if (repFilter) params.set('rep', repFilter);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
@@ -646,6 +651,7 @@ export default function OrdersPage() {
     setStoneSubFilter(p.stoneSubFilter);
     setFactoryFilter(p.factoryFilter);
     setSupplySourceFilter(p.supplySourceFilter);
+    setRepFilter(p.repFilter ?? '');
     setDateFrom(p.dateFrom);
     setDateTo(p.dateTo);
     setActiveMonth(p.activeMonth);
@@ -662,7 +668,7 @@ export default function OrdersPage() {
     const preset: SavedFilterPreset = {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       name,
-      statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+      statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, repFilter,
       dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter, sortOrder,
     };
     const next = [...filterPresets, preset];
@@ -691,22 +697,23 @@ export default function OrdersPage() {
     }
     setPage(0);
     load(0);
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, sortOrder]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, repFilter, dateFrom, dateTo, customerTextedFilter, sortOrder]);
   useEffect(() => { load(page); }, [page]);
 
   // Per-tab counts for the status pill badges — independent of which tab is
   // currently selected (it covers all of them at once), but still respects
-  // the same side filters (factory/supplier/date/customer-texted) as the
+  // the same side filters (factory/supplier/rep/date/customer-texted) as the
   // list itself, so a badge always matches what clicking that tab would show.
   useEffect(() => {
     const params = new URLSearchParams();
     if (factoryFilter) params.set('assignedFactory', factoryFilter);
     if (supplySourceFilter) params.set('supplySource', supplySourceFilter);
+    if (repFilter) params.set('rep', repFilter);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
     apiFetch(`${API}/orders/status-counts?${params}`).then(r => r.ok ? r.json() : {}).then(setStatusCounts).catch(() => {});
-  }, [factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, userRole]);
+  }, [factoryFilter, supplySourceFilter, repFilter, dateFrom, dateTo, customerTextedFilter, userRole]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') localStorage.setItem('jf_orders_view', viewMode);
@@ -718,11 +725,11 @@ export default function OrdersPage() {
     if (typeof window === 'undefined') return;
     try {
       sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({
-        statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
+        statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, repFilter,
         customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder,
       }));
     } catch {}
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, repFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder]);
 
   // Capture scroll position when leaving the page (merged into whatever
   // filter snapshot was last written above) and restore it once, after the
@@ -1369,6 +1376,18 @@ export default function OrdersPage() {
             <option value="">All Stone Suppliers</option>
             {supplySources.map(s => (
               <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+        )}
+        {['ADMIN', 'AUTHORIZER'].includes(userRole) && (
+          <select
+            value={repFilter}
+            onChange={e => setRepFilter(e.target.value)}
+            style={{ ...inputStyle, flex: '0 1 170px', cursor: 'pointer' }}
+          >
+            <option value="">All Reps</option>
+            {reps.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
             ))}
           </select>
         )}

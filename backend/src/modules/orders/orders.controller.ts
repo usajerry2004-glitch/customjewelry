@@ -145,6 +145,14 @@ export class OrdersController {
     return this.ordersService.getWeeklyActivityReport(weekStart, dateFrom, dateTo);
   }
 
+  @Get('reps')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Options for the Orders list\'s "Rep" filter dropdown: every real sales rep name that has appeared on an order, plus the three synthetic web-intake buckets (Web Orders / Ring Builder / Special Web Order).' })
+  getRepFilterOptions() {
+    return this.ordersService.getRepFilterOptions();
+  }
+
   @Get('reports/top-customers')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

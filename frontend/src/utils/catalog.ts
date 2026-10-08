@@ -17,6 +17,14 @@ export const fetchSupplySourceOptions = (): Promise<CatalogOption[]> =>
 export const fetchCadPersonOptions = (): Promise<CatalogOption[]> =>
   apiFetch(`${API}/catalog/cad-persons`).then(r => r.ok ? r.json() : []).catch(() => []);
 
+// Orders list "Rep" filter — real sales rep names plus the three synthetic
+// web-intake buckets (Web Orders / Ring Builder / Special Web Order). Not a
+// CatalogItem-backed list like the options above, so its own shape.
+export interface RepOption { value: string; label: string }
+
+export const fetchRepOptions = (): Promise<RepOption[]> =>
+  apiFetch(`${API}/orders/reps`).then(r => r.ok ? r.json() : []).catch(() => []);
+
 export const addFactoryOption = (label: string): Promise<Response> =>
   apiFetch(`${API}/catalog/factories`, { method: 'POST', body: JSON.stringify({ label }) });
 

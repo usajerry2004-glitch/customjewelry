@@ -19,6 +19,10 @@ export class OrderFilterDto {
   @IsOptional() @IsIn(['asc', 'desc']) sortOrder?: 'asc' | 'desc';
   @IsOptional() @IsString() assignedFactory?: string;
   @IsOptional() @IsString() supplySource?: string;
+  // Rep filter: a real salesRepName, or one of the synthetic buckets
+  // 'web_orders' / 'ring_builder' / 'special_web_order' — see
+  // OrdersService.applyCommonFilters for how each maps to a where clause.
+  @IsOptional() @IsString() rep?: string;
   @IsOptional() @IsNumber() @Min(0) @Type(() => Number) offset?: number;
   @IsOptional() @IsNumber() @Min(1) @Type(() => Number) limit?: number;
 }
