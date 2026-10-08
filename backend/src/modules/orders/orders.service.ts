@@ -886,11 +886,11 @@ export class OrdersService implements OnModuleInit {
     // a real salesRepName (everything that isn't Ring Builder/kira-website/
     // Special Web Order is a human rep, stamped on the order at creation).
     if (filters.rep === 'web_orders') {
-      qb.andWhere(`order.source = 'RING_BUILDER' AND order.externalSource = 'kira-website'`);
+      qb.andWhere(`order.source = 'RING_BUILDER' AND order."externalSource" = 'kira-website'`);
     } else if (filters.rep === 'special_web_order') {
-      qb.andWhere(`order.externalSource = 'Special Web Order'`);
+      qb.andWhere(`order."externalSource" = 'Special Web Order'`);
     } else if (filters.rep === 'ring_builder') {
-      qb.andWhere(`order.source = 'RING_BUILDER' AND (order.externalSource IS NULL OR order.externalSource NOT IN ('kira-website', 'Special Web Order'))`);
+      qb.andWhere(`order.source = 'RING_BUILDER' AND (order."externalSource" IS NULL OR order."externalSource" NOT IN ('kira-website', 'Special Web Order'))`);
     } else if (filters.rep) {
       qb.andWhere('order.salesRepName = :rep', { rep: filters.rep });
     }
