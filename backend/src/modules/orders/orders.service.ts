@@ -1672,10 +1672,15 @@ export class OrdersService implements OnModuleInit {
 
   async update(id: string, dto: Partial<Order>, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.findOne(id, user);
-    // Factory Manager only reaches this endpoint for the Shipping card (tracking
-    // number/ship date/ship via/QC done) — capped to that allowlist rather than
-    // the full Partial<Order> body every other allowed role can send.
-    if (user?.role === UserRole.FACTORY_MANAGER
+    // Factory Manager only reaches this endpoint directly for the Shipping card
+    // (tracking number/ship date/ship via/QC done) — capped to that allowlist
+    // rather than the full Partial<Order> body every other allowed role can
+    // send. dto.status !== undefined means this write is routed here from
+    // updateStatus() instead (e.g. VPO_ISSUED -> MANUFACTURED), which already
+    // ran its own Factory Manager checks (stone received, supplier/factory
+    // assigned) a few lines up — same exception the ADMIN_ONLY_KEYS check
+    // below makes, for the same reason.
+    if (user?.role === UserRole.FACTORY_MANAGER && dto.status === undefined
         && Object.keys(dto).some(k => !FACTORY_MANAGER_EDITABLE_KEYS.includes(k))) {
       throw new ForbiddenException('Factory Manager can only update shipping details.');
     }
