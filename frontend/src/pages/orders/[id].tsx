@@ -585,6 +585,8 @@ export default function OrderDetail() {
   const [pendingPrice, setPendingPrice] = useState('');
   const [supplySourceInput, setSupplySourceInput] = useState('');
   const [savingSupplySource, setSavingSupplySource] = useState(false);
+  const [assignedFactoryInput, setAssignedFactoryInput] = useState('');
+  const [savingAssignedFactory, setSavingAssignedFactory] = useState(false);
   const [quoteOptionsInput, setQuoteOptionsInput] = useState<{ label: string; price: string }[]>([]);
   const [savingQuoteOptions, setSavingQuoteOptions] = useState(false);
   const [assignSupplierModal, setAssignSupplierModal] = useState(false);
@@ -786,6 +788,7 @@ export default function OrderDetail() {
           EDITABLE_CUSTOMER_KEYS.forEach(k => { customerFields[k] = o[k] ?? ''; });
           setCustomerInputs(customerFields);
           setSupplySourceInput(o.supplySource || '');
+          setAssignedFactoryInput(o.assignedFactory || '');
           setQuoteOptionsInput((o.quoteOptions || []).map((q: any) => ({ label: q.label || '', price: String(q.price) })));
         }
       })
@@ -1022,6 +1025,27 @@ export default function OrderDetail() {
       toast.error('Failed to save — check your connection and try again.');
     } finally {
       setSavingSupplySource(false);
+    }
+  };
+
+  const saveAssignedFactory = async () => {
+    if (!order?.id || !assignedFactoryInput) return;
+    setSavingAssignedFactory(true);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ assignedFactory: assignedFactoryInput }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, 'Failed to save.'));
+      }
+    } catch {
+      toast.error('Failed to save — check your connection and try again.');
+    } finally {
+      setSavingAssignedFactory(false);
     }
   };
 
@@ -1625,6 +1649,7 @@ export default function OrderDetail() {
                       (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
                     const canEditCustomer = EDITABLE_CUSTOMER_KEYS.includes(key) && userRole === UserRole.ADMIN;
                     const canEditSupplySource = key === 'supplySource' && userRole === UserRole.ADMIN;
+                    const canEditAssignedFactory = key === 'assignedFactory' && userRole === UserRole.ADMIN;
                     return (
                       <div key={key}>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
@@ -1717,6 +1742,27 @@ export default function OrderDetail() {
                                 style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingSupplySource ? 0.5 : 1 }}
                               >
                                 {savingSupplySource ? '…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        ) : canEditAssignedFactory ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <select
+                              value={assignedFactoryInput}
+                              onChange={e => setAssignedFactoryInput(e.target.value)}
+                              style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
+                            >
+                              {factories.map(f => (
+                                <option key={f.key} value={f.key}>{f.label}</option>
+                              ))}
+                            </select>
+                            {assignedFactoryInput !== (raw ?? '') && (
+                              <button
+                                onClick={saveAssignedFactory}
+                                disabled={savingAssignedFactory}
+                                style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: savingAssignedFactory ? 0.5 : 1 }}
+                              >
+                                {savingAssignedFactory ? '…' : 'Save'}
                               </button>
                             )}
                           </div>
