@@ -800,7 +800,9 @@ export class EmailService {
     poNumber: string;
     customerName: string;
     orderType: string;
-    orderId: string;
+    // Pre-resolved by the caller — orderUrl() for staff, loginUrl() for a
+    // mentioned customer, since a customer can't open the internal dashboard.
+    url: string;
     mentionedByName: string;
     messagePreview: string;
     isPriorityCustomer?: boolean;
@@ -814,7 +816,7 @@ export class EmailService {
         <p><strong>${escapeHtml(opts.mentionedByName)}</strong> tagged you on the order below. The team has tagged you — please check and respond.</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <p style="margin:16px 0;padding:12px 16px;background:#F9F8F6;border-left:3px solid #0369A1;color:#4B5563;font-size:13px;font-style:italic">${escapeHtml(opts.messagePreview)}</p>
-        <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#0369A1')}">Open Order →</a>
+        <a href="${opts.url}" style="${btnStyle('#0369A1')}">Open Order →</a>
       `),
     });
   }

@@ -201,6 +201,19 @@ export class MessagesService {
     if (order.supplySource) {
       extra.push(...await this.userRepo.find({ where: { assignedSupplySource: order.supplySource, isActive: true } }));
     }
+    // The customer who placed this order, plus any teammates at the same
+    // company — so staff can tag the specific contact a message is meant
+    // for, not just whoever happens to be listed as the order's customer.
+    // Doesn't change what a customer can see (isMessageVisible is untouched)
+    // — it only makes them pickable in the @mention list, which in turn
+    // triggers an email to that specific person (see postMessage below).
+    if (order.customerId) {
+      const customer = await this.userRepo.findOne({ where: { id: order.customerId } });
+      if (customer) extra.push(customer);
+    }
+    if (order.companyId) {
+      extra.push(...await this.userRepo.find({ where: { companyId: order.companyId, role: UserRole.CUSTOMER } }));
+    }
 
     const byId = new Map([...roleUsers, ...extra].map(u => [u.id, u]));
     return Array.from(byId.values());
@@ -300,17 +313,22 @@ export class MessagesService {
         ),
       ));
 
-      // Sales Reps aren't necessarily watching the bell for every order —
-      // give them an email too, since a mention usually means the team is
-      // waiting on them specifically to check and respond.
+      // Nobody's necessarily watching the bell for every order — a mention
+      // means the team is waiting on that specific person, so every mentioned
+      // user gets an email too, not just the bell notification above.
       if (order) {
-        await Promise.all(recipients.filter(u => u.role === UserRole.SALES_REP).map(u =>
+        await Promise.all(recipients.filter(u => u.email).map(u =>
           this.emailService.sendMentionAlert({
             to: u.email,
             poNumber: order.poNumber,
             customerName: order.customerFullName || order.storeName || '—',
             orderType: order.orderType || '—',
-            orderId: order.id,
+            // A tagged customer can't log into the internal dashboard —
+            // send them the same passwordless deep link other customer-
+            // facing emails use instead of the staff order URL.
+            url: u.role === UserRole.CUSTOMER
+              ? this.emailService.loginUrl(u.email, order.id)
+              : this.emailService.orderUrl(order.id),
             mentionedByName: authorName,
             messagePreview: preview,
             isPriorityCustomer: order.isPriorityCustomer,
