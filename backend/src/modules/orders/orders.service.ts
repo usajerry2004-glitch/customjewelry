@@ -2395,9 +2395,15 @@ export class OrdersService implements OnModuleInit {
     // Matched by tag, not role — a Stone Manager account can also be tagged with
     // a factory (e.g. Archana covers both stones and factory orders for Creations)
     // and still gets the factory-side notification alongside her Stone Manager one.
+    // TypeORM's .find() silently drops a where-clause property that's
+    // `undefined` instead of matching nothing — querying with the bare
+    // `supplySource` param (undefined for a mounting-only order) would
+    // therefore return EVERY user in the table, not just stone managers.
+    // Guarding on requiresStone keeps this empty instead whenever there's no
+    // real supply source to match.
     const [factoryUsers, stoneUsers] = await Promise.all([
       this.userRepo.find({ where: { assignedFactory: factory } }),
-      this.userRepo.find({ where: { assignedSupplySource: supplySource } }),
+      requiresStone ? this.userRepo.find({ where: { assignedSupplySource: supplySource } }) : Promise.resolve([]),
     ]);
 
     await Promise.all([
@@ -2492,28 +2498,32 @@ export class OrdersService implements OnModuleInit {
       );
     });
 
-    const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
-    this.emailService.sendStoneSupplierAssignedAlert({
-      to: stoneEmails,
-      poNumber: saved.poNumber,
-      orderType: saved.orderType || '—',
-      orderId: saved.id,
-      isPriorityCustomer: saved.isPriorityCustomer,
-    }).then(sent => {
-      if (sent === false) {
+    // No stone to source on a mounting-only order — nothing for a Stone
+    // Manager to do, so no alert to send.
+    if (requiresStone) {
+      const stoneEmails = stoneUsers.map(u => u.email).filter(Boolean);
+      this.emailService.sendStoneSupplierAssignedAlert({
+        to: stoneEmails,
+        poNumber: saved.poNumber,
+        orderType: saved.orderType || '—',
+        orderId: saved.id,
+        isPriorityCustomer: saved.isPriorityCustomer,
+      }).then(sent => {
+        if (sent === false) {
+          this.emailService.sendInternalFailureAlert(
+            'Stone supplier assigned alert failed to send',
+            `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert returned false; see the preceding "Email send failed" log line for the underlying error.`,
+          );
+        }
+      }).catch(err => {
+        this.logger.warn('Stone supplier assigned alert email failed:', err);
+        Sentry.captureException(err);
         this.emailService.sendInternalFailureAlert(
-          'Stone supplier assigned alert failed to send',
-          `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert returned false; see the preceding "Email send failed" log line for the underlying error.`,
+          'Stone supplier assigned alert email failed',
+          `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert threw: ${(err as Error)?.message ?? err}`,
         );
-      }
-    }).catch(err => {
-      this.logger.warn('Stone supplier assigned alert email failed:', err);
-      Sentry.captureException(err);
-      this.emailService.sendInternalFailureAlert(
-        'Stone supplier assigned alert email failed',
-        `Order ${saved.poNumber} (supply source "${supplySource}") — sendStoneSupplierAssignedAlert threw: ${(err as Error)?.message ?? err}`,
-      );
-    });
+      });
+    }
 
     return saved;
   }
