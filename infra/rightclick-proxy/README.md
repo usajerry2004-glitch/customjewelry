@@ -10,6 +10,19 @@ response back.
 
 No dependencies — just `server.js`, using Node's built-ins only.
 
+## Current live deployment
+
+Port 8787 (this guide's example) was already taken by the website on this
+droplet, so the actual running instance uses **port 8799** instead:
+
+```
+RIGHTCLICK_PROXY_URL=http://147.182.215.142:8799
+```
+
+The secret is in the backend's `.env` / DigitalOcean App Platform config as
+`RIGHTCLICK_PROXY_SECRET` — not duplicated here. Verified working 2026-10-16
+(RightClick returned `Success: true` through the proxy).
+
 ## This droplet already runs the jewelry website — read this first
 
 This proxy is a second, completely independent process. It does not touch
