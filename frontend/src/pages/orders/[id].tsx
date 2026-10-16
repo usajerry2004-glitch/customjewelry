@@ -1301,12 +1301,15 @@ export default function OrderDetail() {
   };
 
   const confirmAssignSupplier = async () => {
-    if (!order?.id || !assignFactoryInput || !assignSupplySourceInput) return;
+    if (!order?.id || !assignFactoryInput || (orderNeedsStoneSupplier && !assignSupplySourceInput)) return;
     setAssigningSupplier(true);
     try {
       const res = await apiFetch(`${API}/orders/${order.id}/assign-supplier`, {
         method: 'PATCH',
-        body: JSON.stringify({ factory: assignFactoryInput, supplySource: assignSupplySourceInput }),
+        body: JSON.stringify({
+          factory: assignFactoryInput,
+          supplySource: orderNeedsStoneSupplier ? assignSupplySourceInput : undefined,
+        }),
       });
       if (res.ok) {
         setOrder(await res.json());
@@ -1423,6 +1426,9 @@ export default function OrderDetail() {
     ? (canRingBuilderAdminComplete ? [...validNextStatuses, OrderStatus.COMPLETED] : validNextStatuses)
     : allowedStatuses.filter(s => validNextStatuses.includes(s) && !(isAdminOnlyRevert && s === OrderStatus.CAD_IN_PROGRESS));
   const canDelete = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
+  // Mounting-only orders have no gemstone to set — Assign Supplier only
+  // needs a Factory for these, matching the backend's same exception.
+  const orderNeedsStoneSupplier = (order as any).mountingOption !== 'Mounting Only';
   const canManageSupplier = [UserRole.ADMIN, UserRole.AUTHORIZER].includes(userRole as UserRole);
 
   const submitNewCadPerson = async () => {
@@ -1731,6 +1737,7 @@ export default function OrderDetail() {
                               onChange={e => setSupplySourceInput(e.target.value)}
                               style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                             >
+                              <option value="">— Not assigned —</option>
                               {supplySources.map(s => (
                                 <option key={s.key} value={s.key}>{s.label}</option>
                               ))}
@@ -1752,6 +1759,7 @@ export default function OrderDetail() {
                               onChange={e => setAssignedFactoryInput(e.target.value)}
                               style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
                             >
+                              <option value="">— Not assigned —</option>
                               {factories.map(f => (
                                 <option key={f.key} value={f.key}>{f.label}</option>
                               ))}
@@ -2427,14 +2435,16 @@ export default function OrderDetail() {
 
           {/* Assign Supplier — VPO issued but not yet routed to a factory/stone supplier.
               Invisible to Factory/Stone Manager until this completes. */}
-          {order.status === OrderStatus.VPO_ISSUED && (!order.assignedFactory || !order.supplySource)
+          {order.status === OrderStatus.VPO_ISSUED && (!order.assignedFactory || (orderNeedsStoneSupplier && !order.supplySource))
             && (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER) && (
             <div style={{ ...cardStyle, borderLeft: '3px solid #0EA5E9' }}>
               <div style={{ fontSize: '10px', color: '#0EA5E9', marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 700 }}>
                 VPO Issued — Assign Supplier
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.6 }}>
-                This order isn't visible to any factory or stone supplier yet. Select both to release it to production.
+                {orderNeedsStoneSupplier
+                  ? 'This order isn\'t visible to any factory or stone supplier yet. Select both to release it to production.'
+                  : 'This order isn\'t visible to any factory yet. It\'s mounting-only, so no stone supplier is needed.'}
               </p>
               <button
                 onClick={() => {
@@ -3213,26 +3223,34 @@ export default function OrderDetail() {
                 );
               })}
             </div>
-            <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
-              Stone Supplier
-            </label>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-              {supplySources.map(s => {
-                const cfg = getSupplySourceDisplay(s.key);
-                const selected = assignSupplySourceInput === s.key;
-                return (
-                  <button key={s.key} onClick={() => setAssignSupplySourceInput(s.key)}
-                    style={{
-                      flex: 1, borderRadius: '8px', padding: '10px 8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                      border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
-                      background: selected ? cfg.bg : 'var(--bg-input)',
-                      color: selected ? cfg.color : 'var(--text-secondary)',
-                    }}>
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
+            {orderNeedsStoneSupplier ? (
+              <>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
+                  Stone Supplier
+                </label>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                  {supplySources.map(s => {
+                    const cfg = getSupplySourceDisplay(s.key);
+                    const selected = assignSupplySourceInput === s.key;
+                    return (
+                      <button key={s.key} onClick={() => setAssignSupplySourceInput(s.key)}
+                        style={{
+                          flex: 1, borderRadius: '8px', padding: '10px 8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                          border: `1.5px solid ${selected ? cfg.color : 'var(--border)'}`,
+                          background: selected ? cfg.bg : 'var(--bg-input)',
+                          color: selected ? cfg.color : 'var(--text-secondary)',
+                        }}>
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 20px', fontStyle: 'italic' }}>
+                Mounting-only order — no stone supplier needed.
+              </p>
+            )}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setAssignSupplierModal(false)}
                 style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px' }}>
@@ -3240,8 +3258,8 @@ export default function OrderDetail() {
               </button>
               <button
                 onClick={confirmAssignSupplier}
-                disabled={!assignFactoryInput || !assignSupplySourceInput || assigningSupplier}
-                style={{ flex: 2, background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!assignFactoryInput || !assignSupplySourceInput || assigningSupplier) ? 0.5 : 1 }}>
+                disabled={!assignFactoryInput || (orderNeedsStoneSupplier && !assignSupplySourceInput) || assigningSupplier}
+                style={{ flex: 2, background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '13px', opacity: (!assignFactoryInput || (orderNeedsStoneSupplier && !assignSupplySourceInput) || assigningSupplier) ? 0.5 : 1 }}>
                 {assigningSupplier ? 'Assigning…' : 'Assign & Notify'}
               </button>
             </div>

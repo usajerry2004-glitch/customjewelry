@@ -29,8 +29,10 @@ export class AssignSupplierDto {
   @IsString() @IsNotEmpty()
   factory: string;
 
-  @IsString() @IsNotEmpty()
-  supplySource: string;
+  // Optional for a mounting-only order (no gemstone to set) — see
+  // OrdersService.needsStoneSupplier. Required for every other order.
+  @IsOptional() @IsString()
+  supplySource?: string;
 }
 
 export class BulkAssignSupplierDto extends AssignSupplierDto {

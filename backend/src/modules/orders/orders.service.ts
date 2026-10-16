@@ -31,6 +31,13 @@ export { OrderFilterDto };
 
 const CAD_STATUSES = [OrderStatus.NEW, OrderStatus.CAD_IN_PROGRESS];
 
+// 'Mounting Only' orders have no gemstone to set — Assign Supplier and the
+// VPO_ISSUED -> MANUFACTURED transition only require a Factory for these,
+// since there's no stone to source and no Stone Manager work involved.
+function needsStoneSupplier(order: { mountingOption?: string | null }): boolean {
+  return order.mountingOption !== 'Mounting Only';
+}
+
 interface OrdersUser {
   id: string; email: string; role: string;
   companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null;
@@ -1947,13 +1954,15 @@ export class OrdersService implements OnModuleInit {
 
     // VPO_ISSUED → MANUFACTURED requires a supplier assignment and (for Factory
     // Manager specifically) a received stone — guards against jumping the queue
-    // via a direct API call before "Assign Supplier" has run.
+    // via a direct API call before "Assign Supplier" has run. Mounting-only
+    // orders have no gemstone, so neither check applies to them.
     if (status === OrderStatus.MANUFACTURED) {
       const currentOrder = await this.findOne(id);
-      if (!currentOrder.assignedFactory || !currentOrder.supplySource) {
+      const requiresStone = needsStoneSupplier(currentOrder);
+      if (!currentOrder.assignedFactory || (requiresStone && !currentOrder.supplySource)) {
         throw new BadRequestException('Assign a stone supplier and factory before marking this order as manufactured.');
       }
-      if (user?.role === 'FACTORY_MANAGER' && currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
+      if (requiresStone && user?.role === 'FACTORY_MANAGER' && currentOrder.stoneStatus !== StoneStatus.STONE_RECEIVED) {
         throw new BadRequestException('Stone must be received before marking order as manufactured');
       }
     }
@@ -2356,7 +2365,7 @@ export class OrdersService implements OnModuleInit {
   async assignSupplier(
     id: string,
     factory: string,
-    supplySource: string,
+    supplySource: string | undefined,
     user?: { id?: string; email: string; role: string },
   ): Promise<Order> {
     const order = await this.orderRepo.findOne({ where: { id } });
@@ -2364,15 +2373,22 @@ export class OrdersService implements OnModuleInit {
     if (order.status !== OrderStatus.VPO_ISSUED) {
       throw new BadRequestException('Supplier can only be assigned once the VPO has been issued.');
     }
+    const requiresStone = needsStoneSupplier(order);
+    if (requiresStone && !supplySource) {
+      throw new BadRequestException('A stone supplier is required for this order.');
+    }
     const [validFactory, validSupplySource] = await Promise.all([
       this.catalogService.isValidKey(CatalogItemKind.FACTORY, factory),
-      this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, supplySource),
+      supplySource ? this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, supplySource) : Promise.resolve(true),
     ]);
     if (!validFactory) throw new BadRequestException(`"${factory}" is not a known factory.`);
     if (!validSupplySource) throw new BadRequestException(`"${supplySource}" is not a known stone supplier.`);
 
     order.assignedFactory = factory;
-    order.supplySource = supplySource;
+    // Mounting-only orders have no gemstone to source — leave supplySource
+    // null rather than forcing a meaningless pick, so Stone Manager queues
+    // never see them.
+    order.supplySource = requiresStone ? supplySource! : null;
     const saved = await this.orderRepo.save(order);
     this.logEvent(id, 'SUPPLIER_ASSIGNED', user, undefined, undefined, `Factory: ${factory}, Supply source: ${supplySource}`);
 
