@@ -61,6 +61,20 @@ export class RightClickService {
   private sessionId: string | null = null;
   private sessionObtainedAt = 0;
 
+  // RightClick rate-limits to 30 calls/min per IP, and an invoice combining
+  // several orders fires one lookup per order via Promise.all — left
+  // unserialized, that alone can burst past the limit in a single click,
+  // on top of two admins generating invoices at the same moment. Every call
+  // is chained onto this queue so only one is ever in flight against
+  // RightClick at a time, no matter how many callers ask concurrently.
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   constructor(private readonly config: ConfigService) {}
 
   isConfigured(): boolean {
@@ -73,6 +87,19 @@ export class RightClickService {
   private serial(): string { return this.config.get<string>('RIGHTCLICK_SERIAL') || ''; }
   private apiKey(): string { return this.config.get<string>('RIGHTCLICK_API_KEY') || ''; }
   private apiPassword(): string { return this.config.get<string>('RIGHTCLICK_API_PASSWORD') || ''; }
+
+  // RightClick's firewall only allows the one static IP of the DigitalOcean
+  // droplet already set up for this — our backend runs on App Platform,
+  // whose outbound IP isn't that one. When these are set, every call is
+  // relayed through a tiny proxy on that droplet (see
+  // infra/rightclick-proxy/) instead of hitting RightClick directly, so the
+  // request reaches RightClick from the allowed IP. Left unset, fetchJson
+  // falls back to calling RightClick directly — useful for local dev against
+  // the test environment, which has no such IP restriction.
+  private proxyUrl(): string {
+    return (this.config.get<string>('RIGHTCLICK_PROXY_URL') || '').trim().replace(/\/+$/, '');
+  }
+  private proxySecret(): string { return this.config.get<string>('RIGHTCLICK_PROXY_SECRET') || ''; }
 
   // Without an explicit Accept/Content-Type of application/json, RightClick's
   // server falls back to serving its normal HTML login page (still with a 200/302
@@ -88,18 +115,26 @@ export class RightClickService {
   // opaque "Internal server error" with no useful detail. Caught and
   // rewrapped into a BadRequestException with the actual reason instead.
   private async fetchJson(url: string): Promise<{ ok: boolean; status: number; body: RightClickApiResponse | null }> {
+    const proxyUrl = this.proxyUrl();
+    const target = proxyUrl ? `${proxyUrl}/relay?url=${encodeURIComponent(url)}` : url;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
     try {
-      const res = await fetch(url, {
+      const res = await fetch(target, {
         signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(proxyUrl ? { 'x-proxy-secret': this.proxySecret() } : {}),
+        },
       });
       const body = (await res.json().catch(() => null)) as RightClickApiResponse | null;
       return { ok: res.ok, status: res.status, body };
     } catch (err: any) {
       const reason = err?.name === 'AbortError'
         ? `RightClick did not respond within ${LOOKUP_TIMEOUT_MS / 1000}s.`
+        : proxyUrl
+        ? `Could not reach the RightClick proxy at "${proxyUrl}" — ${err?.message || err}. Check RIGHTCLICK_PROXY_URL and that the proxy is running on the droplet.`
         : `Could not reach RightClick at "${this.baseUrl()}" — ${err?.message || err}. Check RIGHTCLICK_BASE_URL.`;
       throw new BadRequestException(reason);
     } finally {
@@ -132,6 +167,10 @@ export class RightClickService {
   // RightClick has no matching order — not an error, since the admin may
   // simply have mistyped the number.
   async lookupOrder(orderNumber: string): Promise<RightClickCustomerOrder | null> {
+    return this.enqueue(() => this.lookupOrderNow(orderNumber));
+  }
+
+  private async lookupOrderNow(orderNumber: string): Promise<RightClickCustomerOrder | null> {
     if (!this.isConfigured()) {
       throw new BadRequestException('RightClick integration is not configured yet — ask an admin to set the RIGHTCLICK_BASE_URL/SERIAL/API_KEY/API_PASSWORD environment variables.');
     }
