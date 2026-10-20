@@ -189,7 +189,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
     if (!showNotifs) {
       try {
         const res = await apiFetch(`${API}/notifications`);
-        if (res.ok) setNotifs(await res.json());
+        if (res.ok) {
+          const list: Notification[] = await res.json();
+          setNotifs(list);
+          setUnread(list.filter(n => !n.isRead).length);
+        }
       } catch {}
     }
     setShowNotifs(v => !v);

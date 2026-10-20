@@ -61,11 +61,22 @@ export class NotificationsService {
     await this.mutedRepo.delete({ userId, orderId });
   }
 
+  // Every unread notification is returned (not just the newest 50) so the
+  // list always matches the bell's unread count — otherwise older unread
+  // items were unreachable and the badge could never clear by reading.
+  // Already-read history is still capped at the 50 most recent.
   async findAll(userId: string, role?: string): Promise<Notification[]> {
-    const qb = this.notifRepo.createQueryBuilder('n')
-      .where('n.targetUserId = :uid', { uid: userId });
-    if (role === UserRole.ADMIN) qb.andWhere('n.type IN (:...types)', { types: ADMIN_VISIBLE_TYPES });
-    return qb.orderBy('n.createdAt', 'DESC').take(50).getMany();
+    const base = () => {
+      const qb = this.notifRepo.createQueryBuilder('n')
+        .where('n.targetUserId = :uid', { uid: userId });
+      if (role === UserRole.ADMIN) qb.andWhere('n.type IN (:...types)', { types: ADMIN_VISIBLE_TYPES });
+      return qb.orderBy('n.createdAt', 'DESC');
+    };
+    const [unread, read] = await Promise.all([
+      base().andWhere('n.isRead = :r', { r: false }).getMany(),
+      base().andWhere('n.isRead = :r', { r: true }).take(50).getMany(),
+    ]);
+    return [...unread, ...read].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
 
   async markRead(id: string, userId: string): Promise<Notification> {
