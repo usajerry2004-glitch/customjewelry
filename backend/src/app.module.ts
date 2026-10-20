@@ -4,7 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 import { Order } from './database/entities/order.entity';
@@ -109,8 +110,10 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Order matters: JwtAuthGuard must run first so UserThrottlerGuard can
+    // rate-limit per logged-in user instead of per (shared) IP.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
   ],
 })
 export class AppModule implements OnModuleInit {

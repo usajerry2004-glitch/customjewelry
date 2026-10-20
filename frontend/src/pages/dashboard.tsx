@@ -61,30 +61,44 @@ export default function Dashboard() {
       // user, so Stone/Factory Manager KPI tiles need these instead (the
       // plain /orders list endpoint already applies each role's own scoping
       // — own assigned supply source / factory — server-side).
-      const [mRes, priRes, rRes, myRes, vpoRes, manufacturedRes] = await Promise.all([
-        apiFetch(`${API}/orders/metrics`),
-        apiFetch(`${API}/orders/priority`),
-        apiFetch(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
-        apiFetch(`${API}/orders?limit=1`),
-        apiFetch(`${API}/orders?limit=1&status=VPO_ISSUED`),
-        apiFetch(`${API}/orders?limit=1&status=MANUFACTURED`),
-      ]);
-      if (mRes.ok)  setMetrics(await mRes.json());
-      if (myRes.ok) { const d = await myRes.json(); setMyOrderTotal(d.total || 0); }
-      if (vpoRes.ok) { const d = await vpoRes.json(); setMyVpoTotal(d.total || 0); }
-      if (manufacturedRes.ok) { const d = await manufacturedRes.json(); setMyManufacturedTotal(d.total || 0); }
-      let ids: string[] = [];
-      if (priRes.ok) { const p = await priRes.json(); setActions(p); ids.push(...p.map((o: any) => o.id)); }
-      if (rRes.ok)   { const d = await rRes.json(); const l = d.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
-      const uniqueIds = [...new Set(ids)];
-      if (uniqueIds.length) {
-        // Single batched lookup instead of one /cad/order/:id call per order.
+      //
+      // Each request is handled independently: with Promise.all a single
+      // dropped request (common on slower long-distance connections) used to
+      // reject the whole load, so setLoading(false) never ran and every tile
+      // stayed on "—" indefinitely with no error shown.
+      const getJson = async (url: string) => {
         try {
-          const tRes = await apiFetch(`${API}/cad/thumbnails?orderIds=${uniqueIds.join(',')}`);
-          if (tRes.ok) setRefImages(await tRes.json());
-        } catch {}
+          const res = await apiFetch(url);
+          return res.ok ? await res.json() : null;
+        } catch { return null; }
+      };
+      try {
+        const [m, p, r, my, vpo, manufactured] = await Promise.all([
+          getJson(`${API}/orders/metrics`),
+          getJson(`${API}/orders/priority`),
+          getJson(`${API}/orders?limit=10&dateFrom=${sevenAgo}`),
+          getJson(`${API}/orders?limit=1`),
+          getJson(`${API}/orders?limit=1&status=VPO_ISSUED`),
+          getJson(`${API}/orders?limit=1&status=MANUFACTURED`),
+        ]);
+        if (m)  setMetrics(m);
+        if (my) setMyOrderTotal(my.total || 0);
+        if (vpo) setMyVpoTotal(vpo.total || 0);
+        if (manufactured) setMyManufacturedTotal(manufactured.total || 0);
+        const ids: string[] = [];
+        if (Array.isArray(p)) { setActions(p); ids.push(...p.map((o: any) => o.id)); }
+        if (r) { const l = r.orders || []; setRecent(l); ids.push(...l.map((o: any) => o.id)); }
+        // Tiles show as soon as the data is in — thumbnails fill in after.
+        setLoading(false);
+        const uniqueIds = [...new Set(ids)];
+        if (uniqueIds.length) {
+          // Single batched lookup instead of one /cad/order/:id call per order.
+          const thumbs = await getJson(`${API}/cad/thumbnails?orderIds=${uniqueIds.join(',')}`);
+          if (thumbs) setRefImages(thumbs);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     load();
   }, []);

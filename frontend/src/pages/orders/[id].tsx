@@ -694,11 +694,23 @@ export default function OrderDetail() {
     apiFetch(`${API}/customer-codes`).then(r => r.ok ? r.json() : []).then(setCustomerCodeOptions).catch(() => {});
   }, [currentUser]);
 
+  // Both fetchers swallow errors and resolve to [], so a request that failed
+  // on page load used to leave the Assign Supplier modal with no stone
+  // supplier buttons and no explanation. Re-run when the modal opens with an
+  // empty list, and surface the loading/failed state.
+  const [supplierOptionsStatus, setSupplierOptionsStatus] = useState<'idle' | 'loading' | 'failed'>('idle');
+  const loadSupplierOptions = async (force = false) => {
+    if (!force && factories.length && supplySources.length) return;
+    setSupplierOptionsStatus('loading');
+    const [f, s] = await Promise.all([fetchFactoryOptions(), fetchSupplySourceOptions()]);
+    if (f.length) setFactories(f);
+    if (s.length) setSupplySources(s);
+    setSupplierOptionsStatus(f.length && s.length ? 'idle' : 'failed');
+  };
   useEffect(() => {
     if (currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.AUTHORIZER) return;
-    fetchFactoryOptions().then(setFactories);
-    fetchSupplySourceOptions().then(setSupplySources);
-  }, [currentUser]);
+    loadSupplierOptions(true);
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchCadPersonOptions().then(setCadPersonOptions); }, []);
 
@@ -2459,6 +2471,7 @@ export default function OrderDetail() {
                   setAssignFactoryInput(order.assignedFactory || '');
                   setAssignSupplySourceInput(order.supplySource || '');
                   setAssignSupplierModal(true);
+                  loadSupplierOptions();
                 }}
                 style={{ width: '100%', background: '#0EA5E9', border: 'none', borderRadius: '8px', padding: '9px', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
               >
@@ -3236,7 +3249,20 @@ export default function OrderDetail() {
                 <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>
                   Stone Supplier
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                {supplySources.length === 0 && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                    {supplierOptionsStatus === 'loading' ? 'Loading suppliers…' : (
+                      <>
+                        Couldn&apos;t load the supplier list.{' '}
+                        <button onClick={() => loadSupplierOptions(true)}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: '12px' }}>
+                          Retry
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: supplySources.length ? '20px' : 0 }}>
                   {supplySources.map(s => {
                     const cfg = getSupplySourceDisplay(s.key);
                     const selected = assignSupplySourceInput === s.key;
