@@ -123,6 +123,8 @@ export interface Order {
   repairContractor?: string;
   salesRepName?: string;
   salesRepEmail?: string;
+  assignedSalesRepName?: string | null;
+  assignedSalesRepEmail?: string | null;
   companyId?: string | null;
   companyViewerAccessEnabled?: boolean;
   viewerEmbedUrl?: string | null;

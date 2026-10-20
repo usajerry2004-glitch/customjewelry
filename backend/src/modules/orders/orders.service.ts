@@ -1331,7 +1331,7 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<Order & { companyViewerAccessEnabled?: boolean }> {
+  async findOne(id: string, user?: { id?: string; email: string; role: string; companyId?: string | null; assignedFactory?: string | null; assignedSupplySource?: string | null }): Promise<Order & { companyViewerAccessEnabled?: boolean; assignedSalesRepName?: string | null; assignedSalesRepEmail?: string | null }> {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
 
@@ -1374,7 +1374,19 @@ export class OrdersService implements OnModuleInit {
     // not stored on the order itself, so it stays live if the company's access
     // is toggled after the order was created.
     const company = order.companyId ? await this.companyRepo.findOne({ where: { id: order.companyId } }) : null;
-    return { ...order, companyViewerAccessEnabled: company?.viewerAccessEnabled ?? false };
+
+    // Effective sales rep — same rule as getTopSalesRepsReport(): the
+    // company's *current* rep, else the order's own stamped salesRepId.
+    // order.salesRepName is the order's creator, not necessarily the rep.
+    const repId = company?.salesRepId || order.salesRepId;
+    const rep = repId ? await this.userRepo.findOne({ where: { id: repId }, select: ['id', 'firstName', 'lastName', 'email'] }) : null;
+
+    return {
+      ...order,
+      companyViewerAccessEnabled: company?.viewerAccessEnabled ?? false,
+      assignedSalesRepName: rep ? (`${rep.firstName || ''} ${rep.lastName || ''}`.trim() || rep.email) : null,
+      assignedSalesRepEmail: rep?.email || null,
+    };
   }
 
   // Reuses findOne()'s per-role visibility checks (it throws NotFoundException

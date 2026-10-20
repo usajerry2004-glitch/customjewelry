@@ -507,6 +507,7 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'customerFullName', label: 'Customer Name' },
       { key: 'customerEmail', label: 'Customer Email' },
       { key: 'phoneNumber', label: 'Phone' },
+      { key: 'assignedSalesRepName', label: 'Sales Rep' },
     ],
   },
   {
@@ -569,6 +570,13 @@ export default function OrderDetail() {
   const router = useRouter();
   const { id } = router.query;
   const [order, setOrder] = useState<Partial<Order> | null>(null);
+  // Resolved only by GET /orders/:id — mutation responses return the bare
+  // entity without it, so keep the last known value instead of reading it
+  // off `order` (which would blank it after every save).
+  const [salesRepName, setSalesRepName] = useState<string | null>(null);
+  useEffect(() => {
+    if (order && 'assignedSalesRepName' in order) setSalesRepName(order.assignedSalesRepName ?? null);
+  }, [order]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
@@ -1628,7 +1636,7 @@ export default function OrderDetail() {
               // Factory/Stone Manager don't see customer identity (also enforced
               // server-side, see FactoryRedactionInterceptor); phone number only
               // shows up when the order actually has one
-              const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
+              const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber', 'assignedSalesRepName'];
               const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.FACTORY_VIEWER || userRole === UserRole.STONE_MANAGER;
               // Supply source / factory are only meaningful once the VPO has been issued
               const supplySourceRelevant = order.status !== OrderStatus.NEW && order.status !== OrderStatus.CAD_IN_PROGRESS;
@@ -1646,7 +1654,7 @@ export default function OrderDetail() {
                 </h3>
                 <div className="order-spec-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                   {visibleFields.map(({ key, label, format }) => {
-                    const raw = (order as any)[key];
+                    const raw = key === 'assignedSalesRepName' ? salesRepName : (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');
                     const isLink = key === 'referenceWeblink' && raw;
                     const canEditPo = key === 'refCustomerPo' &&
