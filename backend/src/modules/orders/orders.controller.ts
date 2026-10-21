@@ -182,6 +182,19 @@ export class OrdersController {
     return this.ordersService.getClientConversionReport(month, dateFrom, dateTo);
   }
 
+  @Get('reports/clients/orders')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Order list behind one Client Conversion row (?clientKey from reports/clients), with each order\'s stage — same ?month or ?dateFrom&?dateTo rules.' })
+  getClientConversionOrders(
+    @Query('clientKey') clientKey: string,
+    @Query('month') month?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.ordersService.getClientConversionOrders(clientKey || '', month, dateFrom, dateTo);
+  }
+
   @Get('reports/clients/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

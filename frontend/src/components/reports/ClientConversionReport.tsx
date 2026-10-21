@@ -1,11 +1,36 @@
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { apiFetch, API } from '../../utils/apiFetch';
 import {
   DateRange, CustomRangeControl, monthLabel,
   cardStyle, reportTitleStyle, periodStyle, arrowBtnStyle, thStyle, tdStyle,
 } from '../dashboard/ReportsSection';
 
-interface ClientConversion { client: string; ordersPlaced: number; cadsCreated: number; completed: number; pendingCad: number; cancelled: number; conversionPct: number }
+type Stage = 'completed' | 'pending_cad' | 'awaiting_quote' | 'awaiting_approval' | 'revision' | 'cancelled' | 'other';
+
+interface ClientConversion {
+  client: string; clientKey: string; ordersPlaced: number; cadsCreated: number;
+  completed: number; pendingCad: number; awaitingQuote: number; awaitingApproval: number;
+  revision: number; cancelled: number; other: number; conversionPct: number;
+}
+interface ClientOrder { id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: Stage; ageDays: number }
+
+// One column per stage — every order is counted in exactly one of these, so
+// they always add up to Orders Placed (see getClientConversionReport).
+const STAGES: { stage: Stage; key: keyof ClientConversion; label: string; title: string; color: string }[] = [
+  { stage: 'completed',         key: 'completed',        label: 'Completed',         color: '#047857', title: 'Reached VPO Issued or beyond — design approved, in production' },
+  { stage: 'pending_cad',       key: 'pendingCad',       label: 'Pending CAD',       color: '#B45309', title: 'New, or CAD In Progress at the "Pending CAD" label — waiting on the CAD team' },
+  { stage: 'awaiting_quote',    key: 'awaitingQuote',    label: 'Awaiting Quote',    color: '#B45309', title: 'CAD uploaded, not yet priced / sent to the customer' },
+  { stage: 'awaiting_approval', key: 'awaitingApproval', label: 'Awaiting Approval', color: '#2563EB', title: 'CAD sent — waiting on the customer to approve' },
+  { stage: 'revision',          key: 'revision',         label: 'Revision',          color: '#7C3AED', title: 'Customer asked for changes, or rejected the CAD' },
+  { stage: 'cancelled',         key: 'cancelled',        label: 'Cancelled',         color: '#DC2626', title: 'Orders currently Cancelled' },
+  { stage: 'other',             key: 'other',            label: 'Other',             color: '#6B7280', title: 'Anything else — e.g. CAD approved but VPO not issued yet, or a project the customer closed' },
+];
+const STAGE_BY_ID = Object.fromEntries(STAGES.map(s => [s.stage, s])) as Record<Stage, typeof STAGES[number]>;
+const STATUS_LABEL: Record<string, string> = {
+  NEW: 'New', CAD_IN_PROGRESS: 'CAD In Progress', VPO_ISSUED: 'VPO Issued', MANUFACTURED: 'Manufactured',
+  SHIPPED: 'Shipped', REPAIR: 'Repair', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+};
 
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -15,6 +40,8 @@ export const ClientConversionReport: React.FC = () => {
   const [clients, setClients] = useState<ClientConversion[]>([]);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Record<string, ClientOrder[] | 'loading' | 'failed'>>({});
 
   const buildParams = () => customRange
     ? `dateFrom=${customRange.from}&dateTo=${customRange.to}`
@@ -23,21 +50,32 @@ export const ClientConversionReport: React.FC = () => {
   useEffect(() => {
     apiFetch(`${API}/orders/reports/clients?${buildParams()}`).then(r => r.ok ? r.json() : []).then(setClients).catch(() => {});
     setShowAll(false);
+    setExpanded(null);
+    setOrders({});
   }, [monthOffset, customRange]);
+
+  const toggleClient = async (clientKey: string) => {
+    if (expanded === clientKey) { setExpanded(null); return; }
+    setExpanded(clientKey);
+    if (Array.isArray(orders[clientKey])) return;
+    setOrders(o => ({ ...o, [clientKey]: 'loading' }));
+    try {
+      const res = await apiFetch(`${API}/orders/reports/clients/orders?clientKey=${encodeURIComponent(clientKey)}&${buildParams()}`);
+      const list = res.ok ? await res.json() : null;
+      setOrders(o => ({ ...o, [clientKey]: Array.isArray(list) ? list : 'failed' }));
+    } catch {
+      setOrders(o => ({ ...o, [clientKey]: 'failed' }));
+    }
+  };
 
   // Already sorted by orders placed (desc) from the backend, so the first 5
   // are the top 5 — "View more" below just reveals the rest of that same order.
   const TOP_N = 5;
   const visibleClients = showAll ? clients : clients.slice(0, TOP_N);
 
-  const totals = clients.reduce((acc, c) => ({
-    ordersPlaced: acc.ordersPlaced + c.ordersPlaced,
-    cadsCreated: acc.cadsCreated + c.cadsCreated,
-    completed: acc.completed + c.completed,
-    pendingCad: acc.pendingCad + c.pendingCad,
-    cancelled: acc.cancelled + c.cancelled,
-  }), { ordersPlaced: 0, cadsCreated: 0, completed: 0, pendingCad: 0, cancelled: 0 });
-  const totalConversionPct = totals.ordersPlaced ? Math.round((totals.completed / totals.ordersPlaced) * 1000) / 10 : 0;
+  const sum = (key: keyof ClientConversion) => clients.reduce((t, c) => t + (c[key] as number), 0);
+  const totalOrders = sum('ordersPlaced');
+  const totalConversionPct = totalOrders ? Math.round((sum('completed') / totalOrders) * 1000) / 10 : 0;
 
   const handleExportCsv = async () => {
     setExportingCsv(true);
@@ -61,6 +99,39 @@ export const ClientConversionReport: React.FC = () => {
   };
 
   const totalCell: React.CSSProperties = { ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 };
+  const colCount = 4 + STAGES.length;
+
+  const renderOrders = (clientKey: string) => {
+    const list = orders[clientKey];
+    if (list === 'loading' || list === undefined) return <div style={{ padding: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>Loading orders…</div>;
+    if (list === 'failed') return <div style={{ padding: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>Couldn&apos;t load orders.</div>;
+    // Grouped by stage, in the same order as the columns, so it reads as the
+    // breakdown of that row's numbers.
+    return (
+      <div style={{ padding: '6px 4px 12px' }}>
+        {STAGES.filter(s => list.some(o => o.stage === s.stage)).map(s => {
+          const inStage = list.filter(o => o.stage === s.stage);
+          return (
+            <div key={s.stage} style={{ marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '6px 0 4px' }}>
+                {s.label} · {inStage.length}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {inStage.map(o => (
+                  <Link key={o.id} href={`/orders/${o.id}`} target="_blank"
+                    title={`${STATUS_LABEL[o.status] || o.status} · placed ${new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '8px', border: `1px solid ${s.color}33`, background: `${s.color}0D`, color: 'var(--text-primary)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    <strong>{o.poNumber}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}>{o.orderType ? ` · ${o.orderType}` : ''} · {o.ageDays}d</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div id="client-conversion" style={{ ...cardStyle, scrollMarginTop: '20px' }}>
@@ -95,42 +166,50 @@ export const ClientConversionReport: React.FC = () => {
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
           <thead>
             <tr>
               <th style={thStyle}>Client</th>
               <th title="Every order placed in this period" style={{ ...thStyle, textAlign: 'right' }}>Orders Placed</th>
               <th title="Design versions — files for the same order on the same day count once; reference images excluded" style={{ ...thStyle, textAlign: 'right' }}>CADs Created</th>
-              <th title="Orders that reached VPO Issued or beyond (not cancelled)" style={{ ...thStyle, textAlign: 'right' }}>Completed</th>
-              <th title='New orders + CAD In Progress orders at the "Pending CAD" label' style={{ ...thStyle, textAlign: 'right' }}>Pending CAD</th>
-              <th title="Orders currently Cancelled" style={{ ...thStyle, textAlign: 'right' }}>Cancelled</th>
+              {STAGES.map(s => <th key={s.stage} title={s.title} style={{ ...thStyle, textAlign: 'right', cursor: 'help' }}>{s.label}</th>)}
               <th title="Completed ÷ Orders Placed" style={{ ...thStyle, textAlign: 'right' }}>Conversion %</th>
             </tr>
           </thead>
           <tbody>
             {visibleClients.map(c => (
-              <tr key={c.client}>
-                <td style={{ ...tdStyle, fontWeight: 600 }}>{c.client}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cadsCreated}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.completed}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', color: c.pendingCad ? 'var(--warning, #B45309)' : undefined }}>{c.pendingCad}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', color: c.cancelled ? 'var(--danger, #DC2626)' : undefined }}>{c.cancelled}</td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
-              </tr>
+              <React.Fragment key={c.clientKey}>
+                <tr onClick={() => toggleClient(c.clientKey)} style={{ cursor: 'pointer', background: expanded === c.clientKey ? 'var(--bg-input)' : undefined }}
+                  title="Click to see this client's orders and their status">
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>
+                    <span style={{ display: 'inline-block', width: '14px', color: 'var(--text-muted)' }}>{expanded === c.clientKey ? '▾' : '▸'}</span>
+                    {c.client}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cadsCreated}</td>
+                  {STAGES.map(s => {
+                    const v = c[s.key] as number;
+                    return <td key={s.stage} style={{ ...tdStyle, textAlign: 'right', color: v && s.stage !== 'completed' ? s.color : v ? undefined : 'var(--text-muted)' }}>{v}</td>;
+                  })}
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
+                </tr>
+                {expanded === c.clientKey && (
+                  <tr>
+                    <td colSpan={colCount} style={{ ...tdStyle, background: 'var(--bg-input)' }}>{renderOrders(c.clientKey)}</td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             {clients.length > 0 && (
               <tr>
                 <td style={{ ...totalCell, textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
-                <td style={totalCell}>{totals.ordersPlaced}</td>
-                <td style={totalCell}>{totals.cadsCreated}</td>
-                <td style={totalCell}>{totals.completed}</td>
-                <td style={totalCell}>{totals.pendingCad}</td>
-                <td style={totalCell}>{totals.cancelled}</td>
+                <td style={totalCell}>{totalOrders}</td>
+                <td style={totalCell}>{sum('cadsCreated')}</td>
+                {STAGES.map(s => <td key={s.stage} style={totalCell}>{sum(s.key)}</td>)}
                 <td style={totalCell}>{totalConversionPct}%</td>
               </tr>
             )}
-            {clients.length === 0 && <tr><td style={tdStyle} colSpan={7}>No orders in this period.</td></tr>}
+            {clients.length === 0 && <tr><td style={tdStyle} colSpan={colCount}>No orders in this period.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -148,9 +227,9 @@ export const ClientConversionReport: React.FC = () => {
         </div>
       )}
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px', lineHeight: 1.6 }}>
-        Covers every order placed in this period. &quot;CADs Created&quot; excludes reference/inspiration images and collapses every file uploaded for the same order on the same day into one.
-        &quot;Completed&quot; is orders that reached VPO Issued or beyond. &quot;Pending CAD&quot; is New orders plus CAD In Progress orders at the Pending CAD label. &quot;Cancelled&quot; is orders currently cancelled.
-        &quot;Conversion %&quot; is Completed ÷ Orders Placed. Clients are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so &quot;Vow and Vine&quot; and &quot;Vow And Vine LLC&quot; are one row.
+        Covers every order placed in this period. Each order is counted in exactly one stage column, so Completed through Other always add up to Orders Placed — click a client to see its orders grouped by stage.
+        &quot;CADs Created&quot; counts design versions (same order + same day = one, reference images excluded), so it can be higher than orders when designs are revised.
+        &quot;Conversion %&quot; is Completed ÷ Orders Placed. Clients are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd. Hover a column header for its definition.
       </div>
     </div>
   );

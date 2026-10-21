@@ -123,6 +123,35 @@ const PENDING_CAD_SQL = (col: (name: 'sentToCustomer' | 'cadSubStatus') => strin
   `${col('sentToCustomer')} IS NOT TRUE AND (${col('cadSubStatus')} IS NULL OR ${col('cadSubStatus')} = 'PENDING')`;
 const qbCol = (name: string) => `order.${name}`;
 
+// Client Conversion report helpers — raw SQL fragments for an orders alias `a`.
+// Display name of the client an order belongs to.
+const CLIENT_NAME_SQL = (a: string) =>
+  `COALESCE(NULLIF(TRIM(${a}."storeName"), ''), NULLIF(TRIM(${a}."customerFullName"), ''), 'Unknown')`;
+// Grouping key: lower-cased, non-breaking spaces folded, . , ' removed,
+// whitespace collapsed, trailing LLC/Inc/Ltd/… stripped — so "Vow and Vine"
+// and "Vow And Vine LLC" group together. Uses POSIX [[:space:]] rather than
+// \s: backslash escapes depend on the server's standard_conforming_strings,
+// and "Vow And Vine LLC" failed to merge in production with the \s version.
+const CLIENT_KEY_SQL = (a: string) =>
+  `TRIM(regexp_replace(regexp_replace(regexp_replace(translate(lower(${CLIENT_NAME_SQL(a)}), chr(160), ' '), '[.,'']', '', 'g'), '[[:space:]]+', ' ', 'g'), '( (llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''))`;
+// The one stage bucket each order is counted in. CAD In Progress buckets
+// mirror the Orders page CAD sub-filters in buildOrdersQuery.
+const CONVERSION_STAGE_SQL = (a: string) => {
+  const col = (n: string) => `${a}."${n}"`;
+  const cip = `${a}.status = 'CAD_IN_PROGRESS'`;
+  return `CASE
+    WHEN ${a}.status IN ('VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'REPAIR', 'COMPLETED') THEN 'completed'
+    WHEN ${a}.status = 'CANCELLED' THEN 'cancelled'
+    WHEN ${col('isArchived')} THEN 'other'
+    WHEN ${a}.status = 'NEW' THEN 'pending_cad'
+    WHEN ${cip} AND ${PENDING_CAD_SQL(col)} THEN 'pending_cad'
+    WHEN ${cip} AND ${col('cadSubStatus')} = 'UPLOADED' AND ${col('sentToCustomer')} IS NOT TRUE THEN 'awaiting_quote'
+    WHEN ${cip} AND ${col('sentToCustomer')} = true AND (${col('cadSubStatus')} IS NULL OR ${col('cadSubStatus')} IN ('PENDING', 'UPLOADED')) THEN 'awaiting_approval'
+    WHEN ${cip} AND ${col('cadSubStatus')} IN ('REVISION', 'REJECTED') THEN 'revision'
+    ELSE 'other'
+  END`;
+};
+
 function csvEscape(value: string): string {
   // Excel treats a cell starting with = + - @ as a formula — a client named
   // e.g. "-Jane" exported as "#NAME?" (and it's a CSV-injection vector).
@@ -753,46 +782,48 @@ export class OrdersService implements OnModuleInit {
     }));
   }
 
-  // Client-wise breakdown of orders placed in the period (no Top-5 limit):
-  //   - Orders Placed: every order created in the period.
-  //   - CADs Created:  design versions — every file uploaded for the same
-  //                    order on the same calendar day collapses into one
-  //                    (same convention as getCadTrackingReport), reference/
-  //                    customer-reference images excluded. Can legitimately
-  //                    exceed orders placed when designs are revised.
-  //   - Completed:     orders that have reached VPO Issued or beyond (design
-  //                    approved, in production) and aren't cancelled.
-  //   - Pending CAD:   New orders plus CAD In Progress orders still at the
-  //                    "Pending CAD" label — same rule as the Orders page
-  //                    filter (PENDING_CAD_SQL), archived excluded.
-  //   - Cancelled:     orders currently Cancelled (at any stage).
-  //   - Conversion %:  Completed ÷ Orders Placed.
+  // Client-wise breakdown of orders placed in the period (no Top-5 limit).
+  // Every order is counted in exactly one stage bucket (CONVERSION_STAGE_SQL),
+  // so Completed + Pending CAD + Awaiting Quote + Awaiting Approval +
+  // Revision + Cancelled + Other = Orders Placed for every row:
+  //   - Completed:         reached VPO Issued or beyond (design approved, in
+  //                        production).
+  //   - Pending CAD:       New, or CAD In Progress at the "Pending CAD" label.
+  //   - Awaiting Quote:    CAD uploaded, not yet priced/sent to the customer.
+  //   - Awaiting Approval: CAD sent, waiting on the customer.
+  //   - Revision:          customer asked for changes (or rejected the CAD).
+  //   - Cancelled:         currently Cancelled.
+  //   - Other:             anything else — e.g. CAD approved but VPO not yet
+  //                        issued, or a project the customer closed/archived.
+  // The CAD-stage buckets use the same rules as the Orders page's CAD
+  // sub-filters (buildOrdersQuery), so the numbers match those tabs.
+  // Conversion % = Completed ÷ Orders Placed.
   //
-  // Clients are grouped on a normalized name (case, punctuation and trailing
-  // LLC/Inc/Ltd… ignored) so "Vow and Vine" / "Vow And Vine LLC" or
-  // "Powder and Pandemonium" / "Powder And Pandemonium" are one row; the
-  // label shown is the most common spelling in the group. Uses POSIX
-  // [[:space:]] rather than \s: backslash escapes depend on the server's
-  // standard_conforming_strings, and "Vow And Vine LLC" failed to merge in
-  // production with the \s version.
-  // Non-breaking spaces (common in pasted names) are folded to spaces first.
+  // "CADs Created" = design versions: every file uploaded for the same order
+  // on the same calendar day collapses into one (same convention as
+  // getCadTrackingReport), reference/customer-reference images excluded —
+  // so it can legitimately exceed orders placed when designs are revised.
+  //
+  // Clients are grouped on CLIENT_KEY_SQL (case, punctuation, trailing
+  // LLC/Inc/Ltd ignored); the label shown is the most common spelling, and
+  // clientKey is returned so the row's order list (getClientConversionOrders)
+  // can be fetched for exactly the same group.
   //
   // cad_files.orderId is stored as text while orders.id is uuid — needs the
   // explicit cast below or Postgres rejects the join outright.
   async getClientConversionReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{
-    client: string; ordersPlaced: number; cadsCreated: number; completed: number; pendingCad: number; cancelled: number; conversionPct: number;
+    client: string; clientKey: string; ordersPlaced: number; cadsCreated: number;
+    completed: number; pendingCad: number; awaitingQuote: number; awaitingApproval: number;
+    revision: number; cancelled: number; other: number; conversionPct: number;
   }[]> {
     const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
-    const rawCol = (name: string) => `k."${name}"`;
 
     const rows: any[] = await this.orderRepo.query(
       `WITH keyed AS (
-         SELECT o.id, o.status, o."cadSubStatus", o."sentToCustomer", o."isArchived",
-                COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown') AS raw_name,
-                TRIM(regexp_replace(
-                  regexp_replace(regexp_replace(translate(lower(COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown')), chr(160), ' '), '[.,'']', '', 'g'), '[[:space:]]+', ' ', 'g'),
-                  '( (llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''
-                )) AS client_key
+         SELECT o.id,
+                ${CLIENT_NAME_SQL('o')} AS raw_name,
+                ${CLIENT_KEY_SQL('o')} AS client_key,
+                ${CONVERSION_STAGE_SQL('o')} AS stage
          FROM orders o
          WHERE o."createdAt" BETWEEN $1 AND $2
        ),
@@ -804,15 +835,17 @@ export class OrdersService implements OnModuleInit {
          GROUP BY c."orderId"
        )
        SELECT
+         k.client_key AS "clientKey",
          mode() WITHIN GROUP (ORDER BY k.raw_name) AS client,
          COUNT(*)::int AS "ordersPlaced",
          COALESCE(SUM(cd.revisions), 0)::int AS "cadsCreated",
-         COUNT(*) FILTER (WHERE k.status IN ('VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'REPAIR', 'COMPLETED'))::int AS completed,
-         COUNT(*) FILTER (WHERE NOT k."isArchived" AND (
-           k.status = 'NEW'
-           OR (k.status = 'CAD_IN_PROGRESS' AND ${PENDING_CAD_SQL(rawCol)})
-         ))::int AS "pendingCad",
-         COUNT(*) FILTER (WHERE k.status = 'CANCELLED')::int AS cancelled
+         COUNT(*) FILTER (WHERE k.stage = 'completed')::int AS completed,
+         COUNT(*) FILTER (WHERE k.stage = 'pending_cad')::int AS "pendingCad",
+         COUNT(*) FILTER (WHERE k.stage = 'awaiting_quote')::int AS "awaitingQuote",
+         COUNT(*) FILTER (WHERE k.stage = 'awaiting_approval')::int AS "awaitingApproval",
+         COUNT(*) FILTER (WHERE k.stage = 'revision')::int AS revision,
+         COUNT(*) FILTER (WHERE k.stage = 'cancelled')::int AS cancelled,
+         COUNT(*) FILTER (WHERE k.stage = 'other')::int AS other
        FROM keyed k
        LEFT JOIN cads cd ON cd."orderId" = k.id::text
        GROUP BY k.client_key
@@ -825,24 +858,61 @@ export class OrdersService implements OnModuleInit {
       const completed = Number(r.completed);
       return {
         client: r.client,
+        clientKey: r.clientKey,
         ordersPlaced,
         cadsCreated: Number(r.cadsCreated),
         completed,
         pendingCad: Number(r.pendingCad),
+        awaitingQuote: Number(r.awaitingQuote),
+        awaitingApproval: Number(r.awaitingApproval),
+        revision: Number(r.revision),
         cancelled: Number(r.cancelled),
+        other: Number(r.other),
         conversionPct: ordersPlaced ? Math.round((completed / ordersPlaced) * 1000) / 10 : 0,
       };
     });
+  }
+
+  // Order list behind one Client Conversion row — same period, same
+  // CLIENT_KEY_SQL grouping and same stage buckets as the report itself, so
+  // the drill-down always adds up to what was counted.
+  async getClientConversionOrders(clientKey: string, month?: string, dateFrom?: string, dateTo?: string): Promise<{
+    id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: string; ageDays: number;
+  }[]> {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+    const rows: any[] = await this.orderRepo.query(
+      `SELECT o.id, o."poNumber", o."orderType", o."createdAt", o.status,
+              ${CONVERSION_STAGE_SQL('o')} AS stage
+       FROM orders o
+       WHERE o."createdAt" BETWEEN $1 AND $2
+         AND ${CLIENT_KEY_SQL('o')} = $3
+       ORDER BY o."createdAt" DESC`,
+      [start, end, clientKey],
+    );
+    const now = Date.now();
+    return rows.map(r => ({
+      id: r.id,
+      poNumber: r.poNumber,
+      orderType: r.orderType,
+      createdAt: new Date(r.createdAt).toISOString(),
+      status: r.status,
+      stage: r.stage,
+      ageDays: Math.floor((now - new Date(r.createdAt).getTime()) / 86400000),
+    }));
   }
 
   // CSV download for the Reports page's Client Conversion report — same
   // data/date-range rules as getClientConversionReport, just serialized.
   async exportClientConversionCsv(month?: string, dateFrom?: string, dateTo?: string): Promise<string> {
     const rows = await this.getClientConversionReport(month, dateFrom, dateTo);
-    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed (VPO Issued+)', 'Pending CAD', 'Cancelled', 'Conversion %'];
+    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed (VPO Issued+)', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'Revision', 'Cancelled', 'Other', 'Conversion %'];
     const lines = [
       header.map(csvEscape).join(','),
-      ...rows.map(r => [r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.completed), String(r.pendingCad), String(r.cancelled), `${r.conversionPct}%`].map(csvEscape).join(',')),
+      ...rows.map(r => [
+        r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.completed), String(r.pendingCad),
+        String(r.awaitingQuote), String(r.awaitingApproval), String(r.revision), String(r.cancelled), String(r.other),
+        `${r.conversionPct}%`,
+      ].map(csvEscape).join(',')),
     ];
     return lines.join('\n');
   }
