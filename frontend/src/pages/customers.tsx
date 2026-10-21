@@ -7,6 +7,7 @@ import { Order, STATUS_CONFIG } from '../utils/types';
 import { formatName } from '../utils/name';
 import { toast } from '../utils/toast';
 import { downloadCsv } from '../utils/csvExport';
+import { BulkAssignSalesRepModal } from '../components/customers/BulkAssignSalesRepModal';
 
 interface Customer {
   id: string;
@@ -71,6 +72,7 @@ export default function CustomersPage() {
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
   const [refImage, setRefImage] = useState<File | null>(null);
@@ -516,11 +518,20 @@ export default function CustomersPage() {
             Clear filters
           </button>
         )}
+        {isAdmin && Object.keys(salesRepMap).length > 0 && (
+          <button
+            onClick={() => setShowBulkAssign(true)}
+            title="Assign one Sales Rep to many customers at once by pasting a list of emails / company names"
+            style={{ marginLeft: 'auto', background: 'none', color: 'var(--navy)', border: '1px solid var(--navy)', borderRadius: '8px', padding: '9px 16px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Bulk Assign Sales Rep
+          </button>
+        )}
         <button
           onClick={handleExportEmails}
           disabled={allFiltered.length === 0}
           title="Export the customer/store names and emails currently shown (respects the filters above) as a CSV"
-          style={{ marginLeft: 'auto', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12px', fontWeight: 600, cursor: allFiltered.length === 0 ? 'default' : 'pointer', opacity: allFiltered.length === 0 ? 0.6 : 1, whiteSpace: 'nowrap' }}
+          style={{ marginLeft: isAdmin && Object.keys(salesRepMap).length > 0 ? 0 : 'auto', background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '9px 16px', fontSize: '12px', fontWeight: 600, cursor: allFiltered.length === 0 ? 'default' : 'pointer', opacity: allFiltered.length === 0 ? 0.6 : 1, whiteSpace: 'nowrap' }}
         >
           ⬇ Export CSV
         </button>
@@ -1051,6 +1062,15 @@ export default function CustomersPage() {
       )}
 
       {/* ── Delete Customer Confirmation ── */}
+      {showBulkAssign && (
+        <BulkAssignSalesRepModal
+          customers={customers}
+          salesRepMap={salesRepMap}
+          onClose={() => setShowBulkAssign(false)}
+          onDone={() => { load(); }}
+        />
+      )}
+
       {deleteTarget && (
         <div className="modal-bg" style={modalBg} onClick={() => { if (!deleting) { setDeleteTarget(null); setDeleteConfirmInput(''); } }}>
           <div className="modal-box" style={{ ...modalBox, maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
