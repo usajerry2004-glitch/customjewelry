@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, MOUNTING_OPTION_CONFIG } from '../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, MOUNTING_OPTION_CONFIG, needsSupplierAssignment } from '../utils/types';
 import { toast } from '../utils/toast';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' };
@@ -104,7 +104,7 @@ export default function StonePage() {
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {sortedOrders.map(order => {
               const cfg = STATUS_CONFIG[order.status] || { label: order.status, color: '#6B7280' };
-              const unassigned = !order.assignedFactory || !order.supplySource;
+              const unassigned = needsSupplierAssignment(order);
               const stonePending = order.stoneStatus !== StoneStatus.STONE_RECEIVED;
               const busy = actionLoading === order.id;
 

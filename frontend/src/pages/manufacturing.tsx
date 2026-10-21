@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { apiFetch, API } from '../utils/apiFetch';
-import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG, MOUNTING_OPTION_CONFIG } from '../utils/types';
+import { Order, OrderStatus, StoneStatus, SupplySource, STATUS_CONFIG, MOUNTING_OPTION_CONFIG, needsSupplierAssignment, needsStoneSupplier } from '../utils/types';
 
 interface Metrics { inProgress: number; withContractor: number; readyToShip: number; pendingStone: number }
 
@@ -103,9 +103,11 @@ export default function ManufacturingPage() {
                           </span>
                         )}
                         {order.status === OrderStatus.VPO_ISSUED && (
-                          !order.assignedFactory || !order.supplySource
+                          needsSupplierAssignment(order)
                             ? <span style={{ background: 'rgba(14,165,233,0.1)', color: '#0369A1', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>🏭 Assign Supplier</span>
-                            : order.stoneStatus === StoneStatus.STONE_RECEIVED
+                            : !needsStoneSupplier(order)
+                              ? null
+                              : order.stoneStatus === StoneStatus.STONE_RECEIVED
                               ? <span style={{ background: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>💎 Stone Received</span>
                               : <span style={{ background: '#EDE9FE', color: '#5B21B6', padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600 }}>⏳ Pending Stone</span>
                         )}
@@ -121,7 +123,7 @@ export default function ManufacturingPage() {
                   </div>
 
 
-                  {order.status === OrderStatus.VPO_ISSUED && (!order.assignedFactory || !order.supplySource) && (
+                  {order.status === OrderStatus.VPO_ISSUED && needsSupplierAssignment(order) && (
                     <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#0369A1', fontWeight: 500 }}>
                       🏭 This order needs a factory and stone supplier assigned before production can proceed. Open it to Assign Supplier.
                     </div>

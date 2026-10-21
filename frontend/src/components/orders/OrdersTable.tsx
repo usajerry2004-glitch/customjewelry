@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, getCadSubLabel } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, getCadSubLabel, needsSupplierAssignment } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 
 interface OrdersTableProps {
@@ -161,7 +161,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
                   )}
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '260px' }}>
-                      {order.status === 'VPO_ISSUED' && (!assignedFactory || !order.supplySource) && (
+                      {order.status === 'VPO_ISSUED' && needsSupplierAssignment(order) && (
                         <Chip text="Assign Supplier" color="#0369A1" bg="rgba(14,165,233,0.1)" />
                       )}
                       {order.status === 'VPO_ISSUED' && assignedFactory && order.supplySource && stoneStatus !== StoneStatus.STONE_RECEIVED && (

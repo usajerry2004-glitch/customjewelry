@@ -233,6 +233,20 @@ export const MOUNTING_OPTION_CONFIG: Record<string, { label: string; icon: strin
   'Semi-Mount':    { label: 'Semi-Mount',    icon: '◐',  color: '#9A3412', bg: '#FFEDD5' },
 };
 
+// 'Mounting Only' orders have no gemstone to set, so they never get a stone
+// supplier — Assign Supplier only needs a Factory for them (same rule as the
+// backend's needsStoneSupplier and the Assign Supplier modal).
+export function needsStoneSupplier(order: { mountingOption?: string | null }): boolean {
+  return order.mountingOption !== 'Mounting Only';
+}
+
+// True while a VPO-issued order still needs Admin/Authorizer to finish
+// Assign Supplier — drives every "🏭 Assign Supplier" badge. Must match the
+// backend's stone_unassigned filter in buildOrdersQuery.
+export function needsSupplierAssignment(order: { assignedFactory?: string | null; supplySource?: string | null; mountingOption?: string | null }): boolean {
+  return !order.assignedFactory || (needsStoneSupplier(order) && !order.supplySource);
+}
+
 // Friendlier phrasing for the customer portal only — "VPO Issued" is real
 // internal operational terminology staff use daily and should keep seeing
 // on the internal dashboard (which reads STATUS_CONFIG directly); customers

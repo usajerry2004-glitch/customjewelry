@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTION_CONFIG, getCadSubLabel } from '../../utils/types';
+import { Order, STATUS_CONFIG, StoneStatus, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTION_CONFIG, getCadSubLabel, needsSupplierAssignment } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 
 interface OrderCardProps {
@@ -121,7 +121,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
           {cadSubLabel === 'Revision' && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '5px', padding: '1px 7px' }}>↺ Revision</span>
           )}
-          {order.status === 'VPO_ISSUED' && (!(order as any).assignedFactory || !order.supplySource) && (
+          {order.status === 'VPO_ISSUED' && needsSupplierAssignment(order) && (
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#0369A1', background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: '5px', padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               🏭 Assign Supplier
             </span>

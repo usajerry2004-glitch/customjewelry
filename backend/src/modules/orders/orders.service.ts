@@ -1278,8 +1278,11 @@ export class OrdersService implements OnModuleInit {
       qb.andWhere('order.cadSubStatus = :csApproved', { csApproved: 'APPROVED' });
 
     // Stone sub-filters
+    // Mounting Only orders never get a stone supplier (see needsStoneSupplier),
+    // so for them only a missing factory counts as unassigned — otherwise
+    // they stayed under "Assign Supplier" forever after being assigned.
     if (filters.stoneSubFilter === 'stone_unassigned')
-      qb.andWhere('(order.assignedFactory IS NULL OR order.supplySource IS NULL)');
+      qb.andWhere(`(order.assignedFactory IS NULL OR (order.supplySource IS NULL AND order.mountingOption IS DISTINCT FROM 'Mounting Only'))`);
     else if (filters.stoneSubFilter === 'stone_pending')
       qb.andWhere('order.assignedFactory IS NOT NULL AND order.supplySource IS NOT NULL')
         .andWhere('(order.stoneStatus IS NULL OR order.stoneStatus = :spPending)', { spPending: 'PENDING_STONE' });
