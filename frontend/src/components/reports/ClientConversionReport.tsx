@@ -153,9 +153,7 @@ export const ClientConversionReport: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
           {([
-            { format: 'xlsx', label: '⬇ Export Excel', title: 'Excel workbook: Summary (this table), All Orders (every order with its stage and details) and Definitions sheets' },
-            { format: 'csv', label: '⬇ CSV', title: 'This table as a CSV file' },
-          ] as const).map(b => {
+            { format: 'xlsx', label: '⬇ Export Excel', title: 'Excel workbook: Summary (this table), All Orders (every order with its stage and details) and Definitions sheets' },          ] as const).map(b => {
             const disabled = exporting !== null || clients.length === 0;
             return (
               <button key={b.format} onClick={() => handleExport(b.format)} disabled={disabled} title={b.title}
