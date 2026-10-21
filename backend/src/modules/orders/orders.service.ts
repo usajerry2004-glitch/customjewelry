@@ -113,7 +113,21 @@ const CSV_FACTORY_LABELS: Record<string, string> = {
   KAMA_JEWELRY: 'Kama Jewelry', CREATIONS: 'Creations', UNIQUE_DESIGNS: 'Unique Designs', JEWEL_ONE: 'Jewel One',
 };
 
+// "Pending CAD" sub-bucket of CAD_IN_PROGRESS — no CAD sent to the customer
+// yet and no later sub-status. Shared by the Orders page filter, the CAD
+// designer tab count and the Client Conversion report so they always agree.
+// `col` renders a column reference for the calling query: QueryBuilder
+// callers pass plain `order.prop` paths (TypeORM quotes the reserved
+// "order" alias itself), raw SQL callers pass quoted identifiers.
+const PENDING_CAD_SQL = (col: (name: 'sentToCustomer' | 'cadSubStatus') => string) =>
+  `${col('sentToCustomer')} IS NOT TRUE AND (${col('cadSubStatus')} IS NULL OR ${col('cadSubStatus')} = 'PENDING')`;
+const qbCol = (name: string) => `order.${name}`;
+
 function csvEscape(value: string): string {
+  // Excel treats a cell starting with = + - @ as a formula — a client named
+  // e.g. "-Jane" exported as "#NAME?" (and it's a CSV-injection vector).
+  // Prefixing an apostrophe keeps it plain text; real numbers are left as is.
+  if (/^[=+\-@\t\r]/.test(value) && isNaN(Number(value))) value = `'${value}`;
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
@@ -739,58 +753,92 @@ export class OrdersService implements OnModuleInit {
     }));
   }
 
-  // Full client-wise breakdown (no Top-5 limit, unlike the reports above) —
-  // orders placed, CADs created, and how many of those orders reached
-  // COMPLETED — "conversion" meaning confirmed by the business, not just
-  // "progressed to VPO Issued".
+  // Client-wise breakdown of orders placed in the period (no Top-5 limit):
+  //   - Orders Placed: every order created in the period.
+  //   - CADs Created:  design versions — every file uploaded for the same
+  //                    order on the same calendar day collapses into one
+  //                    (same convention as getCadTrackingReport), reference/
+  //                    customer-reference images excluded. Can legitimately
+  //                    exceed orders placed when designs are revised.
+  //   - Completed:     orders that have reached VPO Issued or beyond (design
+  //                    approved, in production) and aren't cancelled.
+  //   - Pending CAD:   New orders plus CAD In Progress orders still at the
+  //                    "Pending CAD" label — same rule as the Orders page
+  //                    filter (PENDING_CAD_SQL), archived excluded.
+  //   - Cancelled:     orders currently Cancelled (at any stage).
+  //   - Conversion %:  Completed ÷ Orders Placed.
   //
-  // "CADs created" collapses every file uploaded for the same order on the
-  // same calendar day into one — same convention as getCadTrackingReport's
-  // (person, style, day) grouping elsewhere in this app: a designer
-  // uploading several files in one sitting (different angles, a quick
-  // re-export) is one design touched, not several. Reference/customer-
-  // reference images are excluded first, same as buildOrderCsvColumns.
+  // Clients are grouped on a normalized name (case, punctuation and trailing
+  // LLC/Inc/Ltd… ignored) so "Vow and Vine" / "Vow And Vine LLC" or
+  // "Powder and Pandemonium" / "Powder And Pandemonium" are one row; the
+  // label shown is the most common spelling in the group.
   //
-  // cad_files.orderId is stored as text while orders.id is uuid — same
-  // mismatch as order_events, needs the explicit cast below or Postgres
-  // rejects the join outright.
-  async getClientConversionReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{ client: string; ordersPlaced: number; cadsCreated: number; ordersCompleted: number; conversionPct: number }[]> {
+  // cad_files.orderId is stored as text while orders.id is uuid — needs the
+  // explicit cast below or Postgres rejects the join outright.
+  async getClientConversionReport(month?: string, dateFrom?: string, dateTo?: string): Promise<{
+    client: string; ordersPlaced: number; cadsCreated: number; completed: number; pendingCad: number; cancelled: number; conversionPct: number;
+  }[]> {
     const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+    const rawCol = (name: string) => `k."${name}"`;
 
-    const rows: { client: string; ordersPlaced: string; cadsCreated: string; ordersCompleted: string; conversionPct: string | null }[] = await this.orderRepo.query(
-      `SELECT
-         COALESCE(NULLIF(o."storeName", ''), NULLIF(o."customerFullName", ''), 'Unknown') AS client,
-         COUNT(DISTINCT o.id)::int AS "ordersPlaced",
-         COUNT(DISTINCT (c."orderId", to_char(c."createdAt", 'YYYY-MM-DD'))) FILTER (
-           WHERE c."designerNotes" IS NULL OR c."designerNotes" NOT IN ('Reference image', 'Customer reference image')
-         )::int AS "cadsCreated",
-         COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS "ordersCompleted",
-         ROUND(100.0 * COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED') / NULLIF(COUNT(DISTINCT o.id), 0), 1) AS "conversionPct"
-       FROM orders o
-       LEFT JOIN cad_files c ON (o.id)::text = c."orderId"
-       WHERE o."createdAt" BETWEEN $1 AND $2
-       GROUP BY client
-       ORDER BY "ordersPlaced" DESC`,
+    const rows: any[] = await this.orderRepo.query(
+      `WITH keyed AS (
+         SELECT o.id, o.status, o."cadSubStatus", o."sentToCustomer", o."isArchived",
+                COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown') AS raw_name,
+                TRIM(regexp_replace(
+                  regexp_replace(regexp_replace(lower(COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown')), '[.,'']', '', 'g'), '\s+', ' ', 'g'),
+                  '(\s+(llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''
+                )) AS client_key
+         FROM orders o
+         WHERE o."createdAt" BETWEEN $1 AND $2
+       ),
+       cads AS (
+         SELECT c."orderId", COUNT(DISTINCT to_char(c."createdAt", 'YYYY-MM-DD'))::int AS revisions
+         FROM cad_files c
+         WHERE c."orderId" IN (SELECT id::text FROM keyed)
+           AND (c."designerNotes" IS NULL OR c."designerNotes" NOT IN ('Reference image', 'Customer reference image'))
+         GROUP BY c."orderId"
+       )
+       SELECT
+         mode() WITHIN GROUP (ORDER BY k.raw_name) AS client,
+         COUNT(*)::int AS "ordersPlaced",
+         COALESCE(SUM(cd.revisions), 0)::int AS "cadsCreated",
+         COUNT(*) FILTER (WHERE k.status IN ('VPO_ISSUED', 'MANUFACTURED', 'SHIPPED', 'REPAIR', 'COMPLETED'))::int AS completed,
+         COUNT(*) FILTER (WHERE NOT k."isArchived" AND (
+           k.status = 'NEW'
+           OR (k.status = 'CAD_IN_PROGRESS' AND ${PENDING_CAD_SQL(rawCol)})
+         ))::int AS "pendingCad",
+         COUNT(*) FILTER (WHERE k.status = 'CANCELLED')::int AS cancelled
+       FROM keyed k
+       LEFT JOIN cads cd ON cd."orderId" = k.id::text
+       GROUP BY k.client_key
+       ORDER BY "ordersPlaced" DESC, client ASC`,
       [start, end],
     );
 
-    return rows.map(r => ({
-      client: r.client,
-      ordersPlaced: Number(r.ordersPlaced),
-      cadsCreated: Number(r.cadsCreated),
-      ordersCompleted: Number(r.ordersCompleted),
-      conversionPct: r.conversionPct != null ? parseFloat(r.conversionPct) : 0,
-    }));
+    return rows.map(r => {
+      const ordersPlaced = Number(r.ordersPlaced);
+      const completed = Number(r.completed);
+      return {
+        client: r.client,
+        ordersPlaced,
+        cadsCreated: Number(r.cadsCreated),
+        completed,
+        pendingCad: Number(r.pendingCad),
+        cancelled: Number(r.cancelled),
+        conversionPct: ordersPlaced ? Math.round((completed / ordersPlaced) * 1000) / 10 : 0,
+      };
+    });
   }
 
   // CSV download for the Reports page's Client Conversion report — same
   // data/date-range rules as getClientConversionReport, just serialized.
   async exportClientConversionCsv(month?: string, dateFrom?: string, dateTo?: string): Promise<string> {
     const rows = await this.getClientConversionReport(month, dateFrom, dateTo);
-    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed', 'Conversion %'];
+    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed (VPO Issued+)', 'Pending CAD', 'Cancelled', 'Conversion %'];
     const lines = [
       header.map(csvEscape).join(','),
-      ...rows.map(r => [r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.ordersCompleted), `${r.conversionPct}%`].map(csvEscape).join(',')),
+      ...rows.map(r => [r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.completed), String(r.pendingCad), String(r.cancelled), `${r.conversionPct}%`].map(csvEscape).join(',')),
     ];
     return lines.join('\n');
   }
@@ -971,13 +1019,18 @@ export class OrdersService implements OnModuleInit {
 
     if (filters.status) qb.andWhere('order.status = :status', { status: filters.status });
 
-    // CAD sub-filters (applied server-side so pagination is accurate)
+    // CAD sub-filters (applied server-side so pagination is accurate).
+    // Must agree with the frontend's getCadSubLabel(), which treats
+    // sentToCustomer as authoritative — an order already sent to the
+    // customer reads "Awaiting Approval" even if its cadSubStatus was left
+    // at PENDING/NULL. Without the sentToCustomer checks here, such orders
+    // showed up under Pending CAD and were missing from Awaiting Approval.
     if (filters.cadSubFilter === 'cad_pending')
-      qb.andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' });
+      qb.andWhere(`(${PENDING_CAD_SQL(qbCol)})`);
     else if (filters.cadSubFilter === 'cad_awaiting_quote')
-      qb.andWhere('(order.cadSubStatus = :csUploaded AND order.sentToCustomer = :notSent)', { csUploaded: 'UPLOADED', notSent: false });
+      qb.andWhere('(order.cadSubStatus = :csUploaded AND order.sentToCustomer IS NOT TRUE)', { csUploaded: 'UPLOADED' });
     else if (filters.cadSubFilter === 'cad_awaiting_approval')
-      qb.andWhere('(order.cadSubStatus = :csUploaded2 AND order.sentToCustomer = :sent)', { csUploaded2: 'UPLOADED', sent: true });
+      qb.andWhere('(order.sentToCustomer = true AND (order.cadSubStatus IS NULL OR order.cadSubStatus IN (:...csAwaiting)))', { csAwaiting: ['PENDING', 'UPLOADED'] });
     else if (filters.cadSubFilter === 'cad_revision')
       qb.andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' });
     else if (filters.cadSubFilter === 'cad_approved')
@@ -1063,7 +1116,7 @@ export class OrdersService implements OnModuleInit {
         return q;
       };
       const [pending, revision] = await Promise.all([
-        buildSubQb().andWhere('(order.cadSubStatus IS NULL OR order.cadSubStatus = :csPending)', { csPending: 'PENDING' }).getCount(),
+        buildSubQb().andWhere(`(${PENDING_CAD_SQL(qbCol)})`).getCount(),
         buildSubQb().andWhere('order.cadSubStatus = :csRevision', { csRevision: 'REVISION' }).getCount(),
       ]);
       counts['cad_pending'] = pending;

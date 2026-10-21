@@ -5,7 +5,7 @@ import {
   cardStyle, reportTitleStyle, periodStyle, arrowBtnStyle, thStyle, tdStyle,
 } from '../dashboard/ReportsSection';
 
-interface ClientConversion { client: string; ordersPlaced: number; cadsCreated: number; ordersCompleted: number; conversionPct: number }
+interface ClientConversion { client: string; ordersPlaced: number; cadsCreated: number; completed: number; pendingCad: number; cancelled: number; conversionPct: number }
 
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -33,9 +33,11 @@ export const ClientConversionReport: React.FC = () => {
   const totals = clients.reduce((acc, c) => ({
     ordersPlaced: acc.ordersPlaced + c.ordersPlaced,
     cadsCreated: acc.cadsCreated + c.cadsCreated,
-    ordersCompleted: acc.ordersCompleted + c.ordersCompleted,
-  }), { ordersPlaced: 0, cadsCreated: 0, ordersCompleted: 0 });
-  const totalConversionPct = totals.ordersPlaced ? Math.round((totals.ordersCompleted / totals.ordersPlaced) * 1000) / 10 : 0;
+    completed: acc.completed + c.completed,
+    pendingCad: acc.pendingCad + c.pendingCad,
+    cancelled: acc.cancelled + c.cancelled,
+  }), { ordersPlaced: 0, cadsCreated: 0, completed: 0, pendingCad: 0, cancelled: 0 });
+  const totalConversionPct = totals.ordersPlaced ? Math.round((totals.completed / totals.ordersPlaced) * 1000) / 10 : 0;
 
   const handleExportCsv = async () => {
     setExportingCsv(true);
@@ -57,6 +59,8 @@ export const ClientConversionReport: React.FC = () => {
       setExportingCsv(false);
     }
   };
+
+  const totalCell: React.CSSProperties = { ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 };
 
   return (
     <div id="client-conversion" style={{ ...cardStyle, scrollMarginTop: '20px' }}>
@@ -90,38 +94,46 @@ export const ClientConversionReport: React.FC = () => {
         </button>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={thStyle}>Client</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>Orders Placed</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>CADs Created</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>Completed</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>Conversion %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {visibleClients.map(c => (
-            <tr key={c.client}>
-              <td style={{ ...tdStyle, fontWeight: 600 }}>{c.client}</td>
-              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
-              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cadsCreated}</td>
-              <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersCompleted}</td>
-              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
-            </tr>
-          ))}
-          {clients.length > 0 && (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
+          <thead>
             <tr>
-              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
-              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{totals.ordersPlaced}</td>
-              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{totals.cadsCreated}</td>
-              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{totals.ordersCompleted}</td>
-              <td style={{ ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{totalConversionPct}%</td>
+              <th style={thStyle}>Client</th>
+              <th title="Every order placed in this period" style={{ ...thStyle, textAlign: 'right' }}>Orders Placed</th>
+              <th title="Design versions — files for the same order on the same day count once; reference images excluded" style={{ ...thStyle, textAlign: 'right' }}>CADs Created</th>
+              <th title="Orders that reached VPO Issued or beyond (not cancelled)" style={{ ...thStyle, textAlign: 'right' }}>Completed</th>
+              <th title='New orders + CAD In Progress orders at the "Pending CAD" label' style={{ ...thStyle, textAlign: 'right' }}>Pending CAD</th>
+              <th title="Orders currently Cancelled" style={{ ...thStyle, textAlign: 'right' }}>Cancelled</th>
+              <th title="Completed ÷ Orders Placed" style={{ ...thStyle, textAlign: 'right' }}>Conversion %</th>
             </tr>
-          )}
-          {clients.length === 0 && <tr><td style={tdStyle} colSpan={5}>No orders in this period.</td></tr>}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {visibleClients.map(c => (
+              <tr key={c.client}>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>{c.client}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.ordersPlaced}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cadsCreated}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{c.completed}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', color: c.pendingCad ? 'var(--warning, #B45309)' : undefined }}>{c.pendingCad}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', color: c.cancelled ? 'var(--danger, #DC2626)' : undefined }}>{c.cancelled}</td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
+              </tr>
+            ))}
+            {clients.length > 0 && (
+              <tr>
+                <td style={{ ...totalCell, textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '11px' }}>Total</td>
+                <td style={totalCell}>{totals.ordersPlaced}</td>
+                <td style={totalCell}>{totals.cadsCreated}</td>
+                <td style={totalCell}>{totals.completed}</td>
+                <td style={totalCell}>{totals.pendingCad}</td>
+                <td style={totalCell}>{totals.cancelled}</td>
+                <td style={totalCell}>{totalConversionPct}%</td>
+              </tr>
+            )}
+            {clients.length === 0 && <tr><td style={tdStyle} colSpan={7}>No orders in this period.</td></tr>}
+          </tbody>
+        </table>
+      </div>
       {clients.length > TOP_N && (
         <div style={{ textAlign: 'center', marginTop: '10px' }}>
           <button
@@ -135,8 +147,10 @@ export const ClientConversionReport: React.FC = () => {
           </button>
         </div>
       )}
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
-        "CADs Created" excludes reference/inspiration images, and collapses every file uploaded for the same order on the same day into one (several angles or a quick re-export in one sitting is one design touched, not several). "Conversion %" is orders that reached Completed, out of all orders placed by that client in this period.
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px', lineHeight: 1.6 }}>
+        Covers every order placed in this period. &quot;CADs Created&quot; excludes reference/inspiration images and collapses every file uploaded for the same order on the same day into one.
+        &quot;Completed&quot; is orders that reached VPO Issued or beyond. &quot;Pending CAD&quot; is New orders plus CAD In Progress orders at the Pending CAD label. &quot;Cancelled&quot; is orders currently cancelled.
+        &quot;Conversion %&quot; is Completed ÷ Orders Placed. Clients are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so &quot;Vow and Vine&quot; and &quot;Vow And Vine LLC&quot; are one row.
       </div>
     </div>
   );
