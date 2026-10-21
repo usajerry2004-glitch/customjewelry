@@ -195,6 +195,26 @@ export class OrdersController {
     return this.ordersService.getClientConversionOrders(clientKey || '', month, dateFrom, dateTo);
   }
 
+  @Get('reports/clients/xlsx')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Excel workbook of the Client Conversion report — Summary (the dashboard table + totals), All Orders (every order with its stage, details and a dashboard link) and Definitions sheets. Same ?month or ?dateFrom&?dateTo rules as reports/clients.' })
+  async exportClientConversionWorkbook(
+    @Query('month') month: string | undefined,
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo') dateTo: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.ordersService.exportClientConversionWorkbook(month, dateFrom, dateTo);
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = dateFrom || dateTo
+      ? `client-conversion-${dateFrom || today}-${dateTo || today}.xlsx`
+      : `client-conversion-${month || today.slice(0, 7)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
   @Get('reports/clients/csv')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

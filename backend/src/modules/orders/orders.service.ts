@@ -5,6 +5,7 @@ import { Cron } from '@nestjs/schedule';
 import { Repository, In, Between, Not, IsNull, LessThanOrEqual, SelectQueryBuilder } from 'typeorm';
 import { randomBytes, createHmac } from 'crypto';
 import * as Sentry from '@sentry/node';
+import * as ExcelJS from 'exceljs';
 import { Order, OrderStatus, StoneStatus, Factory } from '../../database/entities/order.entity';
 import { CatalogService } from '../catalog/catalog.service';
 import { CatalogItemKind } from '../../database/entities/catalog-item.entity';
@@ -915,6 +916,172 @@ export class OrdersService implements OnModuleInit {
       ].map(csvEscape).join(',')),
     ];
     return lines.join('\n');
+  }
+
+  // Excel version of the Client Conversion report: the Summary sheet is the
+  // dashboard table as-is (plus totals), All Orders lists every order behind
+  // it with its stage — same CLIENT_KEY_SQL / CONVERSION_STAGE_SQL as the
+  // report, so filtering All Orders by client + stage reproduces each number
+  // in Summary — and Definitions explains every column.
+  async exportClientConversionWorkbook(month?: string, dateFrom?: string, dateTo?: string): Promise<Buffer> {
+    const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
+    const summary = await this.getClientConversionReport(month, dateFrom, dateTo);
+    const labelByKey = new Map(summary.map(r => [r.clientKey, r.client]));
+
+    const orders: any[] = await this.orderRepo.query(
+      `WITH cads AS (
+         SELECT c."orderId", COUNT(DISTINCT to_char(c."createdAt", 'YYYY-MM-DD'))::int AS revisions
+         FROM cad_files c
+         WHERE c."designerNotes" IS NULL OR c."designerNotes" NOT IN ('Reference image', 'Customer reference image')
+         GROUP BY c."orderId"
+       )
+       SELECT o.id, o."poNumber", o."refCustomerPo", o."orderType", o."metalType", o."metalColor",
+              o."createdAt", o."vpoIssuedAt", o.status, o."quotedCost",
+              ${CLIENT_NAME_SQL('o')} AS client_name,
+              ${CLIENT_KEY_SQL('o')} AS client_key,
+              ${CONVERSION_STAGE_SQL('o')} AS stage,
+              COALESCE(cd.revisions, 0) AS cads,
+              NULLIF(TRIM(CONCAT(u."firstName", ' ', u."lastName")), '') AS rep_name
+       FROM orders o
+       LEFT JOIN cads cd ON cd."orderId" = o.id::text
+       LEFT JOIN companies co ON co.id::text = o."companyId"
+       LEFT JOIN users u ON u.id::text = COALESCE(co."salesRepId", o."salesRepId")
+       WHERE o."createdAt" BETWEEN $1 AND $2
+       ORDER BY o."createdAt" DESC`,
+      [start, end],
+    );
+
+    const STAGE_LABELS: Record<string, string> = {
+      completed: 'Completed', pending_cad: 'Pending CAD', awaiting_quote: 'Awaiting Quote',
+      awaiting_approval: 'Awaiting Approval', revision: 'Revision', cancelled: 'Cancelled', other: 'Other',
+    };
+    const STATUS_LABELS: Record<string, string> = {
+      NEW: 'New', CAD_IN_PROGRESS: 'CAD In Progress', VPO_ISSUED: 'VPO Issued', MANUFACTURED: 'Manufactured',
+      SHIPPED: 'Shipped', REPAIR: 'Repair', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+    };
+    const periodLabel = dateFrom && dateTo
+      ? `${dateFrom} to ${dateTo}`
+      : start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'JewelFlow OS';
+    wb.created = new Date();
+    const headerFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2740' } };
+    const styleHeader = (row: ExcelJS.Row) => {
+      row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      row.eachCell(c => { c.fill = headerFill; c.alignment = { vertical: 'middle', wrapText: true }; });
+      row.height = 30;
+    };
+
+    // ── Summary ────────────────────────────────────────────────────────────
+    const s = wb.addWorksheet('Summary', { views: [{ state: 'frozen', ySplit: 3 }] });
+    s.addRow([`Client Conversion — ${periodLabel}`]).font = { bold: true, size: 14 };
+    s.addRow([`Orders placed in this period · generated ${new Date().toLocaleString('en-US')}`]).font = { italic: true, color: { argb: 'FF6B7280' } };
+    s.columns = [
+      { key: 'client', width: 36 }, { key: 'ordersPlaced', width: 13 }, { key: 'cadsCreated', width: 13 },
+      { key: 'completed', width: 12 }, { key: 'pendingCad', width: 12 }, { key: 'awaitingQuote', width: 14 },
+      { key: 'awaitingApproval', width: 16 }, { key: 'revision', width: 11 }, { key: 'cancelled', width: 11 },
+      { key: 'other', width: 9 }, { key: 'conversion', width: 13 },
+    ];
+    styleHeader(s.addRow(['Client', 'Orders Placed', 'CADs Created', 'Completed', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'Revision', 'Cancelled', 'Other', 'Conversion %']));
+    for (const r of summary) {
+      s.addRow({ ...r, conversion: r.conversionPct / 100 });
+    }
+    const first = 4, last = 3 + summary.length;
+    if (summary.length) {
+      // Formulas so totals follow any edits, with the computed value cached
+      // as `result` so previews that don't recalculate still show numbers.
+      type NumKey = 'ordersPlaced' | 'cadsCreated' | 'completed' | 'pendingCad' | 'awaitingQuote' | 'awaitingApproval' | 'revision' | 'cancelled' | 'other';
+      const sumOf = (col: string, key: NumKey) => ({
+        formula: `SUM(${col}${first}:${col}${last})`,
+        result: summary.reduce((t, r) => t + r[key], 0),
+      });
+      const totalOrders = summary.reduce((t, r) => t + r.ordersPlaced, 0);
+      const totalCompleted = summary.reduce((t, r) => t + r.completed, 0);
+      const total = s.addRow({
+        client: 'TOTAL', ordersPlaced: sumOf('B', 'ordersPlaced'), cadsCreated: sumOf('C', 'cadsCreated'), completed: sumOf('D', 'completed'),
+        pendingCad: sumOf('E', 'pendingCad'), awaitingQuote: sumOf('F', 'awaitingQuote'), awaitingApproval: sumOf('G', 'awaitingApproval'),
+        revision: sumOf('H', 'revision'), cancelled: sumOf('I', 'cancelled'), other: sumOf('J', 'other'),
+        conversion: { formula: `IF(B${last + 1}=0,0,D${last + 1}/B${last + 1})`, result: totalOrders ? totalCompleted / totalOrders : 0 },
+      });
+      total.font = { bold: true };
+      total.eachCell(c => { c.border = { top: { style: 'thin' } }; });
+    }
+    s.getColumn('conversion').numFmt = '0.0%';
+    s.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 11 } };
+
+    // ── All Orders ─────────────────────────────────────────────────────────
+    const o = wb.addWorksheet('All Orders', { views: [{ state: 'frozen', ySplit: 1 }] });
+    o.columns = [
+      { header: 'Client', key: 'client', width: 32 },
+      { header: 'Name on Order', key: 'clientName', width: 28 },
+      { header: 'PO Number', key: 'po', width: 12 },
+      { header: 'Customer PO#', key: 'custPo', width: 22 },
+      { header: 'Order Type', key: 'type', width: 14 },
+      { header: 'Metal', key: 'metal', width: 18 },
+      { header: 'Placed', key: 'placed', width: 12 },
+      { header: 'Age (days)', key: 'age', width: 10 },
+      { header: 'Stage', key: 'stage', width: 18 },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'VPO Issued', key: 'vpo', width: 12 },
+      { header: 'CADs Created', key: 'cads', width: 12 },
+      { header: 'Quoted Price', key: 'price', width: 13 },
+      { header: 'Sales Rep', key: 'rep', width: 20 },
+      { header: 'Open in Dashboard', key: 'link', width: 18 },
+    ];
+    styleHeader(o.getRow(1));
+    const now = Date.now();
+    for (const r of orders) {
+      const created = new Date(r.createdAt);
+      o.addRow({
+        client: labelByKey.get(r.client_key) || r.client_name,
+        clientName: r.client_name,
+        po: r.poNumber,
+        custPo: r.refCustomerPo || '',
+        type: r.orderType || '',
+        metal: [r.metalType, r.metalColor].filter(Boolean).join(' · '),
+        placed: created,
+        age: Math.floor((now - created.getTime()) / 86400000),
+        stage: STAGE_LABELS[r.stage] || r.stage,
+        status: STATUS_LABELS[r.status] || r.status,
+        vpo: r.vpoIssuedAt ? new Date(r.vpoIssuedAt) : null,
+        cads: Number(r.cads),
+        price: r.quotedCost != null ? Number(r.quotedCost) : null,
+        rep: r.rep_name || '',
+        link: { text: 'Open', hyperlink: `${this.frontendUrl}/orders/${r.id}` },
+      });
+    }
+    o.getColumn('placed').numFmt = 'mmm d, yyyy';
+    o.getColumn('vpo').numFmt = 'mmm d, yyyy';
+    o.getColumn('price').numFmt = '$#,##0.00';
+    o.getColumn('link').font = { color: { argb: 'FF2563EB' }, underline: true };
+    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 15 } };
+
+    // ── Definitions ────────────────────────────────────────────────────────
+    const d = wb.addWorksheet('Definitions');
+    d.columns = [{ key: 'term', width: 22 }, { key: 'meaning', width: 110 }];
+    styleHeader(d.addRow(['Column', 'Meaning']));
+    [
+      ['Orders Placed', 'Every order created in the period.'],
+      ['CADs Created', 'Design versions: every file uploaded for the same order on the same day counts once; reference/inspiration images are excluded. Can be higher than orders when designs are revised.'],
+      ['Completed', 'Reached VPO Issued or beyond (design approved, in production), not cancelled.'],
+      ['Pending CAD', 'New, or CAD In Progress at the "Pending CAD" label — waiting on the CAD team.'],
+      ['Awaiting Quote', 'CAD uploaded but not yet priced / sent to the customer.'],
+      ['Awaiting Approval', 'CAD sent to the customer, waiting for their approval.'],
+      ['Revision', 'Customer asked for changes, or rejected the CAD.'],
+      ['Cancelled', 'Orders currently cancelled.'],
+      ['Other', 'Anything else — e.g. CAD approved but VPO not issued yet, or a project the customer closed.'],
+      ['Conversion %', 'Completed ÷ Orders Placed.'],
+      ['Client grouping', 'Names are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so "Vow and Vine" and "Vow And Vine LLC" are one client. "Name on Order" in All Orders shows the exact spelling on each order.'],
+      ['Tip', 'Every order is in exactly one stage, so filtering All Orders by Client and Stage gives the exact orders behind any number on the Summary sheet.'],
+    ].forEach(([term, meaning]) => {
+      const row = d.addRow({ term, meaning });
+      row.getCell('term').font = { bold: true };
+      row.getCell('meaning').alignment = { wrapText: true, vertical: 'top' };
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   private resolveReportRange(month?: string, dateFrom?: string, dateTo?: string): { start: Date; end: Date } {

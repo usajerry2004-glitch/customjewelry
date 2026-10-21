@@ -38,7 +38,7 @@ export const ClientConversionReport: React.FC = () => {
   const [monthOffset, setMonthOffset] = useState(0);
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
   const [clients, setClients] = useState<ClientConversion[]>([]);
-  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [orders, setOrders] = useState<Record<string, ClientOrder[] | 'loading' | 'failed'>>({});
@@ -77,24 +77,24 @@ export const ClientConversionReport: React.FC = () => {
   const totalOrders = sum('ordersPlaced');
   const totalConversionPct = totalOrders ? Math.round((sum('completed') / totalOrders) * 1000) / 10 : 0;
 
-  const handleExportCsv = async () => {
-    setExportingCsv(true);
+  const handleExport = async (format: 'csv' | 'xlsx') => {
+    setExporting(format);
     try {
-      const res = await apiFetch(`${API}/orders/reports/clients/csv?${buildParams()}`);
+      const res = await apiFetch(`${API}/orders/reports/clients/${format}?${buildParams()}`);
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = customRange
-        ? `client-conversion-${customRange.from}-${customRange.to}.csv`
-        : `client-conversion-${monthLabel(monthOffset).param}.csv`;
+        ? `client-conversion-${customRange.from}-${customRange.to}.${format}`
+        : `client-conversion-${monthLabel(monthOffset).param}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } finally {
-      setExportingCsv(false);
+      setExporting(null);
     }
   };
 
@@ -151,18 +151,28 @@ export const ClientConversionReport: React.FC = () => {
             <CustomRangeControl active={customRange} onApply={setCustomRange} onClear={() => setCustomRange(null)} />
           </div>
         </div>
-        <button
-          onClick={handleExportCsv}
-          disabled={exportingCsv || clients.length === 0}
-          style={{
-            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-            cursor: exportingCsv || clients.length === 0 ? 'default' : 'pointer',
-            background: 'var(--navy)', color: '#fff', border: 'none',
-            opacity: exportingCsv || clients.length === 0 ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0,
-          }}
-        >
-          {exportingCsv ? 'Exporting…' : '⬇ Export CSV'}
-        </button>
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          {([
+            { format: 'xlsx', label: '⬇ Export Excel', title: 'Excel workbook: Summary (this table), All Orders (every order with its stage and details) and Definitions sheets' },
+            { format: 'csv', label: '⬇ CSV', title: 'This table as a CSV file' },
+          ] as const).map(b => {
+            const disabled = exporting !== null || clients.length === 0;
+            return (
+              <button key={b.format} onClick={() => handleExport(b.format)} disabled={disabled} title={b.title}
+                style={{
+                  padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  cursor: disabled ? 'default' : 'pointer',
+                  background: b.format === 'xlsx' ? 'var(--navy)' : 'transparent',
+                  color: b.format === 'xlsx' ? '#fff' : 'var(--navy)',
+                  border: b.format === 'xlsx' ? 'none' : '1px solid var(--navy)',
+                  opacity: disabled ? 0.6 : 1, whiteSpace: 'nowrap',
+                }}
+              >
+                {exporting === b.format ? 'Exporting…' : b.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
