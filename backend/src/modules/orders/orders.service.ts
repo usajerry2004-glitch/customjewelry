@@ -771,7 +771,11 @@ export class OrdersService implements OnModuleInit {
   // Clients are grouped on a normalized name (case, punctuation and trailing
   // LLC/Inc/Ltd… ignored) so "Vow and Vine" / "Vow And Vine LLC" or
   // "Powder and Pandemonium" / "Powder And Pandemonium" are one row; the
-  // label shown is the most common spelling in the group.
+  // label shown is the most common spelling in the group. Uses POSIX
+  // [[:space:]] rather than \s: backslash escapes depend on the server's
+  // standard_conforming_strings, and "Vow And Vine LLC" failed to merge in
+  // production with the \s version.
+  // Non-breaking spaces (common in pasted names) are folded to spaces first.
   //
   // cad_files.orderId is stored as text while orders.id is uuid — needs the
   // explicit cast below or Postgres rejects the join outright.
@@ -786,8 +790,8 @@ export class OrdersService implements OnModuleInit {
          SELECT o.id, o.status, o."cadSubStatus", o."sentToCustomer", o."isArchived",
                 COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown') AS raw_name,
                 TRIM(regexp_replace(
-                  regexp_replace(regexp_replace(lower(COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown')), '[.,'']', '', 'g'), '\s+', ' ', 'g'),
-                  '(\s+(llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''
+                  regexp_replace(regexp_replace(translate(lower(COALESCE(NULLIF(TRIM(o."storeName"), ''), NULLIF(TRIM(o."customerFullName"), ''), 'Unknown')), chr(160), ' '), '[.,'']', '', 'g'), '[[:space:]]+', ' ', 'g'),
+                  '( (llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''
                 )) AS client_key
          FROM orders o
          WHERE o."createdAt" BETWEEN $1 AND $2
