@@ -460,6 +460,14 @@ export class OrdersController {
     return this.ordersService.resendFactoryAssignedAlert(id);
   }
 
+  @Get(':id/rightclick-lookup')
+  @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Preview a RightClick order number before linking it (?number=) — RightClick\'s customer, PO, item count and total next to this order\'s customer, plus a nameMatch hint. 400 if RightClick has no such order. Read-only. Admin/Authorizer only.' })
+  previewRightClickOrder(@Param('id') id: string, @Query('number') number: string) {
+    return this.ordersService.previewRightClickOrder(id, number);
+  }
+
   @Post(':id/rightclick-invoice')
   @Roles(UserRole.ADMIN, UserRole.AUTHORIZER)
   @UseGuards(RolesGuard)

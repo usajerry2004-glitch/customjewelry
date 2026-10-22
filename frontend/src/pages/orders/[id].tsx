@@ -622,6 +622,16 @@ export default function OrderDetail() {
   const [savingShipping, setSavingShipping] = useState(false);
   const [rcOrderNumberInput, setRcOrderNumberInput] = useState('');
   const [savingRcOrderNumber, setSavingRcOrderNumber] = useState(false);
+  // Linking is two steps: look the number up in RightClick and show what it
+  // is, then link. A typo that hits another real RightClick order would
+  // otherwise put someone else's address and items on this invoice.
+  const [rcPreview, setRcPreview] = useState<{
+    orderNumber: string; customerName: string | null; customerCompany: string | null; po: string | null;
+    date: string | null; itemCount: number; total: number; jewelflowCustomer: string; nameMatch: boolean; linkedToOtherPo: string | null;
+  } | null>(null);
+  const [rcLookupError, setRcLookupError] = useState('');
+  const [rcLookingUp, setRcLookingUp] = useState(false);
+  const [rcConfirmMismatch, setRcConfirmMismatch] = useState(false);
   const [shipToNameInput, setShipToNameInput] = useState('');
   const [shipToAddressInput, setShipToAddressInput] = useState('');
   const [shipToPhoneInput, setShipToPhoneInput] = useState('');
@@ -1166,16 +1176,38 @@ export default function OrderDetail() {
     }
   };
 
+  const lookupRcOrderNumber = async () => {
+    if (!order?.id) return;
+    const number = rcOrderNumberInput.trim();
+    if (!number) return;
+    setRcLookingUp(true);
+    setRcLookupError('');
+    setRcPreview(null);
+    setRcConfirmMismatch(false);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}/rightclick-lookup?number=${encodeURIComponent(number)}`);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setRcPreview(data);
+      else setRcLookupError(getErrorMessage(data, `Couldn't look up RightClick order ${number}.`));
+    } catch {
+      setRcLookupError("Couldn't reach the server to check this number — check your connection and try again.");
+    } finally {
+      setRcLookingUp(false);
+    }
+  };
+
   const saveRcOrderNumber = async () => {
     if (!order?.id) return;
     setSavingRcOrderNumber(true);
     try {
       const res = await apiFetch(`${API}/orders/${order.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ rcOrderNumber: rcOrderNumberInput || null }),
+        body: JSON.stringify({ rcOrderNumber: rcOrderNumberInput.trim() || null }),
       });
       if (res.ok) {
         setOrder(await res.json());
+        setRcPreview(null);
+        setRcConfirmMismatch(false);
       } else {
         const err = await res.json().catch(() => null);
         toast.error(getErrorMessage(err, 'Failed to save RightClick order number.'));
@@ -2850,18 +2882,87 @@ export default function OrderDetail() {
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>RightClick Order #</div>
                 <input
                   value={rcOrderNumberInput}
-                  onChange={e => setRcOrderNumberInput(e.target.value)}
+                  onChange={e => { setRcOrderNumberInput(e.target.value); setRcPreview(null); setRcLookupError(''); setRcConfirmMismatch(false); }}
+                  onKeyDown={e => { if (e.key === 'Enter' && rcOrderNumberInput.trim()) lookupRcOrderNumber(); }}
                   placeholder="e.g. 10432"
                   style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
-              <button
-                onClick={saveRcOrderNumber}
-                disabled={savingRcOrderNumber || rcOrderNumberInput === (order.rcOrderNumber || '')}
-                style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: (savingRcOrderNumber || rcOrderNumberInput === (order.rcOrderNumber || '')) ? 0.5 : 1, marginBottom: '10px' }}
-              >
-                {savingRcOrderNumber ? '…' : 'Save'}
-              </button>
+              {(() => {
+                const unchanged = rcOrderNumberInput.trim() === (order.rcOrderNumber || '');
+                const clearing = !rcOrderNumberInput.trim() && !!order.rcOrderNumber;
+                const btn: React.CSSProperties = { width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginBottom: '10px' };
+                if (clearing) {
+                  return (
+                    <button onClick={saveRcOrderNumber} disabled={savingRcOrderNumber} style={{ ...btn, opacity: savingRcOrderNumber ? 0.5 : 1 }}>
+                      {savingRcOrderNumber ? '…' : 'Remove RightClick link'}
+                    </button>
+                  );
+                }
+                if (rcPreview) return null;
+                return (
+                  <button onClick={lookupRcOrderNumber} disabled={rcLookingUp || unchanged || !rcOrderNumberInput.trim()}
+                    title="Looks the number up in RightClick and shows what it is before linking"
+                    style={{ ...btn, opacity: (rcLookingUp || unchanged || !rcOrderNumberInput.trim()) ? 0.5 : 1 }}>
+                    {rcLookingUp ? 'Checking RightClick…' : 'Check in RightClick'}
+                  </button>
+                );
+              })()}
+
+              {rcLookupError && (
+                <div style={{ fontSize: '12px', color: '#B91C1C', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', lineHeight: 1.5 }}>
+                  {rcLookupError}
+                </div>
+              )}
+
+              {rcPreview && (
+                <div style={{ border: `1px solid ${rcPreview.linkedToOtherPo ? 'rgba(220,38,38,0.4)' : rcPreview.nameMatch ? 'var(--border)' : '#F59E0B'}`, borderRadius: '8px', padding: '10px 12px', marginBottom: '10px', fontSize: '12px', background: 'var(--bg-input)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                    RightClick order {rcPreview.orderNumber}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px', lineHeight: 1.5 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Customer</span>
+                    <strong>{[rcPreview.customerCompany, rcPreview.customerName].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ') || '—'}</strong>
+                    <span style={{ color: 'var(--text-muted)' }}>PO</span>
+                    <span>{rcPreview.po || '—'}</span>
+                    {rcPreview.date && (<><span style={{ color: 'var(--text-muted)' }}>Date</span><span>{rcPreview.date}</span></>)}
+                    <span style={{ color: 'var(--text-muted)' }}>Items</span>
+                    <span>{rcPreview.itemCount} · ${rcPreview.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>This order</span>
+                    <strong>{rcPreview.jewelflowCustomer}</strong>
+                  </div>
+
+                  {rcPreview.linkedToOtherPo ? (
+                    <div style={{ marginTop: '8px', color: '#B91C1C', lineHeight: 1.5 }}>
+                      Already linked to order {rcPreview.linkedToOtherPo} — one RightClick order can only be linked to one order.
+                    </div>
+                  ) : !rcPreview.nameMatch && (
+                    <div style={{ marginTop: '8px', background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: '6px', padding: '8px', lineHeight: 1.5 }}>
+                      <strong>The customer names don&apos;t match.</strong> If the number was mistyped, this invoice would go out with another customer&apos;s address and items.
+                      <label style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '6px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={rcConfirmMismatch} onChange={e => setRcConfirmMismatch(e.target.checked)} style={{ marginTop: '2px' }} />
+                        <span>I&apos;ve checked — this is the right RightClick order for this customer.</span>
+                      </label>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                    <button onClick={() => { setRcPreview(null); setRcConfirmMismatch(false); }}
+                      style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                      Cancel
+                    </button>
+                    {!rcPreview.linkedToOtherPo && (() => {
+                      const blocked = savingRcOrderNumber || (!rcPreview.nameMatch && !rcConfirmMismatch);
+                      return (
+                        <button onClick={saveRcOrderNumber} disabled={blocked}
+                          style={{ flex: 2, background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px', fontSize: '12px', fontWeight: 600, cursor: blocked ? 'default' : 'pointer', opacity: blocked ? 0.5 : 1 }}>
+                          {savingRcOrderNumber ? 'Linking…' : 'Link this order'}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               <div style={{ borderTop: '1px solid var(--border)', margin: '14px 0 12px' }} />
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>

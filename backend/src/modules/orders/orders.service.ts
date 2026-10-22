@@ -24,8 +24,8 @@ import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
 import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
 import { businessDaysElapsed } from '../../common/business-days.util';
-import { RightClickService } from './rightclick.service';
-import { buildRightClickInvoicePdf, SHIP_VIA_OPTIONS, TERMS_OPTIONS, InvoiceCharges } from './rightclick-invoice-pdf.util';
+import { RightClickService, RightClickCustomerOrder } from './rightclick.service';
+import { buildRightClickInvoicePdf, SHIP_VIA_OPTIONS, TERMS_OPTIONS, InvoiceCharges, parseMoney } from './rightclick-invoice-pdf.util';
 import { SpacesService } from '../spaces/spaces.service';
 
 export { OrderFilterDto };
@@ -152,6 +152,40 @@ const CONVERSION_STAGE_SQL = (a: string) => {
     ELSE 'other'
   END`;
 };
+
+// Item count and total of a RightClick order — RightClick doesn't return an
+// order total, so it's summed from line items the same way the invoice PDF
+// prices them (amount, else price × quantity).
+function summarizeRightClickOrder(rc: RightClickCustomerOrder): { itemCount: number; total: number } {
+  const items = rc.lineitems || [];
+  const total = items.reduce((t, li) => {
+    const qty = parseMoney((li.quantity ?? 1) as any) || 1;
+    return t + (li.amount !== undefined ? parseMoney(li.amount) : parseMoney(li.price) * qty);
+  }, 0);
+  return { itemCount: items.length, total: Math.round(total * 100) / 100 };
+}
+
+// Words nearly every jewelry client name contains — ignored when deciding
+// whether two names refer to the same customer, or "Smith Jewelers" would
+// "match" every other "... Jewelers".
+const GENERIC_NAME_WORDS = new Set([
+  'inc', 'llc', 'ltd', 'limited', 'co', 'corp', 'corporation', 'company', 'dba', 'the', 'and', 'of',
+  'jewelry', 'jewelers', 'jeweler', 'jewellery', 'jewellers', 'jeweller', 'jewels', 'jewel', 'fine',
+  'diamond', 'diamonds', 'gems', 'gem', 'gold', 'designs', 'design', 'group', 'usa', 'canada', 'international',
+]);
+const nameWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/)
+  .filter(w => w.length >= 3 && !GENERIC_NAME_WORDS.has(w));
+
+// True when any JewelFlow-side name (store, customer, customer code name)
+// shares a distinctive word with any RightClick-side name (company, contact).
+// Deliberately lenient — it only decides whether to ask for confirmation.
+// Unknown on either side counts as a match (nothing to compare).
+function namesLikelyMatch(ours: string[], theirs: string[]): boolean {
+  const a = new Set(ours.flatMap(nameWords));
+  const b = theirs.flatMap(nameWords);
+  if (!a.size || !b.length) return true;
+  return b.some(w => a.has(w));
+}
 
 function csvEscape(value: string): string {
   // Excel treats a cell starting with = + - @ as a formula — a client named
@@ -1776,6 +1810,44 @@ export class OrdersService implements OnModuleInit {
   // required to have a RightClick link; the others fall back to their own
   // JewelFlow spec data if they don't (same fallback the single-order path
   // already has).
+  // Looks up a RightClick order number *before* it's linked, so the person
+  // linking it can see what it actually is — RightClick's customer, PO, item
+  // count and total next to this order's own customer. A typo that lands on
+  // another real RightClick order would otherwise pull someone else's
+  // address and line items onto this customer's invoice. nameMatch is a
+  // heuristic for the UI: false means "make someone confirm", not "reject".
+  async previewRightClickOrder(id: string, rawNumber: string): Promise<{
+    orderNumber: string; customerName: string | null; customerCompany: string | null; po: string | null;
+    date: string | null; itemCount: number; total: number;
+    jewelflowCustomer: string; nameMatch: boolean; linkedToOtherPo: string | null;
+  }> {
+    const orderNumber = (rawNumber || '').trim();
+    if (!orderNumber) throw new BadRequestException('Enter a RightClick order number.');
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found.');
+
+    const rcOrder = await this.rightClickService.lookupOrder(orderNumber);
+    if (!rcOrder) throw new BadRequestException(`No RightClick order ${orderNumber} found — check the number.`);
+
+    const conflict = await this.orderRepo.findOne({ where: { rcOrderNumber: orderNumber, id: Not(order.id) } });
+    const { itemCount, total } = summarizeRightClickOrder(rcOrder);
+    const ours = [order.storeName, order.customerFullName, order.customerCodeName].filter(Boolean) as string[];
+    const theirs = [rcOrder.customer?.company, rcOrder.customer?.name].filter(Boolean) as string[];
+
+    return {
+      orderNumber,
+      customerName: rcOrder.customer?.name || null,
+      customerCompany: rcOrder.customer?.company || null,
+      po: rcOrder.po || null,
+      date: rcOrder.date || null,
+      itemCount,
+      total,
+      jewelflowCustomer: ours.join(' · ') || '—',
+      nameMatch: namesLikelyMatch(ours, theirs),
+      linkedToOtherPo: conflict?.poNumber || null,
+    };
+  }
+
   async generateRightClickInvoice(id: string, shipVia: string, terms: string, charges: InvoiceCharges, specialInstructions?: string, otherOrderIds?: string[]): Promise<Order> {
     if (!SHIP_VIA_OPTIONS.includes(shipVia as any)) {
       throw new BadRequestException('Invalid Ship Via option.');
@@ -1816,6 +1888,17 @@ export class OrdersService implements OnModuleInit {
     }
 
     const rcOrders = await Promise.all(combinedOrders.map(o => o.rcOrderNumber ? this.rightClickService.lookupOrder(o.rcOrderNumber) : Promise.resolve(null)));
+
+    // A linked number RightClick doesn't recognise (mistyped, or the order was
+    // deleted in RightClick) used to fall back silently to JewelFlow's own
+    // details with only a tiny note on the PDF. Stop instead, so nobody sends
+    // an invoice they think came from RightClick.
+    const unresolved = combinedOrders.filter((o, i) => o.rcOrderNumber && !rcOrders[i]);
+    if (unresolved.length) {
+      throw new BadRequestException(unresolved.length === 1 && unresolved[0].id === order.id
+        ? `No RightClick order ${order.rcOrderNumber} found — check the RightClick order number on this order before generating the invoice.`
+        : `No RightClick order found for: ${unresolved.map(o => `${o.poNumber} (RightClick #${o.rcOrderNumber})`).join(', ')} — check those RightClick order numbers before generating the invoice.`);
+    }
 
     if (!order.invoiceNumber) {
       order.invoiceNumber = await this.generateInvoiceNumber();
@@ -2020,6 +2103,13 @@ export class OrdersService implements OnModuleInit {
       const conflict = await this.orderRepo.findOne({ where: { rcOrderNumber: dto.rcOrderNumber, id: Not(order.id) } });
       if (conflict) {
         throw new BadRequestException(`RightClick order number "${dto.rcOrderNumber}" is already linked to order ${conflict.poNumber}.`);
+      }
+      // Refuse a number RightClick doesn't know — a typo would otherwise sit
+      // unnoticed until invoice time. (Whether it's the *right* RightClick
+      // order is confirmed in the UI via previewRightClickOrder first.)
+      const rcOrder = await this.rightClickService.lookupOrder(dto.rcOrderNumber);
+      if (!rcOrder) {
+        throw new BadRequestException(`No RightClick order ${dto.rcOrderNumber} found — check the number.`);
       }
     }
     if ((dto.shipToName !== undefined || dto.shipToAddress !== undefined || dto.shipToPhone !== undefined)

@@ -81,7 +81,7 @@ function money(v: number): string {
   return `${sign}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function parseMoney(v: string | number | null | undefined): number {
+export function parseMoney(v: string | number | null | undefined): number {
   const n = typeof v === 'string' ? parseFloat(v) : v;
   return n === null || n === undefined || Number.isNaN(n) ? 0 : n;
 }
