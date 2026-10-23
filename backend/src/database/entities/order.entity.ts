@@ -237,6 +237,18 @@ export class Order {
   @Column({ nullable: true })
   rcJobBagNumber: string;
 
+  // Free-text reference numbers typed in by Admin/Authorizer in the order
+  // detail page's Order Details card — not looked up anywhere, and unrelated
+  // to invoice generation. rcInvoiceNumber is RightClick's own invoice number
+  // (distinct from invoiceNumber, JewelFlow's generated number on its own
+  // invoice PDF). jobBagNumber is entered by hand and deliberately separate
+  // from rcJobBagNumber, which only the spreadsheet import fills.
+  @Column({ nullable: true })
+  rcInvoiceNumber: string;
+
+  @Column({ nullable: true })
+  jobBagNumber: string;
+
   @Column({ nullable: true })
   rcVpoNumber: string;
 

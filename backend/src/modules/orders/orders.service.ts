@@ -2095,6 +2095,10 @@ export class OrdersService implements OnModuleInit {
         && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
       throw new ForbiddenException('Only Admin or Authorizer can link a RightClick order number.');
     }
+    if ((dto.rcInvoiceNumber !== undefined || dto.jobBagNumber !== undefined)
+        && user?.role !== UserRole.ADMIN && user?.role !== UserRole.AUTHORIZER) {
+      throw new ForbiddenException('Only Admin or Authorizer can edit the RightClick invoice or job bag number.');
+    }
     // Nothing else stops two JewelFlow orders from pointing at the same
     // RightClick order — without this, generating an invoice for either one
     // would silently pull the same RightClick line items/customer, correct

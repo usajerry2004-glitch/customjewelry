@@ -129,6 +129,8 @@ export interface Order {
   companyViewerAccessEnabled?: boolean;
   viewerEmbedUrl?: string | null;
   rcOrderNumber?: string | null;
+  rcInvoiceNumber?: string | null;
+  jobBagNumber?: string | null;
   invoiceNumber?: string | null;
   invoicePdfKey?: string | null;
   isArchived?: boolean;

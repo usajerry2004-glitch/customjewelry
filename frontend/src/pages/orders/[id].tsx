@@ -498,6 +498,8 @@ const FIELD_GROUPS: { title: string; fields: { key: string; label: string; forma
       { key: 'supplySource', label: 'Stone Supplier', format: (v) => v ? getSupplySourceDisplay(v).label : v },
       { key: 'assignedFactory', label: 'Factory', format: (v) => v ? getFactoryDisplay(v).label : v },
       { key: 'referenceWeblink', label: 'Reference Link' },
+      { key: 'rcInvoiceNumber', label: 'RightClick Invoice #' },
+      { key: 'jobBagNumber', label: 'Job Bag #' },
     ],
   },
   {
@@ -632,6 +634,10 @@ export default function OrderDetail() {
   const [rcLookupError, setRcLookupError] = useState('');
   const [rcLookingUp, setRcLookingUp] = useState(false);
   const [rcConfirmMismatch, setRcConfirmMismatch] = useState(false);
+  // Plain reference numbers typed in by hand in Order Details — no
+  // RightClick lookup, unrelated to invoice generation.
+  const [refInputs, setRefInputs] = useState<Record<'rcInvoiceNumber' | 'jobBagNumber', string>>({ rcInvoiceNumber: '', jobBagNumber: '' });
+  const [savingRef, setSavingRef] = useState<'rcInvoiceNumber' | 'jobBagNumber' | null>(null);
   const [shipToNameInput, setShipToNameInput] = useState('');
   const [shipToAddressInput, setShipToAddressInput] = useState('');
   const [shipToPhoneInput, setShipToPhoneInput] = useState('');
@@ -804,6 +810,7 @@ export default function OrderDetail() {
           setShipViaInput(o.shipMethod || '');
           setQcDoneInput(!!o.qcDone);
           setRcOrderNumberInput(o.rcOrderNumber || '');
+          setRefInputs({ rcInvoiceNumber: o.rcInvoiceNumber || '', jobBagNumber: o.jobBagNumber || '' });
           setShipToNameInput(o.shipToName || '');
           setShipToAddressInput(o.shipToAddress || '');
           setShipToPhoneInput(o.shipToPhone || '');
@@ -1193,6 +1200,28 @@ export default function OrderDetail() {
       setRcLookupError("Couldn't reach the server to check this number — check your connection and try again.");
     } finally {
       setRcLookingUp(false);
+    }
+  };
+
+  const saveReference = async (field: 'rcInvoiceNumber' | 'jobBagNumber', value: string, label: string) => {
+    if (!order?.id) return;
+    setSavingRef(field);
+    try {
+      const res = await apiFetch(`${API}/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [field]: value.trim() || null }),
+      });
+      if (res.ok) {
+        setOrder(await res.json());
+        toast.success(`${label} saved.`);
+      } else {
+        const err = await res.json().catch(() => null);
+        toast.error(getErrorMessage(err, `Failed to save ${label}.`));
+      }
+    } catch {
+      toast.error(`Failed to save ${label} — check your connection and try again.`);
+    } finally {
+      setSavingRef(null);
     }
   };
 
@@ -1680,7 +1709,7 @@ export default function OrderDetail() {
               // Factory/Stone Manager don't see customer identity (also enforced
               // server-side, see FactoryRedactionInterceptor); phone number only
               // shows up when the order actually has one
-              const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber', 'assignedSalesRepName'];
+              const FACTORY_HIDDEN_KEYS = ['customerFullName', 'storeName', 'customerEmail', 'phoneNumber', 'assignedSalesRepName', 'rcInvoiceNumber'];
               const isRestrictedRole = userRole === UserRole.FACTORY_MANAGER || userRole === UserRole.FACTORY_VIEWER || userRole === UserRole.STONE_MANAGER;
               // Supply source / factory are only meaningful once the VPO has been issued
               const supplySourceRelevant = order.status !== OrderStatus.NEW && order.status !== OrderStatus.CAD_IN_PROGRESS;
@@ -1701,6 +1730,8 @@ export default function OrderDetail() {
                     const raw = key === 'assignedSalesRepName' ? salesRepName : (order as any)[key];
                     const val = format ? format(raw) : (raw ?? '—');
                     const isLink = key === 'referenceWeblink' && raw;
+                    const isRefField = key === 'rcInvoiceNumber' || key === 'jobBagNumber';
+                    const canEditRef = isRefField && (userRole === UserRole.ADMIN || userRole === UserRole.AUTHORIZER);
                     const canEditPo = key === 'refCustomerPo' &&
                       [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER].includes(userRole as UserRole);
                     const canEditSpec = EDITABLE_SPEC_KEYS.includes(key) &&
@@ -1713,7 +1744,32 @@ export default function OrderDetail() {
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                           {label}
                         </div>
-                        {canEditPo ? (
+                        {canEditRef ? (() => {
+                          const field = key as 'rcInvoiceNumber' | 'jobBagNumber';
+                          const value = refInputs[field];
+                          const changed = value.trim() !== ((order as any)[field] || '');
+                          const saving = savingRef === field;
+                          return (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <input
+                                value={value}
+                                onChange={e => setRefInputs(r => ({ ...r, [field]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter' && changed && !saving) saveReference(field, value, label); }}
+                                placeholder={`Add ${label}`}
+                                style={{ flex: 1, minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 8px', fontSize: '13px', color: 'var(--text-primary)', outline: 'none' }}
+                              />
+                              {changed && (
+                                <button
+                                  onClick={() => saveReference(field, value, label)}
+                                  disabled={saving}
+                                  style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}
+                                >
+                                  {saving ? '…' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })() : canEditPo ? (
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <input
                               value={customerPoInput}
