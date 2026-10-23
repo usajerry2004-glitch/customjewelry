@@ -579,9 +579,9 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
             onKeyDown={handleKey}
             onBlur={closeMentionTypeahead}
             placeholder={isCustomer ? 'Send a message to the team…' : isInternal ? 'Internal note (not visible to customer)…' : 'Reply to customer or add a note…'}
-            rows={2}
+            rows={5}
             style={{
-              flex: 1, background: 'var(--bg-card)',
+              flex: 1, background: 'var(--bg-card)', lineHeight: 1.5,
               border: `1px solid ${isInternal ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
               borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px',
               resize: 'none', outline: 'none', fontFamily: 'inherit',

@@ -116,6 +116,11 @@ export class RightClickService {
   // rewrapped into a BadRequestException with the actual reason instead.
   private async fetchJson(url: string): Promise<{ ok: boolean; status: number; body: RightClickApiResponse | null }> {
     const proxyUrl = this.proxyUrl();
+    // A malformed setting (e.g. "ttp://…" with the h missing) otherwise only
+    // surfaces as a vague "fetch failed" that reads like the proxy is down.
+    if (proxyUrl && !/^https?:\/\/[^/\s]+/i.test(proxyUrl)) {
+      throw new BadRequestException(`RIGHTCLICK_PROXY_URL is set to "${proxyUrl}", which isn't a valid address — it must start with http:// or https:// (e.g. http://147.182.215.142:8799). Fix it in the backend app's environment settings.`);
+    }
     const target = proxyUrl ? `${proxyUrl}/relay?url=${encodeURIComponent(url)}` : url;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
