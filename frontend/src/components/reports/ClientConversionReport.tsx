@@ -14,7 +14,24 @@ interface ClientConversion {
   revision: number; cancelled: number; other: number; conversionPct: number;
   revisions: number; ordersWithCad: number; revisionRatePct: number | null;
 }
-interface ClientOrder { id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: Stage; ageDays: number }
+interface ClientOrder {
+  id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: Stage;
+  completedAt: string | null; awaitingSince: string | null;
+  cancelledAt: string | null; shippedDate: string | null;
+}
+
+const fmtDate = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// Chips deliberately show no day count — "days since placed" kept growing
+// after an order finished and read as a delay. Dates are in the hover text.
+const timelineTitle = (o: ClientOrder, statusLabel: string): string => [
+  statusLabel,
+  `Placed ${fmtDate(o.createdAt)}`,
+  o.completedAt ? `Completed ${fmtDate(o.completedAt)}` : null,
+  o.awaitingSince ? `Sent for approval ${fmtDate(o.awaitingSince)}` : null,
+  o.cancelledAt ? `Cancelled ${fmtDate(o.cancelledAt)}` : null,
+  o.shippedDate ? `Shipped ${fmtDate(o.shippedDate)}` : null,
+].filter(Boolean).join(' · ');
 
 // One column per stage — every order is counted in exactly one of these, so
 // they always add up to Orders Placed (see getClientConversionReport).
@@ -124,10 +141,10 @@ export const ClientConversionReport: React.FC = () => {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {inStage.map(o => (
                   <Link key={o.id} href={`/orders/${o.id}`} target="_blank"
-                    title={`${STATUS_LABEL[o.status] || o.status} · placed ${new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    title={timelineTitle(o, STATUS_LABEL[o.status] || o.status)}
                     style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '8px', border: `1px solid ${s.color}33`, background: `${s.color}0D`, color: 'var(--text-primary)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                     <strong>{o.poNumber}</strong>
-                    <span style={{ color: 'var(--text-muted)' }}>{o.orderType ? ` · ${o.orderType}` : ''} · {o.ageDays}d</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{o.orderType ? ` · ${o.orderType}` : ''}</span>
                   </Link>
                 ))}
               </div>

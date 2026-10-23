@@ -135,6 +135,27 @@ const CLIENT_NAME_SQL = (a: string) =>
 // and "Vow And Vine LLC" failed to merge in production with the \s version.
 const CLIENT_KEY_SQL = (a: string) =>
   `TRIM(regexp_replace(regexp_replace(regexp_replace(translate(lower(${CLIENT_NAME_SQL(a)}), chr(160), ' '), '[.,'']', '', 'g'), '[[:space:]]+', ' ', 'g'), '( (llc|inc|incorporated|ltd|limited|co|corp|corporation|gmbh|bv|pty))+$', ''))`;
+// When the customer approved the order's design: the first CAD approval,
+// falling back to vpoIssuedAt (set when a VPO is issued, including the
+// auto-issue on approval) for older orders whose CAD rows predate approvedAt.
+const APPROVED_AT_SQL = (a: string) =>
+  `COALESCE((SELECT MIN(cf."approvedAt") FROM cad_files cf WHERE cf."orderId" = ${a}.id::text AND cf."approvedAt" IS NOT NULL), ${a}."vpoIssuedAt")`;
+
+// When the order counted as Completed in the report (reached VPO Issued):
+// vpoIssuedAt, else the first CAD approval (VPO is auto-issued on approval)
+// for older orders that predate vpoIssuedAt.
+const COMPLETED_AT_SQL = (a: string) =>
+  `COALESCE(${a}."vpoIssuedAt", (SELECT MIN(cf."approvedAt") FROM cad_files cf WHERE cf."orderId" = ${a}.id::text AND cf."approvedAt" IS NOT NULL))`;
+// When the CAD now awaiting approval was sent: awaitingApprovalSince (set on
+// send, not reset by reminder emails), else the latest design upload for
+// orders sent before that column existed.
+const AWAITING_SINCE_SQL = (a: string) =>
+  `COALESCE(${a}."awaitingApprovalSince", (SELECT MAX(cf."createdAt") FROM cad_files cf WHERE cf."orderId" = ${a}.id::text AND (cf."designerNotes" IS NULL OR cf."designerNotes" NOT IN ('Reference image', 'Customer reference image'))))`;
+// When the order was cancelled: the latest logged status change to
+// CANCELLED, else updatedAt for orders cancelled before events were logged.
+const CANCELLED_AT_SQL = (a: string) =>
+  `COALESCE((SELECT MAX(ev."createdAt") FROM order_events ev WHERE ev."orderId" = ${a}.id::text AND ev.action = 'STATUS_CHANGE' AND ev."toStatus" = 'CANCELLED'), ${a}."updatedAt")`;
+
 // The one stage bucket each order is counted in. CAD In Progress buckets
 // mirror the Orders page CAD sub-filters in buildOrdersQuery.
 const CONVERSION_STAGE_SQL = (a: string) => {
@@ -924,12 +945,21 @@ export class OrdersService implements OnModuleInit {
   // Order list behind one Client Conversion row — same period, same
   // CLIENT_KEY_SQL grouping and same stage buckets as the report itself, so
   // the drill-down always adds up to what was counted.
+  //
+  // No day counts here on purpose: a "days since placed" figure kept growing
+  // after an order finished and read as a delay (C00285 showed "78d" though
+  // it was approved in 1 day). The key dates are returned for the hover text.
   async getClientConversionOrders(clientKey: string, month?: string, dateFrom?: string, dateTo?: string): Promise<{
-    id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: string; ageDays: number;
+    id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: string;
+    completedAt: string | null; awaitingSince: string | null;
+    cancelledAt: string | null; shippedDate: string | null;
   }[]> {
     const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
     const rows: any[] = await this.orderRepo.query(
-      `SELECT o.id, o."poNumber", o."orderType", o."createdAt", o.status,
+      `SELECT o.id, o."poNumber", o."orderType", o."createdAt", o.status, o."shippedDate",
+              ${COMPLETED_AT_SQL('o')} AS completed_at,
+              ${AWAITING_SINCE_SQL('o')} AS awaiting_since,
+              ${CANCELLED_AT_SQL('o')} AS cancelled_at,
               ${CONVERSION_STAGE_SQL('o')} AS stage
        FROM orders o
        WHERE o."createdAt" BETWEEN $1 AND $2
@@ -937,7 +967,7 @@ export class OrdersService implements OnModuleInit {
        ORDER BY o."createdAt" DESC`,
       [start, end, clientKey],
     );
-    const now = Date.now();
+    const iso = (v: any) => (v ? new Date(v).toISOString() : null);
     return rows.map(r => ({
       id: r.id,
       poNumber: r.poNumber,
@@ -945,7 +975,10 @@ export class OrdersService implements OnModuleInit {
       createdAt: new Date(r.createdAt).toISOString(),
       status: r.status,
       stage: r.stage,
-      ageDays: Math.floor((now - new Date(r.createdAt).getTime()) / 86400000),
+      completedAt: r.stage === 'completed' ? iso(r.completed_at) : null,
+      awaitingSince: r.stage === 'awaiting_approval' ? iso(r.awaiting_since) : null,
+      cancelledAt: r.stage === 'cancelled' ? iso(r.cancelled_at) : null,
+      shippedDate: r.shippedDate || null,
     }));
   }
 
@@ -983,7 +1016,10 @@ export class OrdersService implements OnModuleInit {
          GROUP BY c."orderId"
        )
        SELECT o.id, o."poNumber", o."refCustomerPo", o."orderType", o."metalType", o."metalColor",
-              o."createdAt", o."vpoIssuedAt", o.status, o."quotedCost",
+              o."createdAt", o."vpoIssuedAt", o.status, o."quotedCost", o."shippedDate",
+              ${APPROVED_AT_SQL('o')} AS approved_at,
+              ${AWAITING_SINCE_SQL('o')} AS awaiting_since,
+              ${CANCELLED_AT_SQL('o')} AS cancelled_at,
               ${CLIENT_NAME_SQL('o')} AS client_name,
               ${CLIENT_KEY_SQL('o')} AS client_key,
               ${CONVERSION_STAGE_SQL('o')} AS stage,
@@ -1073,10 +1109,13 @@ export class OrdersService implements OnModuleInit {
       { header: 'Order Type', key: 'type', width: 14 },
       { header: 'Metal', key: 'metal', width: 18 },
       { header: 'Placed', key: 'placed', width: 12 },
-      { header: 'Age (days)', key: 'age', width: 10 },
       { header: 'Stage', key: 'stage', width: 18 },
       { header: 'Status', key: 'status', width: 16 },
+      { header: 'Approved', key: 'approved', width: 12 },
       { header: 'VPO Issued', key: 'vpo', width: 12 },
+      { header: 'Sent for Approval', key: 'awaitingSince', width: 14 },
+      { header: 'Cancelled', key: 'cancelled', width: 12 },
+      { header: 'Shipped', key: 'shipped', width: 12 },
       { header: 'CADs Created', key: 'cads', width: 12 },
       { header: 'Revisions', key: 'revisions', width: 10 },
       { header: 'Quoted Price', key: 'price', width: 13 },
@@ -1084,7 +1123,6 @@ export class OrdersService implements OnModuleInit {
       { header: 'Open in Dashboard', key: 'link', width: 18 },
     ];
     styleHeader(o.getRow(1));
-    const now = Date.now();
     for (const r of orders) {
       const created = new Date(r.createdAt);
       o.addRow({
@@ -1095,10 +1133,13 @@ export class OrdersService implements OnModuleInit {
         type: r.orderType || '',
         metal: [r.metalType, r.metalColor].filter(Boolean).join(' · '),
         placed: created,
-        age: Math.floor((now - created.getTime()) / 86400000),
         stage: STAGE_LABELS[r.stage] || r.stage,
         status: STATUS_LABELS[r.status] || r.status,
+        approved: r.approved_at ? new Date(r.approved_at) : null,
         vpo: r.vpoIssuedAt ? new Date(r.vpoIssuedAt) : null,
+        awaitingSince: r.stage === 'awaiting_approval' && r.awaiting_since ? new Date(r.awaiting_since) : null,
+        cancelled: r.stage === 'cancelled' && r.cancelled_at ? new Date(r.cancelled_at) : null,
+        shipped: r.shippedDate ? new Date(`${r.shippedDate}T00:00:00Z`) : null,
         cads: Number(r.cads),
         revisions: Math.max(Number(r.cads) - 1, 0),
         price: r.quotedCost != null ? Number(r.quotedCost) : null,
@@ -1108,9 +1149,13 @@ export class OrdersService implements OnModuleInit {
     }
     o.getColumn('placed').numFmt = 'mmm d, yyyy';
     o.getColumn('vpo').numFmt = 'mmm d, yyyy';
+    o.getColumn('approved').numFmt = 'mmm d, yyyy';
+    o.getColumn('awaitingSince').numFmt = 'mmm d, yyyy';
+    o.getColumn('cancelled').numFmt = 'mmm d, yyyy';
+    o.getColumn('shipped').numFmt = 'mmm d, yyyy';
     o.getColumn('price').numFmt = '$#,##0.00';
     o.getColumn('link').font = { color: { argb: 'FF2563EB' }, underline: true };
-    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 16 } };
+    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 19 } };
 
     // ── Definitions ────────────────────────────────────────────────────────
     const d = wb.addWorksheet('Definitions');
@@ -1129,6 +1174,8 @@ export class OrdersService implements OnModuleInit {
       ['Conversion %', 'Completed ÷ Orders Placed.'],
       ['Revisions', 'CADs the customer sent back for changes — every CAD version of an order except its latest, counted the same way as CADs Created, including orders that were revised and later approved. On All Orders, Revisions = CADs Created − 1 for each order.'],
       ['Revision Rate %', 'Share of all CADs that were sent back for changes: Revisions ÷ CADs Created. Example: order A was revised twice and approved on the 3rd CAD, order B was revised once and approved on the 2nd CAD — 5 CADs in total, 3 sent back, so 3 ÷ 5 = 60%. Always between 0% and 100%.'],
+      ['Sent for Approval', 'All Orders sheet: for orders Awaiting Approval, the date the CAD was sent to the customer.'],
+      ['Cancelled (date)', 'All Orders sheet: for cancelled orders, the date the order was cancelled.'],
       ['Client grouping', 'Names are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so "Vow and Vine" and "Vow And Vine LLC" are one client. "Name on Order" in All Orders shows the exact spelling on each order.'],
       ['Tip', 'Every order is in exactly one stage, so filtering All Orders by Client and Stage gives the exact orders behind any number on the Summary sheet.'],
     ].forEach(([term, meaning]) => {
