@@ -850,9 +850,17 @@ export class OrdersService implements OnModuleInit {
     client: string; clientKey: string; ordersPlaced: number; cadsCreated: number;
     completed: number; pendingCad: number; awaitingQuote: number; awaitingApproval: number;
     revision: number; cancelled: number; other: number; conversionPct: number;
+    revisions: number; ordersWithCad: number; revisionRatePct: number | null;
   }[]> {
     const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
 
+    // Revisions = CADs sent back for changes: every CAD version of an order
+    // except its latest (same per-day counting as CADs Created), so an order
+    // revised twice and approved on the 3rd version has 2. Revision Rate =
+    // revisions ÷ CADs Created, i.e. the share of all CADs that were sent
+    // back — 5 CADs with 3 sent back = 60%. Always 0–100%, and orders with
+    // no CAD yet don't affect it (the team's earlier Excel formula,
+    // (CADs − Orders) ÷ Orders, went negative for those).
     const rows: any[] = await this.orderRepo.query(
       `WITH keyed AS (
          SELECT o.id,
@@ -880,7 +888,9 @@ export class OrdersService implements OnModuleInit {
          COUNT(*) FILTER (WHERE k.stage = 'awaiting_approval')::int AS "awaitingApproval",
          COUNT(*) FILTER (WHERE k.stage = 'revision')::int AS revision,
          COUNT(*) FILTER (WHERE k.stage = 'cancelled')::int AS cancelled,
-         COUNT(*) FILTER (WHERE k.stage = 'other')::int AS other
+         COUNT(*) FILTER (WHERE k.stage = 'other')::int AS other,
+         COALESCE(SUM(GREATEST(cd.revisions - 1, 0)), 0)::int AS revisions,
+         COUNT(cd."orderId")::int AS "ordersWithCad"
        FROM keyed k
        LEFT JOIN cads cd ON cd."orderId" = k.id::text
        GROUP BY k.client_key
@@ -904,6 +914,9 @@ export class OrdersService implements OnModuleInit {
         cancelled: Number(r.cancelled),
         other: Number(r.other),
         conversionPct: ordersPlaced ? Math.round((completed / ordersPlaced) * 1000) / 10 : 0,
+        revisions: Number(r.revisions),
+        ordersWithCad: Number(r.ordersWithCad),
+        revisionRatePct: Number(r.cadsCreated) ? Math.round((Number(r.revisions) / Number(r.cadsCreated)) * 1000) / 10 : null,
       };
     });
   }
@@ -940,13 +953,13 @@ export class OrdersService implements OnModuleInit {
   // data/date-range rules as getClientConversionReport, just serialized.
   async exportClientConversionCsv(month?: string, dateFrom?: string, dateTo?: string): Promise<string> {
     const rows = await this.getClientConversionReport(month, dateFrom, dateTo);
-    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed (VPO Issued+)', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'Revision', 'Cancelled', 'Other', 'Conversion %'];
+    const header = ['Client', 'Orders Placed', 'CADs Created', 'Completed (VPO Issued+)', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'In Revision', 'Cancelled', 'Other', 'Conversion %', 'Revisions', 'Revision Rate %'];
     const lines = [
       header.map(csvEscape).join(','),
       ...rows.map(r => [
         r.client, String(r.ordersPlaced), String(r.cadsCreated), String(r.completed), String(r.pendingCad),
         String(r.awaitingQuote), String(r.awaitingApproval), String(r.revision), String(r.cancelled), String(r.other),
-        `${r.conversionPct}%`,
+        `${r.conversionPct}%`, String(r.revisions), r.revisionRatePct == null ? '' : `${r.revisionRatePct}%`,
       ].map(csvEscape).join(',')),
     ];
     return lines.join('\n');
@@ -987,7 +1000,7 @@ export class OrdersService implements OnModuleInit {
 
     const STAGE_LABELS: Record<string, string> = {
       completed: 'Completed', pending_cad: 'Pending CAD', awaiting_quote: 'Awaiting Quote',
-      awaiting_approval: 'Awaiting Approval', revision: 'Revision', cancelled: 'Cancelled', other: 'Other',
+      awaiting_approval: 'Awaiting Approval', revision: 'In Revision', cancelled: 'Cancelled', other: 'Other',
     };
     const STATUS_LABELS: Record<string, string> = {
       NEW: 'New', CAD_IN_PROGRESS: 'CAD In Progress', VPO_ISSUED: 'VPO Issued', MANUFACTURED: 'Manufactured',
@@ -1016,33 +1029,39 @@ export class OrdersService implements OnModuleInit {
       { key: 'completed', width: 12 }, { key: 'pendingCad', width: 12 }, { key: 'awaitingQuote', width: 14 },
       { key: 'awaitingApproval', width: 16 }, { key: 'revision', width: 11 }, { key: 'cancelled', width: 11 },
       { key: 'other', width: 9 }, { key: 'conversion', width: 13 },
+      { key: 'revisions', width: 11 }, { key: 'revisionRate', width: 13 },
     ];
-    styleHeader(s.addRow(['Client', 'Orders Placed', 'CADs Created', 'Completed', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'Revision', 'Cancelled', 'Other', 'Conversion %']));
+    styleHeader(s.addRow(['Client', 'Orders Placed', 'CADs Created', 'Completed', 'Pending CAD', 'Awaiting Quote', 'Awaiting Approval', 'In Revision', 'Cancelled', 'Other', 'Conversion %', 'Revisions', 'Revision Rate %']));
     for (const r of summary) {
-      s.addRow({ ...r, conversion: r.conversionPct / 100 });
+      s.addRow({ ...r, conversion: r.conversionPct / 100, revisionRate: r.revisionRatePct == null ? null : r.revisionRatePct / 100 });
     }
     const first = 4, last = 3 + summary.length;
     if (summary.length) {
       // Formulas so totals follow any edits, with the computed value cached
       // as `result` so previews that don't recalculate still show numbers.
-      type NumKey = 'ordersPlaced' | 'cadsCreated' | 'completed' | 'pendingCad' | 'awaitingQuote' | 'awaitingApproval' | 'revision' | 'cancelled' | 'other';
+      type NumKey = 'ordersPlaced' | 'cadsCreated' | 'completed' | 'pendingCad' | 'awaitingQuote' | 'awaitingApproval' | 'revision' | 'cancelled' | 'other' | 'revisions';
       const sumOf = (col: string, key: NumKey) => ({
         formula: `SUM(${col}${first}:${col}${last})`,
         result: summary.reduce((t, r) => t + r[key], 0),
       });
       const totalOrders = summary.reduce((t, r) => t + r.ordersPlaced, 0);
       const totalCompleted = summary.reduce((t, r) => t + r.completed, 0);
+      const totalRevisions = summary.reduce((t, r) => t + r.revisions, 0);
+      const totalCads = summary.reduce((t, r) => t + r.cadsCreated, 0);
       const total = s.addRow({
         client: 'TOTAL', ordersPlaced: sumOf('B', 'ordersPlaced'), cadsCreated: sumOf('C', 'cadsCreated'), completed: sumOf('D', 'completed'),
         pendingCad: sumOf('E', 'pendingCad'), awaitingQuote: sumOf('F', 'awaitingQuote'), awaitingApproval: sumOf('G', 'awaitingApproval'),
         revision: sumOf('H', 'revision'), cancelled: sumOf('I', 'cancelled'), other: sumOf('J', 'other'),
         conversion: { formula: `IF(B${last + 1}=0,0,D${last + 1}/B${last + 1})`, result: totalOrders ? totalCompleted / totalOrders : 0 },
+        revisions: sumOf('L', 'revisions'),
+        revisionRate: { formula: `IF(C${last + 1}=0,0,L${last + 1}/C${last + 1})`, result: totalCads ? totalRevisions / totalCads : 0 },
       });
       total.font = { bold: true };
       total.eachCell(c => { c.border = { top: { style: 'thin' } }; });
     }
     s.getColumn('conversion').numFmt = '0.0%';
-    s.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 11 } };
+    s.getColumn('revisionRate').numFmt = '0.0%';
+    s.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: 13 } };
 
     // ── All Orders ─────────────────────────────────────────────────────────
     const o = wb.addWorksheet('All Orders', { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -1059,6 +1078,7 @@ export class OrdersService implements OnModuleInit {
       { header: 'Status', key: 'status', width: 16 },
       { header: 'VPO Issued', key: 'vpo', width: 12 },
       { header: 'CADs Created', key: 'cads', width: 12 },
+      { header: 'Revisions', key: 'revisions', width: 10 },
       { header: 'Quoted Price', key: 'price', width: 13 },
       { header: 'Sales Rep', key: 'rep', width: 20 },
       { header: 'Open in Dashboard', key: 'link', width: 18 },
@@ -1080,6 +1100,7 @@ export class OrdersService implements OnModuleInit {
         status: STATUS_LABELS[r.status] || r.status,
         vpo: r.vpoIssuedAt ? new Date(r.vpoIssuedAt) : null,
         cads: Number(r.cads),
+        revisions: Math.max(Number(r.cads) - 1, 0),
         price: r.quotedCost != null ? Number(r.quotedCost) : null,
         rep: r.rep_name || '',
         link: { text: 'Open', hyperlink: `${this.frontendUrl}/orders/${r.id}` },
@@ -1089,7 +1110,7 @@ export class OrdersService implements OnModuleInit {
     o.getColumn('vpo').numFmt = 'mmm d, yyyy';
     o.getColumn('price').numFmt = '$#,##0.00';
     o.getColumn('link').font = { color: { argb: 'FF2563EB' }, underline: true };
-    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 15 } };
+    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 16 } };
 
     // ── Definitions ────────────────────────────────────────────────────────
     const d = wb.addWorksheet('Definitions');
@@ -1102,10 +1123,12 @@ export class OrdersService implements OnModuleInit {
       ['Pending CAD', 'New, or CAD In Progress at the "Pending CAD" label — waiting on the CAD team.'],
       ['Awaiting Quote', 'CAD uploaded but not yet priced / sent to the customer.'],
       ['Awaiting Approval', 'CAD sent to the customer, waiting for their approval.'],
-      ['Revision', 'Customer asked for changes, or rejected the CAD.'],
+      ['In Revision', 'Right now, the customer has asked for changes (or rejected the CAD) and is waiting on a new version.'],
       ['Cancelled', 'Orders currently cancelled.'],
       ['Other', 'Anything else — e.g. CAD approved but VPO not issued yet, or a project the customer closed.'],
       ['Conversion %', 'Completed ÷ Orders Placed.'],
+      ['Revisions', 'CADs the customer sent back for changes — every CAD version of an order except its latest, counted the same way as CADs Created, including orders that were revised and later approved. On All Orders, Revisions = CADs Created − 1 for each order.'],
+      ['Revision Rate %', 'Share of all CADs that were sent back for changes: Revisions ÷ CADs Created. Example: order A was revised twice and approved on the 3rd CAD, order B was revised once and approved on the 2nd CAD — 5 CADs in total, 3 sent back, so 3 ÷ 5 = 60%. Always between 0% and 100%.'],
       ['Client grouping', 'Names are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so "Vow and Vine" and "Vow And Vine LLC" are one client. "Name on Order" in All Orders shows the exact spelling on each order.'],
       ['Tip', 'Every order is in exactly one stage, so filtering All Orders by Client and Stage gives the exact orders behind any number on the Summary sheet.'],
     ].forEach(([term, meaning]) => {

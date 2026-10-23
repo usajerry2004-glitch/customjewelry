@@ -12,6 +12,7 @@ interface ClientConversion {
   client: string; clientKey: string; ordersPlaced: number; cadsCreated: number;
   completed: number; pendingCad: number; awaitingQuote: number; awaitingApproval: number;
   revision: number; cancelled: number; other: number; conversionPct: number;
+  revisions: number; ordersWithCad: number; revisionRatePct: number | null;
 }
 interface ClientOrder { id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: Stage; ageDays: number }
 
@@ -22,7 +23,7 @@ const STAGES: { stage: Stage; key: keyof ClientConversion; label: string; title:
   { stage: 'pending_cad',       key: 'pendingCad',       label: 'Pending CAD',       color: '#B45309', title: 'New, or CAD In Progress at the "Pending CAD" label — waiting on the CAD team' },
   { stage: 'awaiting_quote',    key: 'awaitingQuote',    label: 'Awaiting Quote',    color: '#B45309', title: 'CAD uploaded, not yet priced / sent to the customer' },
   { stage: 'awaiting_approval', key: 'awaitingApproval', label: 'Awaiting Approval', color: '#2563EB', title: 'CAD sent — waiting on the customer to approve' },
-  { stage: 'revision',          key: 'revision',         label: 'Revision',          color: '#7C3AED', title: 'Customer asked for changes, or rejected the CAD' },
+  { stage: 'revision',          key: 'revision',         label: 'In Revision',       color: '#7C3AED', title: 'Right now, the customer has asked for changes (or rejected the CAD) and is waiting on a new version' },
   { stage: 'cancelled',         key: 'cancelled',        label: 'Cancelled',         color: '#DC2626', title: 'Orders currently Cancelled' },
   { stage: 'other',             key: 'other',            label: 'Other',             color: '#6B7280', title: 'Anything else — e.g. CAD approved but VPO not issued yet, or a project the customer closed' },
 ];
@@ -76,6 +77,10 @@ export const ClientConversionReport: React.FC = () => {
   const sum = (key: keyof ClientConversion) => clients.reduce((t, c) => t + (c[key] as number), 0);
   const totalOrders = sum('ordersPlaced');
   const totalConversionPct = totalOrders ? Math.round((sum('completed') / totalOrders) * 1000) / 10 : 0;
+  const totalCads = sum('cadsCreated');
+  const totalRevisionRatePct = totalCads ? Math.round((sum('revisions') / totalCads) * 1000) / 10 : null;
+  const revisionTitle = (revisions: number, cads: number) =>
+    `${revisions} of ${cads} CAD${cads === 1 ? '' : 's'} sent back for changes`;
 
   const handleExport = async (format: 'csv' | 'xlsx') => {
     setExporting(format);
@@ -99,7 +104,7 @@ export const ClientConversionReport: React.FC = () => {
   };
 
   const totalCell: React.CSSProperties = { ...tdStyle, borderBottom: 'none', borderTop: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 };
-  const colCount = 4 + STAGES.length;
+  const colCount = 5 + STAGES.length;
 
   const renderOrders = (clientKey: string) => {
     const list = orders[clientKey];
@@ -174,7 +179,7 @@ export const ClientConversionReport: React.FC = () => {
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1080px' }}>
           <thead>
             <tr>
               <th style={thStyle}>Client</th>
@@ -182,6 +187,7 @@ export const ClientConversionReport: React.FC = () => {
               <th title="Design versions — files for the same order on the same day count once; reference images excluded" style={{ ...thStyle, textAlign: 'right' }}>CADs Created</th>
               {STAGES.map(s => <th key={s.stage} title={s.title} style={{ ...thStyle, textAlign: 'right', cursor: 'help' }}>{s.label}</th>)}
               <th title="Completed ÷ Orders Placed" style={{ ...thStyle, textAlign: 'right' }}>Conversion %</th>
+              <th title="Share of CADs sent back for changes (including orders later approved): revised CADs ÷ CADs Created. E.g. 5 CADs, 3 sent back = 60%." style={{ ...thStyle, textAlign: 'right', cursor: 'help' }}>Revision Rate</th>
             </tr>
           </thead>
           <tbody>
@@ -200,6 +206,10 @@ export const ClientConversionReport: React.FC = () => {
                     return <td key={s.stage} style={{ ...tdStyle, textAlign: 'right', color: v && s.stage !== 'completed' ? s.color : v ? undefined : 'var(--text-muted)' }}>{v}</td>;
                   })}
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: c.conversionPct >= 50 ? 'var(--success)' : c.conversionPct > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{c.conversionPct}%</td>
+                  <td title={c.revisionRatePct == null ? 'No CADs yet' : revisionTitle(c.revisions, c.cadsCreated)}
+                    style={{ ...tdStyle, textAlign: 'right', color: c.revisionRatePct == null ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                    {c.revisionRatePct == null ? '—' : `${c.revisionRatePct}%`}
+                  </td>
                 </tr>
                 {expanded === c.clientKey && (
                   <tr>
@@ -215,6 +225,7 @@ export const ClientConversionReport: React.FC = () => {
                 <td style={totalCell}>{sum('cadsCreated')}</td>
                 {STAGES.map(s => <td key={s.stage} style={totalCell}>{sum(s.key)}</td>)}
                 <td style={totalCell}>{totalConversionPct}%</td>
+                <td style={totalCell} title={revisionTitle(sum('revisions'), totalCads)}>{totalRevisionRatePct == null ? '—' : `${totalRevisionRatePct}%`}</td>
               </tr>
             )}
             {clients.length === 0 && <tr><td style={tdStyle} colSpan={colCount}>No orders in this period.</td></tr>}
@@ -237,7 +248,7 @@ export const ClientConversionReport: React.FC = () => {
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px', lineHeight: 1.6 }}>
         Covers every order placed in this period. Each order is counted in exactly one stage column, so Completed through Other always add up to Orders Placed — click a client to see its orders grouped by stage.
         &quot;CADs Created&quot; counts design versions (same order + same day = one, reference images excluded), so it can be higher than orders when designs are revised.
-        &quot;Conversion %&quot; is Completed ÷ Orders Placed. Clients are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd. Hover a column header for its definition.
+        &quot;Conversion %&quot; is Completed ÷ Orders Placed. &quot;Revision Rate&quot; is the share of CADs sent back for changes (even if the order was approved later): 5 CADs with 3 sent back = 60%. Clients are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd. Hover a column header for its definition.
       </div>
     </div>
   );
