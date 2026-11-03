@@ -11,6 +11,8 @@ export class OrderFilterDto {
   @IsOptional() @IsString() cadSubFilter?: string;
   @IsOptional() @IsString() stoneSubFilter?: string;
   @IsOptional() @IsString() hasCustomerMessage?: string;
+  // 'true' → only website orders submitted as "Special Web Order".
+  @IsOptional() @IsIn(['true', 'false']) specialWebOrder?: string;
   // 'true' requests the Archived tab (projects closed via "Close Project" or
   // auto-archived after 30 days) instead of the normal status tabs — same
   // meaning on both the customer dashboard and the internal Orders list, see

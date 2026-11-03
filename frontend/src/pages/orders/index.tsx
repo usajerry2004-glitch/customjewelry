@@ -117,6 +117,7 @@ interface SavedFilterPreset {
   activeMonth: string;
   customerFilterInput: string;
   customerTextedFilter?: boolean;
+  specialWebFilter?: boolean;
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -219,6 +220,7 @@ export default function OrdersPage() {
   const [customerFilter, setCustomerFilter] = useState(() => readOrdersReturnState()?.customerFilter ?? '');
   const [customerFilterInput, setCustomerFilterInput] = useState(() => readOrdersReturnState()?.customerFilterInput ?? '');
   const [customerTextedFilter, setCustomerTextedFilter] = useState(() => readOrdersReturnState()?.customerTextedFilter ?? false);
+  const [specialWebFilter, setSpecialWebFilter] = useState(() => readOrdersReturnState()?.specialWebFilter ?? false);
   const [showFilterDrop, setShowFilterDrop] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -297,6 +299,7 @@ export default function OrdersPage() {
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
+    if (specialWebFilter) params.set('specialWebOrder', 'true');
     params.set('sortOrder', sortOrder);
     return params;
   };
@@ -652,6 +655,7 @@ export default function OrdersPage() {
     setCustomerFilterInput(p.customerFilterInput);
     setCustomerFilter(p.customerFilterInput);
     setCustomerTextedFilter(p.customerTextedFilter ?? false);
+    setSpecialWebFilter(p.specialWebFilter ?? false);
     setSortOrder(p.sortOrder ?? 'desc');
     setActivePresetId(p.id);
   };
@@ -663,7 +667,7 @@ export default function OrdersPage() {
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       name,
       statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
-      dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter, sortOrder,
+      dateFrom, dateTo, activeMonth, customerFilterInput, customerTextedFilter, specialWebFilter, sortOrder,
     };
     const next = [...filterPresets, preset];
     setFilterPresets(next);
@@ -691,7 +695,7 @@ export default function OrdersPage() {
     }
     setPage(0);
     load(0);
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, sortOrder]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, specialWebFilter, sortOrder]);
   useEffect(() => { load(page); }, [page]);
 
   // Per-tab counts for the status pill badges — independent of which tab is
@@ -705,8 +709,9 @@ export default function OrdersPage() {
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (customerTextedFilter) params.set('hasCustomerMessage', 'true');
+    if (specialWebFilter) params.set('specialWebOrder', 'true');
     apiFetch(`${API}/orders/status-counts?${params}`).then(r => r.ok ? r.json() : {}).then(setStatusCounts).catch(() => {});
-  }, [factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, userRole]);
+  }, [factoryFilter, supplySourceFilter, dateFrom, dateTo, customerTextedFilter, specialWebFilter, userRole]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') localStorage.setItem('jf_orders_view', viewMode);
@@ -719,10 +724,10 @@ export default function OrdersPage() {
     try {
       sessionStorage.setItem(ORDERS_RETURN_STATE_KEY, JSON.stringify({
         statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter,
-        customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder,
+        customerFilter, customerFilterInput, customerTextedFilter, specialWebFilter, dateFrom, dateTo, activeMonth, page, sortOrder,
       }));
     } catch {}
-  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, dateFrom, dateTo, activeMonth, page, sortOrder]);
+  }, [statusFilter, cadSubFilter, stoneSubFilter, factoryFilter, supplySourceFilter, customerFilter, customerFilterInput, customerTextedFilter, specialWebFilter, dateFrom, dateTo, activeMonth, page, sortOrder]);
 
   // Capture scroll position when leaving the page (merged into whatever
   // filter snapshot was last written above) and restore it once, after the
@@ -1376,12 +1381,12 @@ export default function OrdersPage() {
         {/* Desktop: pill buttons */}
         <div className="status-tabs-desktop" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => {
-            const active = statusFilter === f.value && !customerTextedFilter;
+            const active = statusFilter === f.value && !customerTextedFilter && !specialWebFilter;
             const count = statusCounts[f.value];
             return (
               <button
                 key={f.value}
-                onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); }}
+                onClick={() => { setStatusFilter(f.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); setSpecialWebFilter(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
@@ -1413,7 +1418,7 @@ export default function OrdersPage() {
               shouldn't see this tab. */}
           {!['STONE_MANAGER', 'FACTORY_MANAGER', 'FACTORY_VIEWER'].includes(userRole) && (
             <button
-              onClick={() => { setCustomerTextedFilter(true); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
+              onClick={() => { setCustomerTextedFilter(true); setSpecialWebFilter(false); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
               title="Only show orders with an unread customer chat message — clears once any staff member opens the conversation"
               style={{
                 padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
@@ -1427,13 +1432,30 @@ export default function OrdersPage() {
               Customer Text
             </button>
           )}
+          {/* Same exclusive-tab behaviour as Customer Text: spans all statuses. */}
+          {!['STONE_MANAGER', 'FACTORY_MANAGER', 'FACTORY_VIEWER'].includes(userRole) && (
+            <button
+              onClick={() => { setSpecialWebFilter(true); setCustomerTextedFilter(false); setStatusFilter(''); setCadSubFilter(''); setStoneSubFilter(''); }}
+              title="Only show orders submitted from the website as a Special Web Order"
+              style={{
+                padding: '6px 13px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+                fontWeight: specialWebFilter ? 600 : 400,
+                background: specialWebFilter ? 'var(--navy)' : 'var(--bg-card)',
+                color: specialWebFilter ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${specialWebFilter ? 'var(--navy)' : 'var(--border)'}`,
+                transition: 'all 0.15s',
+              }}
+            >
+              Special Web Orders
+            </button>
+          )}
         </div>
 
         {/* Mobile: dropdown select */}
         <select
           className="status-tabs-mobile"
           value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setCadSubFilter(''); setStoneSubFilter(''); }}
+          onChange={e => { setStatusFilter(e.target.value); setCadSubFilter(''); setStoneSubFilter(''); setCustomerTextedFilter(false); setSpecialWebFilter(false); }}
           style={{ ...inputStyle, flex: '1 1 160px', maxWidth: '220px', fontSize: '13px', padding: '8px 12px', fontWeight: 500 }}
         >
           {(ROLE_STATUS_FILTERS[userRole] ?? ALL_STATUS_FILTERS).map(f => (

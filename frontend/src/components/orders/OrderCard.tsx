@@ -75,6 +75,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onClick, compact, h
                 ★ Priority
               </span>
             )}
+            {order.externalSource === 'Special Web Order' && (
+              <span title="Special Web Order from the website" style={{ fontSize: '10px', fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '99px', padding: '1px 8px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                ✦ Special
+              </span>
+            )}
             {order.mountingOption && MOUNTING_OPTION_CONFIG[order.mountingOption] && (
               <span style={{ fontSize: '10px', fontWeight: 700, color: MOUNTING_OPTION_CONFIG[order.mountingOption].color, background: MOUNTING_OPTION_CONFIG[order.mountingOption].bg, border: `1px solid ${MOUNTING_OPTION_CONFIG[order.mountingOption].color}40`, borderRadius: '99px', padding: '1px 8px', letterSpacing: '0.3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {MOUNTING_OPTION_CONFIG[order.mountingOption].icon} {MOUNTING_OPTION_CONFIG[order.mountingOption].label}

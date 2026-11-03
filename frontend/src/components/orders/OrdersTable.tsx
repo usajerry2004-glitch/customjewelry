@@ -143,6 +143,11 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({ orders, hideFinancials
                       {priority && <span style={{ color: 'var(--accent-dark)', fontSize: '11px', marginRight: '2px' }}>★</span>}
                       {order.poNumber}
                     </span>
+                    {order.externalSource === 'Special Web Order' && (
+                      <span title="Special Web Order from the website" style={{ marginLeft: '6px', fontSize: '9.5px', fontWeight: 700, color: '#7C3AED', background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: '99px', padding: '0 6px', whiteSpace: 'nowrap' }}>
+                        ✦ Special
+                      </span>
+                    )}
                     <span style={{ display: 'block', fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px' }}>
                       {order.kiraSkuNumber || (order.refCustomerPo ? `Cust PO# ${order.refCustomerPo}` : '')}
                     </span>

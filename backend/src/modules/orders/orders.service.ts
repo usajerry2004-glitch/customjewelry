@@ -1278,9 +1278,10 @@ export class OrdersService implements OnModuleInit {
   // Filters shared between the paginated list (findAll) and the per-status
   // tab counts (getStatusCounts) — everything except status/cadSubFilter/
   // stoneSubFilter, which each caller applies on its own terms.
-  private applyCommonFilters(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>): void {
+  private applyCommonFilters(qb: SelectQueryBuilder<Order>, filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'specialWebOrder' | 'search' | 'dateFrom' | 'dateTo'>): void {
     if (filters.assignedFactory) qb.andWhere('order.assignedFactory = :assignedFactory', { assignedFactory: filters.assignedFactory });
     if (filters.supplySource) qb.andWhere('order.supplySource = :filterSupplySource', { filterSupplySource: filters.supplySource });
+    if (filters.specialWebOrder === 'true') qb.andWhere('order.externalSource = :specialWebSource', { specialWebSource: 'Special Web Order' });
 
     // "Customer texted" — orders with an UNREAD customer chat message: the
     // customer has posted at least one, and no staff member has opened the
@@ -1427,7 +1428,7 @@ export class OrdersService implements OnModuleInit {
   // gets an accurate count for "if I clicked this tab right now." Also
   // includes the two CAD sub-filter pseudo-statuses (cad_pending/cad_revision)
   // the CAD Designer role's own tab set uses instead of real statuses.
-  async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'search' | 'dateFrom' | 'dateTo'>, user?: OrdersUser): Promise<Record<string, number>> {
+  async getStatusCounts(filters: Pick<OrderFilterDto, 'assignedFactory' | 'supplySource' | 'hasCustomerMessage' | 'specialWebOrder' | 'search' | 'dateFrom' | 'dateTo'>, user?: OrdersUser): Promise<Record<string, number>> {
     const qb = this.orderRepo.createQueryBuilder('order');
     this.applyRoleScope(qb, user);
     // Every normal tab's badge (including "All") excludes archived-closed
