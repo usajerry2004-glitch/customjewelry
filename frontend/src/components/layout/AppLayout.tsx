@@ -227,6 +227,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
     await Promise.all(ids.map(oid => apiFetch(`${API}/notifications/mute/${oid}`, { method: 'DELETE' })));
   };
 
+  const clearAllNotifs = async () => {
+    if (!window.confirm('Clear all notifications? This removes them for good.')) return;
+    const res = await apiFetch(`${API}/notifications`, { method: 'DELETE' });
+    if (!res.ok) return;
+    setNotifs([]);
+    setUnread(0);
+  };
+
   const dismissNotif = async (e: React.MouseEvent, n: Notification) => {
     e.stopPropagation();
     await apiFetch(`${API}/notifications/${n.id}`, { method: 'DELETE' });
@@ -393,6 +401,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
                       {!showNotifPrefs && unread > 0 && (
                         <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                           Mark all read
+                        </button>
+                      )}
+                      {!showNotifPrefs && notifs.length > 0 && (
+                        <button onClick={clearAllNotifs} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                          Clear all
                         </button>
                       )}
                       <button

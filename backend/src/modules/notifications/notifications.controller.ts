@@ -43,6 +43,13 @@ export class NotificationsController {
     return this.notifService.markRead(id, req.user.id);
   }
 
+  @Delete()
+  @ApiOperation({ summary: "Clear (delete) all of the current user's notifications" })
+  clearAll(@Request() req: any) {
+    if (!req.user?.id) throw new UnauthorizedException();
+    return this.notifService.clearAll(req.user.id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Dismiss (delete) a notification' })
   dismiss(@Param('id') id: string, @Request() req: any) {

@@ -98,6 +98,10 @@ export class NotificationsService {
     await this.notifRepo.delete({ id, targetUserId: userId });
   }
 
+  async clearAll(userId: string): Promise<void> {
+    await this.notifRepo.delete({ targetUserId: userId });
+  }
+
   async unreadCount(userId: string, role?: string): Promise<number> {
     const qb = this.notifRepo.createQueryBuilder('n')
       .where('n.targetUserId = :uid', { uid: userId })
