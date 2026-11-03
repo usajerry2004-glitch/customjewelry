@@ -1139,7 +1139,14 @@ export class OrdersService implements OnModuleInit {
         vpo: r.vpoIssuedAt ? new Date(r.vpoIssuedAt) : null,
         awaitingSince: r.stage === 'awaiting_approval' && r.awaiting_since ? new Date(r.awaiting_since) : null,
         cancelled: r.stage === 'cancelled' && r.cancelled_at ? new Date(r.cancelled_at) : null,
-        shipped: r.shippedDate ? new Date(`${r.shippedDate}T00:00:00Z`) : null,
+        // pg hands a DATE column back as a JS Date (local midnight), not a
+        // 'YYYY-MM-DD' string — interpolating that into a string gave
+        // "Invalid Date", which Excel showed as NaN.
+        shipped: r.shippedDate
+          ? (r.shippedDate instanceof Date
+            ? new Date(Date.UTC(r.shippedDate.getFullYear(), r.shippedDate.getMonth(), r.shippedDate.getDate()))
+            : new Date(`${String(r.shippedDate).slice(0, 10)}T00:00:00Z`))
+          : null,
         cads: Number(r.cads),
         revisions: Math.max(Number(r.cads) - 1, 0),
         price: r.quotedCost != null ? Number(r.quotedCost) : null,
