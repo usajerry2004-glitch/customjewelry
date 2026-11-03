@@ -156,6 +156,100 @@ const AWAITING_SINCE_SQL = (a: string) =>
 const CANCELLED_AT_SQL = (a: string) =>
   `COALESCE((SELECT MAX(ev."createdAt") FROM order_events ev WHERE ev."orderId" = ${a}.id::text AND ev.action = 'STATUS_CHANGE' AND ev."toStatus" = 'CANCELLED'), ${a}."updatedAt")`;
 
+// When the first design CAD (not a reference image) was uploaded.
+const FIRST_CAD_AT_SQL = (a: string) =>
+  `(SELECT MIN(cf."createdAt") FROM cad_files cf WHERE cf."orderId" = ${a}.id::text AND (cf."designerNotes" IS NULL OR cf."designerNotes" NOT IN ('Reference image', 'Customer reference image')))`;
+// Design versions, same rule as the report's CADs Created: one per order per day.
+const CAD_VERSIONS_SQL = (a: string) =>
+  `(SELECT COUNT(DISTINCT to_char(cf."createdAt", 'YYYY-MM-DD'))::int FROM cad_files cf WHERE cf."orderId" = ${a}.id::text AND (cf."designerNotes" IS NULL OR cf."designerNotes" NOT IN ('Reference image', 'Customer reference image')))`;
+// First logged status change to SHIPPED — stands in for shippedDate, which
+// is often left blank.
+const SHIPPED_EVENT_AT_SQL = (a: string) =>
+  `(SELECT MIN(ev."createdAt") FROM order_events ev WHERE ev."orderId" = ${a}.id::text AND ev.action = 'STATUS_CHANGE' AND ev."toStatus" = 'SHIPPED')`;
+
+// ── Turnaround (Client Conversion report) ──────────────────────────────────
+// Working days (Mon–Fri) between milestones, against Ruchi's targets: first
+// CAD the day the order comes in, approved by the 2nd CAD, VPO the day of
+// approval, sample shipped within 7 working days of approval (alarms at 7,
+// 14 and 20). Vow and Vine is shown but never flagged — excluded from these
+// targets until its backlog clears.
+export type TurnaroundLevel = 'ok' | 'warn' | 'alert' | 'critical';
+export interface TurnaroundMetric { days: number | null; open: boolean; noDate?: boolean; level: TurnaroundLevel }
+export interface OrderTurnaround {
+  excluded: boolean;
+  firstCad: TurnaroundMetric | null;
+  cadVersions: { count: number; level: TurnaroundLevel } | null;
+  approvalToVpo: TurnaroundMetric | null;
+  approvalToShip: TurnaroundMetric | null;
+}
+export const SHIP_WARN_DAYS = 7;
+export const SHIP_ALERT_DAYS = 14;
+export const SHIP_CRITICAL_DAYS = 20;
+const TURNAROUND_EXCLUDED_CLIENT_KEYS = ['vow and vine'];
+const SHIPPED_STATUSES = ['SHIPPED', 'COMPLETED', 'REPAIR'];
+
+// A DATE column comes back from pg as a local-midnight JS Date; anything
+// else (timestamps, 'YYYY-MM-DD' strings) is parsed as-is.
+function toDateValue(v: any): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  const s = String(v);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(s);
+}
+
+function computeTurnaround(r: {
+  status: string; createdAt: any; client_key: string; first_cad_at?: any; cad_versions?: any;
+  approved_at?: any; vpoIssuedAt?: any; shippedDate?: any; shipped_event_at?: any;
+}, now: Date): OrderTurnaround {
+  const excluded = TURNAROUND_EXCLUDED_CLIENT_KEYS.includes(r.client_key);
+  const cancelled = r.status === 'CANCELLED';
+  const lvl = (l: TurnaroundLevel): TurnaroundLevel => (excluded ? 'ok' : l);
+  const sameDayLevel = (d: number) => lvl(d <= 0 ? 'ok' : d === 1 ? 'warn' : 'alert');
+  const shipLevel = (d: number) => lvl(d >= SHIP_CRITICAL_DAYS ? 'critical' : d >= SHIP_ALERT_DAYS ? 'alert' : d >= SHIP_WARN_DAYS ? 'warn' : 'ok');
+
+  const placed = new Date(r.createdAt);
+  const firstCadAt = toDateValue(r.first_cad_at);
+  const approvedAt = toDateValue(r.approved_at);
+  const vpoAt = toDateValue(r.vpoIssuedAt);
+  const shippedAt = toDateValue(r.shippedDate) || toDateValue(r.shipped_event_at);
+
+  let firstCad: TurnaroundMetric | null = null;
+  if (firstCadAt) {
+    const d = businessDaysElapsed(placed, firstCadAt);
+    firstCad = { days: d, open: false, level: sameDayLevel(d) };
+  } else if (!cancelled && (r.status === 'NEW' || r.status === 'CAD_IN_PROGRESS')) {
+    const d = businessDaysElapsed(placed, now);
+    firstCad = { days: d, open: true, level: sameDayLevel(d) };
+  }
+
+  const versions = Number(r.cad_versions) || 0;
+  const cadVersions = versions ? { count: versions, level: lvl(versions > 2 ? 'alert' : 'ok') } : null;
+
+  let approvalToVpo: TurnaroundMetric | null = null;
+  if (approvedAt && vpoAt) {
+    const d = businessDaysElapsed(approvedAt, vpoAt);
+    approvalToVpo = { days: d, open: false, level: sameDayLevel(d) };
+  } else if (approvedAt && !cancelled) {
+    const d = businessDaysElapsed(approvedAt, now);
+    approvalToVpo = { days: d, open: true, level: sameDayLevel(d) };
+  }
+
+  let approvalToShip: TurnaroundMetric | null = null;
+  if (approvedAt) {
+    if (shippedAt) {
+      const d = businessDaysElapsed(approvedAt, shippedAt);
+      approvalToShip = { days: d, open: false, level: shipLevel(d) };
+    } else if (SHIPPED_STATUSES.includes(r.status)) {
+      approvalToShip = { days: null, open: false, noDate: true, level: 'ok' };
+    } else if (!cancelled) {
+      const d = businessDaysElapsed(approvedAt, now);
+      approvalToShip = { days: d, open: true, level: shipLevel(d) };
+    }
+  }
+
+  return { excluded, firstCad, cadVersions, approvalToVpo, approvalToShip };
+}
+
 // The one stage bucket each order is counted in. CAD In Progress buckets
 // mirror the Orders page CAD sub-filters in buildOrdersQuery.
 const CONVERSION_STAGE_SQL = (a: string) => {
@@ -946,20 +1040,26 @@ export class OrdersService implements OnModuleInit {
   // CLIENT_KEY_SQL grouping and same stage buckets as the report itself, so
   // the drill-down always adds up to what was counted.
   //
-  // No day counts here on purpose: a "days since placed" figure kept growing
-  // after an order finished and read as a delay (C00285 showed "78d" though
-  // it was approved in 1 day). The key dates are returned for the hover text.
+  // No "days since placed" figure here on purpose: it kept growing after an
+  // order finished and read as a delay (C00285 showed "78d" though it was
+  // approved in 1 day). Day counts are per milestone instead — see
+  // computeTurnaround. The key dates are returned for the hover text.
   async getClientConversionOrders(clientKey: string, month?: string, dateFrom?: string, dateTo?: string): Promise<{
     id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: string;
     completedAt: string | null; awaitingSince: string | null;
-    cancelledAt: string | null; shippedDate: string | null;
+    cancelledAt: string | null; shippedDate: string | null; turnaround: OrderTurnaround;
   }[]> {
     const { start, end } = this.resolveReportRange(month, dateFrom, dateTo);
     const rows: any[] = await this.orderRepo.query(
-      `SELECT o.id, o."poNumber", o."orderType", o."createdAt", o.status, o."shippedDate",
+      `SELECT o.id, o."poNumber", o."orderType", o."createdAt", o.status, o."shippedDate", o."vpoIssuedAt",
               ${COMPLETED_AT_SQL('o')} AS completed_at,
               ${AWAITING_SINCE_SQL('o')} AS awaiting_since,
               ${CANCELLED_AT_SQL('o')} AS cancelled_at,
+              ${APPROVED_AT_SQL('o')} AS approved_at,
+              ${FIRST_CAD_AT_SQL('o')} AS first_cad_at,
+              ${CAD_VERSIONS_SQL('o')} AS cad_versions,
+              ${SHIPPED_EVENT_AT_SQL('o')} AS shipped_event_at,
+              ${CLIENT_KEY_SQL('o')} AS client_key,
               ${CONVERSION_STAGE_SQL('o')} AS stage
        FROM orders o
        WHERE o."createdAt" BETWEEN $1 AND $2
@@ -968,6 +1068,7 @@ export class OrdersService implements OnModuleInit {
       [start, end, clientKey],
     );
     const iso = (v: any) => (v ? new Date(v).toISOString() : null);
+    const now = new Date();
     return rows.map(r => ({
       id: r.id,
       poNumber: r.poNumber,
@@ -978,7 +1079,8 @@ export class OrdersService implements OnModuleInit {
       completedAt: r.stage === 'completed' ? iso(r.completed_at) : null,
       awaitingSince: r.stage === 'awaiting_approval' ? iso(r.awaiting_since) : null,
       cancelledAt: r.stage === 'cancelled' ? iso(r.cancelled_at) : null,
-      shippedDate: r.shippedDate || null,
+      shippedDate: iso(toDateValue(r.shippedDate) || r.shipped_event_at),
+      turnaround: computeTurnaround(r, now),
     }));
   }
 
@@ -1023,6 +1125,8 @@ export class OrdersService implements OnModuleInit {
               ${CLIENT_NAME_SQL('o')} AS client_name,
               ${CLIENT_KEY_SQL('o')} AS client_key,
               ${CONVERSION_STAGE_SQL('o')} AS stage,
+              ${FIRST_CAD_AT_SQL('o')} AS first_cad_at,
+              ${SHIPPED_EVENT_AT_SQL('o')} AS shipped_event_at,
               COALESCE(cd.revisions, 0) AS cads,
               NULLIF(TRIM(CONCAT(u."firstName", ' ', u."lastName")), '') AS rep_name
        FROM orders o
@@ -1118,14 +1222,28 @@ export class OrdersService implements OnModuleInit {
       { header: 'Shipped', key: 'shipped', width: 12 },
       { header: 'CADs Created', key: 'cads', width: 12 },
       { header: 'Revisions', key: 'revisions', width: 10 },
+      { header: 'Days to 1st CAD', key: 'tFirstCad', width: 11 },
+      { header: 'Approval → VPO (days)', key: 'tVpo', width: 12 },
+      { header: 'Approval → Ship (days)', key: 'tShip', width: 12 },
+      { header: 'Ship Status', key: 'shipStatus', width: 20 },
       { header: 'Quoted Price', key: 'price', width: 13 },
       { header: 'Sales Rep', key: 'rep', width: 20 },
       { header: 'Open in Dashboard', key: 'link', width: 18 },
     ];
     styleHeader(o.getRow(1));
+    const LEVEL_FILL: Record<TurnaroundLevel, string | null> = { ok: null, warn: 'FFFEF3C7', alert: 'FFFECACA', critical: 'FFDC2626' };
+    const paint = (cell: ExcelJS.Cell, level: TurnaroundLevel | undefined) => {
+      const argb = level && LEVEL_FILL[level];
+      if (!argb) return;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
+      if (level === 'critical') cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    };
+    const now = new Date();
     for (const r of orders) {
       const created = new Date(r.createdAt);
-      o.addRow({
+      const t = computeTurnaround({ ...r, cad_versions: r.cads }, now);
+      const ship = t.approvalToShip;
+      const row = o.addRow({
         client: labelByKey.get(r.client_key) || r.client_name,
         clientName: r.client_name,
         po: r.poNumber,
@@ -1149,10 +1267,18 @@ export class OrdersService implements OnModuleInit {
           : null,
         cads: Number(r.cads),
         revisions: Math.max(Number(r.cads) - 1, 0),
+        tFirstCad: t.firstCad?.days ?? null,
+        tVpo: t.approvalToVpo?.days ?? null,
+        tShip: ship?.days ?? null,
+        shipStatus: !ship ? '' : ship.noDate ? 'Shipped — no date' : ship.open ? 'Not shipped yet' : 'Shipped',
         price: r.quotedCost != null ? Number(r.quotedCost) : null,
         rep: r.rep_name || '',
         link: { text: 'Open', hyperlink: `${this.frontendUrl}/orders/${r.id}` },
       });
+      paint(row.getCell('cads'), t.cadVersions?.level);
+      paint(row.getCell('tFirstCad'), t.firstCad?.level);
+      paint(row.getCell('tVpo'), t.approvalToVpo?.level);
+      paint(row.getCell('tShip'), ship?.level);
     }
     o.getColumn('placed').numFmt = 'mmm d, yyyy';
     o.getColumn('vpo').numFmt = 'mmm d, yyyy';
@@ -1162,7 +1288,7 @@ export class OrdersService implements OnModuleInit {
     o.getColumn('shipped').numFmt = 'mmm d, yyyy';
     o.getColumn('price').numFmt = '$#,##0.00';
     o.getColumn('link').font = { color: { argb: 'FF2563EB' }, underline: true };
-    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 19 } };
+    o.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 23 } };
 
     // ── Definitions ────────────────────────────────────────────────────────
     const d = wb.addWorksheet('Definitions');
@@ -1183,6 +1309,12 @@ export class OrdersService implements OnModuleInit {
       ['Revision Rate %', 'Share of all CADs that were sent back for changes: Revisions ÷ CADs Created. Example: order A was revised twice and approved on the 3rd CAD, order B was revised once and approved on the 2nd CAD — 5 CADs in total, 3 sent back, so 3 ÷ 5 = 60%. Always between 0% and 100%.'],
       ['Sent for Approval', 'All Orders sheet: for orders Awaiting Approval, the date the CAD was sent to the customer.'],
       ['Cancelled (date)', 'All Orders sheet: for cancelled orders, the date the order was cancelled.'],
+      ['Day counts', 'All Orders sheet: working days (Mon–Fri, holidays not excluded). Yellow = needs a look, light red = alarm, dark red = red flag. Vow and Vine orders are shown but never highlighted (excluded from these targets for now).'],
+      ['Days to 1st CAD', 'Order placed → first design CAD uploaded. Target: same day (0). 1 = yellow, 2+ = red. For orders with no CAD yet, the count so far.'],
+      ['CADs Created (colour)', 'Red when the design took more than 2 CADs — the target is approval by the 2nd CAD.'],
+      ['Approval → VPO (days)', 'Design approved → VPO issued. Target: same day (0). 1 = yellow, 2+ = red. If the VPO is not issued yet, the count so far.'],
+      ['Approval → Ship (days)', `Design approved → order shipped (Shipped date, or the day the status changed to Shipped when the date is blank). Target: ${SHIP_WARN_DAYS} working days. ${SHIP_WARN_DAYS}+ = yellow, ${SHIP_ALERT_DAYS}+ = red, ${SHIP_CRITICAL_DAYS}+ = red flag. If not shipped yet, the count so far.`],
+      ['Ship Status', 'Shipped · Not shipped yet (day count still running) · Shipped — no date (status says shipped/completed but no shipped date was entered, so the day count is unknown).'],
       ['Client grouping', 'Names are grouped ignoring capitalization, punctuation and LLC/Inc/Ltd, so "Vow and Vine" and "Vow And Vine LLC" are one client. "Name on Order" in All Orders shows the exact spelling on each order.'],
       ['Tip', 'Every order is in exactly one stage, so filtering All Orders by Client and Stage gives the exact orders behind any number on the Summary sheet.'],
     ].forEach(([term, meaning]) => {

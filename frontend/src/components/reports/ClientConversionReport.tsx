@@ -14,16 +14,42 @@ interface ClientConversion {
   revision: number; cancelled: number; other: number; conversionPct: number;
   revisions: number; ordersWithCad: number; revisionRatePct: number | null;
 }
+type Level = 'ok' | 'warn' | 'alert' | 'critical';
+interface Metric { days: number | null; open: boolean; noDate?: boolean; level: Level }
+interface Turnaround {
+  excluded: boolean;
+  firstCad: Metric | null;
+  cadVersions: { count: number; level: Level } | null;
+  approvalToVpo: Metric | null;
+  approvalToShip: Metric | null;
+}
 interface ClientOrder {
   id: string; poNumber: string; orderType: string | null; createdAt: string; status: string; stage: Stage;
   completedAt: string | null; awaitingSince: string | null;
-  cancelledAt: string | null; shippedDate: string | null;
+  cancelledAt: string | null; shippedDate: string | null; turnaround: Turnaround;
 }
+
+const LEVEL_STYLE: Record<Level, React.CSSProperties> = {
+  ok: {},
+  warn: { background: '#FEF3C7', color: '#92400E' },
+  alert: { background: '#FECACA', color: '#991B1B' },
+  critical: { background: '#DC2626', color: '#fff' },
+};
+// One working-day count; "open" = still running (milestone not reached yet).
+const MetricCell: React.FC<{ m: Metric | null; title: string }> = ({ m, title }) => {
+  if (!m) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+  if (m.noDate) return <span title="Marked shipped/completed but no shipped date was entered" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>no date</span>;
+  return (
+    <span title={`${title}${m.open ? ' — not reached yet, count so far' : ''}`}
+      style={{ ...LEVEL_STYLE[m.level], padding: '1px 7px', borderRadius: '6px', fontWeight: m.level === 'ok' ? 400 : 700, whiteSpace: 'nowrap' }}>
+      {m.days}{m.open ? '+' : ''}
+    </span>
+  );
+};
 
 const fmtDate = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-// Chips deliberately show no day count — "days since placed" kept growing
-// after an order finished and read as a delay. Dates are in the hover text.
+// Hover text for an order row — the key dates behind its day counts.
 const timelineTitle = (o: ClientOrder, statusLabel: string): string => [
   statusLabel,
   `Placed ${fmtDate(o.createdAt)}`,
@@ -128,29 +154,64 @@ export const ClientConversionReport: React.FC = () => {
     if (list === 'loading' || list === undefined) return <div style={{ padding: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>Loading orders…</div>;
     if (list === 'failed') return <div style={{ padding: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>Couldn&apos;t load orders.</div>;
     // Grouped by stage, in the same order as the columns, so it reads as the
-    // breakdown of that row's numbers.
+    // breakdown of that row's numbers. Day counts are working days per
+    // milestone (see computeTurnaround in orders.service).
+    const sub: React.CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'right', padding: '4px 8px', whiteSpace: 'nowrap' };
+    const cell: React.CSSProperties = { fontSize: '12px', padding: '4px 8px', textAlign: 'right', borderTop: '1px solid var(--border-light)' };
     return (
       <div style={{ padding: '6px 4px 12px' }}>
         {STAGES.filter(s => list.some(o => o.stage === s.stage)).map(s => {
           const inStage = list.filter(o => o.stage === s.stage);
           return (
-            <div key={s.stage} style={{ marginBottom: '8px' }}>
+            <div key={s.stage} style={{ marginBottom: '10px' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '6px 0 4px' }}>
                 {s.label} · {inStage.length}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {inStage.map(o => (
-                  <Link key={o.id} href={`/orders/${o.id}`} target="_blank"
-                    title={timelineTitle(o, STATUS_LABEL[o.status] || o.status)}
-                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '8px', border: `1px solid ${s.color}33`, background: `${s.color}0D`, color: 'var(--text-primary)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                    <strong>{o.poNumber}</strong>
-                    <span style={{ color: 'var(--text-muted)' }}>{o.orderType ? ` · ${o.orderType}` : ''}</span>
-                  </Link>
-                ))}
-              </div>
+              <table style={{ borderCollapse: 'collapse', minWidth: '640px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...sub, textAlign: 'left' }}>Order</th>
+                    <th style={{ ...sub, textAlign: 'left' }}>Status</th>
+                    <th style={sub} title="Working days from order placed to first CAD uploaded. Target: same day.">1st CAD</th>
+                    <th style={sub} title="Design versions. Target: approved by the 2nd CAD.">CADs</th>
+                    <th style={sub} title="Working days from design approval to VPO issued. Target: same day.">Approval → VPO</th>
+                    <th style={sub} title="Working days from design approval to shipped. Target: 7 · yellow 7+, red 14+, dark red 20+.">Approval → Ship</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inStage.map(o => {
+                    const t = o.turnaround;
+                    return (
+                      <tr key={o.id} title={timelineTitle(o, STATUS_LABEL[o.status] || o.status)}>
+                        <td style={{ ...cell, textAlign: 'left', whiteSpace: 'nowrap' }}>
+                          <Link href={`/orders/${o.id}`} target="_blank" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
+                            <strong>{o.poNumber}</strong>
+                            <span style={{ color: 'var(--text-muted)' }}>{o.orderType ? ` · ${o.orderType}` : ''}</span>
+                          </Link>
+                          {t.excluded && <span title="Vow and Vine — shown, not flagged" style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--text-muted)' }}>V+V</span>}
+                        </td>
+                        <td style={{ ...cell, textAlign: 'left', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{STATUS_LABEL[o.status] || o.status}</td>
+                        <td style={cell}><MetricCell m={t.firstCad} title="Working days to first CAD" /></td>
+                        <td style={cell}>
+                          {t.cadVersions
+                            ? <span style={{ ...LEVEL_STYLE[t.cadVersions.level], padding: '1px 7px', borderRadius: '6px', fontWeight: t.cadVersions.level === 'ok' ? 400 : 700 }}>{t.cadVersions.count}</span>
+                            : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={cell}><MetricCell m={t.approvalToVpo} title="Working days from approval to VPO" /></td>
+                        <td style={cell}><MetricCell m={t.approvalToShip} title="Working days from approval to shipped" /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           );
         })}
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          Working days (Mon–Fri). <span style={{ ...LEVEL_STYLE.warn, padding: '0 5px', borderRadius: '4px' }}>yellow</span> needs a look ·{' '}
+          <span style={{ ...LEVEL_STYLE.alert, padding: '0 5px', borderRadius: '4px' }}>red</span> alarm ·{' '}
+          <span style={{ ...LEVEL_STYLE.critical, padding: '0 5px', borderRadius: '4px' }}>dark red</span> red flag. &quot;+&quot; = not reached yet, count so far. Vow and Vine is shown but not flagged.
+        </div>
       </div>
     );
   };
