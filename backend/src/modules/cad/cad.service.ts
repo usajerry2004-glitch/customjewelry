@@ -782,6 +782,8 @@ export class CadService {
       .getMany();
     const map: Record<string, string> = {};
     for (const cad of cads) {
+      // Customer voice notes are stored as reference files too — never use one as a card thumbnail.
+      if (/^voice note/i.test(cad.originalName || '') || /\.(m4a|mp3|wav|ogg|oga|opus|aac|weba)$/i.test(cad.originalName || '')) continue;
       if (!map[cad.orderId]) map[cad.orderId] = cad.thumbnailPath || cad.filePath || cad.fileName;
     }
     return map;

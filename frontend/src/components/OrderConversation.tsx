@@ -3,6 +3,7 @@ import { apiFetch, API } from '../utils/apiFetch';
 import { getSocket } from '../utils/socket';
 import { OrderMessage } from '../utils/types';
 import { formatName } from '../utils/name';
+import { VoiceRecorder, LocalAudio, isAudioFile } from './VoiceRecorder';
 
 interface ReadReceipt { userId: string; name: string; role: string; lastReadAt: string }
 
@@ -406,7 +407,13 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
                       </div>
                     )}
                     {msg.content}
-                    {msg.attachmentUrl && (
+                    {msg.attachmentUrl && isAudioFile(msg.attachmentName, msg.attachmentMimeType) && (
+                      <div style={{ marginTop: msg.content ? '8px' : 0, whiteSpace: 'normal' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>🎤 Voice note</div>
+                        <audio controls preload="metadata" src={msg.attachmentUrl} style={{ width: '280px', maxWidth: '100%', height: '34px' }} />
+                      </div>
+                    )}
+                    {msg.attachmentUrl && !isAudioFile(msg.attachmentName, msg.attachmentMimeType) && (
                       <a
                         href={msg.attachmentUrl}
                         target="_blank"
@@ -522,7 +529,7 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', padding: '6px 10px', borderRadius: '6px', background: 'var(--bg-hover)', border: '1px solid var(--border)', fontSize: '12px' }}>
             <span style={{ color: 'var(--text-muted)' }}>Replying to <strong style={{ color: 'var(--text-primary)' }}>{replyTo.authorName}</strong>:</span>
             <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-              {replyTo.content || (replyTo.attachmentName ? `📎 ${replyTo.attachmentName}` : '')}
+              {replyTo.content || (replyTo.attachmentName ? (isAudioFile(replyTo.attachmentName, replyTo.attachmentMimeType) ? '🎤 Voice note' : `📎 ${replyTo.attachmentName}`) : '')}
             </span>
             <button
               onClick={() => setReplyTo(null)}
@@ -536,9 +543,15 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
 
         {attachedFile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '5px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border)', fontSize: '12px' }}>
-            <PaperclipIcon />
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{attachedFile.name}</span>
-            <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(attachedFile.size)}</span>
+            {isAudioFile(attachedFile.name, attachedFile.type) ? (
+              <LocalAudio file={attachedFile} style={{ flex: 1, minWidth: 0 }} />
+            ) : (
+              <>
+                <PaperclipIcon />
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{attachedFile.name}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{formatFileSize(attachedFile.size)}</span>
+              </>
+            )}
             <button
               onClick={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
               style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: 0 }}
@@ -572,6 +585,16 @@ export function OrderConversation({ orderId, currentUserRole, currentUserId }: P
           >
             <PaperclipIcon size={16} />
           </button>
+          <VoiceRecorder
+            variant="compact"
+            label="Record a voice note"
+            onRecorded={file => {
+              if (file.size > MAX_ATTACHMENT_SIZE) { setAttachError('Recording is too large — the limit is 50MB.'); return; }
+              setAttachError('');
+              setAttachedFile(file);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }}
+          />
           <textarea
             ref={textareaRef}
             value={content}

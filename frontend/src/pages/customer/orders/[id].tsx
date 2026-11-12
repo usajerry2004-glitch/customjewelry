@@ -7,6 +7,7 @@ import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order, STATUS_CONFIG, getCadSubLabel, customerStatusLabel } from '../../../utils/types';
 import { formatCurrency } from '../../../utils/format';
 import { OrderConversation } from '../../../components/OrderConversation';
+import { VoiceRecorder, isAudioFile } from '../../../components/VoiceRecorder';
 
 const ThreeDmViewer = dynamic(() => import('../../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../../components/StlViewer'), { ssr: false });
@@ -120,6 +121,26 @@ function CloseProjectModal({ onClose, onSubmit, submitting }: { onClose: () => v
   );
 }
 
+// Fetch with auth, then save via a same-origin blob URL — a plain cross-origin
+// link is unreliable on mobile (browsers try to preview CAD formats in-tab).
+async function downloadCadFile(id: string, filename: string) {
+  try {
+    const res = await apiFetch(`${API}/cad/${id}/download`);
+    if (!res.ok) { alert('Failed to download file. Please try again.'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert('Cannot connect to server. Please check your connection.');
+  }
+}
+
 // ── Inline viewer modal (customer-facing) ─────────────────────────────────
 function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIndex: number; onClose: () => void }) {
   const [idx, setIdx] = useState(initialIndex);
@@ -179,6 +200,10 @@ function CadViewer({ cads, initialIndex, onClose }: { cads: CadFile[]; initialIn
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
+            <button onClick={() => downloadCadFile(cad.id, cad.originalName)}
+              style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: '8px', padding: '7px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ↓ Download
+            </button>
             <button onClick={onClose}
               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 12px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)' }}>
               ✕
@@ -602,6 +627,7 @@ export default function CustomerOrderDetail() {
       {/* Reference Images — always visible, customers can upload */}
       {(() => {
         const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
+        const fileRefs = refs.filter(c => !isAudioFile(c.originalName));
         return (
         <div style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -634,13 +660,40 @@ export default function CustomerOrderDetail() {
             </label>
           </div>
 
-          {refs.length === 0 ? (
+          <div style={{ marginBottom: '14px' }}>
+            <VoiceRecorder
+              label="Record a voice note for our team"
+              onRecorded={async file => {
+                if (!order?.id) return;
+                try {
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  const res = await fetch(`/api/proxy/cad/reference/${order.id}`, { method: 'POST', credentials: 'include', body: fd });
+                  if (res.ok) reload();
+                  else alert('Failed to upload the voice note — check your connection and try again.');
+                } catch {
+                  alert('Failed to upload the voice note — check your connection and try again.');
+                }
+              }}
+            />
+          </div>
+
+          {refs.filter(c => isAudioFile(c.originalName)).map(cad => (
+            <div key={cad.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 10px', marginBottom: '10px', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                🎤 Voice note · {new Date(cad.createdAt).toLocaleDateString()}
+              </div>
+              <audio controls preload="metadata" src={cad.filePath || `/uploads/cad/${cad.fileName}`} style={{ width: '100%', height: '34px' }} />
+            </div>
+          ))}
+
+          {fileRefs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
               No reference images yet. Upload an inspiration photo to share with our design team.
             </div>
           ) : (
           <div className="ref-images-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {refs.map((cad, cadIdx) => {
+            {fileRefs.map((cad, cadIdx) => {
               const ext = (cad.originalName.split('.').pop() || '').toLowerCase();
               const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
               const isVid = ['mp4','mov','webm','avi','mkv','wmv'].includes(ext);
@@ -649,7 +702,7 @@ export default function CustomerOrderDetail() {
               const fallbackIcon = isVid ? '🎬' : ext === 'pdf' ? '📄' : ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'jcd' ? '💎' : '📎';
               return (
                 <div key={cad.id}
-                  onClick={() => setViewerState({ list: refs, idx: cadIdx })}
+                  onClick={() => setViewerState({ list: fileRefs, idx: cadIdx })}
                   style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', width: '150px', cursor: 'pointer' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}

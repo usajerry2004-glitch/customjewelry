@@ -10,6 +10,7 @@ import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, fetchCadPersonOptions, addCadPersonOption } from '../../utils/catalog';
 import { OrderConversation } from '../../components/OrderConversation';
+import { isAudioFile } from '../../components/VoiceRecorder';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
@@ -237,20 +238,13 @@ function CadInlineViewer({ cad: initialCad, cads = [], initialIndex = 0, userRol
               </button>
             </div>
           )}
-          {!(ext === '3dm' && userRole === UserRole.CUSTOMER) && (
-            <a
-              href={`${API}/cad/${cad.id}/download`}
-              onClick={e => { e.preventDefault(); downloadCadFile(cad.id, cad.originalName); }}
-              style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
-            >
-              ↓ Download
-            </a>
-          )}
-          {ext === '3dm' && userRole === UserRole.CUSTOMER && (
-            <span style={{ background: 'rgba(99,102,241,0.12)', color: '#6366F1', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: 600 }}>
-              View Only
-            </span>
-          )}
+          <a
+            href={`${API}/cad/${cad.id}/download`}
+            onClick={e => { e.preventDefault(); downloadCadFile(cad.id, cad.originalName); }}
+            style={{ background: 'var(--navy)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
+          >
+            ↓ Download
+          </a>
           <button
             onClick={onClose}
             style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '15px', cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 1 }}
@@ -2014,9 +2008,35 @@ export default function OrderDetail() {
                       const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
                       const thumbUrl = cad.thumbnailPath || fileUrl;
                       const fallbackIcon = ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'pdf' ? '📄' : '📎';
+                      // Customer voice note — played inline, full row width.
+                      if (isAudioFile(cad.originalName)) {
+                        return (
+                          <div key={cad.id} style={{ gridColumn: '1 / -1', position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 10px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', paddingRight: '24px' }}>
+                              🎤 Voice note · {new Date(cad.createdAt).toLocaleDateString()}
+                            </div>
+                            <audio controls preload="metadata" src={fileUrl} style={{ width: '100%', height: '34px' }} />
+                            {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && (
+                              <button
+                                onClick={async () => {
+                                  if (!order?.id) return;
+                                  if (!confirm('Remove this voice note? This cannot be undone.')) return;
+                                  await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE' });
+                                  const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                                  if (cRes.ok) setCads(await cRes.json());
+                                }}
+                                title="Remove voice note"
+                                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '5px', width: '20px', height: '20px', color: '#fff', fontSize: '12px', cursor: 'pointer', lineHeight: 1 }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <div key={cad.id}
-                          onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
+                          onClick={() => { setViewingRefList(refs.filter(r => !isAudioFile(r.originalName))); setViewingRef(cad); }}
                           style={{ position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}

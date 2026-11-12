@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { CustomerLayout } from '../../../components/layout/CustomerLayout';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { MOUNTING_OPTIONS } from '../../../utils/types';
+import { VoiceRecorder, LocalAudio, isAudioFile } from '../../../components/VoiceRecorder';
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '11px', color: 'var(--text-muted)',
@@ -347,12 +348,16 @@ export default function NewOrderPage() {
               <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {refFiles.map((f, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{f.type.startsWith('video') ? '🎬' : '🖼'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{isAudioFile(f.name, f.type) ? '🎤' : f.type.startsWith('video') ? '🎬' : '🖼'}</span>
+                      {isAudioFile(f.name, f.type) ? (
+                        <LocalAudio file={f} style={{ flex: 1, minWidth: 0 }} />
+                      ) : (
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(f.size / 1024).toFixed(0)} KB</div>
                       </div>
+                      )}
                     </div>
                     <button onClick={() => setRefFiles(prev => prev.filter((_, j) => j !== i))}
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', flexShrink: 0, padding: '2px 6px' }}>✕</button>
@@ -368,6 +373,17 @@ export default function NewOrderPage() {
                   </button>
                 )}
               </div>
+            )}
+          </div>
+
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Voice Note (optional)</label>
+            <VoiceRecorder
+              disabled={refFiles.length >= 10}
+              onRecorded={file => setRefFiles(prev => [...prev, file].slice(0, 10))}
+            />
+            {refFiles.length >= 10 && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>Remove a file above to add a voice note — the limit is 10 files in total.</div>
             )}
           </div>
 

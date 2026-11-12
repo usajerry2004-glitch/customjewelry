@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiFetch, API } from '../../../utils/apiFetch';
 import { Order } from '../../../utils/types';
+import { isAudioFile } from '../../../components/VoiceRecorder';
 
 interface CadFile {
   id: string;
@@ -163,7 +164,12 @@ export default function CadBriefPage() {
                   const isImage = IMAGE_EXT.includes(ext);
                   return (
                     <div key={ref.id} style={{ border: '1px solid #e5e0d8', borderRadius: '6px', overflow: 'hidden', background: '#f9f8f5', breakInside: 'avoid' }}>
-                      {isImage ? (
+                      {isAudioFile(ref.originalName) ? (
+                        <div style={{ padding: '10px' }}>
+                          <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>🎤 Customer voice note</div>
+                          <audio controls preload="metadata" src={url} style={{ width: '100%', height: '34px' }} />
+                        </div>
+                      ) : isImage ? (
                         <img src={url} alt={ref.originalName} style={{ width: '100%', height: 'auto', maxHeight: '420px', objectFit: 'contain', display: 'block', background: '#fff' }} />
                       ) : (
                         <div style={{ height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#9ca3af', padding: '8px', textAlign: 'center' }}>
