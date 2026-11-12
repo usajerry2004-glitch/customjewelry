@@ -10,7 +10,7 @@ import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, fetchCadPersonOptions, addCadPersonOption } from '../../utils/catalog';
 import { OrderConversation } from '../../components/OrderConversation';
-import { isAudioFile } from '../../components/VoiceRecorder';
+import { VoiceRecorder, isAudioFile } from '../../components/VoiceRecorder';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
@@ -1987,6 +1987,23 @@ export default function OrderDetail() {
                     </label>
                   ))}
                 </div>
+
+                {(canUploadRef || userRole === UserRole.CUSTOMER) && !atRefLimit && (
+                  <VoiceRecorder
+                    label="Record a voice note"
+                    hint={userRole === UserRole.CUSTOMER ? undefined : 'Describe the design for the CAD team'}
+                    onRecorded={async file => {
+                      if (!order?.id) return;
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      const res = await fetch(`${API}/cad/reference/${order.id}`, { method: 'POST', credentials: 'include', body: fd });
+                      if (!res.ok) { toast.error('Failed to upload voice note. Please try again.'); return; }
+                      const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+                      if (cRes.ok) setCads(await cRes.json());
+                      toast.success('Voice note added');
+                    }}
+                  />
+                )}
 
                 {refs.length === 0 ? (
                   <div className="card-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>

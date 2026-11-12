@@ -64,6 +64,8 @@ interface Props {
   // 'block' = full-width panel (forms); 'compact' = icon button (chat composer).
   variant?: 'block' | 'compact';
   label?: string;
+  // Helper text beside the record button (block variant).
+  hint?: string;
 }
 
 export function MicIcon({ size = 16 }: { size?: number }) {
@@ -76,7 +78,7 @@ export function MicIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function VoiceRecorder({ onRecorded, disabled, variant = 'block', label = 'Record a voice note' }: Props) {
+export function VoiceRecorder({ onRecorded, disabled, variant = 'block', label = 'Record a voice note', hint }: Props) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
@@ -211,7 +213,7 @@ export function VoiceRecorder({ onRecorded, disabled, variant = 'block', label =
             <MicIcon size={14} /> {label}
           </button>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Explain in your own words how you’d like the piece — up to {MAX_VOICE_SECONDS / 60} minutes.
+            {hint || 'Explain in your own words how you’d like the piece'} — up to {MAX_VOICE_SECONDS / 60} minutes.
           </span>
         </div>
       )}
