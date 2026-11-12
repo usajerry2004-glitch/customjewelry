@@ -1948,12 +1948,23 @@ export default function OrderDetail() {
             );
           })()}
           {(() => {
-            const refs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
+            const allRefs = cads.filter(c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image');
+            // Voice notes get their own section and don't count toward the reference-file limit.
+            const voiceNotes = allRefs.filter(c => isAudioFile(c.originalName));
+            const refs = allRefs.filter(c => !isAudioFile(c.originalName));
             const canUploadRef = [UserRole.ADMIN, UserRole.AUTHORIZER, UserRole.SALES_REP].includes(userRole as UserRole);
+            const canRecordVoice = canUploadRef || userRole === UserRole.CUSTOMER;
+            const canDeleteRef = userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN;
             const atRefLimit = refs.length >= MAX_REFERENCE_IMAGES;
             const visibleRefs = showAllRefs ? refs : refs.slice(0, MAX_REFERENCE_IMAGES);
             const hiddenRefCount = refs.length - visibleRefs.length;
+            const reloadCads = async () => {
+              if (!order?.id) return;
+              const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
+              if (cRes.ok) setCads(await cRes.json());
+            };
             return (
+              <>
               <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
@@ -1988,23 +1999,6 @@ export default function OrderDetail() {
                   ))}
                 </div>
 
-                {(canUploadRef || userRole === UserRole.CUSTOMER) && !atRefLimit && (
-                  <VoiceRecorder
-                    label="Record a voice note"
-                    hint={userRole === UserRole.CUSTOMER ? undefined : 'Describe the design for the CAD team'}
-                    onRecorded={async file => {
-                      if (!order?.id) return;
-                      const fd = new FormData();
-                      fd.append('file', file);
-                      const res = await fetch(`${API}/cad/reference/${order.id}`, { method: 'POST', credentials: 'include', body: fd });
-                      if (!res.ok) { toast.error('Failed to upload voice note. Please try again.'); return; }
-                      const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
-                      if (cRes.ok) setCads(await cRes.json());
-                      toast.success('Voice note added');
-                    }}
-                  />
-                )}
-
                 {refs.length === 0 ? (
                   <div className="card-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {[...Array(4)].map((_, i) => (
@@ -2025,35 +2019,9 @@ export default function OrderDetail() {
                       const fileUrl = cad.filePath || `/uploads/cad/${cad.fileName}`;
                       const thumbUrl = cad.thumbnailPath || fileUrl;
                       const fallbackIcon = ext === '3dm' ? '🧊' : ext === 'stl' ? '🔺' : ext === 'pdf' ? '📄' : '📎';
-                      // Customer voice note — played inline, full row width.
-                      if (isAudioFile(cad.originalName)) {
-                        return (
-                          <div key={cad.id} style={{ gridColumn: '1 / -1', position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 10px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', paddingRight: '24px' }}>
-                              🎤 Voice note · {new Date(cad.createdAt).toLocaleDateString()}
-                            </div>
-                            <audio controls preload="metadata" src={fileUrl} style={{ width: '100%', height: '34px' }} />
-                            {(userRole === UserRole.CAD_DESIGNER || userRole === UserRole.ADMIN) && (
-                              <button
-                                onClick={async () => {
-                                  if (!order?.id) return;
-                                  if (!confirm('Remove this voice note? This cannot be undone.')) return;
-                                  await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE' });
-                                  const cRes = await apiFetch(`${API}/cad/order/${order.id}`);
-                                  if (cRes.ok) setCads(await cRes.json());
-                                }}
-                                title="Remove voice note"
-                                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '5px', width: '20px', height: '20px', color: '#fff', fontSize: '12px', cursor: 'pointer', lineHeight: 1 }}
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                        );
-                      }
                       return (
                         <div key={cad.id}
-                          onClick={() => { setViewingRefList(refs.filter(r => !isAudioFile(r.originalName))); setViewingRef(cad); }}
+                          onClick={() => { setViewingRefList(refs); setViewingRef(cad); }}
                           style={{ position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s' }}
                           onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'}
                           onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'}
@@ -2128,6 +2096,56 @@ export default function OrderDetail() {
                   </div>
                 )}
               </div>
+
+              {/* ── Reference Voice Notes ── */}
+              <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: 0 }}>
+                  🎤 Reference Voice Notes {voiceNotes.length > 0 && `(${voiceNotes.length})`}
+                </h3>
+
+                {canRecordVoice && (
+                  <VoiceRecorder
+                    label="Record a voice note"
+                    hint={userRole === UserRole.CUSTOMER ? undefined : 'Describe the design for the CAD team'}
+                    onRecorded={async file => {
+                      if (!order?.id) return;
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      const res = await fetch(`${API}/cad/reference/${order.id}`, { method: 'POST', credentials: 'include', body: fd });
+                      if (!res.ok) { toast.error('Failed to upload voice note. Please try again.'); return; }
+                      await reloadCads();
+                      toast.success('Voice note added');
+                    }}
+                  />
+                )}
+
+                {voiceNotes.length === 0 ? (
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', padding: '6px 0' }}>
+                    No voice notes yet
+                  </div>
+                ) : voiceNotes.map(cad => (
+                  <div key={cad.id} style={{ position: 'relative', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', paddingRight: '24px' }}>
+                      🎤 Voice note · {new Date(cad.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                    <audio controls preload="metadata" src={cad.filePath || `/uploads/cad/${cad.fileName}`} style={{ width: '100%', height: '34px' }} />
+                    {canDeleteRef && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Remove this voice note? This cannot be undone.')) return;
+                          await apiFetch(`${API}/cad/${cad.id}`, { method: 'DELETE' });
+                          await reloadCads();
+                        }}
+                        title="Remove voice note"
+                        style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '5px', width: '20px', height: '20px', color: '#fff', fontSize: '12px', cursor: 'pointer', lineHeight: 1 }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              </>
             );
           })()}
 

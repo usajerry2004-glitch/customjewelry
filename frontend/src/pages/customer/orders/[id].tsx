@@ -632,7 +632,7 @@ export default function CustomerOrderDetail() {
         <div style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', margin: 0 }}>
-              📌 Reference Images {refs.length > 0 && `(${refs.length})`}
+              📌 Reference Images {fileRefs.length > 0 && `(${fileRefs.length})`}
             </h3>
             <label style={{ cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--accent-dark)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '4px 10px', background: 'transparent' }}>
               + Add Image

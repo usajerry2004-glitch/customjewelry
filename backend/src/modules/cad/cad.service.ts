@@ -27,6 +27,11 @@ const RESET_STALL_SURVEY_FIELDS = {
 
 const MAX_REFERENCE_IMAGES = 10;
 
+// Customer/staff voice notes are stored as reference files too, but they live in
+// their own section — they don't count toward the limit or become thumbnails.
+const isVoiceNote = (name?: string | null) =>
+  /^voice note/i.test(name || '') || /\.(m4a|mp3|wav|ogg|oga|opus|aac|weba)$/i.test(name || '');
+
 // Target field values for each manually-selectable CAD sub-stage — keeps order.cadSubStatus,
 // order.sentToCustomer, and the underlying CAD file statuses consistent with each other.
 const CAD_SUB_STAGE_FIELDS: Record<string, { cadSubStatus: string | null; sentToCustomer: boolean; fileStatus: CadFileStatus }> = {
@@ -547,9 +552,9 @@ export class CadService {
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     const existing = await this.cadRepo.find({ where: { orderId } });
     const existingRefCount = existing.filter(
-      c => c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image',
+      c => (c.designerNotes === 'Reference image' || c.designerNotes === 'Customer reference image') && !isVoiceNote(c.originalName),
     ).length;
-    if (existingRefCount >= MAX_REFERENCE_IMAGES) {
+    if (!isVoiceNote(file.originalname) && existingRefCount >= MAX_REFERENCE_IMAGES) {
       throw new BadRequestException(`Maximum of ${MAX_REFERENCE_IMAGES} reference images allowed per order.`);
     }
     const uploaded = await this.spacesService.uploadWithThumbnail(file.buffer, 'cad', file.originalname, file.mimetype);
@@ -782,8 +787,7 @@ export class CadService {
       .getMany();
     const map: Record<string, string> = {};
     for (const cad of cads) {
-      // Customer voice notes are stored as reference files too — never use one as a card thumbnail.
-      if (/^voice note/i.test(cad.originalName || '') || /\.(m4a|mp3|wav|ogg|oga|opus|aac|weba)$/i.test(cad.originalName || '')) continue;
+      if (isVoiceNote(cad.originalName)) continue;
       if (!map[cad.orderId]) map[cad.orderId] = cad.thumbnailPath || cad.filePath || cad.fileName;
     }
     return map;
