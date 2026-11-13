@@ -11,6 +11,7 @@ import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, fetchCadPersonOptions, addCadPersonOption } from '../../utils/catalog';
 import { OrderConversation } from '../../components/OrderConversation';
 import { VoiceRecorder, isAudioFile } from '../../components/VoiceRecorder';
+import { DeadlineChips } from '../../components/DeadlineChips';
 
 const ThreeDmViewer = dynamic(() => import('../../components/ThreeDmViewer'), { ssr: false });
 const StlViewer = dynamic(() => import('../../components/StlViewer'), { ssr: false });
@@ -1631,6 +1632,9 @@ export default function OrderDetail() {
     <AppLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.storeName || order.customerFullName || ''}
+      titleExtra={userRole && userRole !== UserRole.CUSTOMER
+        ? <DeadlineChips order={order} cads={cads} events={events} />
+        : undefined}
       onBack={goBackToOrders}
       backLabel="Back to Orders"
       actions={

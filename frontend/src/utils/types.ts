@@ -114,6 +114,7 @@ export interface Order {
   qcDone?: boolean;
   vendorName?: string;
   stoneStatus?: StoneStatus | null;
+  vpoIssuedAt?: string | null;
   // String, not the SupplySource/Factory enums — those only cover the original
   // built-ins; the assignable list now also includes whatever an Admin has
   // added via Settings > "+ Add Factory"/"+ Add Stone Supplier".

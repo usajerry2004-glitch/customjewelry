@@ -17,12 +17,14 @@ interface AppLayoutProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  // Shown inline right after the title (e.g. the order page's deadline chips).
+  titleExtra?: React.ReactNode;
   actions?: React.ReactNode;
   onBack?: () => void;
   backLabel?: string;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle, actions, onBack, backLabel = 'Back' }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle, titleExtra, actions, onBack, backLabel = 'Back' }) => {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const [notifs, setNotifs] = useState<Notification[]>([]);
@@ -306,13 +308,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, title, subtitle,
             )}
             <div style={{ minWidth: 0 }}>
               {title && (
-                <div className="topbar-title" style={{
-                  fontFamily: 'Cormorant Garamond, Georgia, serif',
-                  fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)',
-                  letterSpacing: '-0.3px', lineHeight: 1, whiteSpace: 'nowrap',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {title}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div className="topbar-title" style={{
+                    fontFamily: 'Cormorant Garamond, Georgia, serif',
+                    fontSize: '28px', fontWeight: 600, color: 'var(--text-primary)',
+                    letterSpacing: '-0.3px', lineHeight: 1, whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
+                  }}>
+                    {title}
+                  </div>
+                  {titleExtra}
                 </div>
               )}
               {subtitle && (
