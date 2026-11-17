@@ -659,6 +659,26 @@ export class OrdersService implements OnModuleInit {
     } catch (err) {
       this.logger.error('Startup supplySource cleanup failed:', (err as Error)?.message);
     }
+
+    // One-time startup fix: the 30-day auto-archive used to ignore status and
+    // archived orders already past CAD (In Production, Manufactured, ...).
+    // Un-archive those; the job now only touches CAD In Progress orders.
+    // Idempotent — a no-op once none remain.
+    try {
+      const result = await this.orderRepo.query(
+        `UPDATE orders SET "isArchived" = false
+          WHERE "isArchived" = true AND "closureReason" = $1 AND status NOT IN ('CAD_IN_PROGRESS', 'CANCELLED')
+          RETURNING id, "poNumber", status`,
+        [AUTO_ARCHIVE_REASON],
+      );
+      const rows: { id: string; poNumber: string; status: string }[] = Array.isArray(result?.[0]) ? result[0] : (Array.isArray(result) ? result : []);
+      for (const r of rows) {
+        this.logEvent(r.id, 'PROJECT_CLOSED', undefined, r.status, r.status, 'Un-archived — order was past CAD and should not have been auto-archived');
+      }
+      if (rows.length) this.logger.warn(`Startup cleanup: un-archived ${rows.length} wrongly auto-archived order(s): ${rows.map(r => r.poNumber).join(', ')}`);
+    } catch (err) {
+      this.logger.error('Startup auto-archive cleanup failed:', (err as Error)?.message);
+    }
   }
 
   private logEvent(
@@ -2920,6 +2940,11 @@ export class OrdersService implements OnModuleInit {
     const cutoff = new Date(now.getTime() - THIRTY_DAYS_MS);
     const stale = await this.orderRepo.find({
       where: {
+        // Status matters: cadSubStatus/sentToCustomer are never cleared when
+        // an order moves on to production, so without this an order that is
+        // In Production / Manufactured / Shipped still matched and got archived
+        // (and re-archived 30 days after every reactivation).
+        status: OrderStatus.CAD_IN_PROGRESS,
         cadSubStatus: 'UPLOADED',
         sentToCustomer: true,
         isArchived: false,
