@@ -41,6 +41,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SearchModule } from './modules/search/search.module';
 import { CustomerCodesModule } from './modules/customer-codes/customer-codes.module';
 import { CompaniesModule } from './modules/companies/companies.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 import { HealthController } from './health.controller';
@@ -107,6 +108,7 @@ import { HealthController } from './health.controller';
     CustomerCodesModule,
     CompaniesModule,
     CatalogModule,
+    AssistantModule,
   ],
   controllers: [HealthController],
   providers: [

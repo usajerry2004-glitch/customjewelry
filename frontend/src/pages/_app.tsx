@@ -5,10 +5,13 @@ import Head from 'next/head';
 import { useAuthStore } from '../store/auth.store';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Toaster } from '../components/Toaster';
+import { AssistantChat } from '../components/AssistantChat';
 import '../styles/globals.css';
 
 const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 const PUBLIC_PREFIXES = ['/track/', '/custom/'];
+// Token-link pages that can be opened without logging in — no assistant there.
+const NO_ASSISTANT_PREFIXES = ['/survey', '/feedback'];
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -45,6 +48,10 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <Component {...pageProps} />
       <Toaster />
+      {user && !PUBLIC_ROUTES.includes(router.pathname)
+        && !PUBLIC_PREFIXES.some(p => router.pathname.startsWith(p))
+        && !NO_ASSISTANT_PREFIXES.some(p => router.pathname.startsWith(p))
+        && <AssistantChat key={user.id} role={user.role} />}
     </ErrorBoundary>
   );
 }
