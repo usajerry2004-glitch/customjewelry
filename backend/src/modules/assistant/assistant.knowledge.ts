@@ -35,7 +35,9 @@ export const CUSTOMER_GUIDE = `
 - New Order (button on My Orders) starts a custom request: Contact Information, Jewelry Details (type, metal, color, size, quantity), Stone Details (diamond type and quality, gemstone) and Reference & Notes, where inspiration photos or videos can be added along with special instructions.
 - Opening an order shows the Current Status timeline: Order Received → CAD Design → In Production → Manufactured → Completed.
 - While an order is in CAD Design, the stage shows as Pending CAD (the designer is working on it), Awaiting Approval (a design is ready to review), or Revision (changes are being made).
-- When a design is Awaiting Your Approval, open the order to view the 3D design, then approve it or describe the changes you want. Each new design version is marked Revised.
+- How to approve a CAD design: open the order from My Orders. In the design section, files waiting on you are tagged Awaiting Your Approval. Click View on each one to look at the 3D design. If you like, type a note in the feedback box, then click Approve Design. To ask for changes instead, describe what you want in the feedback box and click Request Changes. Reject turns the design down completely. One click covers all the files sent together.
+- The approval email we send also has a link that opens the design with the same Approve Design and Request Changes buttons, no login needed.
+- After approval the order moves into production. After Request Changes the designer revises it and the new version shows up tagged Revised for another look. Each new design version is marked Revised.
 - The design file can be downloaded with the Download button on the design viewer.
 - Reference Images on the order page let you add more inspiration photos; you can also record a voice note for the team.
 - The conversation box on the order page sends a message straight to the team working on the order.
@@ -48,6 +50,8 @@ export const STAFF_GUIDE = `
 - Order detail page: specs, status changes, CAD files and revisions, reference files and reference voice notes, the customer conversation, internal notes, and the activity history.
 - Deadline chips beside the PO number (staff only) count down the targets: first CAD within 24 hours of moving to CAD In Progress, stone within 2 days of supplier assignment, manufacturing within 6 days of VPO issued. Amber means the last quarter of the window, red means overdue.
 - CAD page: the CAD designer's queue (pending CAD and revisions).
+- CAD approval flow: the designer uploads the design files on the order page. An Authorizer or Admin then enters and saves the quoted price in the order sidebar, which sends the files to the customer automatically (the order shows Awaiting customer approval). The customer approves from their dashboard or the email link, and the order moves on to production.
+- Approving a CAD design for the customer (Admin, Authorizer, CAD Designer or Sales Rep), e.g. when they approved by phone or email: open the order. The banner "Sent to customer — awaiting their approval" has Approve All, Review (to look at the files first) and a button to email the customer a reminder (once every 24 hours). Each design file card also has Approve, Request Changes and Reject buttons, with an optional feedback box. One action covers every file uploaded together.
 - Manufacturing and Stone pages: production and stone tracking for orders in production.
 - Reports, To-dos, Repairs and Customers each have their own page in the sidebar. The search bar at the top finds orders, customers, companies and messages.
 `;
