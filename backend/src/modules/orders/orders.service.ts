@@ -343,7 +343,9 @@ function buildOrderSpecDescription(o: Order): string {
 // link — the closest thing to a "reference image" on this row. CAD files and
 // the conversation thread are never in here since they live in separate
 // tables never joined into this query.
-function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; value: (o: Order) => string }[] {
+// salesRepNames: order id -> effective sales rep name (see resolveSalesRepNames);
+// omitted for factory exports, which never show the rep anyway.
+function buildOrderCsvColumns(restrictForFactory: boolean, salesRepNames?: Map<string, string>): { header: string; value: (o: Order) => string }[] {
   return ([
     { header: 'PO Number', value: (o: Order) => o.poNumber || '' },
     { header: 'Customer PO#', value: (o: Order) => o.refCustomerPo || '' },
@@ -377,6 +379,7 @@ function buildOrderCsvColumns(restrictForFactory: boolean): { header: string; va
     { header: 'Quoted Price', value: (o: Order) => o.quotedCost != null ? String(o.quotedCost) : '', factoryVisible: false },
     { header: 'Quote Options', value: (o: Order) => (o.quoteOptions || []).map(q => `${q.label}: ${formatMoney(q.price)}`).join('; '), factoryVisible: false },
     { header: 'Committed Ship Date', value: (o: Order) => o.committedShipDate || '' },
+    { header: 'Sales Rep', value: (o: Order) => salesRepNames?.get(o.id) || '', factoryVisible: false },
     { header: 'Created By', value: (o: Order) => o.salesRepName || o.salesRepEmail || '' },
     { header: 'Created Date', value: (o: Order) => o.createdAt ? o.createdAt.toISOString() : '' },
     { header: 'Updated Date', value: (o: Order) => o.updatedAt ? o.updatedAt.toISOString() : '' },
@@ -1567,6 +1570,34 @@ export class OrdersService implements OnModuleInit {
     return { orders, total };
   }
 
+  // Effective sales rep per order for CSV exports — same rule as findOne()'s
+  // assignedSalesRepName: the company's *current* rep, else the order's own
+  // stamped salesRepId. (order.salesRepName is the creator, shown separately
+  // as "Created By".) Batched: one company query and one user query total.
+  private async resolveSalesRepNames(orders: Order[]): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    if (!orders.length) return names;
+    const companyIds = Array.from(new Set(orders.map(o => o.companyId).filter(Boolean))) as string[];
+    const companies = companyIds.length
+      ? await this.companyRepo.find({ where: { id: In(companyIds) }, select: ['id', 'salesRepId'] })
+      : [];
+    const companyRep = new Map(companies.map(c => [c.id, c.salesRepId]));
+    const repIdByOrder = new Map<string, string>();
+    for (const o of orders) {
+      const repId = (o.companyId && companyRep.get(o.companyId)) || o.salesRepId;
+      if (repId) repIdByOrder.set(o.id, repId);
+    }
+    const repIds = Array.from(new Set(repIdByOrder.values()));
+    if (!repIds.length) return names;
+    const reps = await this.userRepo.find({ where: { id: In(repIds) }, select: ['id', 'firstName', 'lastName', 'email'] });
+    const repName = new Map(reps.map(r => [r.id, `${r.firstName || ''} ${r.lastName || ''}`.trim() || r.email]));
+    for (const [orderId, repId] of repIdByOrder) {
+      const n = repName.get(repId);
+      if (n) names.set(orderId, n);
+    }
+    return names;
+  }
+
   // Exports every order matching the Orders list page's current filters —
   // not just the current page — as a CSV. Same role-scoping/redaction as the
   // existing VPO-issued export (buildOrderCsvColumns), just sourced from
@@ -1578,7 +1609,7 @@ export class OrdersService implements OnModuleInit {
       .addOrderBy('order.createdAt', filters.sortOrder === 'asc' ? 'ASC' : 'DESC');
     const orders = await qb.getMany();
     const isFactory = user?.role === UserRole.FACTORY_MANAGER || user?.role === UserRole.FACTORY_VIEWER;
-    return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
+    return ordersToCsv(orders, buildOrderCsvColumns(isFactory, isFactory ? undefined : await this.resolveSalesRepNames(orders)));
   }
 
   // Powers the count badge on each status tab on the Orders list — same
@@ -1665,7 +1696,7 @@ export class OrdersService implements OnModuleInit {
       }
     }
     const orders = await this.orderRepo.find({ where, order: { vpoIssuedAt: 'DESC' } });
-    return ordersToCsv(orders, buildOrderCsvColumns(isFactory));
+    return ordersToCsv(orders, buildOrderCsvColumns(isFactory, isFactory ? undefined : await this.resolveSalesRepNames(orders)));
   }
 
   // "For RightClick" — one row per selected order, in the shape our ERP's
