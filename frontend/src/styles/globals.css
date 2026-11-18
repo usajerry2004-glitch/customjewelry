@@ -996,3 +996,12 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   }
 }
 
+
+/* ── Dashboard Assistant clearance ───────────────────────────────────────
+   Room under every page so the last buttons (e.g. the order sidebar's
+   Committed Ship Date Save) can scroll above the floating chat button.
+   Last in the file so it wins over the mobile padding overrides above. */
+@media screen {
+  .main-content-pad,
+  .customer-layout-main { padding-bottom: 88px !important; }
+}

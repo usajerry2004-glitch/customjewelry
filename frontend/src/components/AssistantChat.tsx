@@ -81,8 +81,8 @@ export function AssistantChat({ role, userId }: { role: string; userId: string }
     <>
       {open && (
         <div className="assistant-panel" role="dialog" aria-label="Dashboard assistant" style={{
-          position: 'fixed', right: '20px', bottom: '88px', zIndex: 1000,
-          width: 'min(380px, calc(100vw - 32px))', height: 'min(540px, calc(100vh - 120px))',
+          position: 'fixed', right: '16px', bottom: '76px', zIndex: 1000,
+          width: 'min(380px, calc(100vw - 32px))', height: 'min(540px, calc(100vh - 108px))',
           background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px',
           boxShadow: '0 18px 48px rgba(30,42,58,0.22)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
@@ -146,15 +146,15 @@ export function AssistantChat({ role, userId }: { role: string; userId: string }
         onClick={() => setOpen(o => !o)}
         aria-label={open ? 'Close assistant' : 'Open assistant'}
         style={{
-          position: 'fixed', right: '20px', bottom: '20px', zIndex: 1000, width: '56px', height: '56px', borderRadius: '50%',
+          position: 'fixed', right: '16px', bottom: '16px', zIndex: 1000, width: '48px', height: '48px', borderRadius: '50%',
           border: 'none', cursor: 'pointer', background: 'var(--sidebar-bg)', color: '#EDD48B',
           boxShadow: '0 8px 24px rgba(30,42,58,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         {open ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
             <path d="M8.5 11h.01M12 11h.01M15.5 11h.01" />
           </svg>
