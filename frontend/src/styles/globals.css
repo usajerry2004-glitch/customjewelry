@@ -551,7 +551,7 @@ input::placeholder, textarea::placeholder {
 
 /* ── Admin topbar responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .admin-topbar { padding: 0 14px !important; }
+  .admin-topbar { padding: 8px 14px !important; }
 }
 
 /* ── Customer portal topnav responsive ──────────────────────────────── */
