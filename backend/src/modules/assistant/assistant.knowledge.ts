@@ -30,7 +30,7 @@ export const FAQ_KNOWLEDGE = `
 `;
 
 export const CUSTOMER_GUIDE = `
-## Using JewelFlow (customer portal)
+## Using the dashboard (customer portal)
 - My Orders lists every order with its status. Use the status filters at the top to narrow the list.
 - New Order (button on My Orders) starts a custom request: Contact Information, Jewelry Details (type, metal, color, size, quantity), Stone Details (diamond type and quality, gemstone) and Reference & Notes, where inspiration photos or videos can be added along with special instructions.
 - Opening an order shows the Current Status timeline: Order Received → CAD Design → In Production → Manufactured → Completed.
@@ -43,7 +43,7 @@ export const CUSTOMER_GUIDE = `
 `;
 
 export const STAFF_GUIDE = `
-## Using JewelFlow (staff)
+## Using the dashboard (staff)
 - Orders: the main list with a status tab per stage (New, CAD In Progress, VPO Issued, Manufactured, Shipped, Completed and more), search, and filters. A Kanban board view is also available.
 - Order detail page: specs, status changes, CAD files and revisions, reference files and reference voice notes, the customer conversation, internal notes, and the activity history.
 - Deadline chips beside the PO number (staff only) count down the targets: first CAD within 24 hours of moving to CAD In Progress, stone within 2 days of supplier assignment, manufacturing within 6 days of VPO issued. Amber means the last quarter of the window, red means overdue.

@@ -64,7 +64,7 @@ export function AssistantChat({ role }: { role: string }) {
   return (
     <>
       {open && (
-        <div className="assistant-panel" role="dialog" aria-label="JewelFlow assistant" style={{
+        <div className="assistant-panel" role="dialog" aria-label="Dashboard assistant" style={{
           position: 'fixed', right: '20px', bottom: '88px', zIndex: 1000,
           width: 'min(380px, calc(100vw - 32px))', height: 'min(540px, calc(100vh - 120px))',
           background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px',
@@ -72,7 +72,7 @@ export function AssistantChat({ role }: { role: string }) {
         }}>
           <div style={{ padding: '14px 16px', background: 'var(--sidebar-bg)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 700 }}>JewelFlow Assistant</div>
+              <div style={{ fontSize: '14px', fontWeight: 700 }}>Dashboard Assistant</div>
               <div style={{ fontSize: '11px', opacity: 0.7 }}>Orders, CAD, delivery, care & sizing</div>
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -87,7 +87,7 @@ export function AssistantChat({ role }: { role: string }) {
             {messages.length === 0 && (
               <>
                 <div style={bubble('assistant')}>
-                  Hi! Ask me about {isCustomer ? 'your orders' : 'any order'}, design status, delivery dates, jewelry care, sizing, metals, or how to use JewelFlow.
+                  Hi! Ask me about {isCustomer ? 'your orders' : 'any order'}, design status, delivery dates, jewelry care, sizing, metals, or how to use the dashboard.
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {suggestions.map(s => (

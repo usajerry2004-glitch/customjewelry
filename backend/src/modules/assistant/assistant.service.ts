@@ -8,7 +8,7 @@ const MODEL = 'claude-haiku-5-5';
 const MAX_HISTORY = 12;          // messages sent to the model per request
 const MAX_MESSAGE_CHARS = 2000;  // per message
 const MAX_TOOL_ROUNDS = 4;
-const LOOKUP_LIMIT = 8;
+const LOOKUP_LIMIT = 20;
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
 interface ChatUser {
@@ -28,15 +28,27 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
 };
 
+// Same buckets as the Orders page CAD sub-tabs (see buildOrdersQuery's
+// cadSubFilter), so the assistant's labels match what staff see.
 function cadStage(o: any): string | null {
   if (o.status !== 'CAD_IN_PROGRESS') return null;
-  if (o.sentToCustomer) return 'Awaiting customer approval';
-  if (!o.cadSubStatus) return 'Pending CAD (designer working on it)';
   if (o.cadSubStatus === 'REVISION') return 'Revision in progress';
-  if (o.cadSubStatus === 'REJECTED') return 'Rejected';
-  if (o.cadSubStatus === 'UPLOADED') return 'Design uploaded, being prepared for review';
-  return null;
+  if (o.cadSubStatus === 'APPROVED') return 'Design approved by customer';
+  if (o.cadSubStatus === 'REJECTED') return 'Design rejected';
+  if (o.sentToCustomer) return 'Awaiting customer approval';
+  if (o.cadSubStatus === 'UPLOADED') return 'Design uploaded, not yet sent to customer';
+  return 'Pending CAD (designer working on it)';
 }
+
+// Tool enum → OrderFilterDto fields.
+const STATUS_FILTER: Record<string, string> = {
+  order_received: 'NEW', cad_design: 'CAD_IN_PROGRESS', in_production: 'VPO_ISSUED',
+  manufactured: 'MANUFACTURED', shipped: 'SHIPPED', repair: 'REPAIR', completed: 'COMPLETED', cancelled: 'CANCELLED',
+};
+const CAD_FILTER: Record<string, string> = {
+  pending_cad: 'cad_pending', uploaded_not_sent: 'cad_awaiting_quote', awaiting_customer_approval: 'cad_awaiting_approval',
+  revision: 'cad_revision', approved: 'cad_approved',
+};
 
 const day = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 
@@ -71,29 +83,39 @@ function safeOrder(o: any, isStaff: boolean) {
 const TOOLS: Anthropic.Tool[] = [{
   name: 'lookup_orders',
   description:
-    'Look up orders the current user is allowed to see. Returns status, CAD stage, specs and delivery dates. ' +
-    'Pass a PO number, customer name or store name to search, or leave query empty for the most recent orders.',
+    'Look up orders the current user is allowed to see (archived/closed projects excluded). Returns the total number of matches ' +
+    'plus up to 20 orders (newest first) with status, CAD stage, specs and delivery dates. ' +
+    'For questions like "which orders are pending CAD" or "what is in production", use the status / cad_stage filters ' +
+    'instead of the query text. Combine filters with query to narrow by PO, customer or store.',
   input_schema: {
     type: 'object',
-    properties: { query: { type: 'string', description: 'PO number, customer name or store name. Empty for most recent orders.' } },
+    properties: {
+      query: { type: 'string', description: 'PO number, customer name or store name. Leave empty when listing by status.' },
+      status: { type: 'string', enum: Object.keys(STATUS_FILTER), description: 'Only orders in this status.' },
+      cad_stage: {
+        type: 'string', enum: Object.keys(CAD_FILTER),
+        description: 'Only CAD Design orders at this stage. pending_cad = designer has not uploaded yet; uploaded_not_sent = design uploaded but not sent to customer; awaiting_customer_approval = sent, waiting on customer; revision = customer asked for changes; approved = customer approved.',
+      },
+    },
   },
 }];
 
 function systemPrompt(user: ChatUser, isStaff: boolean): string {
   const today = new Date().toISOString().slice(0, 10);
   return [
-    `You are the JewelFlow assistant for Kira Jewels, a custom fine jewelry manufacturer. Today is ${today}.`,
+    `You are the Dashboard Assistant for Kira Jewels, a custom fine jewelry manufacturer. Today is ${today}.`,
     isStaff
       ? `You are talking to a Kira Jewels staff member (role: ${user.role}).`
       : 'You are talking to a customer (a jewelry retailer or their client) about their own orders.',
-    'You help with: order status, CAD design stage, delivery and ship dates, jewelry care, sizing, metals, returns, and how to use JewelFlow.',
+    'You help with: order status, CAD design stage, delivery and ship dates, jewelry care, sizing, metals, returns, and how to use the dashboard. Call the website "the dashboard", never "JewelFlow".',
     'Use the lookup_orders tool for any question about a specific order or orders; never guess order details. If no order matches, say so.',
     'Strict rules:',
     '- Never name, guess or hint at any factory, manufacturer, supplier, vendor or stone source, even if asked directly. Say production is handled by the Kira Jewels team.',
     '- Never state or estimate costs, prices, margins or quotes. For pricing, point to the order page or the sales rep.',
     '- Only discuss orders returned by the tool. Never invent dates; if a date is missing, say it is not set yet.',
     '- If a question is outside these topics or the reference text, or needs a decision (refunds, rush requests, changes), suggest messaging the team in the order conversation or contacting the sales rep.',
-    'Keep answers short, friendly and plain: a few sentences or a short list. Do not use markdown headings or tables.',
+    'Keep answers short, friendly and plain: a few sentences or a short list. Write plain text only: no markdown (no asterisks, bold, headings or tables). For lists, start each line with "- ".',
+    'When listing orders, always state the total that matched. Use the stage names as given (e.g. "Pending CAD", "Awaiting customer approval").',
     '',
     'Reference text:',
     FAQ_KNOWLEDGE,
@@ -137,10 +159,19 @@ export class AssistantService {
   private async runTool(name: string, input: any, user: ChatUser, isStaff: boolean): Promise<string> {
     if (name !== 'lookup_orders') return JSON.stringify({ error: 'Unknown tool' });
     const query = typeof input?.query === 'string' ? input.query.trim().slice(0, 100) : '';
+    const cadSubFilter = CAD_FILTER[input?.cad_stage];
+    const status = cadSubFilter ? 'CAD_IN_PROGRESS' : STATUS_FILTER[input?.status];
     // OrdersService applies the same role scoping as the Orders page:
     // customers only ever get their own orders back.
-    const { orders } = await this.ordersService.findAll({ search: query || undefined, limit: LOOKUP_LIMIT } as any, user as any);
-    return JSON.stringify({ orders: orders.map(o => safeOrder(o, isStaff)) });
+    const { orders, total } = await this.ordersService.findAll(
+      { search: query || undefined, status, cadSubFilter, limit: LOOKUP_LIMIT } as any, user as any,
+    );
+    return JSON.stringify({
+      totalMatching: total,
+      shown: orders.length,
+      ...(total > orders.length ? { note: `Only the newest ${orders.length} of ${total} are listed. Tell the user the total and that the full list is on the Orders page.` } : {}),
+      orders: orders.map(o => safeOrder(o, isStaff)),
+    });
   }
 
   async chat(rawMessages: any, user: ChatUser): Promise<{ reply: string }> {
@@ -167,7 +198,9 @@ export class AssistantService {
         if (response.stop_reason !== 'tool_use' || !toolUses.length) {
           const text = response.content
             .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-            .map(b => b.text).join('\n').trim();
+            .map(b => b.text).join('\n')
+            // The chat window shows plain text; drop markdown bold/heading marks if the model slips.
+            .replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s+/gm, '').trim();
           return { reply: text || "Sorry, I couldn't come up with an answer. Please try rephrasing." };
         }
 
