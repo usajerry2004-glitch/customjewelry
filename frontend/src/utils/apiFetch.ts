@@ -1,3 +1,4 @@
+import { clearAllAssistantHistory } from './assistantHistory';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export { API };
@@ -34,6 +35,7 @@ export function apiFetch(url: string, options: RequestInit = {}): Promise<Respon
     if (res.status === 401 && !isPublicPage()) {
       localStorage.removeItem('jf_user');
       localStorage.removeItem('jf_token');
+      clearAllAssistantHistory();
       window.location.replace('/login');
     }
     return res;

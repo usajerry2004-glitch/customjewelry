@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { clearAllAssistantHistory } from '../utils/assistantHistory';
 
 interface AuthUser {
   id: string;
@@ -33,6 +34,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('jf_token');
       localStorage.removeItem('jf_user');
+      clearAllAssistantHistory();
     }
     set({ user: null });
   },

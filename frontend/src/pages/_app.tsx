@@ -51,7 +51,7 @@ export default function App({ Component, pageProps }: AppProps) {
       {user && !PUBLIC_ROUTES.includes(router.pathname)
         && !PUBLIC_PREFIXES.some(p => router.pathname.startsWith(p))
         && !NO_ASSISTANT_PREFIXES.some(p => router.pathname.startsWith(p))
-        && <AssistantChat key={user.id} role={user.role} />}
+        && <AssistantChat key={user.id} userId={user.id} role={user.role} />}
     </ErrorBoundary>
   );
 }

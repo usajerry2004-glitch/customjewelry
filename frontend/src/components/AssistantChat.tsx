@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { API, apiFetch, getErrorMessage } from '../utils/apiFetch';
+import { assistantHistoryKey, loadAssistantHistory, saveAssistantHistory } from '../utils/assistantHistory';
 
 // Floating AI assistant for customers and staff. Hidden entirely until the
 // backend reports it is configured (ANTHROPIC_API_KEY set).
@@ -9,10 +10,11 @@ interface Msg { role: 'user' | 'assistant'; content: string; error?: boolean }
 const CUSTOMER_SUGGESTIONS = ['Where is my latest order?', 'Which designs need my approval?', 'How do I care for white gold?', 'How do I find my ring size?'];
 const STAFF_SUGGESTIONS = ['Which orders are pending CAD?', 'Status of a PO number', 'What do the deadline chips mean?', '14K vs 18K gold?'];
 
-export function AssistantChat({ role }: { role: string }) {
+export function AssistantChat({ role, userId }: { role: string; userId: string }) {
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([]);
+  // Lazy init is SSR-safe here: the panel renders nothing until /status answers.
+  const [messages, setMessages] = useState<Msg[]>(() => (typeof window === 'undefined' ? [] : loadAssistantHistory(userId)));
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -26,6 +28,20 @@ export function AssistantChat({ role }: { role: string }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  // The conversation is saved (see assistantHistory) so it survives page
+  // changes and reloads; this keeps other open tabs in sync with it.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === assistantHistoryKey(userId)) setMessages(loadAssistantHistory(userId));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [userId]);
+
+  useEffect(() => {
+    saveAssistantHistory(userId, messages);
+  }, [messages, userId]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
