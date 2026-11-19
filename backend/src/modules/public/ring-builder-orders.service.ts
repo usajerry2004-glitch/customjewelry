@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { parseSpecsFromText, normalizeMetal } from './ring-builder-specs';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -95,7 +96,7 @@ export interface RingBuilderOrderResult {
 const KNOWN_STONE_SHAPES = ['Elongated Cushion', 'Round', 'Oval', 'Emerald', 'Princess', 'Cushion', 'Radiant'];
 
 @Injectable()
-export class RingBuilderOrdersService {
+export class RingBuilderOrdersService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RingBuilderOrdersService.name);
   private readonly frontendUrl: string;
 
@@ -171,6 +172,51 @@ export class RingBuilderOrdersService {
     if (dto.customerNotes) parts.push(dto.customerNotes);
 
     return parts.length ? parts.join('\n\n') : undefined;
+  }
+
+  // ── One-time style backfill: website orders that arrived before specs were
+  // read from the item text have blank Product Specs. On boot, fill ONLY the
+  // blank fields from the order's notes (which hold the original title and
+  // description) and fix metal values the dropdowns can't show. Never
+  // overwrites anything staff already entered; safe to run on every boot.
+  onApplicationBootstrap() {
+    this.backfillSpecs().catch(err => this.logger.warn('Ring Builder specs backfill failed:', err));
+  }
+
+  private async backfillSpecs() {
+    const orders = await this.orderRepo.createQueryBuilder('o')
+      .where('o.source = :src', { src: 'RING_BUILDER' })
+      .andWhere(`(COALESCE(o.size,'') = '' OR COALESCE(o.metalType,'') = '' OR COALESCE(o.metalColor,'') = ''
+        OR COALESCE(o.centerStoneShape,'') = '' OR COALESCE(o.diamondQuality,'') = ''
+        OR o.metalType NOT IN ('10K','14K','18K','Platinum')
+        OR o.metalColor NOT IN ('Yellow Gold','White Gold','Rose Gold','Platinum','Two-Tone'))`)
+      .getMany();
+    let updated = 0;
+    for (const o of orders) {
+      const t = parseSpecsFromText(o.customerNotes);
+      const cur = normalizeMetal([o.metalType, o.metalColor].filter(Boolean).join(' '));
+      const blank = (v?: string | null) => !v || !v.trim();
+      const patch: Partial<Order> = {};
+      const mt = cur.metalType || t.metalType;
+      const mc = cur.metalColor || t.metalColor;
+      if (mt && mt !== o.metalType && (blank(o.metalType) || cur.metalType)) patch.metalType = mt;
+      if (mc && mc !== o.metalColor && (blank(o.metalColor) || cur.metalColor)) patch.metalColor = mc;
+      if (blank(o.size) && t.size) patch.size = t.size;
+      if (blank(o.centerStoneShape) || blank(o.approximateCaratWeight)) {
+        const st = this.parseStones(t.stones);
+        if (blank(o.centerStoneShape) && st.shape) patch.centerStoneShape = st.shape;
+        const ct = st.caratWeight || t.caratWeight;
+        if (blank(o.approximateCaratWeight) && ct) patch.approximateCaratWeight = ct;
+      }
+      if (blank(o.diamondQuality) && t.diamondQuality) patch.diamondQuality = t.diamondQuality;
+      if (blank(o.diamondType) && t.diamondType) patch.diamondType = t.diamondType;
+      if (blank(o.stamping) && t.stamping) patch.stamping = t.stamping;
+      if (Object.keys(patch).length) {
+        await this.orderRepo.update(o.id, patch);
+        updated++;
+      }
+    }
+    if (updated) this.logger.log(`Ring Builder specs backfill: filled specs on ${updated} order(s)`);
   }
 
   // ── Find or create customer by email (same pattern as the web-form intake) ──
@@ -267,7 +313,14 @@ export class RingBuilderOrdersService {
 
       const poNumber      = await this.ordersService.generatePoNumber();
       const trackingToken = randomBytes(32).toString('hex');
-      const { shape: parsedShape, caratWeight: parsedCaratWeight } = this.parseStones(item.stones);
+      // The website often sends specs only inside the title/description text,
+      // so fall back to reading them from there, and map metal values onto the
+      // order page's dropdown options ("Yellow" -> "Yellow Gold").
+      const fromText = parseSpecsFromText(item.title, item.description, dto.customerNotes);
+      const { shape: parsedShape, caratWeight: parsedCaratWeight } = this.parseStones(item.stones || fromText.stones);
+      const sent = normalizeMetal([item.metalType, item.metalColor].filter(Boolean).join(' '));
+      const metalType  = sent.metalType  || fromText.metalType  || item.metalType  || undefined;
+      const metalColor = sent.metalColor || fromText.metalColor || item.metalColor || undefined;
 
       // "Special Web Order" carries compulsory defaults regardless of what
       // the item itself specifies — this variant is always 14K LGD / lab
@@ -289,20 +342,20 @@ export class RingBuilderOrdersService {
         phoneNumber:      dto.customer.phoneNumber,
         refCustomerPo:    dto.refCustomerPo,
         orderType:        item.orderType || item.title || 'Ring Builder',
-        size:             item.size,
-        metalType:        item.metalType,
-        metalColor:       item.metalColor,
+        size:             item.size || fromText.size,
+        metalType,
+        metalColor,
         centerStoneShape: parsedShape,
-        approximateCaratWeight: item.caratTotalWeight != null ? `${item.caratTotalWeight} ct TW` : parsedCaratWeight,
+        approximateCaratWeight: item.caratTotalWeight != null ? `${item.caratTotalWeight} ct TW` : (parsedCaratWeight || fromText.caratWeight),
         quantity:         item.quantity || 1,
         quotedCost:       item.unitPrice != null ? item.unitPrice * (item.quantity || 1) : undefined,
         referenceWeblink: item.referenceWeblink,
         customerNotes:    this.buildCustomerNotes(dto, item),
         salesRepName:     'Ring Builder',
         salesRepId:       customer.salesRepId || undefined,
-        stamping:         isSpecialWebOrder ? '14K LGD' : undefined,
-        diamondType:      isSpecialWebOrder ? 'Lab Grown Diamond' : undefined,
-        diamondQuality:   isSpecialWebOrder ? 'F+VS+' : undefined,
+        stamping:         isSpecialWebOrder ? '14K LGD' : fromText.stamping,
+        diamondType:      isSpecialWebOrder ? 'Lab Grown Diamond' : fromText.diamondType,
+        diamondQuality:   isSpecialWebOrder ? 'F+VS+' : fromText.diamondQuality,
       }));
       newlyCreated.push(order);
 
