@@ -53,6 +53,17 @@ export interface RingBuilderItemDto {
   setting?: string;
   coverage?: string;
   caratTotalWeight?: number;
+  // Optional explicit Product Specs fields. When sent, they fill the order's
+  // Product Specs boxes directly (preferred over anything read from the text).
+  sku?: string;                 // -> Kira SKU
+  stamping?: string;            // e.g. "14K LGD"
+  diamondType?: string;         // e.g. "Lab Grown Diamond", "Natural Diamond"
+  diamondQuality?: string;      // e.g. "F+VS+"
+  centerStoneShape?: string;    // e.g. "Emerald"
+  caratWeight?: string;         // e.g. "2.90 ct"
+  mountingOption?: string;      // "Mounting Only" | "Semi-Mount"
+  hasGemstone?: boolean;
+  certificateNumbers?: string[];
   // Rendered preview image(s) of the exact configuration — e.g. multiple
   // camera angles from the configurator — fetched and saved as reference
   // CadFiles, same as a customer-uploaded reference image. imageUrl is kept
@@ -320,6 +331,9 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
       const { shape: parsedShape, caratWeight: parsedCaratWeight } = this.parseStones(item.stones || fromText.stones);
       const sent = normalizeMetal([item.metalType, item.metalColor].filter(Boolean).join(' '));
       const metalType  = sent.metalType  || fromText.metalType  || item.metalType  || undefined;
+      const str = (v?: string) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+      const mounting = ['Mounting Only', 'Semi-Mount'].find(m => m.toLowerCase() === str(item.mountingOption)?.toLowerCase());
+      const certs = Array.isArray(item.certificateNumbers) ? item.certificateNumbers.map(c => String(c).trim()).filter(Boolean) : [];
       const metalColor = sent.metalColor || fromText.metalColor || item.metalColor || undefined;
 
       // "Special Web Order" carries compulsory defaults regardless of what
@@ -345,17 +359,22 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
         size:             item.size || fromText.size,
         metalType,
         metalColor,
-        centerStoneShape: parsedShape,
-        approximateCaratWeight: item.caratTotalWeight != null ? `${item.caratTotalWeight} ct TW` : (parsedCaratWeight || fromText.caratWeight),
+        centerStoneShape: str(item.centerStoneShape) || parsedShape,
+        approximateCaratWeight: str(item.caratWeight)
+          || (item.caratTotalWeight != null ? `${item.caratTotalWeight} ct TW` : (parsedCaratWeight || fromText.caratWeight)),
+        kiraSkuNumber:    str(item.sku),
+        mountingOption:   mounting || null,
+        hasGemstone:      item.hasGemstone === true,
+        certificateNumbers: certs.length ? certs : null,
         quantity:         item.quantity || 1,
         quotedCost:       item.unitPrice != null ? item.unitPrice * (item.quantity || 1) : undefined,
         referenceWeblink: item.referenceWeblink,
         customerNotes:    this.buildCustomerNotes(dto, item),
         salesRepName:     'Ring Builder',
         salesRepId:       customer.salesRepId || undefined,
-        stamping:         isSpecialWebOrder ? '14K LGD' : fromText.stamping,
-        diamondType:      isSpecialWebOrder ? 'Lab Grown Diamond' : fromText.diamondType,
-        diamondQuality:   isSpecialWebOrder ? 'F+VS+' : fromText.diamondQuality,
+        stamping:         isSpecialWebOrder ? '14K LGD' : (str(item.stamping) || fromText.stamping),
+        diamondType:      isSpecialWebOrder ? 'Lab Grown Diamond' : (str(item.diamondType) || fromText.diamondType),
+        diamondQuality:   isSpecialWebOrder ? 'F+VS+' : (str(item.diamondQuality) || fromText.diamondQuality),
       }));
       newlyCreated.push(order);
 

@@ -61,6 +61,11 @@ Call this once per completed checkout. A cart with multiple rings creates one Or
 |---|---|
 | `orderType`, `size`, `metalType`, `metalColor`, `referenceWeblink` | Same-named order field, directly |
 | `quantity` | Order quantity |
+| `sku` | Kira SKU |
+| `stamping`, `diamondType`, `diamondQuality`, `centerStoneShape`, `caratWeight` | Same-named Product Specs field (`caratWeight` -> carat weight), directly |
+| `mountingOption` | `"Mounting Only"` or `"Semi-Mount"` (anything else is ignored) |
+| `hasGemstone` | `true` / `false` |
+| `certificateNumbers` | Array of strings, e.g. `["GIA1234"]` |
 | `unitPrice` × `quantity` | Order's quoted price (total, not per-unit) |
 | `stones` (e.g. `"0.20 ct Round"`) | Split into stone shape + carat weight where we recognize the shape name; kept as-is either way |
 | `caratTotalWeight` | Preferred over the parsed `stones` weight when both are present |
