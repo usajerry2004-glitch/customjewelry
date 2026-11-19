@@ -362,6 +362,12 @@ export class Order {
   @Column({ type: 'timestamp', nullable: true })
   approvalStallRespondedAt: Date | null;
 
+  // The customer's own words when they answered the check-in by replying to
+  // the email instead of using the form (see EmailRepliesService). Null when
+  // answered via the form.
+  @Column({ type: 'text', nullable: true })
+  approvalStallEmailReply: string | null;
+
   // Post-completion feedback survey — NOT sent per-order anymore. Instead,
   // OrdersService.sendMonthlyFeedbackDigest batches every order a customer
   // completed in a calendar month into one email, sent on the first Thursday
@@ -397,6 +403,10 @@ export class Order {
 
   @Column({ type: 'text', nullable: true })
   feedbackComments: string | null;
+
+  // Same as approvalStallEmailReply, for the feedback request email.
+  @Column({ type: 'text', nullable: true })
+  feedbackEmailReply: string | null;
 
   @Column({ nullable: true })
   headStyle: string;

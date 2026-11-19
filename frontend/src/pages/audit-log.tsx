@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, string> = {
   QUOTE_OPTIONS_UPDATED: 'Quote Options Updated',
   CAD_UPLOADED: 'CAD Uploaded',
   STONE_RECEIVED: 'Stone Received',
+  EMAIL_REPLY: 'Customer Email Reply',
 };
 
 const inputStyle: React.CSSProperties = {

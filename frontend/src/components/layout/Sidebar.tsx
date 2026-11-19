@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '✓', label: 'Priority Tasks',   path: '/todos',           roles: Object.values(UserRole) as UserRole[] },
   { icon: '◇', label: 'Settings',       path: '/settings',        roles: [UserRole.ADMIN] },
   { icon: '▦', label: 'Reports',        path: '/reports',         roles: [UserRole.ADMIN] },
+  { icon: '✉', label: 'Email Replies',  path: '/email-replies',   roles: [UserRole.ADMIN] },
   { icon: '🕐', label: 'Audit Log',      path: '/audit-log',       roles: [UserRole.ADMIN, UserRole.SALES_REP, UserRole.AUTHORIZER, UserRole.CAD_DESIGNER, UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER] },
 ];
 

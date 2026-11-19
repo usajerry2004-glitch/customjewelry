@@ -42,6 +42,8 @@ import { SearchModule } from './modules/search/search.module';
 import { CustomerCodesModule } from './modules/customer-codes/customer-codes.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
+import { EmailRepliesModule } from './modules/email-replies/email-replies.module';
+import { EmailReply } from './database/entities/email-reply.entity';
 import { Todo } from './database/entities/todo.entity';
 import { AuthService } from './modules/auth/auth.service';
 import { HealthController } from './health.controller';
@@ -68,7 +70,7 @@ import { HealthController } from './health.controller';
           // lookup/write against them threw "relation does not exist",
           // masked as a generic 500 with no indication it was schema, not
           // data or logic.
-          OrderConversationRead, MutedOrderNotification, CustomerCode, CatalogItem,
+          OrderConversationRead, MutedOrderNotification, CustomerCode, CatalogItem, EmailReply,
         ];
         const pool = { extra: { max: 20, min: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 } };
         if (databaseUrl) {
@@ -109,6 +111,7 @@ import { HealthController } from './health.controller';
     CompaniesModule,
     CatalogModule,
     AssistantModule,
+    EmailRepliesModule,
   ],
   controllers: [HealthController],
   providers: [

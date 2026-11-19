@@ -16,6 +16,15 @@ export interface EmailPayload {
   // email someone should keep getting even after opting out of the general
   // notification noise (e.g. the weekly operations report).
   bypassOptOut?: boolean;
+  // Reply-To header — used by the follow-up emails so a customer's reply can
+  // be matched back to its order (see replyAddress / EmailRepliesService).
+  replyTo?: string;
+}
+
+// Customer's email reply, quoted in an admin alert.
+function quoteBlock(text: string): string {
+  const t = text.length > 1500 ? text.slice(0, 1500) + '…' : text;
+  return `<div style="border-left:3px solid #C09B58;background:#FAF7F0;padding:10px 14px;margin:12px 0;color:#4B5563;font-size:13px;white-space:pre-wrap">${escapeHtml(t)}</div>`;
 }
 
 @Injectable()
@@ -72,6 +81,7 @@ export class EmailService {
         subject: payload.subject,
         html: payload.html,
         attachments: payload.attachments,
+        ...(payload.replyTo ? { replyTo: payload.replyTo } : {}),
       });
 
       this.logger.log(`Email sent: "${payload.subject}" → ${to}`);
@@ -105,6 +115,19 @@ export class EmailService {
 
   feedbackUrl(token: string) {
     return `${this.frontendUrl}/feedback/${token}`;
+  }
+
+  // Plus-address on the sending mailbox (Gmail/Workspace deliver
+  // name+tag@domain to name@domain), e.g. orders+ck-1a2b3c4d5e6f7a8b@… —
+  // EmailRepliesService reads the tag back off a customer's reply to find the
+  // order. kind 'ck' = approval check-in, 'fb' = feedback request. Only the
+  // first 16 hex chars of the tracking token, to stay well under the 64-char
+  // local-part limit (still unguessable). Undefined when no mailbox is set.
+  replyAddress(kind: 'ck' | 'fb', trackingToken: string): string | undefined {
+    const user = this.config.get<string>('GMAIL_USER');
+    if (!user || !user.includes('@') || !trackingToken) return undefined;
+    const [local, domain] = user.split('@');
+    return `Kira Custom Jewelry <${local.split('+')[0]}+${kind}-${trackingToken.slice(0, 16).toLowerCase()}@${domain}>`;
   }
 
   // A bulk-recipient template with an empty `to` array resolves successfully
@@ -430,6 +453,7 @@ export class EmailService {
       : '';
     return this.send({
       to: opts.to,
+      replyTo: this.replyAddress('ck', opts.trackingToken),
       subject: opts.isReminder
         ? `Following up — ${opts.poNumber} still awaiting your approval`
         : `Quick check-in on your design approval — ${opts.poNumber}`,
@@ -440,6 +464,7 @@ export class EmailService {
         ${imageBlock}
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <a href="${link}" style="${btnStyle('#6366F1')}">Let Us Know →</a>
+        <p style="font-size:12px;color:#6B7280;margin-top:16px">Or simply reply to this email and tell us in your own words.</p>
       `),
     });
   }
@@ -454,6 +479,8 @@ export class EmailService {
     orderType: string;
     orderId: string;
     reasonLabel: string;
+    // Set when the customer answered by replying to the email.
+    emailReply?: string | null;
   }) {
     if (!opts.to.length) { this.warnNoRecipients('sendApprovalStallResponseToAdmins', opts.poNumber); return; }
     return this.send({
@@ -461,9 +488,10 @@ export class EmailService {
       subject: `[Approval Check-In] ${opts.poNumber} — ${opts.reasonLabel}`,
       html: emailLayout(`
         <h2 style="color:#D97706;margin:0 0 16px">Customer Responded to Approval Check-In</h2>
-        <p>${opts.customerName} answered the approval check-in survey for the order below:</p>
+        <p>${opts.customerName} answered the approval check-in ${opts.emailReply ? 'by replying to the email' : 'survey'} for the order below:</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <p style="font-weight:700;color:#1A2740">${opts.reasonLabel}</p>
+        ${opts.emailReply ? quoteBlock(opts.emailReply) : ''}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
       `),
     });
@@ -755,6 +783,7 @@ export class EmailService {
 
     return this.send({
       to: opts.to,
+      replyTo: this.replyAddress('fb', opts.orders[0]?.trackingToken),
       subject: opts.isReminder
         ? `Reminder — we'd still love your feedback${count > 1 ? ` (${count} orders)` : ''}`
         : `How did we do? — your completed order${count === 1 ? '' : 's'} this month`,
@@ -763,6 +792,7 @@ export class EmailService {
         <p>Hi ${opts.customerName},</p>
         <p>${intro}</p>
         ${orderRows}
+        <p style="font-size:12px;color:#6B7280;margin-top:16px">Prefer to just reply? Answer this email with a quick note${count > 1 ? ' (mention the order number if it is about one order)' : ''}, and we'll record it for you.</p>
       `),
     });
   }
@@ -777,6 +807,7 @@ export class EmailService {
     orderId: string;
     ratingsSummary: string;
     comments: string | null;
+    emailReply?: string | null;
   }) {
     if (!opts.to.length) { this.warnNoRecipients('sendFeedbackResponseToAdmins', opts.poNumber); return; }
     return this.send({
@@ -784,11 +815,37 @@ export class EmailService {
       subject: `[Feedback] ${opts.poNumber} — ${opts.ratingsSummary}`,
       html: emailLayout(`
         <h2 style="color:#C09B58;margin:0 0 16px">Customer Feedback Received</h2>
-        <p>${opts.customerName} submitted feedback for the order below:</p>
+        <p>${opts.customerName} ${opts.emailReply ? 'sent feedback by replying to the email' : 'submitted feedback'} for the order below:</p>
         ${orderCard(opts.poNumber, opts.customerName, opts.orderType)}
         <p style="font-weight:700;color:#1A2740">${opts.ratingsSummary}</p>
-        ${opts.comments ? `<p style="color:#4B5563;font-style:italic">"${escapeHtml(opts.comments)}"</p>` : ''}
+        ${opts.emailReply ? quoteBlock(opts.emailReply) : opts.comments ? `<p style="color:#4B5563;font-style:italic">"${escapeHtml(opts.comments)}"</p>` : ''}
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#C09B58')}">Open Order →</a>
+      `),
+    });
+  }
+
+  // A customer replied to a follow-up email, but the reply couldn't be turned
+  // into a form answer safely (unclear, a question/request, or sent from an
+  // unexpected address) — nothing was filled in; a person needs to read it.
+  async sendEmailReplyNeedsReview(opts: {
+    to: string[];
+    kindLabel: string;
+    orders: { poNumber: string; orderId: string; customerName: string; orderType: string }[];
+    fromEmail: string;
+    reason: string;
+    replyText: string;
+  }) {
+    if (!opts.to.length || !opts.orders.length) { this.warnNoRecipients('sendEmailReplyNeedsReview', opts.orders[0]?.poNumber); return; }
+    const first = opts.orders[0];
+    return this.send({
+      to: opts.to,
+      subject: `[Needs a look] ${opts.orders.map(o => o.poNumber).join(', ')} — customer replied to the ${opts.kindLabel} email`,
+      html: emailLayout(`
+        <h2 style="color:#D97706;margin:0 0 16px">Customer Replied by Email — Please Review</h2>
+        <p>${escapeHtml(opts.fromEmail)} replied to the ${opts.kindLabel} email. It wasn't filled in automatically: ${escapeHtml(opts.reason)}</p>
+        ${opts.orders.map(o => orderCard(o.poNumber, o.customerName, o.orderType)).join('')}
+        ${quoteBlock(opts.replyText)}
+        <a href="${this.orderUrl(first.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>
       `),
     });
   }

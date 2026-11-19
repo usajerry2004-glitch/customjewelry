@@ -388,7 +388,9 @@ export class PublicOrdersService {
     };
   }
 
-  async submitApprovalStallSurvey(token: string, reason: string, subReason?: string) {
+  // emailReply: set by EmailRepliesService when the customer answered by
+  // replying to the check-in email instead of using the form.
+  async submitApprovalStallSurvey(token: string, reason: string, subReason?: string, emailReply?: string) {
     const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -405,16 +407,18 @@ export class PublicOrdersService {
       approvalStallReason: reason,
       approvalStallSubReason: reason === 'NOT_INTERESTED' ? (subReason || null) : null,
       approvalStallRespondedAt: new Date(),
+      approvalStallEmailReply: emailReply ? emailReply.slice(0, 4000) : null,
     });
 
     const label = describeStallAnswer(reason, subReason);
+    const via = emailReply ? ' (by email reply)' : '';
     const admins = await this.userRepo.find({ where: { role: UserRole.ADMIN } });
 
     await Promise.all(admins.map(u =>
       this.notifRepo.save(this.notifRepo.create({
         type:         NotificationType.APPROVAL_SURVEY_RESPONSE,
         title:        `Approval Check-In — ${order.poNumber}`,
-        message:      `${order.customerFullName || order.storeName || 'Customer'} responded: ${label}`,
+        message:      `${order.customerFullName || order.storeName || 'Customer'} responded${via}: ${label}`,
         orderId:      order.id,
         targetUserId: u.id,
         isPriority:   order.isPriorityCustomer,
@@ -430,6 +434,7 @@ export class PublicOrdersService {
         orderType:    order.orderType || 'Custom Order',
         orderId:      order.id,
         reasonLabel:  label,
+        emailReply:   emailReply || null,
       }).catch(err => this.logger.warn('Approval stall response admin email failed:', err));
     }
 
@@ -459,12 +464,16 @@ export class PublicOrdersService {
     priceRating: unknown,
     qualityRating: unknown,
     comments?: string,
+    // Set by EmailRepliesService for an emailed reply. A reply rarely covers
+    // all three ratings, so missing ones (null) are allowed in that case only.
+    emailReply?: string,
   ) {
     const order = await this.orderRepo.findOne({ where: { trackingToken: token } });
     if (!order) throw new NotFoundException('Order not found');
     if (!order.feedbackRequestedAt) throw new BadRequestException('No feedback request found for this order');
 
-    if (!isValidRating(experienceRating) || !isValidRating(priceRating) || !isValidRating(qualityRating)) {
+    const ratingOk = (v: unknown) => isValidRating(v) || (!!emailReply && v == null);
+    if (!ratingOk(experienceRating) || !ratingOk(priceRating) || !ratingOk(qualityRating)) {
       throw new BadRequestException('experienceRating, priceRating, and qualityRating are all required — integers from 1 to 5.');
     }
     const trimmedComments = (comments || '').trim().slice(0, 2000) || null;
@@ -473,14 +482,17 @@ export class PublicOrdersService {
     // approval-stall survey — a customer re-opening the link to add a comment
     // they forgot shouldn't hit a wall.
     await this.orderRepo.update(order.id, {
-      feedbackExperienceRating: experienceRating,
-      feedbackPriceRating: priceRating,
-      feedbackQualityRating: qualityRating,
+      feedbackExperienceRating: (experienceRating as number | null) ?? null,
+      feedbackPriceRating: (priceRating as number | null) ?? null,
+      feedbackQualityRating: (qualityRating as number | null) ?? null,
       feedbackComments: trimmedComments,
       feedbackRespondedAt: new Date(),
+      feedbackEmailReply: emailReply ? emailReply.slice(0, 4000) : null,
     });
 
-    const ratingsSummary = `Experience ${experienceRating}/5 · Price ${priceRating}/5 · Quality ${qualityRating}/5`;
+    const r = (v: unknown) => (v == null ? '–' : `${v}/5`);
+    const ratingsSummary = `Experience ${r(experienceRating)} · Price ${r(priceRating)} · Quality ${r(qualityRating)}`
+      + (emailReply ? ' (by email reply)' : '');
     const admins = await this.userRepo.find({ where: { role: UserRole.ADMIN } });
 
     await Promise.all(admins.map(u =>
@@ -504,6 +516,7 @@ export class PublicOrdersService {
         orderId:        order.id,
         ratingsSummary,
         comments:       trimmedComments,
+        emailReply:     emailReply || null,
       }).catch(err => this.logger.warn('Feedback response admin email failed:', err));
     }
 

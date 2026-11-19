@@ -23,6 +23,7 @@ const RESET_STALL_SURVEY_FIELDS = {
   approvalStallReason: null,
   approvalStallSubReason: null,
   approvalStallRespondedAt: null,
+  approvalStallEmailReply: null,
 };
 
 const MAX_REFERENCE_IMAGES = 10;

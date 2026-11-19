@@ -2270,7 +2270,13 @@ export default function OrderDetail() {
                 <div style={{ background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.3)', borderLeft: '3px solid #D97706', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
                   <div style={{ fontSize: '12px', color: '#D97706', fontWeight: 700 }}>
                     Approval check-in ({fmtDate(order.approvalStallRespondedAt)}): {reasonText}
+                    {(order as any).approvalStallEmailReply && <span style={{ fontWeight: 600, opacity: 0.8 }}> · from email reply</span>}
                   </div>
+                  {(order as any).approvalStallEmailReply && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '6px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                      "{(order as any).approvalStallEmailReply}"
+                    </div>
+                  )}
                 </div>
               );
             }
@@ -2463,7 +2469,7 @@ export default function OrderDetail() {
           {order.feedbackRespondedAt && (
             <div style={cardStyle}>
               <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', margin: '0 0 12px' }}>
-                Customer Feedback
+                Customer Feedback{(order as any).feedbackEmailReply ? ' · from email reply' : ''}
               </h3>
               <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: order.feedbackComments ? '12px' : 0 }}>
                 {[
@@ -2481,6 +2487,12 @@ export default function OrderDetail() {
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.5 }}>
                   "{order.feedbackComments}"
                 </div>
+              )}
+              {(order as any).feedbackEmailReply && (order as any).feedbackEmailReply !== order.feedbackComments && (
+                <details style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <summary style={{ cursor: 'pointer' }}>Full email reply</summary>
+                  <div style={{ whiteSpace: 'pre-wrap', marginTop: '6px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{(order as any).feedbackEmailReply}</div>
+                </details>
               )}
             </div>
           )}

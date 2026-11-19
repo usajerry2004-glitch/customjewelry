@@ -26,5 +26,6 @@ import { OrdersModule } from '../orders/orders.module';
   ],
   controllers: [PublicOrdersController, RingBuilderOrdersController],
   providers: [PublicOrdersService, RingBuilderOrdersService],
+  exports: [PublicOrdersService],
 })
 export class PublicModule {}
