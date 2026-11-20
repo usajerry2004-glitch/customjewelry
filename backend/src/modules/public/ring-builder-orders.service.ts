@@ -267,7 +267,8 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
   // file is categorized or displayed.
   private async saveReferenceImage(order: Order, imageUrl: string, uploadedBy: string, label = 1): Promise<void> {
     try {
-      const res = await fetch(imageUrl);
+      // Hard cap so one slow/hung image host can't stall anything else.
+      const res = await fetch(imageUrl, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
       const buffer = Buffer.from(await res.arrayBuffer());
       const contentType = res.headers.get('content-type') || 'image/jpeg';
@@ -381,7 +382,11 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
       // imageUrl (legacy single-image field) plus imageUrls (multi-angle),
       // deduped so a client sending the same URL in both doesn't double it up.
       const imageUrls = Array.from(new Set([item.imageUrl, ...(item.imageUrls || [])].filter((u): u is string => Boolean(u))));
-      await Promise.all(imageUrls.map((url, i) => this.saveReferenceImage(order, url, customer.email, i + 1)));
+      // Not awaited: downloading the website's preview images used to happen
+      // before we replied, so a slow image host pushed the request past the
+      // gateway timeout (HTTP 504) even though the order was already saved.
+      // saveReferenceImage never throws, so a failure here just means no image.
+      void Promise.all(imageUrls.map((url, i) => this.saveReferenceImage(order, url, customer.email, i + 1)));
 
       results.push({
         externalOrderId: item.externalOrderId,
