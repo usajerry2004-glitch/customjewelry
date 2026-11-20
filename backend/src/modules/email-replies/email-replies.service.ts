@@ -178,9 +178,21 @@ export class EmailRepliesService {
       auth: { user, pass: this.config.get<string>('GMAIL_APP_PASSWORD')! },
       logger: false,
     });
-    await imap.connect();
-    // readOnly = EXAMINE: we never change flags, so the team's inbox looks untouched.
-    const lock = await imap.getMailboxLock('INBOX', { readOnly: true });
+    // ImapFlow emits 'error' (e.g. a socket timeout) outside any await. With
+    // no listener, Node treats it as fatal and the whole API restarts — this
+    // was crash-looping production. Log it; the next 5-minute poll retries.
+    imap.on('error', (err: any) => this.logger.warn(`IMAP connection error: ${err?.message || err}`));
+    let lock: Awaited<ReturnType<ImapFlow['getMailboxLock']>>;
+    try {
+      await imap.connect();
+      // readOnly = EXAMINE: we never change flags, so the team's inbox looks untouched.
+      lock = await imap.getMailboxLock('INBOX', { readOnly: true });
+    } catch (err) {
+      // A failed connect/open must not leave a half-open socket behind to
+      // time out later on its own.
+      imap.close();
+      throw err;
+    }
     try {
       const mailbox: any = imap.mailbox;
       const validity = String(mailbox?.uidValidity ?? '');
