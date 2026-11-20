@@ -921,6 +921,20 @@ export default function OrderDetail() {
     setUpdatingStatus(false);
   };
 
+  const undoComplete = async () => {
+    if (!order?.id) return;
+    if (!confirm('Undo Completed? The order goes back to the stage it was in before it was marked Completed. (The customer already received the delivered email; that cannot be recalled.)')) return;
+    setUpdatingStatus(true);
+    const res = await apiFetch(`${API}/orders/${order.id}/undo-complete`, { method: 'PATCH' });
+    if (res.ok) {
+      setOrder(await res.json());
+      toast.success('Completion undone.');
+    } else {
+      toast.error(getErrorMessage(await res.json().catch(() => null), 'Failed to undo completion.'));
+    }
+    setUpdatingStatus(false);
+  };
+
   const reactivateOrder = async () => {
     if (!order?.id) return;
     if (!confirm('Reactivate this order? It will be restored to whatever status it was in before cancellation.')) return;
@@ -2885,6 +2899,17 @@ export default function OrderDetail() {
             </div>
           )}
 
+
+          {/* Undo Completed — Admin only, for an order marked Completed by mistake */}
+          {order.status === OrderStatus.COMPLETED && userRole === UserRole.ADMIN && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>Completed by mistake?</div>
+              <button onClick={undoComplete} disabled={updatingStatus}
+                style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px', padding: '9px 14px', color: 'var(--text-primary)', fontSize: '12px', fontWeight: 600, cursor: updatingStatus ? 'not-allowed' : 'pointer', opacity: updatingStatus ? 0.6 : 1 }}>
+                ↺ Undo Completed
+              </button>
+            </div>
+          )}
 
           {/* Reactivate — Admin only, cancelled orders have no other way back in */}
           {order.status === OrderStatus.CANCELLED && userRole === UserRole.ADMIN && (

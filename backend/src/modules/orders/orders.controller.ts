@@ -406,6 +406,14 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, body.status, req.user, body.quotedCost, body.repairContractor, body.customerCode);
   }
 
+  @Patch(':id/undo-complete')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Admin only — undoes an accidental Completed, restoring whichever status the order was in right before it' })
+  undoComplete(@Param('id') id: string, @Request() req: any) {
+    return this.ordersService.undoCompleteOrder(id, req.user);
+  }
+
   @Patch(':id/reactivate')
   @Roles(UserRole.ADMIN)
   @UseGuards(RolesGuard)

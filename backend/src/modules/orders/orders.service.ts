@@ -2812,6 +2812,30 @@ export class OrdersService implements OnModuleInit {
   // updateStatus() logs when cancelling) rather than asking the caller to
   // pick one — falls back to NEW only for orders cancelled before that
   // event logging existed, which have no such record.
+  // Admin-only undo of an accidental "Completed" — same idea as
+  // reactivateOrder() for cancellations. Completing only sets status and
+  // completedAt, so restoring the previous status brings the order back
+  // exactly as it was (CAD sub-stage, sent-to-customer flag etc. untouched).
+  // The "order delivered" email that completion sent can't be recalled.
+  async undoCompleteOrder(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
+    const order = await this.findOne(id);
+    if (order.status !== OrderStatus.COMPLETED) {
+      throw new BadRequestException(`Order ${order.poNumber} is not completed.`);
+    }
+    const lastCompleteEvent = await this.eventRepo.findOne({
+      where: { orderId: id, action: 'STATUS_CHANGE', toStatus: OrderStatus.COMPLETED, fromStatus: Not(OrderStatus.COMPLETED) },
+      order: { createdAt: 'DESC' },
+    });
+    const restoredStatus = lastCompleteEvent?.fromStatus as OrderStatus | undefined;
+    if (!restoredStatus) {
+      throw new BadRequestException(`Can't tell what status ${order.poNumber} was in before it was completed.`);
+    }
+    const restored = await this.update(id, { status: restoredStatus, completedAt: null as any }, user);
+    this.logEvent(id, 'STATUS_CHANGE', user, OrderStatus.COMPLETED, restoredStatus, 'Completion undone by Admin');
+    this.notifyRingBuilderWebhook(restored).catch(err => this.logger.warn('Ring Builder webhook failed:', err));
+    return restored;
+  }
+
   async reactivateOrder(id: string, user?: { id?: string; email: string; role: string }): Promise<Order> {
     const order = await this.findOne(id);
     if (order.status !== OrderStatus.CANCELLED) {
