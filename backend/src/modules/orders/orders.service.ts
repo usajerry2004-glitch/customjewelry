@@ -2421,8 +2421,29 @@ export class OrdersService implements OnModuleInit {
     const shippingFieldsChanged = dto.status === undefined && RING_BUILDER_WEBHOOK_FIELDS.some(k =>
       dto[k] !== undefined && String(dto[k] ?? '') !== String((order as any)[k] ?? ''));
 
+    // A standalone factory pick from the order page's Factory dropdown (no
+    // status change riding along). Captured before Object.assign overwrites it.
+    const previousFactory = order.assignedFactory;
+    const factoryNewlySet = dto.status === undefined
+      && typeof dto.assignedFactory === 'string' && dto.assignedFactory !== ''
+      && dto.assignedFactory !== previousFactory;
+    if (factoryNewlySet) {
+      const valid = await this.catalogService.isValidKey(CatalogItemKind.FACTORY, dto.assignedFactory as string);
+      if (!valid) throw new BadRequestException(`"${dto.assignedFactory}" is not a known factory.`);
+    }
+
     Object.assign(order, dto);
     const saved = await this.orderRepo.save(order);
+
+    // Treat a dropdown pick exactly like Assign Supplier for the factory side:
+    // record SUPPLIER_ASSIGNED (so it's in tonight's daily factory digest) and
+    // email the factory. Only once the VPO is issued — before that there's
+    // nothing for the factory to make. Re-saving the same factory sends nothing.
+    if (factoryNewlySet && saved.status === OrderStatus.VPO_ISSUED) {
+      this.logEvent(id, 'SUPPLIER_ASSIGNED', user, undefined, undefined,
+        `Factory: ${saved.assignedFactory}${previousFactory ? ` (changed from ${previousFactory})` : ''} — set from order page`);
+      await this.notifyFactoryAssigned(saved, saved.assignedFactory as string);
+    }
 
     if (changes.length) {
       this.logEvent(id, 'ORDER_UPDATED', user, undefined, undefined, changes.join('\n'));
@@ -3050,71 +3071,22 @@ export class OrdersService implements OnModuleInit {
     ]);
   }
 
-  // Admin/Authorizer only — routes an already-approved (VPO_ISSUED) order to a
-  // specific factory and stone supplier. This is the only thing that makes the
-  // order visible to any Factory/Stone Manager: notifications and visibility are
-  // scoped to whichever accounts are tagged with this exact factory/supplySource,
-  // never a blanket "all factory managers" broadcast.
-  async assignSupplier(
-    id: string,
-    factory: string,
-    supplySource: string | undefined,
-    user?: { id?: string; email: string; role: string },
-  ): Promise<Order> {
-    const order = await this.orderRepo.findOne({ where: { id } });
-    if (!order) throw new NotFoundException(`Order ${id} not found`);
-    if (order.status !== OrderStatus.VPO_ISSUED) {
-      throw new BadRequestException('Supplier can only be assigned once the VPO has been issued.');
-    }
-    const requiresStone = needsStoneSupplier(order);
-    if (requiresStone && !supplySource) {
-      throw new BadRequestException('A stone supplier is required for this order.');
-    }
-    const [validFactory, validSupplySource] = await Promise.all([
-      this.catalogService.isValidKey(CatalogItemKind.FACTORY, factory),
-      supplySource ? this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, supplySource) : Promise.resolve(true),
-    ]);
-    if (!validFactory) throw new BadRequestException(`"${factory}" is not a known factory.`);
-    if (!validSupplySource) throw new BadRequestException(`"${supplySource}" is not a known stone supplier.`);
-
-    order.assignedFactory = factory;
-    // Mounting-only orders have no gemstone to source — leave supplySource
-    // null rather than forcing a meaningless pick, so Stone Manager queues
-    // never see them.
-    order.supplySource = requiresStone ? supplySource! : null;
-    const saved = await this.orderRepo.save(order);
-    this.logEvent(id, 'SUPPLIER_ASSIGNED', user, undefined, undefined, `Factory: ${factory}, Supply source: ${supplySource}`);
-
-    // Matched by tag, not role — a Stone Manager account can also be tagged with
-    // a factory (e.g. Archana covers both stones and factory orders for Creations)
-    // and still gets the factory-side notification alongside her Stone Manager one.
-    // TypeORM's .find() silently drops a where-clause property that's
-    // `undefined` instead of matching nothing — querying with the bare
-    // `supplySource` param (undefined for a mounting-only order) would
-    // therefore return EVERY user in the table, not just stone managers.
-    // Guarding on requiresStone keeps this empty instead whenever there's no
-    // real supply source to match.
-    const [factoryUsers, stoneUsers] = await Promise.all([
-      this.userRepo.find({ where: { assignedFactory: factory } }),
-      requiresStone ? this.userRepo.find({ where: { assignedSupplySource: supplySource } }) : Promise.resolve([]),
-    ]);
-
+  // Everything the factory itself gets when an order is routed to it: an
+  // in-app notification for each tagged FACTORY_MANAGER, plus the "[New Order]
+  // issued to your factory" email (with the order PDF) to them and the
+  // factory's standing distribution list. Shared by assignSupplier() and the
+  // order page's Factory dropdown (update()), which used to save the factory
+  // silently — the order showed the factory in JewelFlow while the factory
+  // itself never heard about it. Stone-supplier alerts are not sent here:
+  // only assignSupplier() picks a stone supplier.
+  private async notifyFactoryAssigned(saved: Order, factory: string, factoryUsers?: User[]): Promise<void> {
+    const users = factoryUsers ?? await this.userRepo.find({ where: { assignedFactory: factory } });
     await Promise.all([
-      ...factoryUsers.map(u =>
+      ...users.map(u =>
         this.notifRepo.save(this.notifRepo.create({
           type: NotificationType.STATUS_CHANGED,
           title: `VPO Issued — ${saved.poNumber}`,
           message: `Order ${saved.poNumber} has been issued to your factory for manufacturing.`,
-          orderId: saved.id,
-          targetUserId: u.id,
-          isPriority: saved.isPriorityCustomer,
-        })),
-      ),
-      ...stoneUsers.map(u =>
-        this.notifRepo.save(this.notifRepo.create({
-          type: NotificationType.STATUS_CHANGED,
-          title: `VPO Issued — ${saved.poNumber}`,
-          message: `Order ${saved.poNumber} is ready — please arrange stones.`,
           orderId: saved.id,
           targetUserId: u.id,
           isPriority: saved.isPriorityCustomer,
@@ -3127,7 +3099,7 @@ export class OrdersService implements OnModuleInit {
     // to this factory — they're plain email addresses, not accounts, so no
     // user row is created or required for them.
     const factoryEmails = Array.from(new Set([
-      ...factoryUsers.map(u => u.email).filter(Boolean),
+      ...users.map(u => u.email).filter(Boolean),
       ...(STANDING_FACTORY_RECIPIENTS[factory] || []),
     ]));
     // A factory with no tagged FACTORY_MANAGER and no STANDING_FACTORY_RECIPIENTS
@@ -3190,6 +3162,71 @@ export class OrdersService implements OnModuleInit {
         `Order ${saved.poNumber} (factory "${factory}") — unexpected error: ${(err as Error)?.message ?? err}`,
       );
     });
+  }
+
+  // Admin/Authorizer only — routes an already-approved (VPO_ISSUED) order to a
+  // specific factory and stone supplier. This is the only thing that makes the
+  // order visible to any Factory/Stone Manager: notifications and visibility are
+  // scoped to whichever accounts are tagged with this exact factory/supplySource,
+  // never a blanket "all factory managers" broadcast.
+  async assignSupplier(
+    id: string,
+    factory: string,
+    supplySource: string | undefined,
+    user?: { id?: string; email: string; role: string },
+  ): Promise<Order> {
+    const order = await this.orderRepo.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Order ${id} not found`);
+    if (order.status !== OrderStatus.VPO_ISSUED) {
+      throw new BadRequestException('Supplier can only be assigned once the VPO has been issued.');
+    }
+    const requiresStone = needsStoneSupplier(order);
+    if (requiresStone && !supplySource) {
+      throw new BadRequestException('A stone supplier is required for this order.');
+    }
+    const [validFactory, validSupplySource] = await Promise.all([
+      this.catalogService.isValidKey(CatalogItemKind.FACTORY, factory),
+      supplySource ? this.catalogService.isValidKey(CatalogItemKind.SUPPLY_SOURCE, supplySource) : Promise.resolve(true),
+    ]);
+    if (!validFactory) throw new BadRequestException(`"${factory}" is not a known factory.`);
+    if (!validSupplySource) throw new BadRequestException(`"${supplySource}" is not a known stone supplier.`);
+
+    order.assignedFactory = factory;
+    // Mounting-only orders have no gemstone to source — leave supplySource
+    // null rather than forcing a meaningless pick, so Stone Manager queues
+    // never see them.
+    order.supplySource = requiresStone ? supplySource! : null;
+    const saved = await this.orderRepo.save(order);
+    this.logEvent(id, 'SUPPLIER_ASSIGNED', user, undefined, undefined, `Factory: ${factory}, Supply source: ${supplySource}`);
+
+    // Matched by tag, not role — a Stone Manager account can also be tagged with
+    // a factory (e.g. Archana covers both stones and factory orders for Creations)
+    // and still gets the factory-side notification alongside her Stone Manager one.
+    // TypeORM's .find() silently drops a where-clause property that's
+    // `undefined` instead of matching nothing — querying with the bare
+    // `supplySource` param (undefined for a mounting-only order) would
+    // therefore return EVERY user in the table, not just stone managers.
+    // Guarding on requiresStone keeps this empty instead whenever there's no
+    // real supply source to match.
+    const [factoryUsers, stoneUsers] = await Promise.all([
+      this.userRepo.find({ where: { assignedFactory: factory } }),
+      requiresStone ? this.userRepo.find({ where: { assignedSupplySource: supplySource } }) : Promise.resolve([]),
+    ]);
+
+    await Promise.all([
+      ...stoneUsers.map(u =>
+        this.notifRepo.save(this.notifRepo.create({
+          type: NotificationType.STATUS_CHANGED,
+          title: `VPO Issued — ${saved.poNumber}`,
+          message: `Order ${saved.poNumber} is ready — please arrange stones.`,
+          orderId: saved.id,
+          targetUserId: u.id,
+          isPriority: saved.isPriorityCustomer,
+        })),
+      ),
+    ]);
+
+    await this.notifyFactoryAssigned(saved, factory, factoryUsers);
 
     // No stone to source on a mounting-only order — nothing for a Stone
     // Manager to do, so no alert to send.
