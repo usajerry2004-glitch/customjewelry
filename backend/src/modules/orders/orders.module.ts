@@ -1,3 +1,4 @@
+import { PlatingNoteSubscriber } from './plating-note.subscriber';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../../database/entities/order.entity';
@@ -19,7 +20,7 @@ import { SpacesModule } from '../spaces/spaces.module';
 @Module({
   imports: [TypeOrmModule.forFeature([Order, User, Notification, CadFile, OrderEvent, OrderMessage, Sku, Company, CustomerCode]), SkuModule, CatalogModule, SpacesModule],
   controllers: [OrdersController],
-  providers: [OrdersService, RightClickService],
+  providers: [OrdersService, RightClickService, PlatingNoteSubscriber],
   exports: [OrdersService],
 })
 export class OrdersModule {}

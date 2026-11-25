@@ -20,6 +20,7 @@ import { CustomerCode } from '../../database/entities/customer-code.entity';
 import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
+import { withPlatingNote } from '../../database/entities/plating-note';
 import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
 import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
@@ -681,6 +682,29 @@ export class OrdersService implements OnModuleInit {
       if (rows.length) this.logger.warn(`Startup cleanup: un-archived ${rows.length} wrongly auto-archived order(s): ${rows.map(r => r.poNumber).join(', ')}`);
     } catch (err) {
       this.logger.error('Startup auto-archive cleanup failed:', (err as Error)?.message);
+    }
+
+    // One-time backfill: open orders created before the plating note existed
+    // (61F/62F SKUs = plated silver). Uses update(), not save(), so it doesn't
+    // bump anything else. Idempotent — withPlatingNote() returns null once the
+    // note is there.
+    try {
+      const candidates = await this.orderRepo.createQueryBuilder('o')
+        .select(['o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.customerNotes', 'o.referenceWeblink'])
+        .where('o.status NOT IN (:...closed)', { closed: [OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.SHIPPED] })
+        .andWhere(`(o."kiraSkuNumber" ~* '-6[12]F' OR o."customerNotes" ~* '-6[12]F' OR o."referenceWeblink" ~* '-6[12]F')`)
+        .getMany();
+      const tagged: string[] = [];
+      for (const o of candidates) {
+        const next = withPlatingNote(o);
+        if (next === null) continue;
+        await this.orderRepo.update(o.id, { customerNotes: next });
+        this.logEvent(o.id, 'ORDER_UPDATED', undefined, undefined, undefined, 'Added plating note (61F/62F SKU = plated silver)');
+        tagged.push(o.poNumber);
+      }
+      if (tagged.length) this.logger.log(`Plating note backfill: tagged ${tagged.length} open order(s): ${tagged.join(', ')}`);
+    } catch (err) {
+      this.logger.error('Plating note backfill failed:', (err as Error)?.message);
     }
   }
 
