@@ -144,6 +144,28 @@ Full customer/product/price fields are included on every response now, not just 
 
 The customer also automatically gets an email at every internal status change (order confirmed, in production, shipped, delivered) — that's existing behavior, unrelated to and unchanged by this endpoint.
 
+## 2b. Cancel an order — `POST /public/ring-builder/orders/:externalOrderId/cancel`
+
+Cancels an order you sent us, the same as Kira clicking **Cancelled** on the dashboard: the order shows as Cancelled in JewelFlow straight away, and if it had already gone to a factory or stone supplier they're emailed that it's cancelled.
+
+`:externalOrderId` is the same id you sent as `items[].externalOrderId` when submitting (the JewelFlow `poNumber`, e.g. `C02295`, also works). Only orders that came in through this API can be cancelled here.
+
+**Request body** (optional):
+```json
+{ "reason": "Customer cancelled on Ritani" }
+```
+`reason` is optional, up to 500 characters, and is saved in the order's history.
+
+**Responses**
+- `200` — cancelled:
+  ```json
+  { "success": true, "alreadyCancelled": false, "externalOrderId": "wc_order_10432_item_1", "poNumber": "C02295", "status": "CANCELLED" }
+  ```
+  Calling it again for an order that's already cancelled is safe: same `200` with `"alreadyCancelled": true`, and nothing is sent twice.
+- `404` — no order with that id came in through this API.
+- `409` — the piece is already `MANUFACTURED`, `REPAIR`, `SHIPPED` or `COMPLETED`; it can't be cancelled through the API. Contact Kira instead.
+- `401` — missing or wrong `x-api-key`.
+
 ## 3. Outbound push on every status change (and shipping-field edits) — now every order, not just Ring Builder
 
 We push to your site whenever **any** order's status changes, and whenever its shipping fields (tracking number, courier, ship method, committed/shipped date) get set independent of a status change — not just Ring Builder ones. So you don't strictly need to poll at all if you'd rather just receive this. Built to match kirajewels.one's published receiver spec.

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { parseSpecsFromText, normalizeMetal } from './ring-builder-specs';
@@ -480,6 +480,47 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
       cadFileUrl:  latestDesignFile?.filePath || null,
       cadFileName: latestDesignFile?.originalName || latestDesignFile?.fileName || null,
     };
+  }
+
+  // ── Cancel: lets the website (e.g. the Kira DS dropship tool) cancel an
+  // order it sent, without anyone at Kira clicking "Cancelled" on the
+  // dashboard. Runs the exact same cancellation as the dashboard button
+  // (OrdersService.updateStatus → CANCELLED): order archived, status event
+  // logged, factory/stone supplier emailed if it had already reached them.
+  // Only orders that came in through this integration can be cancelled here,
+  // and not once the piece is already made — those need a person at Kira.
+  private static readonly CANCEL_BLOCKED_STATUSES = new Set<OrderStatus>([
+    OrderStatus.MANUFACTURED, OrderStatus.SHIPPED, OrderStatus.REPAIR, OrderStatus.COMPLETED,
+  ]);
+
+  async cancelByExternalId(externalOrderId: string, reason?: string) {
+    const order = (await this.orderRepo.findOne({ where: { externalOrderId, source: 'RING_BUILDER' } }))
+      || (await this.orderRepo.findOne({ where: { poNumber: externalOrderId, source: 'RING_BUILDER' } }));
+    if (!order) throw new NotFoundException('Order not found');
+
+    const result = (alreadyCancelled: boolean, status: OrderStatus) => ({
+      success: true,
+      alreadyCancelled,
+      externalOrderId: order.externalOrderId || order.poNumber,
+      poNumber: order.poNumber,
+      status,
+    });
+
+    if (order.status === OrderStatus.CANCELLED) return result(true, OrderStatus.CANCELLED);
+    if (RingBuilderOrdersService.CANCEL_BLOCKED_STATUSES.has(order.status)) {
+      throw new ConflictException(
+        `Order ${order.poNumber} is already ${order.status} and can't be cancelled through the API. Please contact Kira to cancel it.`,
+      );
+    }
+
+    const actor = { email: 'Website (cancel API)', role: 'SYSTEM' };
+    const cleanReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
+    const cancelled = await this.ordersService.updateStatus(order.id, OrderStatus.CANCELLED, actor);
+    if (cleanReason) {
+      await this.ordersService.logExternalNote(order.id, actor, `Cancelled by website: ${cleanReason}`);
+    }
+    this.logger.log(`Ring Builder cancel: ${order.poNumber} (${externalOrderId}) cancelled by website${cleanReason ? ` — ${cleanReason}` : ''}`);
+    return result(false, cancelled.status);
   }
 
   async getOrderByExternalId(externalOrderId: string) {

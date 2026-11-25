@@ -708,6 +708,12 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
+  // For integrations outside this service (e.g. the website cancel API) to
+  // leave a note in the order's activity history.
+  async logExternalNote(orderId: string, user: { id?: string; email: string }, note: string): Promise<void> {
+    this.logEvent(orderId, 'ORDER_UPDATED', user, undefined, undefined, note);
+  }
+
   private logEvent(
     orderId: string,
     action: string,

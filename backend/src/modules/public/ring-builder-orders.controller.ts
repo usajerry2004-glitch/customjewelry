@@ -21,6 +21,16 @@ export class RingBuilderOrdersController {
     return this.service.createFromRingBuilder(body);
   }
 
+  @Post('orders/:externalOrderId/cancel')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: "Cancel an order by the website's own order number (no auth — API key required)" })
+  async cancelRingBuilderOrder(
+    @Param('externalOrderId') externalOrderId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.service.cancelByExternalId(externalOrderId, body?.reason);
+  }
+
   @Get('orders/:externalOrderId')
   @Throttle({ default: { ttl: 60000, limit: 60 } })
   @ApiOperation({ summary: "Poll an order's current status by the website's own order number (no auth — API key required)" })
