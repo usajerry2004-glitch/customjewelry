@@ -164,7 +164,7 @@ Cancels an order you sent us, the same as Kira clicking **Cancelled** on the das
   Calling it again for an order that's already cancelled is safe: same `200` with `"alreadyCancelled": true`, and nothing is sent twice.
 - `404` — no order with that id came in through this API.
 - `409` — the piece is already `MANUFACTURED`, `REPAIR`, `SHIPPED` or `COMPLETED`; it can't be cancelled through the API. Contact Kira instead.
-- `401` — missing or wrong `x-api-key`.
+- `403` — missing or wrong `x-api-key`.
 
 ## 3. Outbound push on every status change (and shipping-field edits) — now every order, not just Ring Builder
 
