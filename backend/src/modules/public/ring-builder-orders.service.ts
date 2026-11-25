@@ -72,6 +72,10 @@ export interface RingBuilderItemDto {
   // (deduped against imageUrls, not sent twice).
   imageUrl?: string;
   imageUrls?: string[];
+  // Any other reference files, any type (STL, 3DM, OBJ, PDF, ...). Saved to
+  // the order's Reference Files exactly like imageUrls — imageUrls itself
+  // also accepts non-image files now.
+  fileUrls?: string[];
   referenceWeblink?: string;
 }
 
@@ -105,6 +109,41 @@ export interface RingBuilderOrderResult {
 // Longest/most-specific first so "Elongated Cushion" matches before the
 // plain "Cushion" suffix would.
 const KNOWN_STONE_SHAPES = ['Elongated Cushion', 'Round', 'Oval', 'Emerald', 'Princess', 'Cushion', 'Radiant'];
+
+// Reference files fetched from the website are capped so one huge file can't
+// exhaust the server's memory.
+const MAX_REFERENCE_FILE_BYTES = 100 * 1024 * 1024;
+
+const EXT_BY_CONTENT_TYPE: Record<string, string> = {
+  'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+  'image/gif': '.gif', 'image/heic': '.heic', 'image/svg+xml': '.svg',
+  'application/pdf': '.pdf', 'model/stl': '.stl', 'application/sla': '.stl',
+  'application/vnd.ms-pki.stl': '.stl', 'model/obj': '.obj', 'model/gltf-binary': '.glb',
+  'application/zip': '.zip', 'video/mp4': '.mp4',
+};
+
+// Picks the name a downloaded reference file is saved under: the server's
+// Content-Disposition filename, else the last part of the URL path if it has
+// an extension, else ring-builder-file-N plus an extension guessed from the
+// content type.
+function referenceFileName(url: string, disposition: string | null, contentType: string, label: number): string {
+  const clean = (n: string) => n.replace(/[\/:*?"<>|\x00-\x1f]/g, '_').trim().slice(-150);
+  if (disposition) {
+    const star = /filename\*\s*=\s*[^']*''([^;]+)/i.exec(disposition);
+    const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(disposition);
+    const raw = star ? safeDecode(star[1]) : plain?.[1];
+    if (raw && /\.[a-z0-9]{1,8}$/i.test(raw.trim())) return clean(raw);
+  }
+  try {
+    const last = safeDecode(new URL(url).pathname.split('/').pop() || '');
+    if (/\.[a-z0-9]{1,8}$/i.test(last)) return clean(last);
+  } catch { /* not a parseable URL — fall through */ }
+  return `ring-builder-file-${label}${EXT_BY_CONTENT_TYPE[contentType.toLowerCase()] || ''}`;
+}
+
+function safeDecode(s: string): string {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
 
 @Injectable()
 export class RingBuilderOrdersService implements OnApplicationBootstrap {
@@ -271,9 +310,14 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
       const res = await fetch(imageUrl, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
       const buffer = Buffer.from(await res.arrayBuffer());
-      const contentType = res.headers.get('content-type') || 'image/jpeg';
-      const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg';
-      const originalName = `ring-builder-render-${label}${ext}`;
+      if (buffer.length > MAX_REFERENCE_FILE_BYTES) {
+        throw new Error(`File is ${(buffer.length / 1048576).toFixed(1)} MB, over the ${MAX_REFERENCE_FILE_BYTES / 1048576} MB limit`);
+      }
+      // Any file type is accepted (images, STL, 3DM, OBJ, PDF, ...). Keep the
+      // file's real name and type instead of assuming it's a JPEG — an STL
+      // saved as ".jpg" downloads as a broken image.
+      const contentType = (res.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
+      const originalName = referenceFileName(imageUrl, res.headers.get('content-disposition'), contentType, label);
       const uploaded = await this.spacesService.uploadWithThumbnail(buffer, 'customer-uploads', originalName, contentType);
       await this.cadRepo.save(this.cadRepo.create({
         orderId:       order.id,
@@ -287,7 +331,7 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
         status: CadFileStatus.UPLOADED,
       }));
     } catch (err) {
-      this.logger.warn(`Failed to save Ring Builder reference image ${label} for ${order.poNumber}:`, err);
+      this.logger.warn(`Failed to save Ring Builder reference file ${label} (${imageUrl}) for ${order.poNumber}:`, err);
     }
   }
 
@@ -381,7 +425,10 @@ export class RingBuilderOrdersService implements OnApplicationBootstrap {
 
       // imageUrl (legacy single-image field) plus imageUrls (multi-angle),
       // deduped so a client sending the same URL in both doesn't double it up.
-      const imageUrls = Array.from(new Set([item.imageUrl, ...(item.imageUrls || [])].filter((u): u is string => Boolean(u))));
+      // fileUrls carries any other reference files (STL, 3DM, PDF, ...); all
+      // three lists are saved the same way.
+      const imageUrls = Array.from(new Set([item.imageUrl, ...(item.imageUrls || []), ...(item.fileUrls || [])]
+        .filter((u): u is string => typeof u === 'string' && u.trim() !== '')));
       // Not awaited: downloading the website's preview images used to happen
       // before we replied, so a slow image host pushed the request past the
       // gateway timeout (HTTP 504) even though the order was already saved.

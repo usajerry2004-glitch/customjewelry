@@ -71,6 +71,7 @@ Call this once per completed checkout. A cart with multiple rings creates one Or
 | `caratTotalWeight` | Preferred over the parsed `stones` weight when both are present |
 | `refCustomerPo` | Order's customer PO reference |
 | `imageUrl` | Fetched and saved as a reference image on the order (same as an uploaded reference photo) — best-effort, a failed fetch doesn't block the order |
+| `imageUrls` / `fileUrls` | Lists of more reference files, **any file type** (images, `.stl`, `.3dm`, `.obj`, `.pdf`, ...), each saved to the order's Reference Files like `imageUrl`. Each URL must be directly downloadable without login. The saved name comes from the server's `Content-Disposition` filename, else the URL's filename; send a URL that ends in the real filename (e.g. `.../ring-model.stl`) so it keeps its type. Max 100 MB per file. Best-effort, like `imageUrl`. |
 | `title`, `description`, `designId`, `modelId`, `setting`, `coverage`, `shippingAddress`, `orderDate`, `source`, cart-level `customerNotes` | All folded into the order's notes field, so nothing is lost even though there's no dedicated column for each of these |
 | `currency` | Not used — the portal has no multi-currency support, so this is currently ignored |
 
