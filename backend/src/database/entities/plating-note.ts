@@ -9,8 +9,10 @@ const PLATING_NOTES: Record<string, string> = {
   '62': 'PLATED ORDER (62F): 14K yellow gold plated silver.',
 };
 
-// e.g. KJ01855B.RD-2-61F, KJ04473E.OV-2-62F, KJ01855B.RD-5-61F-S7
-const PLATED_SKU_RE = /\bKJ\d+[A-Z]*\.[A-Z0-9.\-]*?-(6[12])F\b/gi;
+// Any Kira SKU (KJ...) with "61F" or "62F" anywhere in it, e.g.
+// KJ01855B.RD-2-61F, KJ04473E.OV-2-62F, KJ01855B.RD-5-61F-S7.
+const KJ_SKU_RE = /\bKJ[0-9A-Z.\-]+/gi;
+const PLATING_CODE_RE = /(6[12])F/gi;
 
 type NoteFields = { kiraSkuNumber?: string | null; customerNotes?: string | null; referenceWeblink?: string | null };
 
@@ -19,7 +21,9 @@ type NoteFields = { kiraSkuNumber?: string | null; customerNotes?: string | null
 export function withPlatingNote(o: NoteFields): string | null {
   const haystack = [o.kiraSkuNumber, o.customerNotes, o.referenceWeblink].filter(Boolean).join('\n');
   const codes = new Set<string>();
-  for (const m of haystack.matchAll(PLATED_SKU_RE)) codes.add(m[1]);
+  for (const sku of haystack.match(KJ_SKU_RE) || []) {
+    for (const m of sku.matchAll(PLATING_CODE_RE)) codes.add(m[1]);
+  }
   if (!codes.size) return null;
 
   const notes = o.customerNotes || '';

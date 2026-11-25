@@ -692,7 +692,7 @@ export class OrdersService implements OnModuleInit {
       const candidates = await this.orderRepo.createQueryBuilder('o')
         .select(['o.id', 'o.poNumber', 'o.kiraSkuNumber', 'o.customerNotes', 'o.referenceWeblink'])
         .where('o.status NOT IN (:...closed)', { closed: [OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.SHIPPED] })
-        .andWhere(`(o."kiraSkuNumber" ~* '-6[12]F' OR o."customerNotes" ~* '-6[12]F' OR o."referenceWeblink" ~* '-6[12]F')`)
+        .andWhere(`(o."kiraSkuNumber" ~* '6[12]F' OR o."customerNotes" ~* '6[12]F' OR o."referenceWeblink" ~* '6[12]F')`)
         .getMany();
       const tagged: string[] = [];
       for (const o of candidates) {
