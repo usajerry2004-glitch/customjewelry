@@ -708,7 +708,8 @@ export class OrdersService implements OnModuleInit {
       this.logger.error('Plating note backfill failed:', (err as Error)?.message);
     }
 
-    // Same one-time backfill for Kira DS orders ("DS ORDER - IGI NEEDED").
+    // Same one-time backfill for Kira DS orders ("IGI NEEDED"); also swaps
+    // the earlier "DS ORDER - IGI NEEDED" wording on orders already tagged.
     try {
       const candidates = await this.orderRepo.createQueryBuilder('o')
         .select(['o.id', 'o.poNumber', 'o.storeName', 'o.customerEmail', 'o.customerNotes'])
@@ -720,7 +721,7 @@ export class OrdersService implements OnModuleInit {
         const next = withDsNote(o);
         if (next === null) continue;
         await this.orderRepo.update(o.id, { customerNotes: next });
-        this.logEvent(o.id, 'ORDER_UPDATED', undefined, undefined, undefined, 'Added "DS ORDER - IGI NEEDED" note');
+        this.logEvent(o.id, 'ORDER_UPDATED', undefined, undefined, undefined, 'Added "IGI NEEDED" note (DS order)');
         tagged.push(o.poNumber);
       }
       if (tagged.length) this.logger.log(`DS note backfill: tagged ${tagged.length} open order(s): ${tagged.join(', ')}`);

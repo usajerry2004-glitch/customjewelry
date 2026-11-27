@@ -1650,7 +1650,7 @@ export default function OrderDetail() {
         <>
           {isDsOrder(order) && (
             <span title="Kira DS order — an IGI certificate is required" style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(99,102,241,0.12)', color: '#4338CA', border: '1px solid rgba(99,102,241,0.4)', borderRadius: '99px', padding: '3px 12px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', marginRight: '8px' }}>
-              DS order - IGI Needed
+              IGI Needed
             </span>
           )}
           {userRole && userRole !== UserRole.CUSTOMER && <DeadlineChips order={order} cads={cads} events={events} />}
