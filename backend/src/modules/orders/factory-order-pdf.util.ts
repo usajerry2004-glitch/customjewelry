@@ -1,4 +1,5 @@
 import { Order } from '../../database/entities/order.entity';
+import { DS_ORDER_NOTE, isDsOrder } from '../../database/entities/ds-order';
 
 // Plain require, not a typed import: without esModuleInterop, `import
 // PDFDocument from 'pdfkit'` resolves to the module's `.default`, which
@@ -109,6 +110,15 @@ export async function buildFactoryOrderPdf(order: Order): Promise<Buffer> {
     { label: 'Carat Weight', value: order.approximateCaratWeight ? `${order.approximateCaratWeight} ct` : '—' },
     { label: 'Gemstone', value: order.hasGemstone ? 'Yes' : 'No' },
   ], y);
+
+  // ── DS order callout — every Kira DS order needs an IGI certificate ──
+  if (isDsOrder(order)) {
+    y += 8;
+    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 26, 4).fillAndStroke(NOTE_BG, NOTE_BORDER);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NOTE_LABEL)
+      .text(DS_ORDER_NOTE, MARGIN + 12, y + 8, { characterSpacing: 0.4 });
+    y += 34;
+  }
 
   // ── Mounting Only / Semi-Mount callout — flagged so Factory/Stone don't
   // expect a full stone-setting job on this order ──

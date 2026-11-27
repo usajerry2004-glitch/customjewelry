@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTIONS, UserRole, getCadSubLabel } from '../../utils/types';
+import { Order, OrderStatus, StoneStatus, STATUS_CONFIG, getFactoryDisplay, getSupplySourceDisplay, MOUNTING_OPTIONS, UserRole, getCadSubLabel, isDsOrder } from '../../utils/types';
 import { formatCurrency } from '../../utils/format';
 import { apiFetch, API, getErrorMessage } from '../../utils/apiFetch';
 import { CatalogOption, fetchFactoryOptions, fetchSupplySourceOptions, fetchCadPersonOptions, addCadPersonOption } from '../../utils/catalog';
@@ -1646,9 +1646,16 @@ export default function OrderDetail() {
     <AppLayout
       title={order.poNumber || 'Order Detail'}
       subtitle={order.storeName || order.customerFullName || ''}
-      titleExtra={userRole && userRole !== UserRole.CUSTOMER
-        ? <DeadlineChips order={order} cads={cads} events={events} />
-        : undefined}
+      titleExtra={(isDsOrder(order) || (userRole && userRole !== UserRole.CUSTOMER)) ? (
+        <>
+          {isDsOrder(order) && (
+            <span title="Kira DS order — an IGI certificate is required" style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(99,102,241,0.12)', color: '#4338CA', border: '1px solid rgba(99,102,241,0.4)', borderRadius: '99px', padding: '3px 12px', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', marginRight: '8px' }}>
+              DS order - IGI Needed
+            </span>
+          )}
+          {userRole && userRole !== UserRole.CUSTOMER && <DeadlineChips order={order} cads={cads} events={events} />}
+        </>
+      ) : undefined}
       onBack={goBackToOrders}
       backLabel="Back to Orders"
       actions={

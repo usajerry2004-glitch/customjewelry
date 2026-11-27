@@ -21,6 +21,7 @@ import { EmailService } from '../email/email.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { SkuService } from '../sku/sku.service';
 import { withPlatingNote } from '../../database/entities/plating-note';
+import { DS_ORDER_EMAIL, isDsOrder, withDsNote } from '../../database/entities/ds-order';
 import { STANDING_FACTORY_RECIPIENTS } from './factory-notification-recipients';
 import { formatMoney } from '../../common/format-money.util';
 import { buildFactoryOrderPdf } from './factory-order-pdf.util';
@@ -705,6 +706,26 @@ export class OrdersService implements OnModuleInit {
       if (tagged.length) this.logger.log(`Plating note backfill: tagged ${tagged.length} open order(s): ${tagged.join(', ')}`);
     } catch (err) {
       this.logger.error('Plating note backfill failed:', (err as Error)?.message);
+    }
+
+    // Same one-time backfill for Kira DS orders ("DS ORDER - IGI NEEDED").
+    try {
+      const candidates = await this.orderRepo.createQueryBuilder('o')
+        .select(['o.id', 'o.poNumber', 'o.storeName', 'o.customerEmail', 'o.customerNotes'])
+        .where('o.status NOT IN (:...closed)', { closed: [OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.SHIPPED] })
+        .andWhere(`(LOWER(TRIM(o."customerEmail")) = :dsEmail OR o."storeName" ~* '\\mkira\\s*ds\\M')`, { dsEmail: DS_ORDER_EMAIL })
+        .getMany();
+      const tagged: string[] = [];
+      for (const o of candidates) {
+        const next = withDsNote(o);
+        if (next === null) continue;
+        await this.orderRepo.update(o.id, { customerNotes: next });
+        this.logEvent(o.id, 'ORDER_UPDATED', undefined, undefined, undefined, 'Added "DS ORDER - IGI NEEDED" note');
+        tagged.push(o.poNumber);
+      }
+      if (tagged.length) this.logger.log(`DS note backfill: tagged ${tagged.length} open order(s): ${tagged.join(', ')}`);
+    } catch (err) {
+      this.logger.error('DS note backfill failed:', (err as Error)?.message);
     }
   }
 
@@ -3172,6 +3193,7 @@ export class OrdersService implements OnModuleInit {
         orderType: saved.orderType || '—',
         orderId: saved.id,
         isPriorityCustomer: saved.isPriorityCustomer,
+        isDsOrder: isDsOrder(saved),
         attachments,
       });
       // sendFactoryAssignedAlert already alerts ops when `to` is empty
@@ -3333,6 +3355,7 @@ export class OrdersService implements OnModuleInit {
       orderType: order.orderType || '—',
       orderId: order.id,
       isPriorityCustomer: order.isPriorityCustomer,
+      isDsOrder: isDsOrder(order),
       attachments,
     });
 

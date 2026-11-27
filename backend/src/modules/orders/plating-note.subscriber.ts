@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntitySubscriberInterface, InsertEvent, UpdateEvent } from 'typeorm';
 import { Order } from '../../database/entities/order.entity';
 import { withPlatingNote } from '../../database/entities/plating-note';
+import { withDsNote } from '../../database/entities/ds-order';
 
 // 61F/62F SKUs are plated silver — make sure the order note says so,
 // whichever path created or edited the order (website, dropship, web form,
@@ -27,5 +28,8 @@ export class PlatingNoteSubscriber implements EntitySubscriberInterface<Order> {
   private apply(order: Partial<Order>) {
     const next = withPlatingNote(order);
     if (next !== null) order.customerNotes = next;
+    // DS line goes on top of everything, plating line included.
+    const ds = withDsNote(order);
+    if (ds !== null) order.customerNotes = ds;
   }
 }

@@ -528,13 +528,14 @@ export class EmailService {
 
   // Sent only to the Factory Manager(s) tagged to the factory this order was just
   // routed to — not a blanket "all factory managers" notice.
-  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean; attachments?: { filename: string; content: Buffer }[] }) {
+  async sendFactoryAssignedAlert(opts: { to: string[]; poNumber: string; orderType: string; orderId: string; isPriorityCustomer?: boolean; isDsOrder?: boolean; attachments?: { filename: string; content: Buffer }[] }) {
     if (!opts.to.length) { this.warnNoRecipients('sendFactoryAssignedAlert', opts.poNumber); return; }
     return this.send({
       to: opts.to,
-      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}[New Order] ${opts.poNumber} issued to your factory`,
+      subject: `${prioritySubjectPrefix(opts.isPriorityCustomer)}${opts.isDsOrder ? '[DS - IGI Needed] ' : ''}[New Order] ${opts.poNumber} issued to your factory`,
       html: emailLayout(`
         ${priorityBanner(opts.isPriorityCustomer)}
+        ${opts.isDsOrder ? '<div style="background:#EEF2FF;border:1px solid #6366F1;color:#3730A3;border-radius:6px;padding:10px 14px;margin:0 0 16px;font-weight:700">DS order - IGI Needed</div>' : ''}
         <h2 style="color:#D97706;margin:0 0 16px">Order Issued to Your Factory</h2>
         <p>Order <strong>${opts.poNumber}</strong> (${opts.orderType || '—'}) has been issued for manufacturing.</p>
         <a href="${this.orderUrl(opts.orderId)}" style="${btnStyle('#D97706')}">Open Order →</a>

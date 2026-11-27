@@ -146,6 +146,14 @@ export interface Order {
   updatedAt: string;
 }
 
+// Kira DS (dropship) orders — "Kira DS Orders" store / ds.orders@kirajewels.one.
+// They all need an IGI certificate. Keep in sync with backend ds-order.ts.
+export function isDsOrder(o: Partial<Pick<Order, 'storeName' | 'customerEmail'>> | null | undefined): boolean {
+  if (!o) return false;
+  return (o.customerEmail || '').trim().toLowerCase() === 'ds.orders@kirajewels.one'
+    || /\bkira\s*ds\b/i.test(o.storeName || '');
+}
+
 export interface OrderMessage {
   id: string;
   orderId: string;
