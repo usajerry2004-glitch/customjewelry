@@ -2,6 +2,7 @@ import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nes
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { UserRole } from '../../database/entities/user.entity';
+import { isDsOrder } from '../../database/entities/ds-order';
 
 const REDACTED_FIELDS = ['quotedCost', 'quoteOptions', 'customerFullName', 'storeName', 'customerEmail', 'phoneNumber'];
 const REDACTED_ROLES: string[] = [UserRole.FACTORY_MANAGER, UserRole.FACTORY_VIEWER, UserRole.STONE_MANAGER];
@@ -15,6 +16,9 @@ function redact(value: any): any {
   if (value && typeof value === 'object') {
     const clone: any = { ...value };
     if ('poNumber' in clone) {
+      // Factory/Stone still need to know it's a DS order (IGI needed) even
+      // though the store name/email that identify it are hidden from them.
+      if ('storeName' in clone || 'customerEmail' in clone) clone.isDsOrder = isDsOrder(clone);
       for (const field of REDACTED_FIELDS) delete clone[field];
     }
     for (const key of Object.keys(clone)) {
